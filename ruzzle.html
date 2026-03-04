@@ -1562,9 +1562,9 @@
 			let unsubscribePartita = null;
 			let unsubscribeProposte = null;
 			let wordDisplayLocked = false;
-			let dictionaryReady = false;
 			let proposteInCoda = [];
-			// --- TRIE ---
+			let proposteGiaApplicate = new Set();
+// --- TRIE ---
 			class TrieNode {
 			  constructor() {
 			    this.children = {};
@@ -1676,6 +1676,7 @@
 			    banner.style.background = `linear-gradient(135deg, ${options.color} 0%, ${adjustColor(options.color, -20)} 100%)`;
 			    banner.style.animation = '';
     			banner.style.boxShadow = '0 4px 15px rgba(0, 0, 0, 0.3)';
+				delete banner.dataset.winner;
 			    // Genera HTML bottoni
 			    let buttonsHtml = '';
 			    if (options.buttons && options.buttons.length > 0) {
@@ -1804,7 +1805,6 @@
 			    }
 			    console.log("🌳 Costruzione Trie...");
 			    buildTrie();
-			    dictionaryReady = true;
 			    loadingMsg.style.display = 'none';
 			    console.log(`✅ DIZIONARIO PRONTO: ${dictionary.size} parole`);
 			const codeParam = urlParams.get('code');
@@ -1937,9 +1937,7 @@
 			  btnSandbox.style.display = 'none';
 			  setSortMode('chrono');
 			  const btnNewEl = document.querySelector('.btn-new');
-			  if (btnNewEl) {
-			    btnNewEl.style.display = matchId ? 'none' : 'block';
-			  }
+			if (btnNewEl) btnNewEl.style.display = 'none';
 			  wordDisplay.textContent = "";
 			  lineLayer.innerHTML = '';
 			  document.getElementById('possible-count').textContent = '...';
@@ -3712,7 +3710,7 @@ if (data.stato === "in_corso") {
 				        score = punteggioFinale;
 				    }
 					const btnNewEl = document.querySelector('.btn-new');
-			      if (btnNewEl) btnNewEl.style.display = 'block';
+			      if (btnNewEl) btnNewEl.style.display = 'none';
 			// Rivincita proposta?
 			if (data.prossimaPartita) {
 			const rifiutanti = data.rivincitaRifiutataDa || [];
@@ -3867,10 +3865,13 @@ if (isPareggio) {
 
     const banner = document.getElementById('game-banner');
     if (banner) {
-        banner.style.animation = 'disco-flash 0.8s 5, earthquake 0.3s 5';
+        banner.dataset.winner = mioNome;
+		banner.style.animation = 'disco-flash 0.8s 5, earthquake 0.3s 5';
         banner.style.boxShadow = '0 0 30px rgba(241, 196, 15, 0.8), 0 0 60px rgba(241, 196, 15, 0.4)';
         setTimeout(() => {
-            if (banner) {
+            const b = document.getElementById('game-banner');
+            // ✅ Applica glow SOLO se sono ancora il vincitore
+            if (b && b.dataset.winner === mioNome) {
                 banner.style.animation = 'banner-glow 2s infinite';
                 banner.style.boxShadow = '';
             }
@@ -4034,7 +4035,7 @@ if (!window.analisiGiaAttivata) {
 			  inviaPropostaFirebase(parola, 'extra');
 			}
 			async function inviaPropostaFirebase(parola, tipo) {
-			  const azione = (tipo === 'extra') ? "AGGIUNGERE alle EXTRA" : "ELIMINARE (EXCLUDED)";
+			  const azione = (tipo === 'extra') ? "AGGIUNGERE alle EXTRA" : "ELIMINARE ";
 			  if (!confirm(`Vuoi proporre al gruppo di ${azione} la parola: ${parola}?`)) return;
 			  await db.collection("partite").doc(matchId).collection("proposte").doc(parola).set({
 			    parola: parola,
@@ -4087,19 +4088,25 @@ async function processaProposta(docId, prop) {
 }
 
 async function verificaApplicazioneProposta(docId) {
+    // ✅ Evita doppia esecuzione
+    if (proposteGiaApplicate.has(docId)) return;
+    
     const freshDoc = await db.collection("partite").doc(matchId)
         .collection("proposte").doc(docId).get();
 
     if (freshDoc.exists && currentGameData && currentGameData.partecipanti) {
         const freshProp = freshDoc.data();
         if (freshProp.voti.length >= currentGameData.partecipanti.length) {
+            // ✅ Segna come applicata PRIMA di eseguire
+            proposteGiaApplicate.add(docId);
+            
             await applicaModificaDizionario(freshProp.parola, freshProp.tipo);
             await db.collection("partite").doc(matchId)
                 .collection("proposte").doc(docId)
                 .delete().catch(e => {});
         }
     }
-}			
+}		
 async function applicaModificaDizionario(parola, tipo) {
     // === AGGIORNA DIZIONARIO LOCALE ===
     if (tipo === 'extra') {
@@ -4636,6 +4643,7 @@ async function toggleWordMultiplayer(word, li, data, conteggioParoleGlobali) {
 		</div>
 	</body>
 </html>
+
 
 
 
