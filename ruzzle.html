@@ -3739,51 +3739,81 @@ if (data.stato === "in_corso") {
 			});
 			return;
 			}
-			      // Nessuna rivincita - mostra classifica
-			      let classifica = Object.entries(data.punteggi).sort((a, b) => b[1] - a[1]);
-			      const haVinto = classifica[0][0] === mioNome;
-			      let risultatiStr = classifica.map(([p, s]) => `${p}: ${s}`).join(' | ');
-			      showGameBanner({
-			        icon: haVinto ? '👑' : '🐷',
-			        title: haVinto ? 'VITTORIA!' : 'SCONFITTA!',
-			        subtitle: risultatiStr,
-			        color: haVinto ? '#f1c40f' : '#7f8c8d',
-			        buttons: [{
-			          text: '🔄 RIVINCITA',
-			          onclick: 'apriRivincitaBanner()',
-			          special: true
-			        }]
-			      });
-			      	if (haVinto) fireConfettiLight();
-					// ✅ Attiva/Aggiorna analisi
-					if (!window.analisiGiaAttivata) {
-					    window.analisiGiaAttivata = true;
-					    setTimeout(() => attivaAnalisiMultiplayerSilent(), 500);
-					} else {
-					    // ✅ Aggiorna i dati se l'analisi è già attiva (cambio parole di altri)
-					    const selAnalisi = document.getElementById('sel-analisi');
-					    if (selAnalisi) {
-					        // Ricalcola conteggio globale
-					        let conteggioParoleGlobali = {};
-					        data.partecipanti.forEach(p => {
-					            (data.parole[p] || []).forEach(par => {
-					                conteggioParoleGlobali[par.w] = (conteggioParoleGlobali[par.w] || 0) + 1;
-					            });
-					        });
-					        
-					        // Aggiorna vista corrente
-					        renderizzaAnalisiPlayerSilent(selAnalisi.value, data, conteggioParoleGlobali);
-					        
-					        // ✅ Aggiorna anche punteggio finale mostrato nel banner se presente
-					        let classifica = Object.entries(data.punteggi).sort((a, b) => b[1] - a[1]);
-					        let risultatiStr = classifica.map(([p, s]) => `${p}: ${s}`).join(' | ');
-					        
-					        const bannerSubtitle = document.querySelector('#game-banner .banner-left div:last-child');
-					        if (bannerSubtitle && !data.prossimaPartita) {
-					            bannerSubtitle.textContent = risultatiStr;
-					        }
-					    }
-					}
+// Nessuna rivincita - mostra classifica con CELEBRAZIONE
+let classifica = Object.entries(data.punteggi).sort((a, b) => b[1] - a[1]);
+const haVinto = classifica[0][0] === mioNome;
+let risultatiStr = classifica.map(([p, s]) => `${p}: ${s}`).join(' | ');
+
+if (haVinto) {
+    // ✅ BANNER VITTORIA EPICO
+    showGameBanner({
+        icon: '👑',
+        title: '🎉🏆 VITTORIA! 🏆🎉',
+        subtitle: risultatiStr,
+        color: '#f1c40f',
+        buttons: [{
+            text: '🔄 RIVINCITA',
+            onclick: 'apriRivincitaBanner()',
+            special: true
+        }]
+    });
+
+    // ✅ Animazione pulsante sul banner
+    const banner = document.getElementById('game-banner');
+    if (banner) {
+        banner.style.animation = 'disco-flash 0.8s 5, earthquake 0.3s 5';
+        banner.style.boxShadow = '0 0 30px rgba(241, 196, 15, 0.8), 0 0 60px rgba(241, 196, 15, 0.4)';
+        // Rimuovi animazione dopo che finisce
+        setTimeout(() => {
+            if (banner) {
+                banner.style.animation = 'pulse-ready 2s infinite';
+                banner.style.boxShadow = '0 4px 15px rgba(0, 0, 0, 0.3)';
+            }
+        }, 4000);
+    }
+
+    // ✅ Confetti + Fuochi d'artificio
+    fireConfetti();
+    startEndGameCelebration();
+    setTimeout(() => stopFireworks(), 6000);
+
+} else {
+    // Banner sconfitta (sobrio)
+    showGameBanner({
+        icon: '🐷',
+        title: 'SCONFITTA!',
+        subtitle: risultatiStr,
+        color: '#7f8c8d',
+        buttons: [{
+            text: '🔄 RIVINCITA',
+            onclick: 'apriRivincitaBanner()',
+            special: true
+        }]
+    });
+}
+
+// ✅ Attiva analisi (senza sovrascrivere il banner)
+if (!window.analisiGiaAttivata) {
+    window.analisiGiaAttivata = true;
+    setTimeout(() => attivaAnalisiMultiplayerSilent(), 500);
+} else {
+    const selAnalisi = document.getElementById('sel-analisi');
+    if (selAnalisi) {
+        let conteggioParoleGlobali = {};
+        data.partecipanti.forEach(p => {
+            (data.parole[p] || []).forEach(par => {
+                conteggioParoleGlobali[par.w] = (conteggioParoleGlobali[par.w] || 0) + 1;
+            });
+        });
+        renderizzaAnalisiPlayerSilent(selAnalisi.value, data, conteggioParoleGlobali);
+        
+        // ✅ Aggiorna sottotitolo banner con classifica aggiornata
+        const bannerSubtitle = document.querySelector('#game-banner .banner-left div:last-child');
+        if (bannerSubtitle && !data.prossimaPartita) {
+            bannerSubtitle.textContent = risultatiStr;
+        }
+    }
+}
 			    }
 			  });
 			  // ✅ LISTENER PROPOSTE
@@ -3937,6 +3967,7 @@ if (data.stato === "in_corso") {
 			  alert("Proposta inviata! Gli altri devono approvare.");
 			}
 async function applicaModificaDizionario(parola, tipo) {
+    // === AGGIORNA DIZIONARIO LOCALE ===
     if (tipo === 'extra') {
         if (!EXTRA_WORDS.includes(parola)) EXTRA_WORDS.push(parola);
         dictionary.add(parola);
@@ -3946,48 +3977,50 @@ async function applicaModificaDizionario(parola, tipo) {
     }
     buildTrie();
     
-    // ✅ Aggiorna dizionario custom nella partita
     if (matchId) {
+        // === SALVA NEL DIZIONARIO CUSTOM DELLA PARTITA ===
+        // (serve per sincronizzare tutti i client in tempo reale)
         const updateData = {};
         if (tipo === 'extra') {
             updateData['dizionarioCustom.extra'] = firebase.firestore.FieldValue.arrayUnion(parola);
         } else {
             updateData['dizionarioCustom.excluded'] = firebase.firestore.FieldValue.arrayUnion(parola);
         }
-        
         await db.collection("partite").doc(matchId).update(updateData);
         
-        // ✅ RICALCOLA PUNTEGGI PER TUTTI I GIOCATORI
+        // === RICALCOLA PUNTEGGI PER TUTTI I GIOCATORI ===
         if (tipo === 'exclude' && currentGameData) {
+            // Lista completa parole escluse (inclusa quella appena aggiunta)
+            const excludedWords = [
+                ...(currentGameData.dizionarioCustom?.excluded || []),
+                parola
+            ];
+            
             const nuoviPunteggi = {};
-            const nuoveParole = {};
             
             currentGameData.partecipanti.forEach(player => {
-                let parolePlayer = currentGameData.parole[player] || [];
-                
-                // Rimuovi la parola esclusa
-                parolePlayer = parolePlayer.filter(p => p.w !== parola);
-                nuoveParole[player] = parolePlayer;
-                
-                // Ricalcola punteggio (considerando duplicati)
+                // Le parole restano nell'array! Non le tocchiamo
+                const parolePlayer = currentGameData.parole[player] || [];
                 let punteggio = 0;
+                
                 parolePlayer.forEach(p => {
-                    // Conta quanti giocatori hanno questa parola
+                    // Parola esclusa → 0 punti
+                    if (excludedWords.includes(p.w)) return;
+                    
+                    // Parola duplicata (trovata da più giocatori) → 0 punti
                     let count = 0;
                     currentGameData.partecipanti.forEach(altro => {
-                        const paroleAltro = altro === player ? parolePlayer : (nuoveParole[altro] || currentGameData.parole[altro] || []);
+                        const paroleAltro = currentGameData.parole[altro] || [];
                         if (paroleAltro.some(x => x.w === p.w)) count++;
                     });
-                    // Se solo uno ha la parola, conta
                     if (count <= 1) punteggio += p.p;
                 });
                 
                 nuoviPunteggi[player] = punteggio;
             });
             
-            // Aggiorna Firebase con nuovi punteggi
+            // Aggiorna SOLO i punteggi (le parole restano intatte)
             await db.collection("partite").doc(matchId).update({
-                parole: nuoveParole,
                 punteggi: nuoviPunteggi
             });
             
@@ -3997,7 +4030,7 @@ async function applicaModificaDizionario(parola, tipo) {
         }
     }
     
-    // Aggiorna dizionario globale
+    // === SALVA NEL DIZIONARIO GLOBALE (per le prossime partite) ===
     const globalRef = db.collection("config").doc("dizionario");
     if (tipo === 'extra') {
         await globalRef.set({
@@ -4011,7 +4044,8 @@ async function applicaModificaDizionario(parola, tipo) {
     
     alert(`${tipo === 'extra' ? '✅ Aggiunta' : '🚫 Rimossa'} PERMANENTEMENTE: "${parola}"`);
     
-    // ✅ Forza refresh dell'analisi
+    // === FORZA REFRESH ANALISI PER ME ===
+    // (gli altri ricevono l'aggiornamento tramite onSnapshot)
     if (currentGameData) {
         let conteggioParoleGlobali = {};
         currentGameData.partecipanti.forEach(p => {
@@ -4268,15 +4302,6 @@ async function attivaAnalisiMultiplayerSilent() {
     }
 
     renderizzaAnalisiPlayerSilent(mioNome, data, conteggioParoleGlobali);
-
-    // Banner chiaro per la verifica
-    showGameBanner({
-        icon: '🔍',
-        title: 'VERIFICA PAROLE',
-        subtitle: 'Clicca sulle parole per proporre rimozione',
-        color: '#27ae60',
-        buttons: []
-    });
 }
 			
 function renderizzaAnalisiPlayerSilent(nomePlayer, data, conteggioParoleGlobali) {
@@ -4284,35 +4309,54 @@ function renderizzaAnalisiPlayerSilent(nomePlayer, data, conteggioParoleGlobali)
     wordsListEl.innerHTML = "";
     foundWords.clear();
 
+    // ✅ Legge le parole escluse dalla partita (sincronizzato via onSnapshot)
+    const excludedWords = data.dizionarioCustom?.excluded || [];
+
     const parole = (data.parole[nomePlayer] || []).sort((a, b) => a.w.localeCompare(b.w));
     let playerScore = 0;
 
     parole.forEach(item => {
         const isDuplicata = conteggioParoleGlobali[item.w] > 1;
-        const puntiEffettivi = isDuplicata ? 0 : item.p;
+        const isExcluded = excludedWords.includes(item.w);
+        const daPunti = !isDuplicata && !isExcluded;
+        const puntiEffettivi = daPunti ? item.p : 0;
         playerScore += puntiEffettivi;
 
-        foundWords.set(item.w, { points: item.p, path: item.path, active: true });
+        foundWords.set(item.w, { points: item.p, path: item.path, active: daPunti });
 
         const li = document.createElement('li');
         li.dataset.word = item.w;
-        if (isDuplicata) li.classList.add('deleted');
+
+        // ✅ Sbarrata se esclusa O duplicata
+        if (!daPunti) li.classList.add('deleted');
+
+        // ✅ Etichetta punti con motivo
+        let ptsLabel;
+        if (isExcluded) ptsLabel = '0 (🚫)';
+        else if (isDuplicata) ptsLabel = '0 (dup)';
+        else ptsLabel = puntiEffettivi;
+
+        // ✅ Bottone 🗑️ su TUTTE le parole tranne quelle GIÀ escluse
+        //    (anche le duplicate possono essere proposte per eliminazione futura)
+        const removeBtn = isExcluded 
+            ? '' 
+            : `<button onclick="event.stopPropagation(); inviaPropostaFirebase('${item.w}', 'exclude')" 
+                      style="background:none; border:none; cursor:pointer; color:#e74c3c;" 
+                      title="Proponi rimozione dal dizionario">🗑️</button>`;
 
         li.innerHTML = `
             <div class="word-item-left">
                 <button class="btn-eye" onclick="event.stopPropagation(); showWordOnGrid('${item.w}')">👁️</button>
                 <span>${item.w}</span>
-                <button onclick="event.stopPropagation(); inviaPropostaFirebase('${item.w}', 'exclude')" 
-        style="background:none; border:none; cursor:pointer; color:#e74c3c;" 
-        title="Proponi rimozione">🗑️</button>
+                ${removeBtn}
             </div>
-            <span class="pts">${isDuplicata ? '0 (dup)' : puntiEffettivi}</span>
+            <span class="pts">${ptsLabel}</span>
         `;
 
         wordsListEl.appendChild(li);
     });
 
-    // Aggiorna punteggio sidebar
+    // ✅ Aggiorna punteggio nella sidebar
     if (nomePlayer === mioNome) {
         score = playerScore;
         scoreDisplay.textContent = score;
@@ -4459,3 +4503,4 @@ async function toggleWordMultiplayer(word, li, data, conteggioParoleGlobali) {
 		</div>
 	</body>
 </html>
+
