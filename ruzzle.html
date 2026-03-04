@@ -1528,6 +1528,7 @@
 			let unsubscribeProposte = null;
 			let wordDisplayLocked = false;
 			let dictionaryReady = false;
+			let verificaInCorsoDa = null;   // Chi sta attualmente modificando le parole
 			// --- TRIE ---
 			class TrieNode {
 			  constructor() {
@@ -3360,7 +3361,16 @@
 			      return;
 			    }
 			    currentGameData = data;
-			    // Nascondi SEMPRE la lobby (usiamo solo banner)
+				// Gestione lock eliminazione
+				if (data.verificaInCorsoDa !== verificaInCorsoDa) {
+				    verificaInCorsoDa = data.verificaInCorsoDa;
+				    
+				    const sel = document.getElementById('sel-analisi');
+				    if (sel && isAnalysisPhase) {
+				        renderizzaAnalisiPlayerSilent(sel.value, data, getConteggioGlobale());
+				    }
+				}
+				  // Nascondi SEMPRE la lobby (usiamo solo banner)
 			    document.getElementById('multiplayer-lobby').style.display = 'none';
 			    const btnNewEl = document.querySelector('.btn-new');
 			    if (btnNewEl) {
@@ -3817,6 +3827,61 @@ if (data.stato === "in_corso") {
 			  }
 			  // Il calcolo finale avviene automaticamente nel listener quando tutti hanno confermato
 			}
+			async function iniziaEliminazioneParole() {
+			    if (verificaInCorsoDa && verificaInCorsoDa !== mioNome) {
+			        alert(`Eliminazione già in corso da ${verificaInCorsoDa}`);
+			        return;
+			    }
+			
+			    if (!confirm("Inizierai l'eliminazione delle parole.\nSolo tu potrai modificare finché non terminerai.")) return;
+			
+			    await db.collection("partite").doc(matchId).update({
+			        verificaInCorsoDa: mioNome
+			    });
+			
+			    verificaInCorsoDa = mioNome;
+			
+			    // Ricarica vista corrente
+			    const sel = document.getElementById('sel-analisi');
+			    if (sel && currentGameData) {
+			        renderizzaAnalisiPlayerSilent(sel.value, currentGameData, getConteggioGlobale());
+			    }
+			
+			    showGameBanner({
+			        icon: '✂️',
+			        title: 'ELIMINAZIONE IN CORSO',
+			        subtitle: 'Puoi modificare parole di tutti i giocatori',
+			        color: '#e74c3c',
+			        buttons: [{ text: '✅ TERMINA ELIMINAZIONE', onclick: 'terminaEliminazioneParole()' }]
+			    });
+			}
+			
+			async function terminaEliminazioneParole() {
+			    if (verificaInCorsoDa !== mioNome) return;
+			
+			    await db.collection("partite").doc(matchId).update({
+			        verificaInCorsoDa: firebase.firestore.FieldValue.delete()
+			    });
+			
+			    verificaInCorsoDa = null;
+			    removeGameBanner();
+			
+			    const sel = document.getElementById('sel-analisi');
+			    if (sel && currentGameData) {
+			        renderizzaAnalisiPlayerSilent(sel.value, currentGameData, getConteggioGlobale());
+			    }
+			}
+			
+			function getConteggioGlobale() {
+			    let conteggio = {};
+			    if (!currentGameData) return conteggio;
+			    currentGameData.partecipanti.forEach(p => {
+			        (currentGameData.parole[p] || []).forEach(par => {
+			            conteggio[par.w] = (conteggio[par.w] || 0) + 1;
+			        });
+			    });
+			    return conteggio;
+			}
 			async function attivaAnalisiMultiplayer() {
 			  const loadingDiv = document.createElement('div');
 			  loadingDiv.innerHTML = ' < div style = "text-align:center; padding:20px;" > ⏳Caricamento analisi... < /div>';
@@ -4193,81 +4258,98 @@ async function applicaModificaDizionario(parola, tipo) {
 			}
 			}
 			async function attivaAnalisiMultiplayerSilent() {
-			  const snap = await db.collection("partite").doc(matchId).get();
-			  const data = snap.data();
-			  document.getElementById('proposta-manuale-container').style.display = 'block';
-			  isAnalysisPhase = true;
-			  isGameActive = true;
-			  if (document.getElementById('analysis-msg')) document.getElementById('analysis-msg').style.display = "block";
-			  if (document.getElementById('btn-missed')) document.getElementById('btn-missed').style.display = "block";
-			  let conteggioParoleGlobali = {};
-			  data.partecipanti.forEach(p => {
-			    (data.parole[p] || []).forEach(par => {
-			      conteggioParoleGlobali[par.w] = (conteggioParoleGlobali[par.w] || 0) + 1;
-			    });
-			  });
-			  const wordsListEl = document.getElementById('found-words');
-			  wordsListEl.innerHTML = "";
-			  if (!document.getElementById('sel-analisi')) {
-			    const headerDiv = document.createElement('div');
-			    headerDiv.style = "background:#2c3e50; padding:10px; border-radius:5px; margin-bottom:10px;";
-			    headerDiv.innerHTML = `
-																<label style="font-size:0.7rem; font-weight:bold; display:block; margin-bottom:5px;">MOSTRA PAROLE DI:</label>
-																<select id="sel-analisi" style="width:100%; background:#1e1e1e; color:white; border:1px solid #444; padding:5px;"></select>`;
-			    wordsListEl.parentNode.insertBefore(headerDiv, wordsListEl);
-			    const sel = document.getElementById('sel-analisi');
+			    const snap = await db.collection("partite").doc(matchId).get();
+			    const data = snap.data();
+			    
+			    document.getElementById('proposta-manuale-container').style.display = 'block';
+			    isAnalysisPhase = true;
+			    isGameActive = true;
+			    isSandboxMode = true;
+			
+			    analysisMsg.style.display = "block";
+			    btnMissed.style.display = "block";
+			    sortControls.style.display = "flex";
+			
+			    let conteggioParoleGlobali = {};
 			    data.partecipanti.forEach(p => {
-			      const o = document.createElement('option');
-			      o.value = p;
-			      o.textContent = p + (p === mioNome ? " (TU)" : "");
-			      sel.appendChild(o);
+			        (data.parole[p] || []).forEach(par => {
+			            conteggioParoleGlobali[par.w] = (conteggioParoleGlobali[par.w] || 0) + 1;
+			        });
 			    });
-			    sel.onchange = (e) => renderizzaAnalisiPlayerSilent(e.target.value, data, conteggioParoleGlobali);
-			  }
-			  renderizzaAnalisiPlayerSilent(mioNome, data, conteggioParoleGlobali);
+			
+			    const wordsListEl = document.getElementById('found-words');
+			    wordsListEl.innerHTML = "";
+			
+			    // Header "MOSTRA PAROLE DI" - sempre con TU per primo
+			    if (!document.getElementById('sel-analisi')) {
+			        const headerDiv = document.createElement('div');
+			        headerDiv.style = "background:#2c3e50; padding:10px; border-radius:5px; margin-bottom:10px;";
+			        headerDiv.innerHTML = `
+			            <label style="font-size:0.7rem; font-weight:bold; display:block; margin-bottom:5px;">MOSTRA PAROLE DI:</label>
+			            <select id="sel-analisi" style="width:100%; background:#1e1e1e; color:white; border:1px solid #444; padding:5px;"></select>`;
+			
+			        wordsListEl.parentNode.insertBefore(headerDiv, wordsListEl);
+			
+			        const sel = document.getElementById('sel-analisi');
+			        const partecipantiOrdinati = [mioNome, ...data.partecipanti.filter(p => p !== mioNome)];
+			        
+			        partecipantiOrdinati.forEach(p => {
+			            const o = document.createElement('option');
+			            o.value = p;
+			            o.textContent = p + (p === mioNome ? " (TU)" : "");
+			            sel.appendChild(o);
+			        });
+			
+			        sel.value = mioNome;
+			        sel.onchange = () => renderizzaAnalisiPlayerSilent(sel.value, data, conteggioParoleGlobali);
+			    }
+			
+			    renderizzaAnalisiPlayerSilent(mioNome, data, conteggioParoleGlobali);
+			
+			    // Banner iniziale per iniziare l'eliminazione
+			    if (!verificaInCorsoDa) {
+			        showGameBanner({
+			            icon: '✂️',
+			            title: 'FASE VERIFICA',
+			            subtitle: 'Chiunque può iniziare l\'eliminazione delle parole',
+			            color: '#e74c3c',
+			            buttons: [{ 
+			                text: 'INIZIA ELIMINAZIONE', 
+			                onclick: 'iniziaEliminazioneParole()' 
+			            }]
+			        });
+			    }
 			}
 			
 function renderizzaAnalisiPlayerSilent(nomePlayer, data, conteggioParoleGlobali) {
     const wordsListEl = document.getElementById('found-words');
     wordsListEl.innerHTML = "";
-    
-    // ✅ Ricostruisci foundWords per il player visualizzato
     foundWords.clear();
-    
+
     const parole = (data.parole[nomePlayer] || []).sort((a, b) => a.w.localeCompare(b.w));
-    
-    // ✅ Calcola punteggio totale del player
     let playerScore = 0;
-    
+
     parole.forEach(item => {
         const isDuplicata = conteggioParoleGlobali[item.w] > 1;
         const puntiEffettivi = isDuplicata ? 0 : item.p;
         playerScore += puntiEffettivi;
-        
-        foundWords.set(item.w, {
-            points: item.p,
-            path: item.path,
-            active: true // Le parole caricate da Firebase sono sempre attive
-        });
-        
+
+        foundWords.set(item.w, { points: item.p, path: item.path, active: true });
+
         const li = document.createElement('li');
         li.dataset.word = item.w;
-        
-        if (isDuplicata) {
-            li.classList.add('deleted'); // Usa stile barrato per duplicati
-        }
-        
+        if (isDuplicata) li.classList.add('deleted');
+
         li.innerHTML = `
             <div class="word-item-left">
                 <button class="btn-eye" onclick="event.stopPropagation(); showWordOnGrid('${item.w}')">👁️</button>
                 <span>${item.w}</span>
-                ${nomePlayer === mioNome ? `<button onclick="event.stopPropagation(); inviaPropostaFirebase('${item.w}', 'exclude')" style="background:none; border:none; cursor:pointer;" title="Proponi Rimozione">📢</button>` : ''}
             </div>
             <span class="pts">${isDuplicata ? '0 (dup)' : puntiEffettivi}</span>
         `;
-        
-        // ✅ CLICK PER ELIMINARE (solo le proprie parole, non duplicate)
-        if (nomePlayer === mioNome && !isDuplicata) {
+
+        // Solo chi sta facendo l'eliminazione può cliccare (su qualsiasi giocatore)
+        if (verificaInCorsoDa === mioNome && !isDuplicata) {
             li.style.cursor = 'pointer';
             li.addEventListener('click', (e) => {
                 if (!e.target.classList.contains('btn-eye')) {
@@ -4275,25 +4357,18 @@ function renderizzaAnalisiPlayerSilent(nomePlayer, data, conteggioParoleGlobali)
                 }
             });
         }
-        
+
         wordsListEl.appendChild(li);
     });
-    
-    // ✅ Aggiorna punteggio mostrato
+
+    // Aggiorna punteggio visibile
     if (nomePlayer === mioNome) {
-        scoreDisplay.textContent = playerScore;
         score = playerScore;
+        scoreDisplay.textContent = score;
     }
-    
-    // ✅ Mostra conteggio parole
+
     wordCountDisplay.textContent = parole.length;
-    
-    // ✅ Abilita stile interattivo
-    if (nomePlayer === mioNome) {
-        wordsListEl.classList.add('interactive');
-    } else {
-        wordsListEl.classList.remove('interactive');
-    }
+    wordsListEl.classList.toggle('interactive', verificaInCorsoDa === mioNome);
 }
 // ✅ TOGGLE PAROLA IN MULTIPLAYER (elimina/ripristina)
 async function toggleWordMultiplayer(word, li, data, conteggioParoleGlobali) {
@@ -4433,6 +4508,7 @@ async function toggleWordMultiplayer(word, li, data, conteggioParoleGlobali) {
 		</div>
 	</body>
 </html>
+
 
 
 
