@@ -1528,7 +1528,6 @@
 			let unsubscribeProposte = null;
 			let wordDisplayLocked = false;
 			let dictionaryReady = false;
-			let verificaInCorsoDa = null;   // Chi sta attualmente modificando le parole
 			// --- TRIE ---
 			class TrieNode {
 			  constructor() {
@@ -3361,14 +3360,22 @@
 			      return;
 			    }
 			    currentGameData = data;
-				// Gestione lock eliminazione
-				if (data.verificaInCorsoDa !== verificaInCorsoDa) {
-				    verificaInCorsoDa = data.verificaInCorsoDa;
+				// === AGGIORNAMENTO PUNTEGGI IN TEMPO REALE ===
+				aggiornaInterfacciaMultiplayer(data);
+				
+				// Aggiorna banner classifica se in stato conclusa
+				if (data.stato === "conclusa") {
+				    let classifica = Object.entries(data.punteggi || {}).sort((a, b) => b[1] - a[1]);
+				    let risultatiStr = classifica.map(([p, s]) => `${p}: ${s}`).join(' | ');
 				    
-				    const sel = document.getElementById('sel-analisi');
-				    if (sel && isAnalysisPhase) {
-				        renderizzaAnalisiPlayerSilent(sel.value, data, getConteggioGlobale());
-				    }
+				    const subtitleEl = document.querySelector('#game-banner .banner-left div:last-child');
+				    if (subtitleEl) subtitleEl.textContent = risultatiStr;
+				}
+				
+				// Aggiorna punteggio proprio se visibile
+				if (data.punteggi && data.punteggi[mioNome] !== undefined) {
+				    score = data.punteggi[mioNome];
+				    scoreDisplay.textContent = score;
 				}
 				  // Nascondi SEMPRE la lobby (usiamo solo banner)
 			    document.getElementById('multiplayer-lobby').style.display = 'none';
@@ -3827,50 +3834,6 @@ if (data.stato === "in_corso") {
 			  }
 			  // Il calcolo finale avviene automaticamente nel listener quando tutti hanno confermato
 			}
-			async function iniziaEliminazioneParole() {
-			    if (verificaInCorsoDa && verificaInCorsoDa !== mioNome) {
-			        alert(`Eliminazione già in corso da ${verificaInCorsoDa}`);
-			        return;
-			    }
-			
-			    if (!confirm("Inizierai l'eliminazione delle parole.\nSolo tu potrai modificare finché non terminerai.")) return;
-			
-			    await db.collection("partite").doc(matchId).update({
-			        verificaInCorsoDa: mioNome
-			    });
-			
-			    verificaInCorsoDa = mioNome;
-			
-			    // Ricarica vista corrente
-			    const sel = document.getElementById('sel-analisi');
-			    if (sel && currentGameData) {
-			        renderizzaAnalisiPlayerSilent(sel.value, currentGameData, getConteggioGlobale());
-			    }
-			
-			    showGameBanner({
-			        icon: '✂️',
-			        title: 'ELIMINAZIONE IN CORSO',
-			        subtitle: 'Puoi modificare parole di tutti i giocatori',
-			        color: '#e74c3c',
-			        buttons: [{ text: '✅ TERMINA ELIMINAZIONE', onclick: 'terminaEliminazioneParole()' }]
-			    });
-			}
-			
-			async function terminaEliminazioneParole() {
-			    if (verificaInCorsoDa !== mioNome) return;
-			
-			    await db.collection("partite").doc(matchId).update({
-			        verificaInCorsoDa: firebase.firestore.FieldValue.delete()
-			    });
-			
-			    verificaInCorsoDa = null;
-			    removeGameBanner();
-			
-			    const sel = document.getElementById('sel-analisi');
-			    if (sel && currentGameData) {
-			        renderizzaAnalisiPlayerSilent(sel.value, currentGameData, getConteggioGlobale());
-			    }
-			}
 			
 			function getConteggioGlobale() {
 			    let conteggio = {};
@@ -3961,6 +3924,19 @@ if (data.stato === "in_corso") {
 			  if (parola.length < 4) return alert("Minimo 4 lettere!");
 			  if (parola.length > 20) return alert("Troppo lunga!");
 			  inviaPropostaFirebase(parola, 'extra');
+			}
+			async function proponiRimozioneParola(parola, proprietario) {
+			    if (!confirm(`Vuoi proporre la RIMOZIONE della parola "${parola}" di ${proprietario}?`)) return;
+			
+			    await db.collection("partite").doc(matchId).collection("proposte").doc(`remove_${parola}`).set({
+			        parola: parola,
+			        tipo: 'remove',
+			        proprietario: proprietario,
+			        proponente: mioNome,
+			        voti: [mioNome]
+			    });
+			
+			    alert("Proposta di rimozione inviata. Gli altri giocatori devono approvare.");
 			}
 			async function inviaPropostaFirebase(parola, tipo) {
 			  const azione = (tipo === 'extra') ? "AGGIUNGERE alle EXTRA" : "ELIMINARE (EXCLUDED)";
@@ -4257,69 +4233,64 @@ async function applicaModificaDizionario(parola, tipo) {
 			  });
 			}
 			}
-			async function attivaAnalisiMultiplayerSilent() {
-			    const snap = await db.collection("partite").doc(matchId).get();
-			    const data = snap.data();
-			    
-			    document.getElementById('proposta-manuale-container').style.display = 'block';
-			    isAnalysisPhase = true;
-			    isGameActive = true;
-			    isSandboxMode = true;
-			
-			    analysisMsg.style.display = "block";
-			    btnMissed.style.display = "block";
-			    sortControls.style.display = "flex";
-			
-			    let conteggioParoleGlobali = {};
-			    data.partecipanti.forEach(p => {
-			        (data.parole[p] || []).forEach(par => {
-			            conteggioParoleGlobali[par.w] = (conteggioParoleGlobali[par.w] || 0) + 1;
-			        });
-			    });
-			
-			    const wordsListEl = document.getElementById('found-words');
-			    wordsListEl.innerHTML = "";
-			
-			    // Header "MOSTRA PAROLE DI" - sempre con TU per primo
-			    if (!document.getElementById('sel-analisi')) {
-			        const headerDiv = document.createElement('div');
-			        headerDiv.style = "background:#2c3e50; padding:10px; border-radius:5px; margin-bottom:10px;";
-			        headerDiv.innerHTML = `
-			            <label style="font-size:0.7rem; font-weight:bold; display:block; margin-bottom:5px;">MOSTRA PAROLE DI:</label>
-			            <select id="sel-analisi" style="width:100%; background:#1e1e1e; color:white; border:1px solid #444; padding:5px;"></select>`;
-			
-			        wordsListEl.parentNode.insertBefore(headerDiv, wordsListEl);
-			
-			        const sel = document.getElementById('sel-analisi');
-			        const partecipantiOrdinati = [mioNome, ...data.partecipanti.filter(p => p !== mioNome)];
-			        
-			        partecipantiOrdinati.forEach(p => {
-			            const o = document.createElement('option');
-			            o.value = p;
-			            o.textContent = p + (p === mioNome ? " (TU)" : "");
-			            sel.appendChild(o);
-			        });
-			
-			        sel.value = mioNome;
-			        sel.onchange = () => renderizzaAnalisiPlayerSilent(sel.value, data, conteggioParoleGlobali);
-			    }
-			
-			    renderizzaAnalisiPlayerSilent(mioNome, data, conteggioParoleGlobali);
-			
-			    // Banner iniziale per iniziare l'eliminazione
-			    if (!verificaInCorsoDa) {
-			        showGameBanner({
-			            icon: '✂️',
-			            title: 'FASE VERIFICA',
-			            subtitle: 'Chiunque può iniziare l\'eliminazione delle parole',
-			            color: '#e74c3c',
-			            buttons: [{ 
-			                text: 'INIZIA ELIMINAZIONE', 
-			                onclick: 'iniziaEliminazioneParole()' 
-			            }]
-			        });
-			    }
-			}
+async function attivaAnalisiMultiplayerSilent() {
+    const snap = await db.collection("partite").doc(matchId).get();
+    const data = snap.data();
+    
+    document.getElementById('proposta-manuale-container').style.display = 'block';
+    isAnalysisPhase = true;
+    isGameActive = true;
+    isSandboxMode = true;
+
+    analysisMsg.style.display = "block";
+    btnMissed.style.display = "block";
+    sortControls.style.display = "flex";
+
+    let conteggioParoleGlobali = {};
+    data.partecipanti.forEach(p => {
+        (data.parole[p] || []).forEach(par => {
+            conteggioParoleGlobali[par.w] = (conteggioParoleGlobali[par.w] || 0) + 1;
+        });
+    });
+
+    const wordsListEl = document.getElementById('found-words');
+    wordsListEl.innerHTML = "";
+
+    // Header "MOSTRA PAROLE DI" — sempre TU per primo
+    if (!document.getElementById('sel-analisi')) {
+        const headerDiv = document.createElement('div');
+        headerDiv.style = "background:#2c3e50; padding:10px; border-radius:5px; margin-bottom:10px;";
+        headerDiv.innerHTML = `
+            <label style="font-size:0.7rem; font-weight:bold; display:block; margin-bottom:5px;">MOSTRA PAROLE DI:</label>
+            <select id="sel-analisi" style="width:100%; background:#1e1e1e; color:white; border:1px solid #444; padding:5px;"></select>`;
+
+        wordsListEl.parentNode.insertBefore(headerDiv, wordsListEl);
+
+        const sel = document.getElementById('sel-analisi');
+        const partecipantiOrdinati = [mioNome, ...data.partecipanti.filter(p => p !== mioNome)];
+        
+        partecipantiOrdinati.forEach(p => {
+            const o = document.createElement('option');
+            o.value = p;
+            o.textContent = p + (p === mioNome ? " (TU)" : "");
+            sel.appendChild(o);
+        });
+
+        sel.value = mioNome;                    // ← Parte sempre con il giocatore stesso
+        sel.onchange = () => renderizzaAnalisiPlayerSilent(sel.value, data, conteggioParoleGlobali);
+    }
+
+    renderizzaAnalisiPlayerSilent(mioNome, data, conteggioParoleGlobali);
+
+    // Banner chiaro per la verifica
+    showGameBanner({
+        icon: '🔍',
+        title: 'VERIFICA PAROLE',
+        subtitle: 'Clicca sulle parole per proporre rimozione',
+        color: '#27ae60',
+        buttons: []
+    });
+}
 			
 function renderizzaAnalisiPlayerSilent(nomePlayer, data, conteggioParoleGlobali) {
     const wordsListEl = document.getElementById('found-words');
@@ -4344,31 +4315,23 @@ function renderizzaAnalisiPlayerSilent(nomePlayer, data, conteggioParoleGlobali)
             <div class="word-item-left">
                 <button class="btn-eye" onclick="event.stopPropagation(); showWordOnGrid('${item.w}')">👁️</button>
                 <span>${item.w}</span>
+                <button onclick="event.stopPropagation(); proponiRimozioneParola('${item.w}', '${nomePlayer}')" 
+                        style="background:none; border:none; cursor:pointer; color:#e74c3c;" title="Proponi rimozione">🗑️</button>
             </div>
             <span class="pts">${isDuplicata ? '0 (dup)' : puntiEffettivi}</span>
         `;
 
-        // Solo chi sta facendo l'eliminazione può cliccare (su qualsiasi giocatore)
-        if (verificaInCorsoDa === mioNome && !isDuplicata) {
-            li.style.cursor = 'pointer';
-            li.addEventListener('click', (e) => {
-                if (!e.target.classList.contains('btn-eye')) {
-                    toggleWordMultiplayer(item.w, li, data, conteggioParoleGlobali);
-                }
-            });
-        }
-
         wordsListEl.appendChild(li);
     });
 
-    // Aggiorna punteggio visibile
+    // Aggiorna punteggio sidebar
     if (nomePlayer === mioNome) {
         score = playerScore;
         scoreDisplay.textContent = score;
     }
 
     wordCountDisplay.textContent = parole.length;
-    wordsListEl.classList.toggle('interactive', verificaInCorsoDa === mioNome);
+    wordsListEl.classList.add('interactive');
 }
 // ✅ TOGGLE PAROLA IN MULTIPLAYER (elimina/ripristina)
 async function toggleWordMultiplayer(word, li, data, conteggioParoleGlobali) {
@@ -4508,6 +4471,7 @@ async function toggleWordMultiplayer(word, li, data, conteggioParoleGlobali) {
 		</div>
 	</body>
 </html>
+
 
 
 
