@@ -3739,13 +3739,12 @@ if (data.stato === "in_corso") {
 			});
 			return;
 			}
-// Nessuna rivincita - mostra classifica con CELEBRAZIONE
+// Nessuna rivincita - mostra classifica
 let classifica = Object.entries(data.punteggi).sort((a, b) => b[1] - a[1]);
 const haVinto = classifica[0][0] === mioNome;
 let risultatiStr = classifica.map(([p, s]) => `${p}: ${s}`).join(' | ');
 
 if (haVinto) {
-    // ✅ BANNER VITTORIA EPICO
     showGameBanner({
         icon: '👑',
         title: '🎉🏆 VITTORIA! 🏆🎉',
@@ -3758,12 +3757,11 @@ if (haVinto) {
         }]
     });
 
-    // ✅ Animazione pulsante sul banner
+    // ✅ Animazione banner dorato (SENZA fuochi d'artificio)
     const banner = document.getElementById('game-banner');
     if (banner) {
         banner.style.animation = 'disco-flash 0.8s 5, earthquake 0.3s 5';
         banner.style.boxShadow = '0 0 30px rgba(241, 196, 15, 0.8), 0 0 60px rgba(241, 196, 15, 0.4)';
-        // Rimuovi animazione dopo che finisce
         setTimeout(() => {
             if (banner) {
                 banner.style.animation = 'pulse-ready 2s infinite';
@@ -3772,13 +3770,10 @@ if (haVinto) {
         }, 4000);
     }
 
-    // ✅ Confetti + Fuochi d'artificio
-    fireConfetti();
-    startEndGameCelebration();
-    setTimeout(() => stopFireworks(), 6000);
+    // ✅ Solo confetti leggeri, NO fuochi
+    fireConfettiLight();
 
 } else {
-    // Banner sconfitta (sobrio)
     showGameBanner({
         icon: '🐷',
         title: 'SCONFITTA!',
@@ -3806,8 +3801,7 @@ if (!window.analisiGiaAttivata) {
             });
         });
         renderizzaAnalisiPlayerSilent(selAnalisi.value, data, conteggioParoleGlobali);
-        
-        // ✅ Aggiorna sottotitolo banner con classifica aggiornata
+
         const bannerSubtitle = document.querySelector('#game-banner .banner-left div:last-child');
         if (bannerSubtitle && !data.prossimaPartita) {
             bannerSubtitle.textContent = risultatiStr;
@@ -3817,28 +3811,43 @@ if (!window.analisiGiaAttivata) {
 			    }
 			  });
 			  // ✅ LISTENER PROPOSTE
-			  unsubscribeProposte = db.collection("partite").doc(matchId).collection("proposte").onSnapshot(snap => {
-			    snap.docChanges().forEach(async change => {
-			      if (change.type === "added" || change.type === "modified") {
-			        const prop = change.doc.data();
-			        if (!prop.voti.includes(mioNome)) {
-			          const azione = prop.tipo === 'extra' ? 'AGGIUNGERE' : 'RIMUOVERE';
-			          if (confirm(`VOTAZIONE: ${prop.proponente} vuole ${azione} "${prop.parola}". Approvi?`)) {
-			            await db.collection("partite").doc(matchId).collection("proposte").doc(prop.parola).update({
-			              voti: firebase.firestore.FieldValue.arrayUnion(mioNome)
-			            }).catch(e => console.error("Errore voto:", e));
-			          }
-			        }
-			        if (currentGameData && currentGameData.partecipanti) {
-			          const numPartecipanti = currentGameData.partecipanti.length;
-			          if (prop.voti.length >= numPartecipanti) {
-			            await applicaModificaDizionario(prop.parola, prop.tipo);
-			            await db.collection("partite").doc(matchId).collection("proposte").doc(prop.parola).delete().catch(e => console.error("Errore delete:", e));
-			          }
-			        }
-			      }
-			    });
-			  });
+unsubscribeProposte = db.collection("partite").doc(matchId).collection("proposte").onSnapshot(snap => {
+    snap.docChanges().forEach(async change => {
+        if (change.type === "added" || change.type === "modified") {
+            const docId = change.doc.id;
+            const prop = change.doc.data();
+
+            // ✅ Se non ho ancora votato, chiedi conferma
+            if (!prop.voti.includes(mioNome)) {
+                const azione = prop.tipo === 'extra' ? 'AGGIUNGERE' : 'RIMUOVERE DAL DIZIONARIO';
+                if (confirm(`VOTAZIONE: ${prop.proponente} vuole ${azione} "${prop.parola}". Approvi?`)) {
+                    await db.collection("partite").doc(matchId).collection("proposte")
+                        .doc(docId)  // ✅ Usa l'ID reale del documento
+                        .update({
+                            voti: firebase.firestore.FieldValue.arrayUnion(mioNome)
+                        }).catch(e => console.error("Errore voto:", e));
+                }
+            }
+
+            // ✅ Ri-leggi il documento per avere i voti aggiornati
+            const freshDoc = await db.collection("partite").doc(matchId)
+                .collection("proposte").doc(docId).get();
+
+            if (freshDoc.exists && currentGameData && currentGameData.partecipanti) {
+                const freshProp = freshDoc.data();
+                const numPartecipanti = currentGameData.partecipanti.length;
+
+                if (freshProp.voti.length >= numPartecipanti) {
+                    // ✅ Applica la modifica e cancella la proposta
+                    await applicaModificaDizionario(freshProp.parola, freshProp.tipo);
+                    await db.collection("partite").doc(matchId)
+                        .collection("proposte").doc(docId)  // ✅ Usa l'ID reale
+                        .delete().catch(e => console.error("Errore delete proposta:", e));
+                }
+            }
+        }
+    });
+});
 			  loadDictionary();
 			}
 			
@@ -4503,4 +4512,5 @@ async function toggleWordMultiplayer(word, li, data, conteggioParoleGlobali) {
 		</div>
 	</body>
 </html>
+
 
