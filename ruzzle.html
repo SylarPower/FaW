@@ -1563,7 +1563,8 @@ let unsubscribePartita = null;
 let unsubscribeProposte = null;
 let wordDisplayLocked = false;
 let dictionaryReady = false;
-			let proposteInCoda = [];
+let proposteInCoda = [];
+let isUpdatingWords = false;
 // --- TRIE ---
 class TrieNode {
 constructor() {
@@ -1661,59 +1662,62 @@ const modalGridSelect = document.getElementById('modal-grid-select');
 const gameEndModal = document.getElementById('game-end-modal');
 // --- BANNER SYSTEM ---
 function showGameBanner(options) {
-let banner = document.getElementById('game-banner');
-const isNewBanner = !banner;
-
-if (isNewBanner) {
-// Crea nuovo banner solo se non esiste
-banner = document.createElement('div');
-banner.id = 'game-banner';
-banner.className = 'game-banner';
-document.body.appendChild(banner);
-}
-
-// ✅ Aggiorna stile senza ricreare
-banner.style.background = `linear-gradient(135deg, ${options.color} 0%, ${adjustColor(options.color, -20)} 100%)`;
-			    
-			    banner.style.animation = '';
-    			banner.style.boxShadow = '0 4px 15px rgba(0, 0, 0, 0.3)';
-// Genera HTML bottoni
-let buttonsHtml = '';
-if (options.buttons && options.buttons.length > 0) {
-buttonsHtml = options.buttons.map(btn => {
-const specialClass = btn.special ? 'btn-rivincita' : 'btn-action';
-const specialStyle = btn.special ? '' : 'style="width:auto; padding:8px 16px; margin:0; background:white; color:#333; border:none;"';
-return `<button onclick="${btn.onclick}" class="${specialClass}" ${specialStyle}>${btn.text}</button>`;
-}).join('');
-}
-
-let spinnerHtml = '';
-if (options.spinner) {
-spinnerHtml = `<div style="width:20px; height:20px; border:3px solid white; border-top-color:transparent; border-radius:50%; animation: spin 1s linear infinite;"></div>`;
-}
-
-const newContent = `
-			        <div class="banner-left">
-			            <span style="font-size:1.5rem;">${options.icon}</span>
-			            <div>
-			                <div style="font-weight:bold;">${options.title}</div>
-			                <div style="font-size:0.8rem; opacity:0.9;">${options.subtitle}</div>
-			            </div>
-			        </div>
-			        <div class="banner-right">
-			            ${buttonsHtml}
-			            ${spinnerHtml}
-			        </div>
-			    `;
-
-// ✅ Aggiorna solo se il contenuto è diverso
-if (banner.innerHTML !== newContent) {
-banner.innerHTML = newContent;
-}
-
-// Rimuovi vecchi banner se esistono
-const oldBanner = document.getElementById('wait-banner');
-if (oldBanner) oldBanner.remove();
+    let banner = document.getElementById('game-banner');
+    
+    // ✅ Confronta stato invece di HTML
+    const stateKey = JSON.stringify({
+        title: options.title,
+        subtitle: options.subtitle,
+        buttons: options.buttons?.map(b => b.text)
+    });
+    
+    if (!banner) {
+        banner = document.createElement('div');
+        banner.id = 'game-banner';
+        banner.className = 'game-banner';
+        document.body.appendChild(banner);
+    }
+    
+    // ✅ Se lo stato è identico, non fare nulla
+    if (banner.dataset.state === stateKey && !options.spinner) {
+        return;
+    }
+    
+    banner.dataset.state = stateKey;
+    banner.style.background = `linear-gradient(135deg, ${options.color} 0%, ${adjustColor(options.color, -20)} 100%)`;
+    
+    // Genera HTML bottoni
+    let buttonsHtml = '';
+    if (options.buttons && options.buttons.length > 0) {
+        buttonsHtml = options.buttons.map(btn => {
+            const specialClass = btn.special ? 'btn-rivincita' : 'btn-action';
+            const specialStyle = btn.special ? '' : 'style="width:auto; padding:8px 16px; margin:0; background:white; color:#333; border:none;"';
+            return `<button onclick="${btn.onclick}" class="${specialClass}" ${specialStyle}>${btn.text}</button>`;
+        }).join('');
+    }
+    
+    let spinnerHtml = '';
+    if (options.spinner) {
+        spinnerHtml = `<div style="width:20px; height:20px; border:3px solid white; border-top-color:transparent; border-radius:50%; animation: spin 1s linear infinite;"></div>`;
+    }
+    
+    banner.innerHTML = `
+        <div class="banner-left">
+            <span style="font-size:1.5rem;">${options.icon}</span>
+            <div>
+                <div style="font-weight:bold;">${options.title}</div>
+                <div style="font-size:0.8rem; opacity:0.9;">${options.subtitle}</div>
+            </div>
+        </div>
+        <div class="banner-right">
+            ${buttonsHtml}
+            ${spinnerHtml}
+        </div>
+    `;
+    
+    // Rimuovi vecchi banner
+    const oldBanner = document.getElementById('wait-banner');
+    if (oldBanner) oldBanner.remove();
 }
 
 function removeGameBanner() {
@@ -2077,7 +2081,15 @@ inserted = true;
 }
 
 function renderGrid() {
-gridEl.innerHTML = '';
+  // ✅ RIMUOVI TUTTI I LISTENER ESISTENTI
+  const oldTiles = gridEl.querySelectorAll('.tile');
+  oldTiles.forEach(tile => {
+    const clone = tile.cloneNode(true);
+    if (tile.parentNode) {
+      tile.parentNode.replaceChild(clone, tile);
+    }
+  });
+	gridEl.innerHTML = '';
 gridEl.style.setProperty('--grid-cols', gridSize);
 let displayLetters = [...gridLetters];
 let displayBonuses = [...gridBonuses];
@@ -2634,6 +2646,11 @@ const currentCells = cellsParam || [...selectedCells];
 if (!word || word.length === 0 || currentCells.length === 0) {
 return;
 }
+ // ✅ FIX: Controlla lunghezza parola (non celle)
+  if (word.length < MIN_WORD_LENGTH) {
+    shakeAndClear(currentCells);
+    return;
+  }
 if (errorTimeout) {
 clearTimeout(errorTimeout);
 errorTimeout = null;
@@ -2664,12 +2681,6 @@ shakeAndClear(currentCells);
 return;
 }
 // === MODALITÀ GIOCO ===
-// ✅ Controlla lettere effettive, non celle
-const actualLetters = countActualLetters(currentCells);
-if (actualLetters < MIN_WORD_LENGTH) {
-shakeAndClear(currentCells);
-return;
-}
 if (foundWords.has(word)) {
 wordDisplay.style.background = "#f1c40f";
 selectedCells = [];
@@ -3390,22 +3401,24 @@ if (!mioNome && matchId) {
 alert("Effettua il login per giocare in multiplayer.");
 window.location.href = "index.html";
 }
-// ✅ DEBOUNCE PER FIREBASE
-const aggiornaInterfacciaMultiplayer = debounce((data) => {
-const altri = data.partecipanti.filter(n => n !== mioNome);
-let scoresHtml = "";
-altri.forEach(a => {
-const punteggio = data.punteggi && data.punteggi[a] ? data.punteggi[a] : 0;
-scoresHtml += `
-																<span style="margin:0 5px;">🆚 ${a}: 
-																	<strong>${punteggio}</strong>
-																</span>`;
-});
-const scoreEl = document.getElementById('live-opponent-score');
-if (scoreEl && scoreEl.innerHTML !== scoresHtml) {
-scoreEl.innerHTML = scoresHtml;
-}
-}, 500);
+// ✅ DEBOUNCE MIGLIORATO CON CACHE
+const aggiornaInterfacciaMultiplayer = (() => {
+  let lastScoresHtml = "";
+  return debounce((data) => {
+    const altri = data.partecipanti.filter(n => n !== mioNome);
+    const scoresHtml = altri.map(a => {
+      const punteggio = data.punteggi?.[a] || 0;
+      return `<span style="margin:0 5px;">🆚 ${a}: <strong>${punteggio}</strong></span>`;
+    }).join('');
+    
+    // ✅ Confronta con ultimo valore
+    if (scoresHtml === lastScoresHtml) return;
+    lastScoresHtml = scoresHtml;
+    
+    const scoreEl = document.getElementById('live-opponent-score');
+    if (scoreEl) scoreEl.innerHTML = scoresHtml;
+  }, 300);
+})();
 if (!matchId) {
 // MODALITÀ SOLO
 if (document.getElementById('multiplayer-lobby')) document.getElementById('multiplayer-lobby').style.display = 'none';
@@ -3420,6 +3433,7 @@ if (unsubscribeProposte) unsubscribeProposte();
 // ✅ LISTENER PRINCIPALE PARTITA
 setupProposteListener();
 unsubscribePartita = db.collection("partite").doc(matchId).onSnapshot(async doc => {
+if (isUpdatingWords) return;
 const data = doc.data();
 if (!data) {
 window.location.href = "index.html";
@@ -4240,14 +4254,19 @@ renderizzaAnalisiPlayerSilent(selAnalisi.value, currentGameData, conteggioParole
 }
 // ✅ CLEANUP FIREBASE
 function cleanupFirebaseListeners() {
-if (unsubscribePartita) {
-unsubscribePartita();
-unsubscribePartita = null;
-}
-if (unsubscribeProposte) {
-unsubscribeProposte();
-unsubscribeProposte = null;
-}
+  try {
+    if (typeof unsubscribePartita === 'function') {
+      unsubscribePartita();
+    }
+    if (typeof unsubscribeProposte === 'function') {
+      unsubscribeProposte();
+    }
+  } catch(e) {
+    console.warn("⚠️ Errore cleanup listeners:", e);
+  } finally {
+    unsubscribePartita = null;
+    unsubscribeProposte = null;
+  }
 }
 window.addEventListener('beforeunload', cleanupFirebaseListeners);
 
@@ -4544,78 +4563,78 @@ wordsListEl.classList.add('interactive');
 }
 // ✅ TOGGLE PAROLA IN MULTIPLAYER (elimina/ripristina)
 async function toggleWordMultiplayer(word, li, data, conteggioParoleGlobali) {
-const isDeleted = li.classList.contains('deleted');
-
-if (isDeleted) {
-// RIPRISTINA: riaggiunge la parola
-li.classList.remove('deleted');
-const wordData = foundWords.get(word);
-const pts = wordData ? wordData.points : 0;
-li.querySelector('.pts').textContent = pts;
-
-// Aggiungi a Firebase
-const mieParole = data.parole[mioNome] || [];
-const esisteGia = mieParole.some(p => p.w === word);
-
-if (!esisteGia && wordData) {
-mieParole.push({ w: word, p: wordData.points, path: wordData.path });
-}
-
-try {
-// Ricalcola punteggio
-let nuovoPunteggio = 0;
-mieParole.forEach(p => {
-const isDup = conteggioParoleGlobali[p.w] > 1;
-if (!isDup) nuovoPunteggio += p.p;
-});
-
-await db.collection("partite").doc(matchId).update({
-[`parole.${mioNome}`]: mieParole,
-[`punteggi.${mioNome}`]: nuovoPunteggio
-});
-
-score = nuovoPunteggio;
-scoreDisplay.textContent = nuovoPunteggio;
-
-} catch(e) {
-console.error("Errore ripristino parola:", e);
-li.classList.add('deleted');
-}
-
-} else {
-// ELIMINA: rimuove la parola
-li.classList.add('deleted');
-li.querySelector('.pts').textContent = '0';
-
-// Rimuovi da Firebase
-let mieParole = data.parole[mioNome] || [];
-mieParole = mieParole.filter(p => p.w !== word);
-
-try {
-// Ricalcola punteggio
-let nuovoPunteggio = 0;
-mieParole.forEach(p => {
-const isDup = conteggioParoleGlobali[p.w] > 1;
-if (!isDup) nuovoPunteggio += p.p;
-});
-
-await db.collection("partite").doc(matchId).update({
-[`parole.${mioNome}`]: mieParole,
-[`punteggi.${mioNome}`]: nuovoPunteggio
-});
-
-score = nuovoPunteggio;
-scoreDisplay.textContent = nuovoPunteggio;
-
-// Aggiorna anche il conteggio globale
-conteggioParoleGlobali[word] = (conteggioParoleGlobali[word] || 1) - 1;
-
-} catch(e) {
-console.error("Errore eliminazione parola:", e);
-li.classList.remove('deleted');
-}
-}
-}		
+    // ✅ Previeni loop
+    if (isUpdatingWords) {
+        console.warn("⚠️ Aggiornamento in corso, ignoro click");
+        return;
+    }
+    
+    isUpdatingWords = true;
+    
+    try {
+        const isDeleted = li.classList.contains('deleted');
+        
+        if (isDeleted) {
+            // RIPRISTINA
+            li.classList.remove('deleted');
+            const wordData = foundWords.get(word);
+            const pts = wordData ? wordData.points : 0;
+            li.querySelector('.pts').textContent = pts;
+            
+            let mieParole = data.parole[mioNome] || [];
+            const esisteGia = mieParole.some(p => p.w === word);
+            
+            if (!esisteGia && wordData) {
+                mieParole.push({ w: word, p: wordData.points, path: wordData.path });
+            }
+            
+            let nuovoPunteggio = 0;
+            mieParole.forEach(p => {
+                const isDup = conteggioParoleGlobali[p.w] > 1;
+                if (!isDup) nuovoPunteggio += p.p;
+            });
+            
+            await db.collection("partite").doc(matchId).update({
+                [`parole.${mioNome}`]: mieParole,
+                [`punteggi.${mioNome}`]: nuovoPunteggio
+            });
+            
+            score = nuovoPunteggio;
+            scoreDisplay.textContent = nuovoPunteggio;
+            
+        } else {
+            // ELIMINA
+            li.classList.add('deleted');
+            li.querySelector('.pts').textContent = '0';
+            
+            let mieParole = (data.parole[mioNome] || []).filter(p => p.w !== word);
+            
+            let nuovoPunteggio = 0;
+            mieParole.forEach(p => {
+                const isDup = conteggioParoleGlobali[p.w] > 1;
+                if (!isDup) nuovoPunteggio += p.p;
+            });
+            
+            await db.collection("partite").doc(matchId).update({
+                [`parole.${mioNome}`]: mieParole,
+                [`punteggi.${mioNome}`]: nuovoPunteggio
+            });
+            
+            score = nuovoPunteggio;
+            scoreDisplay.textContent = nuovoPunteggio;
+            conteggioParoleGlobali[word] = Math.max(0, (conteggioParoleGlobali[word] || 1) - 1);
+        }
+        
+    } catch(e) {
+        console.error("❌ Errore toggle parola:", e);
+        alert("Errore durante l'operazione");
+    } finally {
+        // ✅ Sblocca dopo 500ms
+        setTimeout(() => {
+            isUpdatingWords = false;
+        }, 500);
+    }
+}	
 function apriModalRivincita() {
 document.getElementById('multiplayer-lobby').style.display = 'none';
 apriRivincitaBanner();
@@ -4680,3 +4699,4 @@ setupHomeButtonCleanup();
 </div>
 </body>
 </html>
+
