@@ -3829,7 +3829,7 @@ const haVinto = !isPareggio && vincitori[0] === mioNome;
 const haPareggiatoAlTop = isPareggio && vincitori.includes(mioNome);
 
 let risultatiStr = classifica.map(([p, s], i) => {
-    const medal = i === 0 ? '👑' : '💀';
+    //const medal = i === 0 ? '👑' : '💀';
     let medal;
     if (s === topScore && isPareggio) medal = '🤝';
     else if (i === 0) medal = '👑';
