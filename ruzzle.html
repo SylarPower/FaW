@@ -1753,94 +1753,146 @@ alert(msg);
 }
 // --- ✅ LOAD DICTIONARY CON TIMEOUT ---
 async function loadDictionary() {
-console.log("🔄 Inizio caricamento dizionario...");
-loadingMsg.style.display = 'flex';
-try {
-const urls = ['https://raw.githubusercontent.com/napolux/paroleitaliane/refs/heads/main/paroleitaliane/280000_parole_italiane.txt', 'https://raw.githubusercontent.com/napolux/paroleitaliane/refs/heads/main/paroleitaliane/9000_nomi_propri.txt'];
-console.log("📡 Download file dizionari...");
-const fetchWithTimeout = (url, timeout = 15000) => {
-return Promise.race([
-fetch(url),
-new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout connessione')), timeout))
-]);
-};
-const responses = await Promise.all(urls.map(url => fetchWithTimeout(url)));
-console.log("📄 Conversione testi...");
-const texts = await Promise.all(responses.map(r => r.text()));
-const addWordsToDictionary = (textData) => {
-textData.split('\n').forEach(w => {
-const clean = w.trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z]/g, "");
-if (clean.length >= MIN_WORD_LENGTH && !EXCLUDED_WORDS.includes(clean)) {
-dictionary.add(clean);
-}
-});
-};
-texts.forEach(t => addWordsToDictionary(t));
-EXTRA_WORDS.forEach(w => dictionary.add(w));
-console.log("🔥 Caricamento dizionario Firebase...");
-try {
-const globalDocPromise = db.collection("config").doc("dizionario").get();
-const globalDoc = await Promise.race([
-globalDocPromise,
-new Promise((_, reject) => setTimeout(() => reject(new Error('Firebase timeout')), 5000))
-]);
-if (globalDoc.exists) {
-const data = globalDoc.data();
-if (data.extra) {
-data.extra.forEach(w => {
-if (w && !EXTRA_WORDS.includes(w)) {
-EXTRA_WORDS.push(w);
-dictionary.add(w);
-}
-});
-}
-if (data.excluded) {
-data.excluded.forEach(w => {
-if (w && !EXCLUDED_WORDS.includes(w)) {
-EXCLUDED_WORDS.push(w);
-dictionary.delete(w);
-}
-});
-}
-console.log("✅ Dizionario Firebase caricato");
-}
-} catch (fbError) {
-console.warn("⚠️ Firebase non disponibile (continuo comunque):", fbError);
-}
-console.log("🌳 Costruzione Trie...");
-buildTrie();
-dictionaryReady = true;
-loadingMsg.style.display = 'none';
-console.log(`✅ DIZIONARIO PRONTO: ${dictionary.size} parole`);
-const codeParam = urlParams.get('code');
-
-if(codeParam) {
-console.log("🎮 Avvio partita con codice:", codeParam);
-initGame(codeParam);
-} else if (!matchId) {
-// ✅ Solo se NON siamo in multiplayer
-console.log("🏠 Nessun codice - Schermata home");
-gridEl.innerHTML = '';
-displaySeed.textContent = "----";
-}
-// ✅ Se matchId esiste, il listener Firebase gestirà la griglia
-} catch (error) {
-console.error("❌ ERRORE FATALE:", error);
-loadingMsg.innerHTML = `
-			          
-					<div style="color:#e74c3c; text-align:center;">
-			              ❌ Errore caricamento dizionari
-						<br>
-							<small style="opacity:0.8;">${error.message}</small>
-							<br>
-								<br>
-									<button onclick="location.reload()" class="btn-action" style="width:auto; padding:10px 20px;">
-			                  🔄 RIPROVA
-			              </button>
-								</div>
-			      `;
-loadingMsg.style.display = 'flex';
-}
+  console.log("🔄 [1/6] Inizio caricamento dizionario...");
+  loadingMsg.style.display = 'flex';
+  
+  try {
+    const urls = [
+      'https://raw.githubusercontent.com/napolux/paroleitaliane/refs/heads/main/paroleitaliane/280000_parole_italiane.txt',
+      'https://raw.githubusercontent.com/napolux/paroleitaliane/refs/heads/main/paroleitaliane/9000_nomi_propri.txt'
+    ];
+    
+    console.log("📡 [2/6] Download file dizionari...");
+    
+    const fetchWithTimeout = (url, timeout = 15000) => {
+      return Promise.race([
+        fetch(url),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error(`Timeout: ${url}`)), timeout)
+        )
+      ]);
+    };
+    
+    let responses;
+    try {
+      responses = await Promise.all(urls.map(url => fetchWithTimeout(url)));
+      console.log("✅ [3/6] Download completato");
+    } catch (fetchError) {
+      console.error("❌ Errore download:", fetchError);
+      throw new Error("Impossibile scaricare i dizionari. Controlla la connessione.");
+    }
+    
+    console.log("📄 [4/6] Conversione testi...");
+    const texts = await Promise.all(responses.map(r => r.text()));
+    console.log(`✅ Testi caricati: ${texts[0].length} + ${texts[1].length} caratteri`);
+    
+    const addWordsToDictionary = (textData) => {
+      const words = textData.split('\n');
+      let count = 0;
+      words.forEach(w => {
+        const clean = w.trim().toUpperCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/[^A-Z]/g, "");
+        if (clean.length >= MIN_WORD_LENGTH && !EXCLUDED_WORDS.includes(clean)) {
+          dictionary.add(clean);
+          count++;
+        }
+      });
+      return count;
+    };
+    
+    const count1 = addWordsToDictionary(texts[0]);
+    const count2 = addWordsToDictionary(texts[1]);
+    console.log(`✅ Parole aggiunte: ${count1} + ${count2}`);
+    
+    EXTRA_WORDS.forEach(w => dictionary.add(w));
+    console.log(`✅ Extra words aggiunte: ${EXTRA_WORDS.length}`);
+    
+    // Firebase - con timeout separato
+    console.log("🔥 [5/6] Caricamento dizionario Firebase...");
+    try {
+      const globalDocPromise = db.collection("config").doc("dizionario").get();
+      const globalDoc = await Promise.race([
+        globalDocPromise,
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Firebase timeout')), 5000)
+        )
+      ]);
+      
+      if (globalDoc.exists) {
+        const data = globalDoc.data();
+        let extraCount = 0;
+        let excludedCount = 0;
+        
+        if (data.extra && Array.isArray(data.extra)) {
+          data.extra.forEach(w => {
+            if (w && !EXTRA_WORDS.includes(w)) {
+              EXTRA_WORDS.push(w);
+              dictionary.add(w);
+              extraCount++;
+            }
+          });
+        }
+        
+        if (data.excluded && Array.isArray(data.excluded)) {
+          data.excluded.forEach(w => {
+            if (w && !EXCLUDED_WORDS.includes(w)) {
+              EXCLUDED_WORDS.push(w);
+              dictionary.delete(w);
+              excludedCount++;
+            }
+          });
+        }
+        
+        console.log(`✅ Firebase: +${extraCount} extra, -${excludedCount} escluse`);
+      } else {
+        console.log("ℹ️ Nessun dizionario custom su Firebase");
+      }
+    } catch (fbError) {
+      console.warn("⚠️ Firebase non disponibile (continuo comunque):", fbError.message);
+    }
+    
+    console.log("🌳 [6/6] Costruzione Trie...");
+    buildTrie();
+    
+    dictionaryReady = true;
+    loadingMsg.style.display = 'none';
+    console.log(`✅ DIZIONARIO PRONTO: ${dictionary.size} parole`);
+    
+    // ========== GESTIONE AVVIO ==========
+    const codeParam = urlParams.get('code');
+    
+    if (matchId) {
+      // MULTIPLAYER: Il listener Firebase gestirà tutto
+      console.log("🎮 Modalità MULTIPLAYER - matchId:", matchId);
+      // Non fare nulla qui, il listener onSnapshot è già attivo
+    } else if (codeParam) {
+      // SINGOLO CON CODICE
+      console.log("🎮 Avvio partita con codice:", codeParam);
+      initGame(codeParam);
+    } else {
+      // HOME - Nessun codice
+      console.log("🏠 Schermata home - nessun codice");
+      gridEl.innerHTML = '';
+      displaySeed.textContent = "----";
+      document.getElementById('start-screen').style.display = 'flex';
+    }
+    
+  } catch (error) {
+    console.error("❌ ERRORE FATALE:", error);
+    loadingMsg.innerHTML = `
+      <div style="color:#e74c3c; text-align:center; padding:20px;">
+        <div style="font-size:3rem; margin-bottom:15px;">❌</div>
+        <div style="font-size:1.2rem; margin-bottom:10px;">Errore caricamento dizionario</div>
+        <div style="font-size:0.9rem; opacity:0.8; margin-bottom:20px;">${error.message}</div>
+        <button onclick="location.reload()" class="btn-action" style="width:auto; padding:12px 25px;">
+          🔄 RIPROVA
+        </button>
+      </div>
+    `;
+    loadingMsg.style.display = 'flex';
+  }
 }
 // --- CORE GAME LOGIC ---
 function startNewGame() {
@@ -4699,4 +4751,5 @@ setupHomeButtonCleanup();
 </div>
 </body>
 </html>
+
 
