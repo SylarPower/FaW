@@ -3963,14 +3963,15 @@ conteggioParoleGlobali[par.w] = (conteggioParoleGlobali[par.w] || 0) + 1;
 renderizzaAnalisiPlayerSilent(selAnalisi.value, data, conteggioParoleGlobali);
 
 const bannerSubtitle = document.querySelector('#game-banner .banner-left div:last-child');
-if (bannerSubtitle && !data.prossimaPartita) {
-    bannerSubtitle.innerHTML = risultatiStr;
-}
-}
-}
-});
+        if (bannerSubtitle && !data.prossimaPartita) {
+            bannerSubtitle.innerHTML = risultatiStr;
+        }
+    }
+}   // ← chiude if (data.stato === "conclusa")
+
+});     // ← chiude onSnapshot(async (doc) => { ... })
+
 loadDictionary();
-}
 
 function setProntoOnline() {
 db.collection("partite").doc(matchId).update({
