@@ -1386,8 +1386,6 @@ const mioNome = localStorage.getItem('mioNome');
 let gridSize = 5;
 const MIN_WORD_LENGTH = 4;
 const LETTER_POOL = "AAAAAAAABBCCDDEEEEEEEEFFGGGHHIIIIIILLLMMNNOOOOOOPPQRRSSTTTUUUVVZ";
-let EXTRA_WORDS = ["ASIA", "EUROPA", "AFRICA", "AMERICA", "OCEANIA", "ANTARTIDE", "ITALIA", "CINA", "INDIA", "USA", "RUSSIA", "FRANCIA", "SPAGNA", "GERMANIA", "PERU", "CILE", "IRAN", "IRAQ", "LAOS", "MALI", "CUBA", "FIJI", "TOGO", "ROMA", "MILANO", "NAPOLI", "TORINO", "BARI", "OSLO", "LIMA", "RIGA", "BONN", "NILO", "RENO", "PO", "TEVERE", "ARNO", "ADIGE", "PIAVE", "ADDA", "ALPI", "ANDE", "URALI", "ETNA", "LAGO", "MARE", "MONTE", "CITTA", "ISOLA", "BELA", "LOBO", "LOGO", "JAVA", "HTML", "WEB", "EMAIL", "FILE", "APP", "GODITI", "DIMMI", "DAMMI", "FAMMI", "DILLO", "FALLO", "VATTENE", "PIGLIAMI", "SENTIMI", "ANITA", "LUCA", "MARCO", "ANNA", "MARIA", "PAOLO", "LUIGI", "SARA", "ELENA", "ROSA", "VIOLA", "GIOIA", "SOLE", "LUNA", "STELLA", "PISA", "SIENA", "PARMA", "COMO", "LECCO", "LODI", "ENNA", "RAGUSA", "FOGGIA", "TERNI", "AOSTA", "MONZA", "MEGA", "EZIO", "PORCHI", "MAMELI", "GARDA", "MASAI", "MAASAI", "PABLO", "SELINA", "LAVAREDO", "LARA", "PETO", "GENE", "ENNE", "ALARE", "RAGU", "MONA", "GASAI", "FETA", "FETE", "MASO", "MASI", "MEME", "GASI", "CAGA", "SITE", "CASIO", "ALONSO", "DRENI", "CEDO", "PENTO", "PENTE", "ERMA", "ERMI", "SITA", "TOFU", "POTAI", "PIPPE", "CALCIA", "ERSE", "ERSI", "QUINOA", "GASO", "BUSET", "MISO", "NASA", "EBOLA", "TERA", "NONE", "ZORRO", "EOLIE", "SERI", "SILE", "PELMO", "PITA"];
-let EXCLUDED_WORDS = ["SAETTI", "BIFFE", "PIATO", "PIOTA", "GILE", "GLIE", "GIOI", "POPE", "RAFFA", "RAFFI", "ZAFFI", "PASCI", "MEVE", "MINO", "BASTE", "DIANE", "MAIO", "SPALLI", "RENA", "FELA", "FERA", "GATO", "ZOIA", "ANCE", "ELISE", "ELSE", "FIFE", "PILLI", "PILLO", "BASA", "INIO", "PIVA", "PIVE", "ROMI", "ALPA", "ALPO", "BIDE", "LARIO", "LARO", "LAURI", "PROTI", "NESTO", "TOSONE", "GORE", "BIAVA", "FOIA", "PASSE", "SAPA", "LETO", "LETA", "ORTE", "TORE", "SILA", "SERPA", "ENEO", "LENE", "LENO", "LIANO", "IANO", "MALO", "BALIO", "TELMA", "TALLO", "GRUMA", "GIACO", "PASCO", "CIRA", "VAGITA", "FEDO", "PRECI", "SIRO", "QUIRO", "POTTE", "ROSI", "POTTA", "PELUTO", "BOVO", "BETTO", "CIANA", "CIANE", "CIANI", "VELIE", "FAGO", "CORE", "RICO", "BOVE", "CEBO", "LIMANA", "GIANA", "MUFFI", "MUFFO", "NILA", "FOGNATA", "NASATE", "LICE", "GERI", "MITRE", "TOMA", "PELTA", "POLTA", "FANNE", "INNA", "GENICA", "AGIEA", "FANNI", "SANNA", "SANNE", "GINNO", "FANNI", "OLGO", "CALE", "IMMO", "MITRE", "TREVO", "MESCE", "PINGE", "NINI", "ANITO", "OVATO", "GELSA", "TOSSO", "COTI", "BAULA", "BAULO", "CARMI", "LORA", "SIMO", "BOTRO", "EOLA", "AGGIO", "ALIA", "BORNI", "BORNIA"];
 // --- ACHIEVEMENTS ---
 const ACHIEVEMENTS = [{
 id: 'not_now',
@@ -1558,7 +1556,6 @@ let currentHighlightedWord = null;
 let isCrazyMode = false;
 let isBiatchMode = false;
 let currentGameData = null;
-let dizionarioCustomApplicato = false;
 let unsubscribePartita = null;
 let unsubscribeProposte = null;
 let wordDisplayLocked = false;
@@ -1747,97 +1744,113 @@ msg += `${finito ? '✅' : '⏳'} ${p}: ${s} PT\n`;
 });
 alert(msg);
 }
-// --- ✅ LOAD DICTIONARY CON TIMEOUT ---
+// --- ✅ LOAD DICTIONARY (solo Firebase per extra/excluded) ---
 async function loadDictionary() {
-console.log("🔄 Inizio caricamento dizionario...");
-loadingMsg.style.display = 'flex';
-try {
-const urls = ['https://raw.githubusercontent.com/napolux/paroleitaliane/refs/heads/main/paroleitaliane/280000_parole_italiane.txt', 'https://raw.githubusercontent.com/napolux/paroleitaliane/refs/heads/main/paroleitaliane/9000_nomi_propri.txt'];
-console.log("📡 Download file dizionari...");
-const fetchWithTimeout = (url, timeout = 15000) => {
-return Promise.race([
-fetch(url),
-new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout connessione')), timeout))
-]);
-};
-const responses = await Promise.all(urls.map(url => fetchWithTimeout(url)));
-console.log("📄 Conversione testi...");
-const texts = await Promise.all(responses.map(r => r.text()));
-const addWordsToDictionary = (textData) => {
-textData.split('\n').forEach(w => {
-const clean = w.trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z]/g, "");
-if (clean.length >= MIN_WORD_LENGTH && !EXCLUDED_WORDS.includes(clean)) {
-dictionary.add(clean);
-}
-});
-};
-texts.forEach(t => addWordsToDictionary(t));
-EXTRA_WORDS.forEach(w => dictionary.add(w));
-console.log("🔥 Caricamento dizionario Firebase...");
-try {
-const globalDocPromise = db.collection("config").doc("dizionario").get();
-const globalDoc = await Promise.race([
-globalDocPromise,
-new Promise((_, reject) => setTimeout(() => reject(new Error('Firebase timeout')), 5000))
-]);
-if (globalDoc.exists) {
-const data = globalDoc.data();
-if (data.extra) {
-data.extra.forEach(w => {
-if (w && !EXTRA_WORDS.includes(w)) {
-EXTRA_WORDS.push(w);
-dictionary.add(w);
-}
-});
-}
-if (data.excluded) {
-data.excluded.forEach(w => {
-if (w && !EXCLUDED_WORDS.includes(w)) {
-EXCLUDED_WORDS.push(w);
-dictionary.delete(w);
-}
-});
-}
-console.log("✅ Dizionario Firebase caricato");
-}
-} catch (fbError) {
-console.warn("⚠️ Firebase non disponibile (continuo comunque):", fbError);
-}
-console.log("🌳 Costruzione Trie...");
-buildTrie();
-dictionaryReady = true;
-loadingMsg.style.display = 'none';
-console.log(`✅ DIZIONARIO PRONTO: ${dictionary.size} parole`);
-const codeParam = urlParams.get('code');
+    console.log("🔄 Inizio caricamento dizionario...");
+    loadingMsg.style.display = 'flex';
+    loadingMsg.innerHTML = `
+        <div>Caricamento Dizionario...</div>
+        <div style="font-size:0.85rem; margin-top:8px; color:#777;" id="loading-progress">Download parole italiane...</div>
+    `;
 
-if(codeParam) {
-console.log("🎮 Avvio partita con codice:", codeParam);
-initGame(codeParam);
-} else if (!matchId) {
-// ✅ Solo se NON siamo in multiplayer
-console.log("🏠 Nessun codice - Schermata home");
-gridEl.innerHTML = '';
-displaySeed.textContent = "----";
+    try {
+        const urls = [
+            'https://raw.githubusercontent.com/napolux/paroleitaliane/refs/heads/main/paroleitaliane/280000_parole_italiane.txt',
+            'https://raw.githubusercontent.com/napolux/paroleitaliane/refs/heads/main/paroleitaliane/9000_nomi_propri.txt'
+        ];
+
+        // Download dei file base
+        const texts = [];
+        for (let i = 0; i < urls.length; i++) {
+            document.getElementById('loading-progress').textContent = `Scaricamento file ${i+1}/2...`;
+            const response = await fetchWithTimeout(urls[i], 25000);
+            if (!response.ok) throw new Error(`Errore download file ${i+1}`);
+            texts.push(await response.text());
+        }
+
+        // Popola dictionary con le parole base
+        dictionary.clear(); // pulisci prima
+
+        const addWords = (textData) => {
+            textData.split('\n').forEach(w => {
+                const clean = w.trim().toUpperCase()
+                    .normalize('NFD').replace(/[\u0300-\u036f]/g, "")
+                    .replace(/[^A-Z]/g, "");
+                if (clean.length >= MIN_WORD_LENGTH) {
+                    dictionary.add(clean);
+                }
+            });
+        };
+
+        texts.forEach(addWords);
+
+        console.log(`📚 Parole base caricate: ${dictionary.size}`);
+
+        // === CARICA EXTRA ED EXCLUDED SOLO DA FIREBASE ===
+        document.getElementById('loading-progress').textContent = "Applicazione modifiche Firebase...";
+
+        try {
+            const globalDoc = await Promise.race([
+                db.collection("config").doc("dizionario").get(),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('Firebase timeout')), 8000))
+            ]);
+
+            if (globalDoc.exists) {
+                const data = globalDoc.data();
+
+                // Extra words
+                if (data.extra && Array.isArray(data.extra)) {
+                    data.extra.forEach(w => {
+                        if (w) dictionary.add(w.toUpperCase().trim());
+                    });
+                }
+
+                // Excluded words
+                if (data.excluded && Array.isArray(data.excluded)) {
+                    data.excluded.forEach(w => {
+                        if (w) dictionary.delete(w.toUpperCase().trim());
+                    });
+                }
+            }
+        } catch (fbError) {
+            console.warn("⚠️ Impossibile leggere dizionario Firebase:", fbError);
+        }
+
+        // Costruisci Trie
+        document.getElementById('loading-progress').textContent = "Costruzione indice parole...";
+        buildTrie();
+
+        dictionaryReady = true;
+        loadingMsg.style.display = 'none';
+        console.log(`✅ Dizionario pronto: ${dictionary.size} parole`);
+
+        // Avvio gioco
+        const codeParam = urlParams.get('code');
+        if (codeParam) {
+            initGame(codeParam);
+        } else if (!matchId) {
+            console.log("🏠 Modalità singolo");
+            displaySeed.textContent = "----";
+        }
+
+    } catch (error) {
+        console.error("❌ Errore caricamento dizionario:", error);
+        loadingMsg.innerHTML = `
+            <div style="color:#e74c3c; text-align:center; padding:20px;">
+                ❌ Errore nel caricamento del dizionario<br><br>
+                <small>${error.message}</small><br><br>
+                <button onclick="location.reload()" class="btn-action">🔄 RIPROVA</button>
+            </div>
+        `;
+    }
 }
-// ✅ Se matchId esiste, il listener Firebase gestirà la griglia
-} catch (error) {
-console.error("❌ ERRORE FATALE:", error);
-loadingMsg.innerHTML = `
-			          
-					<div style="color:#e74c3c; text-align:center;">
-			              ❌ Errore caricamento dizionari
-						<br>
-							<small style="opacity:0.8;">${error.message}</small>
-							<br>
-								<br>
-									<button onclick="location.reload()" class="btn-action" style="width:auto; padding:10px 20px;">
-			                  🔄 RIPROVA
-			              </button>
-								</div>
-			      `;
-loadingMsg.style.display = 'flex';
-}
-}
+
+// Funzione di emergenza per test
+window.forceStartWithoutDictionary = function() {
+    dictionaryReady = true;
+    loadingMsg.style.display = 'none';
+    initGame(null);
+};
 // --- CORE GAME LOGIC ---
 function startNewGame() {
 newGameModal.style.display = 'flex';
@@ -3473,24 +3486,6 @@ if (data.dizionarioCustom) {
 const extraLen = (data.dizionarioCustom.extra || []).length;
 const excludedLen = (data.dizionarioCustom.excluded || []).length;
 const currentVersion = `${extraLen}-${excludedLen}`;
-if (!dizionarioCustomApplicato || window.lastDictVersion !== currentVersion) {
-(data.dizionarioCustom.extra || []).forEach(w => {
-if (w && !EXTRA_WORDS.includes(w)) {
-EXTRA_WORDS.push(w);
-dictionary.add(w);
-}
-});
-(data.dizionarioCustom.excluded || []).forEach(w => {
-if (w && !EXCLUDED_WORDS.includes(w)) {
-EXCLUDED_WORDS.push(w);
-dictionary.delete(w);
-}
-});
-buildTrie();
-dizionarioCustomApplicato = true;
-window.lastDictVersion = currentVersion;
-if (DEBUG_MODE) console.log("Dizionario custom aggiornato:", currentVersion);
-}
 }
 const pronti = data.pronti || [];
 const finito = data.finito || [];
@@ -4144,98 +4139,48 @@ async function verificaApplicazioneProposta(docId) {
     }
 }			
 async function applicaModificaDizionario(parola, tipo) {
-// === AGGIORNA DIZIONARIO LOCALE ===
-if (tipo === 'extra') {
-if (!EXTRA_WORDS.includes(parola)) EXTRA_WORDS.push(parola);
-dictionary.add(parola);
-} else {
-if (!EXCLUDED_WORDS.includes(parola)) EXCLUDED_WORDS.push(parola);
-dictionary.delete(parola);
-}
-buildTrie();
+    const parolaUpper = parola.toUpperCase().trim();
 
-if (matchId) {
-// === SALVA NEL DIZIONARIO CUSTOM DELLA PARTITA ===
-// (serve per sincronizzare tutti i client in tempo reale)
-const updateData = {};
-if (tipo === 'extra') {
-updateData['dizionarioCustom.extra'] = firebase.firestore.FieldValue.arrayUnion(parola);
-} else {
-updateData['dizionarioCustom.excluded'] = firebase.firestore.FieldValue.arrayUnion(parola);
-}
-await db.collection("partite").doc(matchId).update(updateData);
+    // Aggiorna dictionary locale
+    if (tipo === 'extra') {
+        dictionary.add(parolaUpper);
+    } else {
+        dictionary.delete(parolaUpper);
+    }
 
-// === RICALCOLA PUNTEGGI PER TUTTI I GIOCATORI ===
-if (tipo === 'exclude' && currentGameData) {
-// Lista completa parole escluse (inclusa quella appena aggiunta)
-const excludedWords = [
-...(currentGameData.dizionarioCustom?.excluded || []),
-parola
-];
+    buildTrie(); // ricostruisci il Trie
 
-const nuoviPunteggi = {};
+    // Salva su Firebase (sia globale che nella partita)
+    try {
+        const globalRef = db.collection("config").doc("dizionario");
+        
+        if (tipo === 'extra') {
+            await globalRef.set({
+                extra: firebase.firestore.FieldValue.arrayUnion(parolaUpper)
+            }, { merge: true });
+        } else {
+            await globalRef.set({
+                excluded: firebase.firestore.FieldValue.arrayUnion(parolaUpper)
+            }, { merge: true });
+        }
 
-currentGameData.partecipanti.forEach(player => {
-// Le parole restano nell'array! Non le tocchiamo
-const parolePlayer = currentGameData.parole[player] || [];
-let punteggio = 0;
+        // Aggiorna anche nella partita corrente (per sincronizzare gli altri giocatori)
+        if (matchId) {
+            const updateData = {};
+            if (tipo === 'extra') {
+                updateData['dizionarioCustom.extra'] = firebase.firestore.FieldValue.arrayUnion(parolaUpper);
+            } else {
+                updateData['dizionarioCustom.excluded'] = firebase.firestore.FieldValue.arrayUnion(parolaUpper);
+            }
+            await db.collection("partite").doc(matchId).update(updateData);
+        }
 
-parolePlayer.forEach(p => {
-// Parola esclusa → 0 punti
-if (excludedWords.includes(p.w)) return;
+        alert(`${tipo === 'extra' ? '✅ Aggiunta' : '🚫 Esclusa'} permanentemente: "${parolaUpper}"`);
 
-// Parola duplicata (trovata da più giocatori) → 0 punti
-let count = 0;
-currentGameData.partecipanti.forEach(altro => {
-const paroleAltro = currentGameData.parole[altro] || [];
-if (paroleAltro.some(x => x.w === p.w)) count++;
-});
-if (count <= 1) punteggio += p.p;
-});
-
-nuoviPunteggi[player] = punteggio;
-});
-
-// Aggiorna SOLO i punteggi (le parole restano intatte)
-await db.collection("partite").doc(matchId).update({
-punteggi: nuoviPunteggi
-});
-
-// Aggiorna locale
-score = nuoviPunteggi[mioNome] || 0;
-scoreDisplay.textContent = score;
-}
-}
-
-// === SALVA NEL DIZIONARIO GLOBALE (per le prossime partite) ===
-const globalRef = db.collection("config").doc("dizionario");
-if (tipo === 'extra') {
-await globalRef.set({
-extra: firebase.firestore.FieldValue.arrayUnion(parola)
-}, { merge: true });
-} else {
-await globalRef.set({
-excluded: firebase.firestore.FieldValue.arrayUnion(parola)
-}, { merge: true });
-}
-
-alert(`${tipo === 'extra' ? '✅ Aggiunta' : '🚫 Rimossa'} PERMANENTEMENTE: "${parola}"`);
-
-// === FORZA REFRESH ANALISI PER ME ===
-// (gli altri ricevono l'aggiornamento tramite onSnapshot)
-if (currentGameData) {
-let conteggioParoleGlobali = {};
-currentGameData.partecipanti.forEach(p => {
-(currentGameData.parole[p] || []).forEach(par => {
-conteggioParoleGlobali[par.w] = (conteggioParoleGlobali[par.w] || 0) + 1;
-});
-});
-
-const selAnalisi = document.getElementById('sel-analisi');
-if (selAnalisi) {
-renderizzaAnalisiPlayerSilent(selAnalisi.value, currentGameData, conteggioParoleGlobali);
-}
-}
+    } catch (e) {
+        console.error("Errore salvataggio Firebase:", e);
+        alert("Parola modificata localmente, ma errore nel salvataggio su Firebase");
+    }
 }
 // ✅ CLEANUP FIREBASE
 function cleanupFirebaseListeners() {
