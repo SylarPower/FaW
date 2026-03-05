@@ -1565,7 +1565,6 @@ let wordDisplayLocked = false;
 let dictionaryReady = false;
 let proposteInCoda = [];
 let isUpdatingWords = false;
-let medal;
 	// --- TRIE ---
 class TrieNode {
 constructor() {
@@ -3496,33 +3495,6 @@ currentGameData = data;
 // === AGGIORNAMENTO PUNTEGGI IN TEMPO REALE ===
 aggiornaInterfacciaMultiplayer(data);
 
-// Aggiorna banner classifica se in stato conclusa
-				if (data.stato === "conclusa") {
-				    let classifica = Object.entries(data.punteggi || {}).sort((a, b) => b[1] - a[1]);
-				    let risultatiStr = classifica.map(([p, s], i) => {
-    const medal = i === 0 ? '👑' : '💀';
-    return `${medal} ${p}: <strong>${s} PT</strong>`;
-}).join('<br>');
-				    
-const subtitleEl = document.querySelector('#game-banner .banner-left div:last-child');
-if (subtitleEl) subtitleEl.innerHTML = risultatiStr;
-				}
-if (data.stato === "conclusa") {
-    let classifica = Object.entries(data.punteggi || {}).sort((a, b) => b[1] - a[1]);
-    const topScore = classifica[0][1];
-    const isPareggio = classifica.filter(([p, s]) => s === topScore).length > 1;
-    
-    let risultatiStr = classifica.map(([p, s], i) => {
-        if (s === topScore && isPareggio) medal = '🤝';
-        else if (i === 0) medal = '👑';
-        else medal = '💀';
-        return `${medal} ${p}: <strong>${s} PT</strong>`;
-    }).join('<br>');
-    
-    const subtitleEl = document.querySelector('#game-banner .banner-left div:last-child');
-    if (subtitleEl) subtitleEl.innerHTML = risultatiStr;
-}
-
 // Aggiorna punteggio proprio se visibile
 if (data.punteggi && data.punteggi[mioNome] !== undefined) {
 score = data.punteggi[mioNome];
@@ -3890,7 +3862,6 @@ buttons: [
 });
 return;
 }
-// Nessuna rivincita - mostra classifica
 // Nessuna rivincita - mostra classifica con gestione pareggio
 let classifica = Object.entries(data.punteggi).sort((a, b) => b[1] - a[1]);
 const topScore = classifica[0][1];
@@ -3900,14 +3871,13 @@ const haVinto = !isPareggio && vincitori[0] === mioNome;
 const haPareggiatoAlTop = isPareggio && vincitori.includes(mioNome);
 
 let risultatiStr = classifica.map(([p, s], i) => {
-    const medal = i === 0 ? '👑' : '💀';
-    if (s === topScore && isPareggio) medal = '🤝';
-    else if (i === 0) medal = '👑';
-    else medal = '💀';
-return `${medal} ${p}: <strong>${s} PT</strong>`;
+    let m;
+    if (s === topScore && isPareggio) m = '🤝';
+    else if (i === 0) m = '👑';
+    else m = '💀';
+    return `${m} ${p}: <strong>${s} PT</strong>`;
 }).join('<br>');
 
-if (haVinto) {
 if (isPareggio) {
     // === PAREGGIO ===
     showGameBanner({
@@ -3923,7 +3893,6 @@ if (isPareggio) {
     });
 
     if (haPareggiatoAlTop) {
-        // Glow arancione per pareggio (più sobrio della vittoria)
         const banner = document.getElementById('game-banner');
         if (banner) {
             banner.style.animation = 'banner-glow-draw 2s infinite';
@@ -3998,7 +3967,8 @@ if (bannerSubtitle && !data.prossimaPartita) {
     bannerSubtitle.innerHTML = risultatiStr;
 }
 }
-};
+}
+});
 loadDictionary();
 }
 
@@ -4037,7 +4007,7 @@ return conteggio;
 }
 async function attivaAnalisiMultiplayer() {
 const loadingDiv = document.createElement('div');
-loadingDiv.innerHTML = ' < div style = "text-align:center; padding:20px;" > ⏳Caricamento analisi... < /div>';
+loadingDiv.innerHTML = '<div style="text-align:center; padding:20px;">⏳ Caricamento analisi...</div>';
 document.getElementById('found-words').appendChild(loadingDiv);
 const snap = await db.collection("partite").doc(matchId).get();
 const data = snap.data();
@@ -4137,20 +4107,14 @@ const prop = change.doc.data();
 
                 // ✅ Se non ho ancora votato
 if (!prop.voti.includes(mioNome)) {
-                    const azione = prop.tipo === 'extra' ? 'AGGIUNGERE' : 'RIMUOVERE DAL DIZIONARIO';
-                    if (confirm(`VOTAZIONE: ${prop.proponente} vuole ${azione} "${prop.parola}". Approvi?`)) {
-                        await db.collection("partite").doc(matchId).collection("proposte")
-                            .doc(docId)
-                            .update({
-                                voti: firebase.firestore.FieldValue.arrayUnion(mioNome)
-                            }).catch(e => console.error("Errore voto:", e));
+                    // Tab nascosta → accoda per dopo
                     if (document.hidden) {
-                        // ✅ Tab non attiva → accoda
                         if (!proposteInCoda.some(p => p.docId === docId)) {
                             proposteInCoda.push({ docId, prop });
                         }
-                        return; // Non fare altro finché non torna in focus
-}
+                        return;
+                    }
+                    // Tab visibile → chiedi voto direttamente
                     await processaProposta(docId, prop);
 }
 
@@ -4168,7 +4132,6 @@ if (!prop.voti.includes(mioNome)) {
                 }
                 // ✅ Controlla se tutti hanno votato
                 await verificaApplicazioneProposta(docId);
-}
 });
 });
 }
