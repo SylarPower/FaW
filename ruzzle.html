@@ -79,18 +79,6 @@
 			transform: translate(1px, -2px) rotate(-1deg);
 			}
 			}
-@keyframes bannerWinShake {
-  0%, 100% { transform: translate(0,0); }
-  20% { transform: translate(-1px, 1px); }
-  40% { transform: translate(1px, -1px); }
-  60% { transform: translate(-1px, -1px); }
-  80% { transform: translate(1px, 1px); }
-}
-
-#game-banner.win-celebration {
-  animation: bannerWinShake 0.35s infinite;
-  box-shadow: 0 0 35px rgba(241, 196, 15, 0.55), 0 4px 15px rgba(0,0,0,0.3);
-}
 			@keyframes disco-flash {
 			0% {
 			background-color: #e74c3c;
@@ -223,6 +211,15 @@
 			body.mega-win-effect {
 			animation: earthquake 0.5s 3, disco-flash 0.5s 3;
 			}
+        /* Aggiunta per vibrazione più fluida */
+        .score-box-container.vibrating {
+            animation: vibrate 0.4s linear infinite;
+        }
+        @keyframes vibrate {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-4px); }
+            75% { transform: translateX(4px); }
+        }
 			/* ✅ DISABILITA ANIMAZIONI DURANTE PROCESSING */
 			body.processing * {
 			animation-play-state: paused !important;
@@ -1354,7 +1351,6 @@
 			};
 			firebase.initializeApp(firebaseConfig);
 			const db = firebase.firestore();
-			const DEBUG_MODE = false;
 			// Variabili per il match live
 			const urlParams = new URLSearchParams(window.location.search);
 			const matchId = urlParams.get('matchId');
@@ -1528,19 +1524,12 @@
 			let isCrazyMode = false;
 			let isBiatchMode = false;
 			let currentGameData = null;
-			let dizionarioCustomApplicato = false;
 			let unsubscribePartita = null;
+			let unsubscribeProposte = null;
 			let wordDisplayLocked = false;
 			let dictionaryReady = false;
-			let unsubscribeEliminazioni = null;
-			let pendingEliminations = new Map(); // word -> docData (pending)
-			let shownVotePromptFor = new Set();  // word -> per non ripromptare a raffica
-			let lastWinnerName = null;
+			let proposteAttive = new Map(); // parola → {proponente, voti}
 
-			// helper: esclusioni partita corrente
-			function getMatchExcludedSet(data) {
-			  return new Set((data && Array.isArray(data.paroleEscluse)) ? data.paroleEscluse : []);
-			}
 			// --- TRIE ---
 			class TrieNode {
 			  constructor() {
@@ -1741,35 +1730,21 @@
 			    const addWordsToDictionary = (textData) => {
 			      textData.split('\n').forEach(w => {
 			        const clean = w.trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z]/g, "");
-			        if (clean.length >= MIN_WORD_LENGTH) {
-			          dictionary.add(clean);
-			        }
+					if (clean.length >= MIN_WORD_LENGTH) {
+						 dictionary.add(clean);
+					}
 			      });
 			    };
 			    texts.forEach(t => addWordsToDictionary(t));
-				console.log("🔥 Caricamento dizionario Firebase (source of truth)...");
-				try {
-				  const globalDoc = await db.collection("config").doc("dizionario").get();
-				  if (globalDoc.exists) {
-					 const data = globalDoc.data() || {};
-					 const extra = Array.isArray(data.extra) ? data.extra : [];
-					 const excluded = Array.isArray(data.excluded) ? data.excluded : [];
-
-					 // Applica extra
-					 extra.forEach(w => {
-						if (w) dictionary.add(String(w).trim().toUpperCase());
-					 });
-
-					 // Applica excluded
-					 excluded.forEach(w => {
-						if (w) dictionary.delete(String(w).trim().toUpperCase());
-					 });
-
-					 console.log(`✅ Dizionario Firebase applicato (extra:${extra.length}, excluded:${excluded.length})`);
-				  }
-				} catch (fbError) {
-				  console.warn("⚠️ Firebase dizionario non disponibile (continuo comunque):", fbError);
-				}
+			    console.log("🔥 Caricamento dizionario Firebase...");
+			    try {
+			      const globalDocPromise = db.collection("config").doc("dizionario").get();
+			      const globalDoc = await Promise.race([
+			        globalDocPromise,
+			        new Promise((_, reject) => setTimeout(() => reject(new Error('Firebase timeout')), 5000))
+			    } catch (fbError) {
+			      console.warn("⚠️ Firebase non disponibile (continuo comunque):", fbError);
+			    }
 			    console.log("🌳 Costruzione Trie...");
 			    buildTrie();
 			    dictionaryReady = true;
@@ -2565,7 +2540,7 @@
 			    document.querySelectorAll('.tile').forEach(t => t.classList.remove('anim-valid'));
 			  }, 1500);
 			}
-			
+
 			// --- ✅ SISTEMA VALIDAZIONE OTTIMIZZATO ---
 			const endDrag = () => {
 			    if (!inputState.isDragging) return;
@@ -3057,7 +3032,53 @@
 			function copySeedNewGame() {
 			  navigator.clipboard.writeText(currentSeed);
 			}
-			
+			function getConteggioGlobaleAggiornato(paroleMap) {
+				 let conteggio = {};
+				 Object.values(paroleMap).forEach(lista => {
+					  lista.forEach(par => {
+							conteggio[par.w] = (conteggio[par.w] || 0) + 1;
+					  });
+				 });
+				 return conteggio;
+			}
+
+        function controllaCambioVincitore(nuoviPunteggi) {
+            if (!currentGameData) return;
+            const vecchioVincitore = Object.entries(currentGameData.punteggi || {})
+                .sort((a,b)=>b[1]-a[1])[0]?.[0];
+            const nuovoVincitore = Object.entries(nuoviPunteggi)
+                .sort((a,b)=>b[1]-a[1])[0]?.[0];
+
+            if (nuovoVincitore !== vecchioVincitore && nuovoVincitore === mioNome) {
+                celebraVittoria();
+            }
+        }
+        async function proponiParola(tipo, parola, playerOwner = null) {
+            if (!currentGameData || !matchId) return;
+            if (proposteAttive.has(parola)) {
+                alert("Esiste già una proposta attiva per questa parola.");
+                return;
+            }
+
+            const azione = tipo === 'extra' ? "AGGIUNGERE" : "ELIMINARE";
+            if (!confirm(`Vuoi proporre di ${azione} definitivamente la parola "${parola}"?\n\nTutti i giocatori devono approvare all'unanimità.`)) return;
+
+            const proposta = {
+                parola: parola,
+                tipo: tipo,
+                proponente: mioNome,
+                playerOwner: playerOwner,
+                voti: [mioNome],
+                timestamp: Date.now()
+            };
+
+            await db.collection("partite").doc(matchId)
+                .collection("proposte")
+                .doc(parola)
+                .set(proposta);
+
+            alert(`Proposta di ${tipo === 'extra' ? 'inserimento' : 'eliminazione'} inviata!`);
+        }
 			function copyWords() {
 			  const listItems = document.querySelectorAll('#found-words li');
 			  const exportList = [];
@@ -3205,7 +3226,7 @@
 			    }).onfinish = () => p.remove();
 			  }
 			}
-			
+		
 			
 			function stopFireworks() {
 			  if (fireworksInterval) {
@@ -3213,72 +3234,23 @@
 			    fireworksInterval = null;
 			  }
 			}
-			
-			function launchFirework() {
-			  const colors = ['#ff0044', '#ffff00', '#00ff44', '#00ccff', '#ff00ff'];
-			  const startX = Math.random() * window.innerWidth;
-			  const startY = window.innerHeight;
-			  const endX = startX + (Math.random() - 0.5) * 200;
-			  const endY = window.innerHeight * 0.2 + Math.random() * window.innerHeight * 0.4;
-			  const color = colors[Math.floor(Math.random() * colors.length)];
-			  const rocket = document.createElement('div');
-			  rocket.style.position = 'fixed';
-			  rocket.style.left = startX + 'px';
-			  rocket.style.top = startY + 'px';
-			  rocket.style.width = '4px';
-			  rocket.style.height = '12px';
-			  rocket.style.background = color;
-			  rocket.style.borderRadius = '2px';
-			  rocket.style.zIndex = '9998';
-			  document.body.appendChild(rocket);
-			  rocket.animate([{
-			    transform: `translate(0, 0)`
-			  }, {
-			    transform: `translate(${endX - startX}px, ${endY - startY}px)`
-			  }], {
-			    duration: 1000,
-			    easing: 'ease-out'
-			  }).onfinish = () => {
-			    rocket.remove();
-			    explode(endX, endY, color);
-			  };
-			
-			  function explode(x, y, color) {
-			    for (let i = 0; i < 80; i++) {
-			      const p = document.createElement('div');
-			      p.style.position = 'fixed';
-			      p.style.left = x + 'px';
-			      p.style.top = y + 'px';
-			      p.style.width = '6px';
-			      p.style.height = '6px';
-			      p.style.backgroundColor = color;
-			      p.style.borderRadius = '50%';
-			      p.style.zIndex = '9998';
-			      const angle = Math.random() * Math.PI * 2;
-			      const velocity = Math.random() * 100;
-			      const tx = Math.cos(angle) * velocity;
-			      const ty = Math.sin(angle) * velocity;
-			      document.body.appendChild(p);
-			      p.animate([{
-			        transform: `translate(0,0) scale(1)`,
-			        opacity: 1,
-			        offset: 0
-			      }, {
-			        transform: `translate(${tx}px, ${ty}px) scale(0.9)`,
-			        opacity: 0.9,
-			        offset: 0.2
-			      }, {
-			        transform: `translate(${tx}px, ${ty + 500}px) scale(0)`,
-			        opacity: 0,
-			        offset: 1
-			      }], {
-			        duration: 2000 + Math.random() * 2000,
-			        easing: 'linear'
-			      }).onfinish = () => p.remove();
-			    }
-			  }
-			}
-			
+        function celebraVittoria() {
+            document.body.classList.add('mega-win-effect');
+            
+            const scoreBox = document.querySelector('.score-box-container');
+            if (scoreBox) {
+                scoreBox.classList.add('vibrating');
+                setTimeout(() => scoreBox.classList.remove('vibrating'), 1200);
+            }
+            
+            fireConfettiLight();
+            
+            const scoreVal = document.getElementById('total-score');
+            if (scoreVal) {
+                scoreVal.style.textShadow = '0 0 30px #f1c40f';
+                setTimeout(() => scoreVal.style.textShadow = '', 2800);
+            }
+        }	
 			function showBiatchOverlay() {
 			  const texts = ["GIRA BIATCH!", "OPS!", "DI QUA!", "MUOVITI!", "🐷🐷🐷"];
 			  const overlay = document.createElement('div');
@@ -3333,6 +3305,7 @@
 			} else {
 			  // MODALITÀ MULTIPLAYER
 			  if (unsubscribePartita) unsubscribePartita();
+			  if (unsubscribeProposte) unsubscribeProposte();
 			  // ✅ LISTENER PRINCIPALE PARTITA
 			  unsubscribePartita = db.collection("partite").doc(matchId).onSnapshot(async doc => {
 			    const data = doc.data();
@@ -3341,6 +3314,7 @@
 			      return;
 			    }
 			    currentGameData = data;
+				// Gestione lock eliminazione
 				  // Nascondi SEMPRE la lobby (usiamo solo banner)
 			    document.getElementById('multiplayer-lobby').style.display = 'none';
 			    const btnNewEl = document.querySelector('.btn-new');
@@ -3680,34 +3654,22 @@ if (data.stato === "in_corso") {
 			return;
 			}
 			      // Nessuna rivincita - mostra classifica
-					let classifica = Object.entries(data.punteggi || {}).sort((a, b) => b[1] - a[1]);
-					const winner = classifica.length ? classifica[0][0] : null;
-					const haVinto = (winner === mioNome);
-
-					let risultatiStr = classifica.map(([p, s]) => `${p}: ${s}`).join(' | ');
-
-					showGameBanner({
-					  icon: haVinto ? '👑' : '🐷',
-					  title: haVinto ? 'VITTORIA!' : 'SCONFITTA!',
-					  subtitle: risultatiStr,
-					  color: haVinto ? '#f1c40f' : '#7f8c8d',
-					  buttons: [{
-						 text: '🔄 RIVINCITA',
-						 onclick: 'apriRivincitaBanner()',
-						 special: true
-					  }]
-					});
-
-					// Se cambia winner => aggiorna celebrazione
-					if (winner !== lastWinnerName) {
-					  lastWinnerName = winner;
-					  setWinCelebration(false);     // reset
-					  if (haVinto) setWinCelebration(true);
-					} else {
-					  // winner invariato: mantieni coerente lo stato
-					  setWinCelebration(haVinto);
-					}
+			      let classifica = Object.entries(data.punteggi).sort((a, b) => b[1] - a[1]);
+			      const haVinto = classifica[0][0] === mioNome;
+			      let risultatiStr = classifica.map(([p, s]) => `${p}: ${s}`).join(' | ');
+			      showGameBanner({
+			        icon: haVinto ? '👑' : '🐷',
+			        title: haVinto ? 'VITTORIA!' : 'SCONFITTA!',
+			        subtitle: risultatiStr,
+			        color: haVinto ? '#f1c40f' : '#7f8c8d',
+			        buttons: [{
+			          text: '🔄 RIVINCITA',
+			          onclick: 'apriRivincitaBanner()',
+			          special: true
+			        }]
+			      });
 					// ✅ Attiva/Aggiorna analisi
+					if (haVinto) celebraVittoria();
 					if (!window.analisiGiaAttivata) {
 					    window.analisiGiaAttivata = true;
 					    setTimeout(() => attivaAnalisiMultiplayerSilent(), 500);
@@ -3738,6 +3700,41 @@ if (data.stato === "in_corso") {
 					}
 			    }
 			  });
+// Listener proposte eliminazione
+db.collection("partite").doc(matchId).collection("proposte_eliminazione").onSnapshot(snap => {
+    snap.docChanges().forEach(async change => {
+        const prop = change.doc.data();
+        const parola = prop.parola;
+
+        if (change.type === "added" || change.type === "modified") {
+            proposteAttive.set(parola, prop);
+
+            // Se non ho ancora votato
+            if (!prop.voti.includes(mioNome)) {
+                const ok = confirm(`PROPOSTA ELIMINAZIONE\n\n${prop.proponente} propone di eliminare la parola "${parola}"\n\nApprovi?`);
+                if (ok) {
+                    await db.collection("partite").doc(matchId)
+                        .collection("proposte_eliminazione")
+                        .doc(parola)
+                        .update({
+                            voti: firebase.firestore.FieldValue.arrayUnion(mioNome)
+                        });
+                }
+            }
+
+            // Controlla se unanime
+            if (prop.voti.length >= currentGameData.partecipanti.length) {
+                await applicaEliminazioneParola(parola);
+                // Cancella la proposta
+                await db.collection("partite").doc(matchId)
+                    .collection("proposte_eliminazione")
+                    .doc(parola)
+                    .delete();
+                proposteAttive.delete(parola);
+            }
+        }
+    });
+});
 			  loadDictionary();
 			}
 			
@@ -3774,77 +3771,6 @@ if (data.stato === "in_corso") {
 			    });
 			    return conteggio;
 			}
-			async function attivaAnalisiMultiplayer() {
-			  const loadingDiv = document.createElement('div');
-			  loadingDiv.innerHTML = ' < div style = "text-align:center; padding:20px;" > ⏳Caricamento analisi... < /div>';
-			  document.getElementById('found-words').appendChild(loadingDiv);
-			  const snap = await db.collection("partite").doc(matchId).get();
-			  const data = snap.data();
-			  loadingDiv.remove();
-			  document.getElementById('multiplayer-lobby').style.display = 'none';
-			  isAnalysisPhase = true;
-			  isGameActive = true;
-			  if (document.getElementById('analysis-msg')) document.getElementById('analysis-msg').style.display = "block";
-			  if (document.getElementById('btn-missed')) document.getElementById('btn-missed').style.display = "block";
-			  let conteggioParoleGlobali = {};
-			  data.partecipanti.forEach(p => {
-			    (data.parole[p] || []).forEach(par => {
-			      conteggioParoleGlobali[par.w] = (conteggioParoleGlobali[par.w] || 0) + 1;
-			    });
-			  });
-			  const wordsListEl = document.getElementById('found-words');
-			  wordsListEl.innerHTML = "";
-			  if (!document.getElementById('sel-analisi')) {
-			    const headerDiv = document.createElement('div');
-			    headerDiv.style = "background:#2c3e50; padding:10px; border-radius:5px; margin-bottom:10px;";
-			    headerDiv.innerHTML = `
-																<label style="font-size:0.7rem; font-weight:bold; display:block; margin-bottom:5px;">MOSTRA PAROLE DI:</label>
-																<select id="sel-analisi" style="width:100%; background:#1e1e1e; color:white; border:1px solid #444; padding:5px;"></select>`;
-			    wordsListEl.parentNode.insertBefore(headerDiv, wordsListEl);
-			    const sel = document.getElementById('sel-analisi');
-			    data.partecipanti.forEach(p => {
-			      const o = document.createElement('option');
-			      o.value = p;
-			      o.textContent = p + (p === mioNome ? " (TU)" : "");
-			      sel.appendChild(o);
-			    });
-			    sel.onchange = (e) => renderizzaAnalisiPlayer(e.target.value);
-			  }
-			  const renderizzaAnalisiPlayer = (nomePlayer) => {
-			    wordsListEl.innerHTML = "";
-			    const parole = (data.parole[nomePlayer] || []).sort((a, b) => a.w.localeCompare(b.w));
-			    parole.forEach(item => {
-			      foundWords.set(item.w, {
-			        points: item.p,
-			        path: item.path
-			      });
-			      const isDuplicata = conteggioParoleGlobali[item.w] > 1;
-			      const li = document.createElement('li');
-			      if (isDuplicata) {
-			        li.style.textDecoration = "line-through";
-			        li.style.opacity = "0.5";
-			      }
-			      li.innerHTML = `
-			              
-																<div class="word-item-left">
-																	<button class="btn-eye" onclick="showWordOnGrid('${item.w}')">👁️</button>
-																	<span>${item.w}</span>
-																	<button onclick="inviaPropostaFirebase('${item.w}', 'exclude')" style="background:none; border:none; cursor:pointer;" title="Proponi Rimozione">📢</button>
-																</div>
-																<span class="pts">${isDuplicata ? 0 : item.p}</span>`;
-			      wordsListEl.appendChild(li);
-			    });
-			  };
-			  renderizzaAnalisiPlayer(mioNome);
-			  const btnTornaLobby = document.createElement('button');
-			  btnTornaLobby.textContent = "⬅️ TORNA ALLA LOBBY / RIVINCITA";
-			  btnTornaLobby.className = 'btn-action';
-			  btnTornaLobby.style.marginTop = '15px';
-			  btnTornaLobby.onclick = () => {
-			    document.getElementById('multiplayer-lobby').style.display = 'flex';
-			  };
-			  wordsListEl.parentNode.appendChild(btnTornaLobby);
-			}
 			
 			// ✅ CLEANUP FIREBASE
 			function cleanupFirebaseListeners() {
@@ -3852,10 +3778,10 @@ if (data.stato === "in_corso") {
 			    unsubscribePartita();
 			    unsubscribePartita = null;
 			  }
-				if (unsubscribeEliminazioni) {
-				  unsubscribeEliminazioni();
-				  unsubscribeEliminazioni = null;
-				}
+			  if (unsubscribeProposte) {
+			    unsubscribeProposte();
+			    unsubscribeProposte = null;
+			  }
 			}
 			window.addEventListener('beforeunload', cleanupFirebaseListeners);
 			window.addEventListener('pagehide', cleanupFirebaseListeners);
@@ -4040,183 +3966,104 @@ if (data.stato === "in_corso") {
 			  });
 			}
 			}
-			async function attivaAnalisiMultiplayerSilent() {
-			    const snap = await db.collection("partite").doc(matchId).get();
-			    const data = snap.data();
-			    isAnalysisPhase = true;
-			    isGameActive = true;
-			    isSandboxMode = true;
-			
-			    analysisMsg.style.display = "block";
-			    btnMissed.style.display = "block";
-			    sortControls.style.display = "flex";
-			
-			    let conteggioParoleGlobali = {};
-			    data.partecipanti.forEach(p => {
-			        (data.parole[p] || []).forEach(par => {
-			            conteggioParoleGlobali[par.w] = (conteggioParoleGlobali[par.w] || 0) + 1;
-			        });
-			    });
-			
-			    const wordsListEl = document.getElementById('found-words');
-			    wordsListEl.innerHTML = "";
-			
-			    // Header "MOSTRA PAROLE DI" - sempre con TU per primo
-			    if (!document.getElementById('sel-analisi')) {
-			        const headerDiv = document.createElement('div');
-			        headerDiv.style = "background:#2c3e50; padding:10px; border-radius:5px; margin-bottom:10px;";
-			        headerDiv.innerHTML = `
-			            <label style="font-size:0.7rem; font-weight:bold; display:block; margin-bottom:5px;">MOSTRA PAROLE DI:</label>
-			            <select id="sel-analisi" style="width:100%; background:#1e1e1e; color:white; border:1px solid #444; padding:5px;"></select>`;
-			
-			        wordsListEl.parentNode.insertBefore(headerDiv, wordsListEl);
-			
-			        const sel = document.getElementById('sel-analisi');
-			        const partecipantiOrdinati = [mioNome, ...data.partecipanti.filter(p => p !== mioNome)];
-			        
-			        partecipantiOrdinati.forEach(p => {
-			            const o = document.createElement('option');
-			            o.value = p;
-			            o.textContent = p + (p === mioNome ? " (TU)" : "");
-			            sel.appendChild(o);
-			        });
-			
-			        sel.value = mioNome;
-			        sel.onchange = () => renderizzaAnalisiPlayerSilent(sel.value, data, conteggioParoleGlobali);
-			    }
-			
-			    renderizzaAnalisiPlayerSilent(mioNome, data, conteggioParoleGlobali);
-			
-			}
-			
-function renderizzaAnalisiPlayerSilent(nomePlayer, data, conteggioParoleGlobali) {
-  const wordsListEl = document.getElementById('found-words');
-  wordsListEl.innerHTML = "";
-  foundWords.clear();
+        async function attivaAnalisiMultiplayerSilent() {
+            const snap = await db.collection("partite").doc(matchId).get();
+            const data = snap.data();
+            
+            document.getElementById('proposta-manuale-container').style.display = 'block';
+            isAnalysisPhase = true;
+            isGameActive = true;
+            isSandboxMode = true;
 
-  const excludedSet = getMatchExcludedSet(data);
+            analysisMsg.style.display = "block";
+            btnMissed.style.display = "block";
+            sortControls.style.display = "flex";
 
-  const parole = (data.parole?.[nomePlayer] || []).sort((a, b) => a.w.localeCompare(b.w));
+            let conteggio = getConteggioGlobaleAggiornato(data.parole || {});
 
-  parole.forEach(item => {
-    const w = item.w;
+            const wordsListEl = document.getElementById('found-words');
+            wordsListEl.innerHTML = "";
 
-    const isDuplicata = (conteggioParoleGlobali[w] || 0) > 1;
-    const isEsclusaMatch = excludedSet.has(w);
-    const isZero = isDuplicata || isEsclusaMatch;
+            if (!document.getElementById('sel-analisi')) {
+                const headerDiv = document.createElement('div');
+                headerDiv.style = "background:#2c3e50; padding:10px; border-radius:5px; margin-bottom:10px;";
+                headerDiv.innerHTML = `
+                    <label style="font-size:0.7rem; font-weight:bold; display:block; margin-bottom:5px;">MOSTRA PAROLE DI:</label>
+                    <select id="sel-analisi" style="width:100%; background:#1e1e1e; color:white; border:1px solid #444; padding:5px;"></select>`;
 
-    foundWords.set(w, { points: item.p, path: item.path, active: true });
+                wordsListEl.parentNode.insertBefore(headerDiv, wordsListEl);
 
-    const isPending = pendingEliminations.has(w);
+                const sel = document.getElementById('sel-analisi');
+                const partecipantiOrdinati = [mioNome, ...data.partecipanti.filter(p => p !== mioNome)];
+                
+                partecipantiOrdinati.forEach(p => {
+                    const o = document.createElement('option');
+                    o.value = p;
+                    o.textContent = p + (p === mioNome ? " (TU)" : "");
+                    sel.appendChild(o);
+                });
 
-    const li = document.createElement('li');
-    li.dataset.word = w;
-    if (isZero) li.classList.add('deleted');
+                // Parte dal vincitore
+                const vincitore = Object.entries(data.punteggi || {})
+                    .sort((a,b) => b[1]-a[1])[0]?.[0] || mioNome;
 
-    const labelPts = isEsclusaMatch
-      ? '0 (excl)'
-      : (isDuplicata ? '0 (dup)' : String(item.p));
+                sel.value = vincitore;
+                sel.onchange = () => renderizzaAnalisiPlayerSilent(sel.value, data, conteggio);
+            }
 
-    const disBtn = (isPending || isEsclusaMatch) ? 'disabled' : '';
-    const btnText = isPending ? '⏳' : '🚫';
-    const btnTitle = isPending
-      ? 'Votazione in corso'
-      : (isEsclusaMatch ? 'Già esclusa' : 'Proponi eliminazione (serve unanimità)');
-
-    li.innerHTML = `
-      <div class="word-item-left">
-        <button class="btn-eye" onclick="event.stopPropagation(); showWordOnGrid('${w}')" title="Mostra">👁️</button>
-        <span>${w}</span>
-        <button
-          ${disBtn}
-          onclick="event.stopPropagation(); proponiEliminazioneParola('${w}')"
-          style="background:none; border:none; cursor:${(isPending || isEsclusaMatch) ? 'not-allowed' : 'pointer'}; opacity:${(isPending || isEsclusaMatch) ? '0.4' : '1'};"
-          title="${btnTitle}"
-        >${btnText}</button>
-      </div>
-      <span class="pts">${labelPts}</span>
-    `;
-
-    wordsListEl.appendChild(li);
-  });
-
-  wordCountDisplay.textContent = parole.length;
-  wordsListEl.classList.remove('interactive'); // non si cliccano più per “eliminare direttamente”
-}
-// ✅ TOGGLE PAROLA IN MULTIPLAYER (elimina/ripristina)
-async function toggleWordMultiplayer(word, li, data, conteggioParoleGlobali) {
-    const isDeleted = li.classList.contains('deleted');
-    
-    if (isDeleted) {
-        // RIPRISTINA: riaggiunge la parola
-        li.classList.remove('deleted');
-        const wordData = foundWords.get(word);
-        const pts = wordData ? wordData.points : 0;
-        li.querySelector('.pts').textContent = pts;
-        
-        // Aggiungi a Firebase
-        const mieParole = data.parole[mioNome] || [];
-        const esisteGia = mieParole.some(p => p.w === word);
-        
-        if (!esisteGia && wordData) {
-            mieParole.push({ w: word, p: wordData.points, path: wordData.path });
+            renderizzaAnalisiPlayerSilent(mioNome, data, conteggio);
         }
-        
-        try {
-            // Ricalcola punteggio
-            let nuovoPunteggio = 0;
-            mieParole.forEach(p => {
-                const isDup = conteggioParoleGlobali[p.w] > 1;
-                if (!isDup) nuovoPunteggio += p.p;
+
+        function renderizzaAnalisiPlayerSilent(nomePlayer, data, conteggio) {
+            const wordsListEl = document.getElementById('found-words');
+            wordsListEl.innerHTML = "";
+            foundWords.clear();
+
+            const parole = (data.parole[nomePlayer] || []).sort((a,b) => a.w.localeCompare(b.w));
+            let playerScore = 0;
+
+            parole.forEach(item => {
+                const isDuplicata = conteggio[item.w] > 1;
+                const puntiEffettivi = isDuplicata ? 0 : item.p;
+                playerScore += puntiEffettivi;
+
+                foundWords.set(item.w, { points: item.p, path: item.path });
+
+                const li = document.createElement('li');
+                li.dataset.word = item.w;
+                if (isDuplicata) li.classList.add('deleted');
+
+                li.innerHTML = `
+                    <div class="word-item-left">
+                        <button class="btn-eye" onclick="event.stopPropagation(); showWordOnGrid('${item.w}')">👁️</button>
+                        <span>${item.w}</span>
+                        ${!isDuplicata ? `<button onclick="event.stopPropagation(); proponiParola('exclude','${item.w}','${nomePlayer}')" style="background:none;border:none;cursor:pointer;font-size:1.2rem;" title="Proponi eliminazione">✂️</button>` : ''}
+                    </div>
+                    <span class="pts">${isDuplicata ? '0 (dup)' : puntiEffettivi}</span>
+                `;
+                wordsListEl.appendChild(li);
             });
-            
-            await db.collection("partite").doc(matchId).update({
-                [`parole.${mioNome}`]: mieParole,
-                [`punteggi.${mioNome}`]: nuovoPunteggio
-            });
-            
-            score = nuovoPunteggio;
-            scoreDisplay.textContent = nuovoPunteggio;
-            
-        } catch(e) {
-            console.error("Errore ripristino parola:", e);
-            li.classList.add('deleted');
+
+            if (nomePlayer === mioNome) {
+                score = playerScore;
+                scoreDisplay.textContent = score;
+            }
+            wordCountDisplay.textContent = parole.length;
         }
-        
-    } else {
-        // ELIMINA: rimuove la parola
-        li.classList.add('deleted');
-        li.querySelector('.pts').textContent = '0';
-        
-        // Rimuovi da Firebase
-        let mieParole = data.parole[mioNome] || [];
-        mieParole = mieParole.filter(p => p.w !== word);
-        
-        try {
-            // Ricalcola punteggio
-            let nuovoPunteggio = 0;
-            mieParole.forEach(p => {
-                const isDup = conteggioParoleGlobali[p.w] > 1;
-                if (!isDup) nuovoPunteggio += p.p;
-            });
-            
-            await db.collection("partite").doc(matchId).update({
-                [`parole.${mioNome}`]: mieParole,
-                [`punteggi.${mioNome}`]: nuovoPunteggio
-            });
-            
-            score = nuovoPunteggio;
-            scoreDisplay.textContent = nuovoPunteggio;
-            
-            // Aggiorna anche il conteggio globale
-            conteggioParoleGlobali[word] = (conteggioParoleGlobali[word] || 1) - 1;
-            
-        } catch(e) {
-            console.error("Errore eliminazione parola:", e);
-            li.classList.remove('deleted');
+		  
+        function proponiParolaManuale() {
+            const input = document.getElementById('input-nuova-parola');
+            const parola = input.value.trim().toUpperCase().replace(/[^A-Z]/g, '');
+            if (parola.length < 4) return alert("Minimo 4 lettere!");
+            proponiParola('extra', parola);
+            input.value = '';
         }
+
+    // Inizializzazione listener proposte
+    if (matchId) {
+        setupProposteListener();
     }
-}		
+
 			function apriModalRivincita() {
 			  document.getElementById('multiplayer-lobby').style.display = 'none';
 			  apriRivincitaBanner();
@@ -4242,157 +4089,7 @@ async function toggleWordMultiplayer(word, li, data, conteggioParoleGlobali) {
 			    actionDiv.appendChild(btnTorna);
 			  }
 			}
-			function getConteggioGlobaleFromData(data) {
-			  let conteggio = {};
-			  if (!data || !data.partecipanti) return conteggio;
-
-			  data.partecipanti.forEach(p => {
-				 (data.parole?.[p] || []).forEach(par => {
-					conteggio[par.w] = (conteggio[par.w] || 0) + 1;
-				 });
-			  });
-			  return conteggio;
-			}
-
-			async function proponiEliminazioneParola(parola) {
-			  parola = String(parola || '').trim().toUpperCase();
-			  if (!matchId || !parola) return;
-
-			  // se già pending, stop
-			  const pend = pendingEliminations.get(parola);
-			  if (pend && pend.stato === 'pending') {
-				 alert(`C'è già una votazione in corso per "${parola}".`);
-				 return;
-			  }
-
-			  if (!confirm(`Vuoi proporre l'eliminazione di "${parola}"?\n(Serve approvazione di tutti)`)) return;
-
-			  const ref = db.collection("partite").doc(matchId).collection("eliminazioni").doc(parola);
-
-			  try {
-				 await db.runTransaction(async (tx) => {
-					const snap = await tx.get(ref);
-					if (snap.exists) {
-					  const d = snap.data() || {};
-					  if (d.stato === 'pending') {
-						 throw new Error("Votazione già in corso");
-					  }
-					}
-					tx.set(ref, {
-					  parola,
-					  proponente: mioNome,
-					  stato: 'pending',
-					  createdAt: Date.now(),
-					  voti: { [mioNome]: true }
-					});
-				 });
-			  } catch (e) {
-				 console.error(e);
-				 alert(`Impossibile proporre: ${e.message || e}`);
-				 return;
-			  }
-
-			  alert("Proposta inviata. Gli altri devono votare.");
-			}
-
-			async function votaEliminazioneParola(parola, approvo) {
-			  parola = String(parola || '').trim().toUpperCase();
-			  if (!matchId || !parola) return;
-
-			  const elimRef = db.collection("partite").doc(matchId).collection("eliminazioni").doc(parola);
-			  const matchRef = db.collection("partite").doc(matchId);
-			  const configRef = db.collection("config").doc("dizionario");
-
-			  try {
-				 await db.runTransaction(async (tx) => {
-					const elimSnap = await tx.get(elimRef);
-					const matchSnap = await tx.get(matchRef);
-					if (!elimSnap.exists) return;
-
-					const elim = elimSnap.data() || {};
-					if (elim.stato !== 'pending') return;
-
-					const match = matchSnap.data() || {};
-					const players = match.partecipanti || [];
-
-					// scrivo il mio voto
-					tx.update(elimRef, { [`voti.${mioNome}`]: !!approvo });
-
-					// rileggo "virtualmente" i voti (elim + il mio appena scritto)
-					const voti = { ...(elim.voti || {}), [mioNome]: !!approvo };
-
-					// se qualcuno rifiuta => chiudi ciclo (delete doc)
-					const qualcunoHaRifiutato = Object.values(voti).some(v => v === false);
-					if (qualcunoHaRifiutato) {
-					  tx.delete(elimRef);
-					  return;
-					}
-
-					// se non hanno votato tutti, attendi
-					const hannoVotatoTutti = players.length > 0 && players.every(p => typeof voti[p] !== 'undefined');
-					if (!hannoVotatoTutti) return;
-
-					// tutti true => applica esclusione
-					const excludedSet = new Set([...(match.paroleEscluse || []), parola]);
-
-					// conteggio globale parole (dup)
-					const wordCount = {};
-					players.forEach(p => {
-					  (match.parole?.[p] || []).forEach(par => {
-						 wordCount[par.w] = (wordCount[par.w] || 0) + 1;
-					  });
-					});
-
-					// ricalcolo punteggi: conta solo (non dup) e (non esclusa)
-					const nuoviPunteggi = {};
-					players.forEach(p => {
-					  let s = 0;
-					  (match.parole?.[p] || []).forEach(par => {
-						 const w = par.w;
-						 if (excludedSet.has(w)) return;
-						 if ((wordCount[w] || 0) === 1) s += par.p;
-					  });
-					  nuoviPunteggi[p] = s;
-					});
-
-					tx.update(matchRef, {
-					  paroleEscluse: firebase.firestore.FieldValue.arrayUnion(parola),
-					  punteggi: nuoviPunteggi
-					});
-
-					// aggiorna excluded globali
-					tx.set(configRef, {
-					  excluded: firebase.firestore.FieldValue.arrayUnion(parola)
-					}, { merge: true });
-
-					// chiudi ciclo
-					tx.delete(elimRef);
-				 });
-			  } catch (e) {
-				 console.error("Errore voto/applicazione:", e);
-				 alert("Errore durante voto/applicazione.");
-			  }
-			}			
-let winConfettiCooldown = 0;
-
-function setWinCelebration(active) {
-  const banner = document.getElementById('game-banner');
-  if (!banner) return;
-
-  banner.classList.toggle('win-celebration', !!active);
-
-  if (active) {
-    // vibrazione “fisica” su mobile (se supportato)
-    try { if (navigator.vibrate) navigator.vibrate([120, 60, 120, 60, 200]); } catch(e){}
-
-    // confetti “carini” (no fuochi)
-    const now = Date.now();
-    if (now > winConfettiCooldown) {
-      winConfettiCooldown = now + 1500;
-      fireConfetti(banner);
-    }
-  }
-}
+			
 			function setupHomeButtonCleanup() {
 			  document.addEventListener('click', (e) => {
 			    const target = e.target.closest('a, button');
