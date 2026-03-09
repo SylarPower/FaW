@@ -3302,28 +3302,38 @@ function aggiornaFesteggiamentoVincitore(data) {
     if (!data || !data.punteggi) return;
 
     const partecipanti = data.partecipanti || [];
+    const paroleEscluse = data.paroleEscluse || [];   // ← Parole cancellate/escluse
+
     let playerStats = [];
 
     // Calcolo statistiche per ogni giocatore
     partecipanti.forEach(player => {
         const totalScore = data.punteggi[player] || 0;
         
-        const parole = data.parole?.[player] || [];
-        const maxWordScore = parole.length > 0 
-            ? Math.max(...parole.map(p => p.p || 0)) 
-            : 0;
+        const parolePlayer = data.parole?.[player] || [];
+        
+        let maxWordScore = 0;
+        let maxWord = "-";
+
+        // Solo parole VALIDE (non escluse/cancellate)
+        parolePlayer.forEach(par => {
+            if (!paroleEscluse.includes(par.w)) {           // ← FILTRAGGIO IMPORTANTE
+                if (par.p > maxWordScore) {
+                    maxWordScore = par.p;
+                    maxWord = par.w;
+                }
+            }
+        });
 
         playerStats.push({
             name: player,
             totalScore: totalScore,
             maxWordScore: maxWordScore,
-            maxWord: parole.length > 0 
-                ? parole.reduce((prev, current) => (prev.p > current.p) ? prev : current).w 
-                : "-"
+            maxWord: maxWord
         });
     });
 
-    // Ordiniamo: prima per punteggio totale, poi per parola più preziosa
+    // Ordiniamo: prima per punteggio totale, poi per parola più preziosa valida
     playerStats.sort((a, b) => {
         if (b.totalScore !== a.totalScore) return b.totalScore - a.totalScore;
         return b.maxWordScore - a.maxWordScore;
@@ -3332,7 +3342,7 @@ function aggiornaFesteggiamentoVincitore(data) {
     const bestTotal = playerStats[0].totalScore;
     const bestMaxWordScore = playerStats[0].maxWordScore;
 
-    // Tutti i giocatori che hanno sia lo stesso punteggio totale che la stessa parola più preziosa
+    // Tutti i giocatori che pareggiano sia sul totale che sulla parola più preziosa valida
     const vincitori = playerStats.filter(p => 
         p.totalScore === bestTotal && p.maxWordScore === bestMaxWordScore
     ).map(p => p.name);
@@ -3352,7 +3362,7 @@ function aggiornaFesteggiamentoVincitore(data) {
             titolo = 'PAREGGIO!';
             sottotitolo = `${vincitori.join(' e ')} hanno pareggiato con ${bestTotal} pt`;
             if (bestMaxWordScore > 0) {
-                sottotitolo += ` (parola più preziosa: ${bestMaxWordScore} pt)`;
+                sottotitolo += ` (parola più preziosa valida: ${bestMaxWordScore} pt)`;
             }
             colore = '#f39c12';
             icona = '🤝';
@@ -3367,7 +3377,7 @@ function aggiornaFesteggiamentoVincitore(data) {
                 .join(' | ');
             
             if (statsVincitore && statsVincitore.maxWordScore > 0) {
-                sottotitolo += ` • Max parola: ${statsVincitore.maxWord} (${statsVincitore.maxWordScore} pt)`;
+                sottotitolo += ` • Max parola valida: ${statsVincitore.maxWord} (${statsVincitore.maxWordScore} pt)`;
             }
             
             colore = haVinto ? '#f1c40f' : '#7f8c8d';
@@ -3379,22 +3389,17 @@ function aggiornaFesteggiamentoVincitore(data) {
             title: titolo,
             subtitle: sottotitolo,
             color: colore,
-            vibrate: haVinto && !isPareggio,   // vibra solo in caso di vittoria netta
+            vibrate: haVinto && !isPareggio,
             buttons: [{ text: '🔄 RIVINCITA', onclick: 'apriRivincitaBanner()', special: true }]
         });
     }
-
-    // Festeggiamenti solo per vittoria netta (non per pareggio)
-    // if (haVinto && !isPareggio) {
-    //     celebraVittoria();
-    // }
 
     if (data.punteggi[mioNome] !== undefined) {
         score = data.punteggi[mioNome];
         scoreDisplay.textContent = score;
     }
 
-    currentWinner = vincitori[0]; // per compatibilità interna
+    currentWinner = vincitori[0];
 }
 
 function aggiornaLiveScorePostGame(data) {
@@ -4505,19 +4510,17 @@ function renderizzaAnalisiPlayerSilent(nomePlayer, data, conteggioParoleGlobali)
             <span class="pts">${statusLabel}</span>
         `;
 
-        // ✅ Tutti possono proporre eliminazione (se non duplicata, non esclusa, e nessuna proposta pendente)
-        if (!isSbarrata && !hasPending) {
-            li.style.cursor = 'pointer';
-            li.addEventListener('click', (e) => {
-                if (!e.target.classList.contains('btn-eye')) {
-                    proponiEliminazioneParola(item.w, nomePlayer);
-                }
-            });
-        } else if (hasPending) {
-            li.style.cursor = 'not-allowed';
-            li.style.opacity = '0.7';
-            li.style.borderLeft = '3px solid #f39c12';
-        }
+		// Permettiamo di proporre eliminazione anche sulle parole duplicate
+		if (!hasPending) {
+		    li.style.cursor = 'pointer';
+		    li.addEventListener('click', (e) => {
+		        if (!e.target.classList.contains('btn-eye')) {
+		            proponiEliminazioneParola(item.w, nomePlayer);
+		        }
+		    });
+		} else {
+		    li.style.cursor = 'not-allowed';
+		}
 
         wordsListEl.appendChild(li);
     });
@@ -4534,13 +4537,24 @@ function renderizzaAnalisiPlayerSilent(nomePlayer, data, conteggioParoleGlobali)
 
 // ✅ PROPONI ELIMINAZIONE PAROLA (nuovo sistema)
 async function proponiEliminazioneParola(word, giocatoreTarget) {
-    // Controlla se c'è già una proposta pendente
     if (pendingEliminazioni.has(word)) {
-        alert(`C'è già una proposta di eliminazione in corso per "${word}". Attendi che si completi.`);
+        alert(`C'è già una proposta di eliminazione in corso per "${word}".`);
         return;
     }
 
-    if (!confirm(`Vuoi proporre di eliminare la parola "${word}" di ${giocatoreTarget}?\n\nGli altri giocatori dovranno confermare.`)) return;
+    const isDuplicata = (getConteggioGlobale()[word] || 0) > 1;
+
+    let messaggio = `Vuoi proporre di ESCLUDERE PERMANENTEMENTE dal dizionario la parola "${word}"?\n\n`;
+
+    if (isDuplicata) {
+        messaggio += `Questa parola è stata trovata da più giocatori (è barrata).\n`;
+        messaggio += `Se approvata, verrà rimossa dal dizionario per TUTTE le partite future.\n\n`;
+    } else {
+        messaggio += `Questa parola apparterrà solo a ${giocatoreTarget}.\n`;
+        messaggio += `Se approvata, verrà rimossa dal dizionario per TUTTE le partite future.\n\n`;
+    }
+
+    if (!confirm(messaggio)) return;
 
     try {
         await db.collection("partite").doc(matchId).collection("eliminazioni").doc(word).set({
@@ -4550,8 +4564,11 @@ async function proponiEliminazioneParola(word, giocatoreTarget) {
             accettati: [mioNome],
             rifiutati: [],
             stato: 'pending',
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            isGlobalExclusion: true   // utile per futuro
         });
+
+        alert(`Proposta di esclusione permanente inviata per "${word}".\nGli altri giocatori devono approvare.`);
     } catch (e) {
         console.error("Errore proposta eliminazione:", e);
         alert("Errore nell'invio della proposta.");
@@ -4764,3 +4781,4 @@ async function applicaEliminazioneParola(parola) {
 		</div>
 	</body>
 </html>
+
