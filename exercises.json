@@ -1,6 +1,6 @@
 [
   {"id":"barbell_bench_press","name":"Barbell Bench Press","bp":"Petto","eq":"Barbell","tgt":["chest","triceps","front_delts"],"media":["barbell_bench_press.mp4"]},
-  {"id":"incline_barbell_bench_press","name":"Incline Barbell Bench Press","bp":"Petto","eq":"Barbell","tgt":["upper_chest","triceps","front_delts"],"media":["incline_barbell_bench_press.mp4"]},
+  {"id":"incline_barbell_bench_press","name":"Incline Barbell Bench Press","bp":"Petto","eq":"Barbell","tgt":["upper_chest","triceps","front_delts"],"media":["https://media.musclewiki.com/media/uploads/videos/branded/male-Barbell-barbell-incline-bench-press-side.mp4","https://media.musclewiki.com/media/uploads/videos/branded/male-Barbell-barbell-incline-bench-press-front.mp4"]},
   {"id":"decline_barbell_bench_press","name":"Decline Barbell Bench Press","bp":"Petto","eq":"Barbell","tgt":["lower_chest","triceps","front_delts"],"media":["decline_barbell_bench_press.mp4"]},
   {"id":"dumbbell_bench_press","name":"Dumbbell Bench Press","bp":"Petto","eq":"Dumbbell","tgt":["chest","triceps","front_delts"],"media":["dumbbell_bench_press.mp4"]},
   {"id":"incline_dumbbell_bench_press","name":"Incline Dumbbell Bench Press","bp":"Petto","eq":"Dumbbell","tgt":["upper_chest","triceps","front_delts"],"media":["incline_dumbbell_bench_press.mp4"]},
