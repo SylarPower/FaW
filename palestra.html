@@ -267,23 +267,7 @@
         }
         .prog-badge.incomplete { background:rgba(241,196,15,.12);color:var(--yel); }
         .prog-badge.complete { background:rgba(39,174,96,.15);color:var(--grn); }
-			/* ===== ULTIMA SESSIONE ===== */
-			.last-session {
-				 display:flex;align-items:center;gap:8px;
-				 padding:8px 12px;margin:0 0 8px;
-				 background:rgba(3,218,198,.06);border:1px solid rgba(3,218,198,.12);
-				 border-radius:10px;font-size:.72rem;color:var(--acc);
-			}
-			.last-session .ls-icon { font-size:.9rem; }
-			.last-session .ls-data { flex:1;color:var(--tx2); }
-			.last-session .ls-data strong { color:var(--acc); }
-			.last-session .ls-load {
-				 padding:4px 10px;border-radius:8px;border:1px solid rgba(3,218,198,.3);
-				 background:rgba(3,218,198,.1);color:var(--acc);
-				 font-size:.68rem;font-weight:700;cursor:pointer;
-				 min-height:30px;
-			}
-			.last-session .ls-load:active { opacity:.7; }			
+			
 			/* ===== ACCORDION ESERCIZI ===== */
 			.ex-body {
 				 max-height:0;overflow:hidden;
@@ -1145,22 +1129,8 @@ h += `<button class="btn-icon" onclick="event.stopPropagation();openSSModal('${e
 h += `<button class="btn-icon" onclick="event.stopPropagation();remEx('${ex.uid}')" style="border-radius:10px;padding:0 12px;font-size:.78rem;min-width:auto;width:auto;color:var(--red);">🗑️</button>`;
 h += `</div>`;
 
-// Ultima sessione
-const lastData = getLast(ex.exerciseId);
-if (lastData) {
-    const lastDate = new Date(lastData.dt).toLocaleDateString('it-IT', {day:'numeric', month:'short'});
-    const lastSets = lastData.sd ? lastData.sd.length : lastData.s || 0;
-    const lastReps = lastData.r || 0;
-    const lastW = lastData.w || 0;
-    h += `<div class="last-session">
-        <span class="ls-icon">📋</span>
-        <span class="ls-data">Ultima volta (${lastDate}): <strong>${lastSets}×${lastReps} @${lastW}kg</strong></span>
-        <button class="ls-load" onclick="event.stopPropagation();loadLast('${ex.uid}')">Carica</button>
-    </div>`;
-}
-
-// Media (video)
-h += buildMediaBox(ex.uid, d);
+    // Media (video)
+    h += buildMediaBox(ex.uid, d);
 
     // Target muscoli
     if (d && d.tgt && Array.isArray(d.tgt) && d.tgt.length > 0) {
@@ -1598,18 +1568,7 @@ function getLast(eid) {
     if (!D.hist) return null;
     return D.hist.filter(x => x.eid === eid).sort((a, b) => new Date(b.dt) - new Date(a.dt))[0] || null;
 }
-function loadLast(exUid) {
-    const ex = fEx(exUid);
-    if (!ex) return;
-    const last = getLast(ex.exerciseId);
-    if (!last || !last.sd) {
-        toast('📭 Nessun dato precedente', 'info');
-        return;
-    }
-    ex.sd = last.sd.map(s => ({r: s.r, w: s.w, done: false}));
-    save(); renDay();
-    toast('📋 Dati caricati dall\'ultima sessione', 'ok');
-}
+
 function addEx(eid) {
     const d = exDef(eid), day = gD();
     if (!d || !day) return;
