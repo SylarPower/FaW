@@ -325,9 +325,6 @@ input[type=number]::-webkit-outer-spin-button {
             <button class="bpp" id="bSS" onclick="togSS()">🔗 Superserie</button>
             <button class="bg" onclick="complWO()">✅ Completa</button>
         </div>
-        <div style="display:flex;gap:5px;margin-bottom:10px;flex-wrap:wrap;">
-            <button class="bs" onclick="openPlate()" style="font-size:.72rem;padding:6px 10px;">🧮 Plate Calculator</button>
-        </div>
         <div id="ssHint" class="sph" style="display:none;"></div>
         <div id="eList"></div>
     </div>
@@ -400,7 +397,7 @@ async function loadExDB() {
 
 // Calcola il volume della singola istanza esercizio
 function calcVolEx(ex) {
-    if (!ex.sd) return 0;
+    if (!ex || !ex.sd) return 0;
     return ex.sd.reduce((acc, s) => s.done ? acc + (parseFloat(s.w || 0) * parseInt(s.r || 0)) : acc, 0);
 }
 
@@ -426,8 +423,7 @@ const exDef=id=>EX_DB.find(e=>e.id===id);
 const exGif = e => (e.gif && e.gif.endsWith('.gif')) ? e.gif : '';
 // Calcola 1RM teorico
 function calc1RM(w, r) {
-    if (!w || !r || r === 0) return 0;
-    if (r === 1) return w;
+    if (!w || !r || r == 0) return 0;
     return Math.round(w * (1 + r / 30));
 }
 let myExChart = null;
@@ -587,24 +583,35 @@ function gD(){return D.days.find(d=>d.id===curDay);}
 function renDay() {
     const day = gD();
     const cont = document.getElementById('exList');
+    if(!cont) return;
     cont.innerHTML = '';
     
+    console.log("Esercizi trovati nel giorno:", day.exs);
+
     if (!day.exs || day.exs.length === 0) {
         cont.innerHTML = '<p class="emp">Nessun esercizio. Aggiungine uno!</p>';
         return;
     }
 
-    // --- NUOVA PANORAMICA MUSCOLARE ---
-    const muscles = [...new Set(day.exs.map(e => exDef(e.exerciseId)?.bp).filter(Boolean))];
-    let intro = `<div style="background:var(--c1); padding:15px; border-radius:12px; margin-bottom:20px; border:1px solid var(--brd);">
-                    <div style="color:var(--tx2); font-size:0.8rem; text-transform:uppercase; margin-bottom:5px;">Focus di oggi:</div>
-                    <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                        ${muscles.map(m => `<span class="badge" style="background:var(--c3); color:var(--acc); border:1px solid var(--acc)">${m}</span>`).join('')}
-                    </div>
-                 </div>`;
+    // PANORAMICA MUSCOLARE
+    const muscles = [...new Set(day.exs.map(e => {
+        const d = exDef(e.exerciseId);
+        return d ? d.bp : null;
+    }).filter(Boolean))];
+
+    let h = `
+    <div style="background:var(--c1); padding:15px; border-radius:12px; margin-bottom:20px; border:1px solid var(--brd);">
+        <div style="color:var(--tx2); font-size:0.7rem; text-transform:uppercase; margin-bottom:8px;">Focus Muscolare:</div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            ${muscles.map(m => `<span style="background:var(--c2); color:var(--acc); padding:4px 10px; border-radius:20px; font-size:0.8rem; border:1px solid var(--acc)">${m}</span>`).join('')}
+        </div>
+    </div>`;
     
-    let h = intro;
-    day.exs.forEach(ex => { h += renEC(ex); });
+    // Ciclo per aggiungere gli esercizi
+    day.exs.forEach(ex => { 
+        h += renEC(ex); 
+    });
+    
     cont.innerHTML = h;
 }
 
