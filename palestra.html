@@ -196,14 +196,14 @@
 
         /* ===== SET ROWS ===== */
         .sets-container { padding:0 16px 16px; }
-        .sets-grid-header {
-            display:grid;grid-template-columns:36px 1fr 1fr 52px;gap:8px;
+			.sets-grid-header {
+				 display:grid;grid-template-columns:36px 1fr 1fr 52px 32px;gap:8px;
             padding:0 4px 8px;color:var(--tx3);font-size:.65rem;
             text-transform:uppercase;font-weight:700;letter-spacing:.5px;
             text-align:center;
         }
-        .set-row {
-            display:grid;grid-template-columns:36px 1fr 1fr 52px;gap:8px;
+			.set-row {
+				 display:grid;grid-template-columns:36px 1fr 1fr 52px 32px;gap:8px;
             align-items:center;margin-bottom:8px;padding:8px 4px;
             border-radius:12px;transition:all .3s ease;
             background:transparent;
@@ -248,7 +248,13 @@
             transform:scale(1.05);
         }
         .set-check.done:active { transform:scale(.95); }
-
+			.set-del {
+				 width:32px;height:32px;border-radius:50%;border:none;
+				 background:none;color:var(--tx3);font-size:.85rem;
+				 display:flex;align-items:center;justify-content:center;
+				 cursor:pointer;padding:0;transition:all .15s;
+			}
+			.set-del:active { color:var(--red);transform:scale(.85); }
         /* ===== PROGRESS COUNTER ===== */
         .progress-info {
             display:flex;justify-content:space-between;align-items:center;
@@ -321,8 +327,8 @@
 
         /* ===== VIEW MODE STYLES ===== */
         .view-only .set-check { display:none; }
-        .view-only .sets-grid-header { grid-template-columns:36px 1fr 1fr; }
-        .view-only .set-row { grid-template-columns:36px 1fr 1fr; }
+			.view-only .sets-grid-header { grid-template-columns:36px 1fr 1fr 32px; }
+			.view-only .set-row { grid-template-columns:36px 1fr 1fr 32px; }
         .view-only .add-set-btn { display:none; }
         .view-only .ex-progress { display:none; }
         .view-only .progress-info { display:none; }
@@ -353,15 +359,28 @@
         .exo:active { border-color:var(--acc);background:var(--c3);transform:scale(.98); }
         .exo .on { font-size:.88rem;color:var(--tx);font-weight:600; }
         .exo .om { font-size:.7rem;color:var(--tx2); }
-        .mch {
-            display:inline-block;padding:7px 14px;border-radius:20px;
-            font-size:.72rem;border:1px solid var(--brd);background:var(--c1);
-            color:var(--tx2);cursor:pointer;margin:3px;white-space:nowrap;
-            transition:all .15s;min-height:34px;
-        }
-        .mch.on { background:var(--acc);color:#000;border-color:var(--acc);font-weight:bold; }
-        .chips { display:flex;overflow-x:auto;gap:4px;padding:6px 0;-webkit-overflow-scrolling:touch; }
-        .chips::-webkit-scrollbar { display:none; }
+			.mch {
+				 display:inline-flex;align-items:center;justify-content:center;
+				 padding:9px 16px;border-radius:25px;
+				 font-size:.78rem;font-weight:600;
+				 border:2px solid var(--brd);background:var(--c2);
+				 color:var(--tx);cursor:pointer;margin:3px;white-space:nowrap;
+				 transition:all .2s;min-height:40px;
+				 text-transform:capitalize;
+				 letter-spacing:.3px;
+			}
+			.mch:active { transform:scale(.95); }
+			.mch.on {
+				 background:var(--acc);color:#000;border-color:var(--acc);
+				 font-weight:bold;
+				 box-shadow:0 2px 12px rgba(3,218,198,.3);
+			}
+			.chips {
+				 display:flex;overflow-x:auto;gap:6px;padding:8px 0 12px;
+				 -webkit-overflow-scrolling:touch;
+				 border-bottom:1px solid var(--brd);margin-bottom:4px;
+			}
+			.chips::-webkit-scrollbar { display:none; }
 
         /* ===== ACHIEVEMENTS ===== */
         .ag { display:grid;grid-template-columns:repeat(2,1fr);gap:8px; }
@@ -902,12 +921,34 @@ function renDays() {
 					<h4>${doneWeek ? '✅' : '📅'} ${d.name}</h4>
 					<span>${n} eserciz${n === 1 ? 'io' : 'i'}${doneWeek ? ' • fatto questa settimana' : ''}</span>
 			  </div>
-			  <div class="da" style="display:flex;gap:6px;align-items:center;">
-					${doneWeek ? '<span class="done-week-badge">✅ Fatto</span>' : ''}
-					<button class="bd" onclick="event.stopPropagation();remDay('${d.id}')" style="padding:8px 12px;">🗑️</button>
-			  </div>
+				<div class="da" style="display:flex;gap:6px;align-items:center;">
+					 ${doneWeek ? '<span class="done-week-badge">✅ Fatto</span>' : ''}
+					 <button class="tb" onclick="event.stopPropagation();dupDay('${d.id}')" style="padding:8px 12px;" title="Duplica">📋</button>
+					 <button class="bd" onclick="event.stopPropagation();remDay('${d.id}')" style="padding:8px 12px;" title="Elimina">🗑️</button>
+				</div>
 		 </div>`;
 	}).join('');
+}
+
+function dupDay(id) {
+    const day = D.days.find(d => d.id === id);
+    if (!day) return;
+    const newName = prompt("Nome della nuova giornata:", day.name + " (copia)");
+    if (!newName || !newName.trim()) return;
+    const copy = {
+        id: uid(),
+        name: newName.trim(),
+        exs: day.exs.map(ex => ({
+            ...ex,
+            uid: uid(),
+            sd: ex.sd ? ex.sd.map(s => ({...s, done: false})) : []
+        }))
+    };
+    D.days.push(copy);
+    save();
+    renDays();
+    toast('📋 "' + newName.trim() + '" creata da "' + day.name + '"', 'ok');
+    if (navigator.vibrate) navigator.vibrate(30);
 }
 
 // ============================================================
@@ -1063,20 +1104,21 @@ function renEC(ex) {
     }
 
     // Tabella serie
-    h += `<div class="sets-grid-header"><span>SET</span><span>KG</span><span>REPS</span>${!viewMode ? '<span></span>' : ''}</div>`;
+h += `<div class="sets-grid-header"><span>SET</span><span>REPS</span><span>KG</span>${!viewMode ? '<span></span>' : ''}<span></span></div>`;
 
     ex.sd.forEach((s, i) => {
         const isDone = s.done;
         h += `<div class="set-row${isDone ? ' done' : ''}" id="sr-${ex.uid}-${i}">
             <div class="set-num">${i + 1}</div>
-            <input type="number" inputmode="decimal" class="set-input" value="${s.w || ''}"
-                   placeholder="0" oninput="updS('${ex.uid}',${i},'w',this.value)">
-            <input type="number" inputmode="numeric" class="set-input" value="${s.r || ''}"
-                   placeholder="0" oninput="updS('${ex.uid}',${i},'r',this.value)">
+					<input type="number" inputmode="numeric" class="set-input" value="${s.r || ''}"
+							 placeholder="0" oninput="updS('${ex.uid}',${i},'r',this.value)">
+					<input type="number" inputmode="decimal" class="set-input" value="${s.w || ''}"
+							 placeholder="0" oninput="updS('${ex.uid}',${i},'w',this.value)">
             ${!viewMode ? `
             <button class="set-check${isDone ? ' done' : ''}" onclick="chkSet('${ex.uid}',${i},this)">
                 ${isDone ? '✓' : ''}
             </button>` : ''}
+            <button class="set-del" onclick="remSet('${ex.uid}',${i})" title="Elimina serie">✕</button>
         </div>`;
     });
 
@@ -1234,15 +1276,33 @@ function remEx(u) {
     save(); renDay();
     toast('🗑️ Esercizio rimosso', 'info');
 }
-
+function remSet(u, i) {
+    const e = fEx(u);
+    if (!e) return;
+    if (e.sd.length <= 1) {
+        toast('⚠️ Serve almeno 1 serie', 'warn');
+        return;
+    }
+    e.sd.splice(i, 1);
+    save();
+    renDay();
+    toast('🗑️ Serie eliminata', 'info', 1200);
+    if (navigator.vibrate) navigator.vibrate(15);
+}
 // ============================================================
 // 📋 EXERCISE SELECTOR
 // ============================================================
 function openSel() {
     document.getElementById('mSel').style.display = 'flex';
-    document.getElementById('mChips').innerHTML = BPARTS.map(m =>
-        `<span class="mch${mf===m?' on':''}" onclick="mf='${m}';openSel();">${m === 'all' ? '🏷️ Tutti' : m}</span>`
-    ).join('');
+		const chipLabels = {
+			 'all':'🏷️ Tutti','back':'🔙 Schiena','cardio':'❤️ Cardio',
+			 'chest':'🫁 Petto','lower arms':'💪 Avambr.','lower legs':'🦵 Polp.',
+			 'neck':'🦒 Collo','shoulders':'🤷 Spalle','upper arms':'💪 Braccia',
+			 'upper legs':'🦵 Gambe','waist':'🎯 Core'
+		};
+		document.getElementById('mChips').innerHTML = BPARTS.map(m =>
+			 `<span class="mch${mf===m?' on':''}" onclick="mf='${m}';openSel();">${chipLabels[m] || m}</span>`
+		).join('');
     filEx();
     setTimeout(() => document.getElementById('exQ').focus(), 350);
 }
