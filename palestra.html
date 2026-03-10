@@ -582,20 +582,7 @@
     <button class="bs" onclick="closeSel()" style="width:100%;margin-top:12px;">Chiudi</button>
 </div>
 </div>
-<!-- MODAL: SUPERSERIE -->
-<div id="mSS" class="modal" onclick="if(event.target===this)this.style.display='none'">
-<div class="mc" style="max-width:500px;">
-    <h2>🔗 Crea Superserie</h2>
-    <p style="font-size:.78rem;color:var(--tx2);text-align:center;margin-bottom:12px;">
-        Seleziona 1-3 esercizi da collegare (max 4 totali)
-    </p>
-    <div id="ssExList" style="overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch;"></div>
-    <div style="display:flex;gap:8px;margin-top:12px;">
-        <button class="bs" onclick="document.getElementById('mSS').style.display='none'" style="flex:1;">Annulla</button>
-        <button class="bp" onclick="confirmSS()" style="flex:1;">✅ Conferma</button>
-    </div>
-</div>
-</div>
+
 <!-- MODAL: PROGRESSIONE -->
 <div id="mProg" class="modal" onclick="if(event.target===this)this.style.display='none'">
 <div class="mc" style="max-width:500px;">
@@ -758,8 +745,7 @@ const BODY_BACK = `
   <ellipse data-muscle="calves" cx="80" cy="352" rx="9" ry="20" class="m-area"/>
   <ellipse data-muscle="calves" cx="120" cy="352" rx="9" ry="20" class="m-area"/>
 </svg>`;
-// Peso fittizio per esercizi a corpo libero (per il calcolo della mappa muscolare)
-const BW_FACTOR = 20;
+
 // Mappa: nomi usati nei JSON → nome del muscolo nell'SVG
 const MUSCLE_MAP = {
     // Target diretti (come nel tuo JSON)
@@ -1049,33 +1035,10 @@ function renDay() {
         ${muscles.map(m => `<span style="background:var(--c2);color:var(--acc);padding:6px 14px;border-radius:20px;font-size:.78rem;font-weight:600;border:1px solid rgba(3,218,198,.2)">${m}</span>`).join('')}
     </div>`;
 
-	// Exercise cards (con raggruppamento superserie)
-	const rendered = new Set();
-
-	day.exs.forEach(ex => {
-		 if (rendered.has(ex.uid)) return;
-
-		 if (ex.ssG) {
-			  // Trova tutti gli esercizi in questa superserie
-			  const group = day.exs.filter(e => e.ssG === ex.ssG);
-
-			  h += `<div class="ss-group fade-in">`;
-			  h += `<div class="ss-header">
-					<span class="ss-label">🔗 Superserie (${group.length} esercizi)</span>
-					<button class="ss-break" onclick="breakSS('${ex.ssG}')">Sciogli</button>
-			  </div>`;
-
-			  group.forEach(gex => {
-					try { h += renEC(gex); } catch(e) { console.error("Render error:", gex, e); }
-					rendered.add(gex.uid);
-			  });
-
-			  h += `</div>`;
-		 } else {
-			  try { h += renEC(ex); } catch(e) { console.error("Render error:", ex, e); }
-			  rendered.add(ex.uid);
-		 }
-	});
+    // Exercise cards
+    day.exs.forEach(ex => {
+        try { h += renEC(ex); } catch(e) { console.error("Render error:", ex, e); }
+    });
 
     cont.innerHTML = h;
     cont.className = viewMode ? 'view-only' : '';
@@ -1120,14 +1083,13 @@ function renEC(ex) {
     h += `<div class="ex-body${isOpen ? ' open' : ''}" id="exbody-${ex.uid}">`;
 
     // Bottoni azione
-h += `<div style="display:flex;gap:6px;padding:12px 0 8px;flex-wrap:wrap;">`;
-if (hasMedia) {
-    h += `<button class="btn-icon" onclick="event.stopPropagation();togVid('${ex.uid}')" style="border-radius:10px;padding:0 12px;font-size:.78rem;min-width:auto;width:auto;">🎬 Video</button>`;
-}
-h += `<button class="btn-icon" onclick="event.stopPropagation();showProgression('${ex.exerciseId}','${safeName}')" style="border-radius:10px;padding:0 12px;font-size:.78rem;min-width:auto;width:auto;">📈 Grafico</button>`;
-h += `<button class="btn-icon" onclick="event.stopPropagation();openSSModal('${ex.uid}')" style="border-radius:10px;padding:0 12px;font-size:.78rem;min-width:auto;width:auto;color:var(--pur2);">${ex.ssG ? '🔗 In Superserie' : '🔗 Superset'}</button>`;
-h += `<button class="btn-icon" onclick="event.stopPropagation();remEx('${ex.uid}')" style="border-radius:10px;padding:0 12px;font-size:.78rem;min-width:auto;width:auto;color:var(--red);">🗑️</button>`;
-h += `</div>`;
+    h += `<div style="display:flex;gap:6px;padding:12px 0 8px;flex-wrap:wrap;">`;
+    if (hasMedia) {
+        h += `<button class="btn-icon" onclick="event.stopPropagation();togVid('${ex.uid}')" style="border-radius:10px;padding:0 12px;font-size:.78rem;min-width:auto;width:auto;">🎬 Video</button>`;
+    }
+    h += `<button class="btn-icon" onclick="event.stopPropagation();showProgression('${ex.exerciseId}','${safeName}')" style="border-radius:10px;padding:0 12px;font-size:.78rem;min-width:auto;width:auto;">📈 Grafico</button>`;
+    h += `<button class="btn-icon" onclick="event.stopPropagation();remEx('${ex.uid}')" style="border-radius:10px;padding:0 12px;font-size:.78rem;min-width:auto;width:auto;color:var(--red);">🗑️</button>`;
+    h += `</div>`;
 
     // Media (video)
     h += buildMediaBox(ex.uid, d);
@@ -1272,185 +1234,6 @@ function chkSet(exUid, idx, btn) {
         toast('💪 ' + ex.name + ' completato!', 'ok', 1800);
     }
 }
-/* ===== SUPERSERIE ===== */
-.ss-group {
-    border:2px solid var(--pur);border-radius:18px;
-    padding:8px;margin:14px 0;
-    background:rgba(155,89,182,.04);
-    position:relative;
-}
-.ss-header {
-    display:flex;justify-content:space-between;align-items:center;
-    padding:6px 10px;margin-bottom:4px;
-}
-.ss-label {
-    font-size:.7rem;font-weight:800;color:var(--pur2);
-    text-transform:uppercase;letter-spacing:1px;
-    display:flex;align-items:center;gap:6px;
-}
-.ss-label::before {
-    content:'';width:8px;height:8px;border-radius:50%;
-    background:var(--pur2);display:inline-block;
-}
-.ss-break {
-    padding:5px 12px;border-radius:8px;border:1px solid rgba(207,102,121,.3);
-    background:rgba(207,102,121,.1);color:var(--red);
-    font-size:.68rem;font-weight:600;cursor:pointer;
-}
-.ss-break:active { opacity:.7; }
-.ss-connector {
-    position:absolute;left:20px;width:2px;
-    background:var(--pur);opacity:.3;
-}
-.ss-group .ex-card { margin:6px 0;border-color:rgba(155,89,182,.3); }
-
-/* Opzioni nel modal superserie */
-.ss-option {
-    display:flex;align-items:center;gap:12px;
-    padding:14px;margin:6px 0;border-radius:12px;
-    background:var(--c2);border:2px solid var(--brd);
-    cursor:pointer;transition:all .2s;min-height:56px;
-}
-.ss-option:active { transform:scale(.98); }
-.ss-option.selected {
-    border-color:var(--pur);background:rgba(155,89,182,.1);
-}
-.ss-option input[type="checkbox"] { display:none; }
-.ss-option .ss-check-mark {
-    width:28px;height:28px;border-radius:50%;
-    border:2px solid var(--brd);display:flex;
-    align-items:center;justify-content:center;
-    font-size:.9rem;flex-shrink:0;transition:all .2s;
-}
-.ss-option.selected .ss-check-mark {
-    background:var(--pur);border-color:var(--pur);color:#fff;
-}
-.ss-option-info { flex:1;min-width:0; }
-.ss-option-name { font-size:.88rem;font-weight:600;color:var(--tx); }
-.ss-option-detail { font-size:.7rem;color:var(--tx2); }
-.ss-count {
-    text-align:center;padding:8px;font-size:.75rem;
-    color:var(--pur2);font-weight:600;
-}
-// ===== SUPERSERIE =====
-let ssTarget = null;
-
-function openSSModal(exUid) {
-    ssTarget = exUid;
-    const day = gD();
-    const ex = day.exs.find(e => e.uid === exUid);
-    if (!ex) return;
-
-    const currentGroup = ex.ssG;
-    const others = day.exs.filter(e => e.uid !== exUid);
-
-    if (others.length === 0) {
-        toast('⚠️ Aggiungi altri esercizi prima', 'warn');
-        return;
-    }
-
-    let h = '';
-    others.forEach(e => {
-        const inSameGroup = currentGroup && e.ssG === currentGroup;
-        const def = exDef(e.exerciseId);
-        h += `
-        <div class="ss-option${inSameGroup ? ' selected' : ''}" onclick="toggleSSOption(this)">
-            <input type="checkbox" class="ss-check-input" value="${e.uid}" ${inSameGroup ? 'checked' : ''}>
-            <div class="ss-check-mark">${inSameGroup ? '✓' : ''}</div>
-            <div class="ss-option-info">
-                <div class="ss-option-name">${e.name}</div>
-                <div class="ss-option-detail">${def ? def.bp : ''} • ${e.sd ? e.sd.length : 0} serie</div>
-            </div>
-        </div>`;
-    });
-
-    const selectedCount = currentGroup ? day.exs.filter(e => e.ssG === currentGroup).length : 1;
-    h += `<div class="ss-count" id="ssCount">${selectedCount}/4 esercizi selezionati</div>`;
-
-    document.getElementById('ssExList').innerHTML = h;
-    document.getElementById('mSS').style.display = 'flex';
-}
-
-function toggleSSOption(el) {
-    const input = el.querySelector('.ss-check-input');
-    const mark = el.querySelector('.ss-check-mark');
-
-    // Conta quanti sono già selezionati
-    const allChecked = document.querySelectorAll('.ss-check-input:checked').length;
-
-    if (!input.checked && allChecked >= 3) {
-        toast('⚠️ Max 4 esercizi per superserie', 'warn');
-        return;
-    }
-
-    input.checked = !input.checked;
-    el.classList.toggle('selected', input.checked);
-    mark.textContent = input.checked ? '✓' : '';
-
-    // Aggiorna contatore
-    const total = document.querySelectorAll('.ss-check-input:checked').length + 1;
-    const counter = document.getElementById('ssCount');
-    if (counter) counter.textContent = total + '/4 esercizi selezionati';
-}
-
-function confirmSS() {
-    const day = gD();
-    if (!day) return;
-
-    const checks = document.querySelectorAll('.ss-check-input:checked');
-    const selectedUids = [ssTarget, ...Array.from(checks).map(c => c.value)];
-
-    if (selectedUids.length < 2) {
-        // Rimuovi dalla superserie
-        const ex = day.exs.find(e => e.uid === ssTarget);
-        if (ex && ex.ssG) {
-            const oldGroup = ex.ssG;
-            ex.ssG = null;
-            // Se resta solo 1 nel vecchio gruppo, rimuovi anche quello
-            const remaining = day.exs.filter(e => e.ssG === oldGroup);
-            if (remaining.length === 1) remaining[0].ssG = null;
-        }
-        save(); renDay();
-        document.getElementById('mSS').style.display = 'none';
-        toast('🔗 Superserie rimossa', 'info');
-        return;
-    }
-
-    const groupId = uid();
-
-    // Prima pulisci vecchi gruppi di tutti gli esercizi selezionati
-    selectedUids.forEach(u => {
-        const e = day.exs.find(x => x.uid === u);
-        if (e && e.ssG) {
-            const oldGroup = e.ssG;
-            e.ssG = null;
-            const remaining = day.exs.filter(x => x.ssG === oldGroup);
-            if (remaining.length === 1) remaining[0].ssG = null;
-        }
-    });
-
-    // Assegna il nuovo gruppo
-    selectedUids.forEach(u => {
-        const e = day.exs.find(x => x.uid === u);
-        if (e) e.ssG = groupId;
-    });
-
-    save();
-    document.getElementById('mSS').style.display = 'none';
-    renDay();
-    toast('🔗 Superserie creata!', 'ok');
-    if (navigator.vibrate) navigator.vibrate([20, 10, 20]);
-}
-
-function breakSS(groupId) {
-    const day = gD();
-    if (!day) return;
-    day.exs.forEach(e => {
-        if (e.ssG === groupId) e.ssG = null;
-    });
-    save(); renDay();
-    toast('🔗 Superserie sciolta', 'info');
-}
 // ===== ACCORDION ESERCIZI =====
 function togEx(uid) {
     const body = document.getElementById('exbody-' + uid);
@@ -1489,13 +1272,7 @@ function remEx(u) {
     if (!ex) return;
     if (!confirm('Rimuovere "' + ex.name + '"?')) return;
     const d = gD();
-    const oldGroup = ex.ssG;
     d.exs = d.exs.filter(e => e.uid !== u);
-    // Se era in una superserie e ne resta solo 1, rimuovi il gruppo
-    if (oldGroup) {
-        const remaining = d.exs.filter(e => e.ssG === oldGroup);
-        if (remaining.length === 1) remaining[0].ssG = null;
-    }
     save(); renDay();
     toast('🗑️ Esercizio rimosso', 'info');
 }
@@ -1790,8 +1567,7 @@ function renVol() {
             D.hist.forEach(l => {
                 if (!l.dt) return;
                 if (toLocalDate(l.dt) === key) {
-                    const peso = (l.w && l.w > 0) ? l.w : BW_FACTOR;
-							vol += (l.s || 0) * (l.r || 0) * peso;
+                    vol += (l.s || 0) * (l.r || 0) * (l.w || 0);
                 }
             });
         }
@@ -1852,8 +1628,7 @@ function renMuscle() {
     todayLogs.forEach(l => {
         const def = exDef(l.eid);
         if (!def) return;
-			const peso = (l.w && l.w > 0) ? l.w : BW_FACTOR;
-			const vol = (l.s || 0) * (l.r || 0) * peso;
+        const vol = (l.s || 0) * (l.r || 0) * (l.w || 1);
 
         // Da body part (bp)
         const bpMuscle = MUSCLE_MAP[def.bp];
