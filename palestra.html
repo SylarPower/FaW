@@ -48,6 +48,34 @@
         .card h3{color:var(--acc);font-size:1rem;margin-bottom:12px;}
 
         /* Buttons */
+.btn-circle {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    border: none;
+    background: var(--c2);
+    color: var(--tx);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 1.1rem;
+}
+
+/* Rendi gli input numerici puliti su mobile */
+input[type=number]::-webkit-inner-spin-button, 
+input[type=number]::-webkit-outer-spin-button { 
+    -webkit-appearance: none; 
+    margin: 0; 
+}
+
+.ec {
+    transition: transform 0.1s ease;
+}
+
+.ec:active {
+    transform: scale(0.99); /* Feedback alla pressione */
+}
         button{
             font-family:inherit;border-radius:8px;cursor:pointer;font-weight:600;
             font-size:0.85rem;border:1px solid var(--brd);background:var(--c2);
@@ -627,79 +655,59 @@ function renDay(){
 
 function renEC(ex, inSS) {
     const d = exDef(ex.exerciseId);
+    const mColor = d ? getMuscleColor(d.bp) : 'var(--acc)';
     const vol = calcVolEx(ex);
-    const sc = ssMode ? (ss1 === ex.uid ? 'ssel2' : 'ssel') : '';
-    const hc = inSS ? 'hss' : '';
-    const ck = ssMode ? `onclick="ssClk('${ex.uid}')"` : '';
-    
-    // Recupero colore muscolare
-    const mColor = d ? getMuscleColor(d.bp) : 'var(--brd)';
-    
-    // Calcolo 1RM stimato dal set migliore
-    let bestRM = 0;
-    if (ex.sd) {
-        ex.sd.forEach(s => {
-            const currentRM = calc1RM(parseFloat(s.w), parseInt(s.r));
-            if (currentRM > bestRM) bestRM = currentRM;
-        });
-    }
 
-    // Gestione Video: mostriamo il tasto solo se d.video esiste nel JSON
-    const hasVideo = d && d.video && d.video.trim() !== "";
+    let h = `<div class="ec ${inSS ? 'hss' : ''}" style="border-left: 6px solid ${mColor}; margin-bottom: 15px; border-radius: 8px; background: var(--c1); overflow: hidden;">`;
 
-    let h = `<div class="ec ${sc} ${hc}" id="ex-${ex.uid}" ${ck} style="border-left: 5px solid ${mColor}">`;
-
-    // HEADER: Titolo, Volume, 1RM
-    h += `<div class="eh">
-            <div class="ei" onclick="event.stopPropagation(); showProgression('${ex.exerciseId}', '${ex.name.replace(/'/g, "\\'")}')" style="cursor:pointer">
-                <h4>${ex.name} 📈</h4>
-                <div class="em">
-                    <span style="color:${mColor}; font-weight:bold;">${d ? d.bp : 'Muscolo'}</span> • 
-                    ${d ? d.eq : 'Attrezzatura'}
-                    ${bestRM > 0 ? ` • <span class="rm-badge">1RM ≈ ${bestRM}kg</span>` : ''}
-                </div>
-                <div style="margin-top:4px;">
-                    <span class="badge" style="background:var(--pur); color:#fff;">Volume: ${vol} kg</span>
-                </div>
+    // HEADER SEMPLICE
+    h += `<div style="padding: 12px; display: flex; justify-content: space-between; align-items: flex-start;">
+            <div style="flex: 1;" onclick="showProgression('${ex.exerciseId}', '${ex.name.replace(/'/g, "\\'")}')">
+                <h4 style="margin:0; font-size: 1.1rem; color: var(--tx);">${ex.name} 📈</h4>
+                <small style="color: var(--tx2); text-transform: uppercase; letter-spacing: 0.5px;">
+                    ${d ? d.bp : ''} • ${d ? d.eq : ''}
+                </small>
             </div>
-            <div class="ea">
-                ${hasVideo ? `<button onclick="event.stopPropagation(); togVid('${ex.uid}')" style="font-size:1.4rem;">🎬</button>` : ''}
-                <button onclick="event.stopPropagation(); togEx('${ex.uid}')" style="font-size:1.2rem;">⚙️</button>
+            <div style="display: flex; gap: 10px;">
+                ${d && d.video ? `<button class="btn-circle" onclick="togVid('${ex.uid}', '${d.video}')">🎬</button>` : ''}
+                <button class="btn-circle" onclick="togEx('${ex.uid}')">⚙️</button>
             </div>
+          </div>`;
+
+    // VIDEO (YouTube o MP4)
+    h += getMediaHTML(ex.uid, d ? d.video : null);
+
+    // TABELLA ESERCIZI (Più spaziosa per le dita)
+    h += `<div style="padding: 0 12px 12px 12px;">
+            <div style="display: grid; grid-template-columns: 30px 1fr 1fr 50px; gap: 8px; align-items: center; margin-bottom: 8px; color: var(--tx3); font-size: 0.75rem; font-weight: bold; text-align: center;">
+                <span>SET</span><span>KG</span><span>REPS</span><span>OK</span>
+            </div>
+            <div id="sets-${ex.uid}">`;
+
+    ex.sd.forEach((s, i) => {
+        const isDone = s.done ? 'background: var(--acc); color: #000; border-color: var(--acc);' : '';
+        h += `
+        <div style="display: grid; grid-template-columns: 30px 1fr 1fr 50px; gap: 8px; align-items: center; margin-bottom: 10px;">
+            <div style="text-align: center; color: var(--tx2); font-weight: bold;">${i + 1}</div>
+            <input type="number" value="${s.w}" oninput="updSet('${ex.uid}',${i},'w',this.value)" 
+                   style="width: 100%; text-align: center; padding: 10px; border-radius: 6px; border: 1px solid var(--brd); background: var(--c2); color: var(--tx); font-size: 1rem;">
+            <input type="number" value="${s.r}" oninput="updSet('${ex.uid}',${i},'r',this.value)" 
+                   style="width: 100%; text-align: center; padding: 10px; border-radius: 6px; border: 1px solid var(--brd); background: var(--c2); color: var(--tx); font-size: 1rem;">
+            <button onclick="chkSet('${ex.uid}',${i})" 
+                    style="height: 44px; width: 44px; border-radius: 6px; border: 2px solid var(--brd); background: transparent; color: var(--tx); font-weight: bold; cursor: pointer; ${isDone}">
+                ${s.done ? '✓' : ''}
+            </button>
         </div>`;
+    });
 
-    // VIDEO PLAYER (Nascosto di default)
-    if (hasVideo) {
-        h += `<div class="egif" id="vid-cont-${ex.uid}" style="display:none; padding:10px;">
-                <video id="video-${ex.uid}" loop muted playsinline style="width:100%; border-radius:12px; background:#000; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">
-                    <source src="${MEDIA_PATH + d.video}" type="video/mp4">
-                </video>
-              </div>`;
-    }
-
-    // SEZIONE SET
-    h += `<div class="sets-header">
-            <span>SET</span><span>PESO (kg)</span><span>REPS</span><span>OK</span>
+    h += `</div>
+          <button onclick="addSet('${ex.uid}')" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px dashed var(--tx3); background: transparent; color: var(--tx2); font-size: 0.9rem; margin-top: 5px;">
+            + Aggiungi Serie
+          </button>
+          <div style="margin-top: 10px; text-align: right;">
+            <small style="color: var(--tx3);">Volume: <b>${vol}kg</b></small>
           </div>
-          <div class="sets-track">`;
-    
-    if (ex.sd && ex.sd.length) {
-        ex.sd.forEach((s, i) => {
-            const isDone = s.done ? 'done' : '';
-            h += `
-            <div class="set-row ${isDone}">
-                <div class="set-num">${i + 1}</div>
-                <input type="number" value="${s.w}" step="0.5" oninput="updSet('${ex.uid}',${i},'w',this.value)" placeholder="kg">
-                <div class="set-x">×</div>
-                <input type="number" value="${s.r}" oninput="updSet('${ex.uid}',${i},'r',this.value)" placeholder="reps">
-                <button class="set-chk" onclick="chkSet('${ex.uid}',${i})">${s.done ? '✓' : ''}</button>
-            </div>`;
-        });
-    }
-
-    h += `<button class="add-set-btn" onclick="addSet('${ex.uid}')">+ Aggiungi Serie</button>
-          </div></div>`;
-    
+        </div></div>`;
     return h;
 }
 function calcVolume(ex){
@@ -728,7 +736,23 @@ function getEmoji(bp) {
     const em = {'Petto':'🍒','Schiena':'🐢','Spalle':'🦅','Bicipiti':'💪','Tricipiti':'🐎','Gambe':'🍗','Core':'🧱'};
     return em[bp] || '🏋️';
 }
+function getMediaHTML(uid, videoLink) {
+    if (!videoLink) return "";
+    const isExternal = videoLink.startsWith('http');
+    const finalUrl = isExternal ? videoLink : MEDIA_PATH + videoLink;
 
+    if (finalUrl.includes("youtube.com") || finalUrl.includes("youtu.be")) {
+        return `<div class="egif" id="vid-cont-${uid}" style="display:none; padding:10px; aspect-ratio: 16/9;">
+                    <iframe id="video-${uid}" src="" frameborder="0" style="width:100%; height:100%; border-radius:8px;"></iframe>
+                </div>`;
+    }
+
+    return `<div class="egif" id="vid-cont-${uid}" style="display:none; padding:10px;">
+                <video id="video-${uid}" loop muted playsinline style="width:100%; border-radius:8px; background:#000;">
+                    <source src="${finalUrl}" type="video/mp4">
+                </video>
+            </div>`;
+}
 function getMediaTag(mediaArray){
 
 if(!mediaArray || !mediaArray.length) return '';
