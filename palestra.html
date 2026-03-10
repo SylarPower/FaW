@@ -7,10 +7,12 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>🏋️ GymTracker Pro</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏋️</text></svg>">
-    <link rel="manifest" href="data:application/json,%7B%22name%22%3A%22GymTracker%20Pro%22%2C%22short_name%22%3A%22GymTracker%22%2C%22start_url%22%3A%22palestra.html%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23121212%22%2C%22theme_color%22%3A%22%23121212%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22data%3Aimage%2Fsvg%2Bxml%2C%253Csvg%2520xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%2520viewBox%3D'0%25200%2520100%2520100'%253E%253Ctext%2520y%3D'.9em'%2520font-size%3D'90'%253E%25F0%259F%258F%258B%25EF%25B8%258F%253C%2Ftext%253E%253C%2Fsvg%253E%22%2C%22sizes%22%3A%22any%22%2C%22type%22%3A%22image%2Fsvg%2Bxml%22%7D%5D%7D">
+    <link rel="icon" href="gym-icon.png">
+	 <link rel="apple-touch-icon" href="gym-icon.png">
+    <link rel="manifest" href="gym-manifest.json">
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+	 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root{
             --bg:#121212;--c1:#1e1e1e;--c2:#252525;--c3:#2a2a2a;
@@ -97,7 +99,6 @@
         .ec.ssel2{border:2px solid var(--pur2);box-shadow:0 0 8px rgba(187,134,252,.3);}
         .ec.hss{border-left:4px solid var(--pur);}
         .eh{display:flex;align-items:center;gap:10px;padding:12px;}
-        .eh img{width:56px;height:56px;border-radius:10px;object-fit:cover;background:var(--c1);flex-shrink:0;}
         .ei{flex:1;min-width:0;}
         .ei h4{color:var(--tx);font-size:.85rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
         .ei .em{font-size:.68rem;color:var(--tx2);}
@@ -182,14 +183,6 @@
         [data-theme="light"] .ac.ok{background:linear-gradient(135deg,#e0f2f1,#b2dfdb);}
         .ac.no{background:var(--c1);opacity:.3;}
         .aci{font-size:1.5rem;}.act{font-size:.62rem;font-weight:bold;color:var(--tx);margin-top:2px;}.acd{font-size:.52rem;color:var(--tx2);margin-top:1px;}
-
-        /* Goals */
-        .gc{background:var(--c2);border-radius:10px;padding:14px;margin:8px 0;border:1px solid var(--brd);}
-        .gh{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;}
-        .gh strong{color:var(--tx);font-size:.82rem;}
-        .gs{font-size:.68rem;color:var(--tx2);margin-bottom:6px;}
-        .gb{height:5px;background:var(--c3);border-radius:3px;overflow:hidden;}
-        .gf{height:100%;border-radius:3px;transition:width .5s;}
 
         /* History */
         .hd{color:var(--acc);font-size:.78rem;font-weight:bold;margin-top:14px;padding-bottom:4px;border-bottom:1px solid var(--brd);}
@@ -301,22 +294,6 @@
     <!-- Achievements -->
     <div class="card"><h3>🏆 Achievements</h3><div id="aList" class="ag"></div></div>
 
-    <!-- Goals -->
-    <div class="card">
-        <h3>🎯 Obiettivi</h3>
-        <button class="bp" onclick="togGF()" style="width:100%;margin-bottom:10px;">+ Nuovo Obiettivo</button>
-        <div id="gForm" style="display:none;background:var(--c2);padding:14px;border-radius:10px;margin-bottom:12px;">
-            <select id="gEx" style="margin:4px 0;"></select>
-            <input type="number" id="gTgt" placeholder="Peso obiettivo (kg)" style="margin:4px 0;">
-            <input type="date" id="gDl" style="margin:4px 0;">
-            <div style="display:flex;gap:8px;margin-top:8px;">
-                <button class="bp" onclick="saveGoal()" style="flex:1;">Salva</button>
-                <button class="bs" onclick="togGF()" style="flex:1;">Annulla</button>
-            </div>
-        </div>
-        <div id="gList"></div>
-    </div>
-
     <!-- History -->
     <div class="card"><h3>📊 Cronologia</h3><div id="hList" style="max-height:350px;overflow-y:auto;-webkit-overflow-scrolling:touch;"></div></div>
 </div>
@@ -332,7 +309,6 @@
             <button class="bg" onclick="complWO()">✅ Completa</button>
         </div>
         <div style="display:flex;gap:5px;margin-bottom:10px;flex-wrap:wrap;">
-            <button class="bs" onclick="dupDay()" style="font-size:.72rem;padding:6px 10px;">📋 Duplica Giornata</button>
             <button class="bs" onclick="openPlate()" style="font-size:.72rem;padding:6px 10px;">🧮 Plate Calculator</button>
         </div>
         <div id="ssHint" class="sph" style="display:none;"></div>
@@ -390,6 +366,15 @@
     <button class="bs" onclick="closePlate()" style="width:100%;margin-top:12px;">Chiudi</button>
 </div>
 </div>
+<div id="mProg" class="modal" onclick="if(event.target===this)this.style.display='none'">
+    <div class="mc" style="max-width:500px;">
+        <h2 id="progTitle">Andamento Esercizio</h2>
+        <div style="height:300px; width:100%;">
+            <canvas id="exChart"></canvas>
+        </div>
+        <button class="bs" onclick="document.getElementById('mProg').style.display='none'" style="width:100%;margin-top:15px;">Chiudi</button>
+    </div>
+</div>
 <script>
 // =============================================
 // 🔥 FIREBASE
@@ -401,61 +386,41 @@ if(!MIO){alert('Devi prima fare login dal portale!');location.href='index.html';
 document.getElementById('ubadge').textContent=MIO;
 
 // =============================================
-// 🎬 EXERCISE DB — GIF da ExerciseDB API
+// 🎬 EXERCISE DATABASE (Manuale da GitHub)
 // =============================================
-let EX_DB=[];
-const CACHE_KEY='gym_exdb_v2';
-const CACHE_EXP=7*24*60*60*1000; // 7 giorni
 
-async function loadExDB(){
-    // Prova cache
-    try{
-        const c=JSON.parse(localStorage.getItem(CACHE_KEY));
-        if(c && Date.now()-c.ts < CACHE_EXP && c.data?.length > 100){
-            EX_DB=c.data;
-            console.log('✅ DB da cache: '+EX_DB.length+' esercizi');
-            return;
-        }
-    }catch(e){}
+// --- CONFIGURAZIONE GITHUB ---
+const GITHUB_USER = "SylarPower"; 
+const GITHUB_REPO = "FunAtWork";
+const MEDIA_PATH = `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/main/esercizi/`;
 
-    // Fetch da API
-    try{
-        const r=await fetch('https://exercisedb-api.vercel.app/api/v1/exercises?limit=1500&offset=0');
-        if(!r.ok) throw new Error('API status '+r.status);
-        const j=await r.json();
-        const data=j.data||j;
-        EX_DB=data.map(e=>({
-            id:e.id,
-            name:e.name,
-            bp:e.bodyPart||'',
-            eq:e.equipment||'body weight',
-            gif:e.gifUrl||'',
-            tgt:e.target||'',
-            sec:e.secondaryMuscles||[],
-            lv:e.level||''
-        }));
-        // Salva in cache (solo i campi necessari)
-        try{localStorage.setItem(CACHE_KEY,JSON.stringify({ts:Date.now(),data:EX_DB}));}catch(e){}
-        console.log('✅ DB da API: '+EX_DB.length+' esercizi');
-    }catch(e){
-        console.warn('⚠️ API fallita, uso fallback',e);
-        // Fallback minimale
-        const FB='https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/';
-        EX_DB=[
-            {id:'fb_bench',name:'Barbell Bench Press',bp:'chest',eq:'barbell',gif:'',tgt:'pectorals',sec:['shoulders','triceps'],img:FB+'Barbell_Bench_Press_-_Medium_Grip/0.jpg'},
-            {id:'fb_squat',name:'Barbell Squat',bp:'upper legs',eq:'barbell',gif:'',tgt:'quads',sec:['glutes','hamstrings'],img:FB+'Barbell_Squat/0.jpg'},
-            {id:'fb_dead',name:'Barbell Deadlift',bp:'back',eq:'barbell',gif:'',tgt:'spine',sec:['glutes','hamstrings'],img:FB+'Barbell_Deadlift/0.jpg'},
-            {id:'fb_ohp',name:'Overhead Press',bp:'shoulders',eq:'barbell',gif:'',tgt:'delts',sec:['triceps'],img:FB+'Standing_Military_Press/0.jpg'},
-            {id:'fb_row',name:'Barbell Row',bp:'back',eq:'barbell',gif:'',tgt:'lats',sec:['biceps'],img:FB+'Bent_Over_Barbell_Row/0.jpg'},
-            {id:'fb_curl',name:'Dumbbell Curl',bp:'upper arms',eq:'dumbbell',gif:'',tgt:'biceps',sec:['forearms'],img:FB+'Dumbbell_Bicep_Curl/0.jpg'},
-            {id:'fb_tri',name:'Tricep Pushdown',bp:'upper arms',eq:'cable',gif:'',tgt:'triceps',sec:[],img:FB+'Triceps_Pushdown/0.jpg'},
-            {id:'fb_lat',name:'Lat Pulldown',bp:'back',eq:'cable',gif:'',tgt:'lats',sec:['biceps'],img:FB+'Wide-Grip_Lat_Pulldown/0.jpg'},
-            {id:'fb_lp',name:'Leg Press',bp:'upper legs',eq:'machine',gif:'',tgt:'quads',sec:['glutes'],img:FB+'Leg_Press/0.jpg'},
-            {id:'fb_lr',name:'Lateral Raise',bp:'shoulders',eq:'dumbbell',gif:'',tgt:'delts',sec:[],img:FB+'Side_Lateral_Raise/0.jpg'},
-            {id:'fb_fly',name:'Dumbbell Fly',bp:'chest',eq:'dumbbell',gif:'',tgt:'pectorals',sec:[],img:FB+'Dumbbell_Flyes/0.jpg'},
-            {id:'fb_cr',name:'Calf Raise',bp:'lower legs',eq:'machine',gif:'',tgt:'calves',sec:[],img:FB+'Standing_Calf_Raises/0.jpg'},
-        ];
+let EX_DB = [];
+
+async function loadExDB() {
+    const statusEl = document.getElementById('load-status');
+    try {
+        if (statusEl) statusEl.textContent = 'Sincronizzazione archivio esercizi...';
+        
+        // Carica il file exercises.json che caricherai nel tuo repo
+        const r = await fetch('exercises.json');
+        if (!r.ok) throw new Error();
+        EX_DB = await r.json();
+        
+        console.log('✅ Archivio pronto: ' + EX_DB.length + ' esercizi');
+    } catch(e) {
+        console.error("Errore caricamento exercises.json");
+        if (statusEl) statusEl.textContent = 'Errore: carica exercises.json su GitHub!';
     }
+}
+
+// Funzione per i colori dei muscoli (Highlight Area)
+function getMuscleColor(bp) {
+    const map = {
+        'Petto': '#ff4757', 'Schiena': '#2f3542', 'Spalle': '#ffa502', 
+        'Bicipiti': '#ff6b81', 'Tricipiti': '#70a1ff', 'Gambe': '#2ed573', 
+        'Core': '#eccc68', 'Avambracci': '#a4b0be'
+    };
+    return map[bp] || '--acc';
 }
 
 const BPARTS=['all','back','cardio','chest','lower arms','lower legs','neck','shoulders','upper arms','upper legs','waist'];
@@ -477,9 +442,60 @@ let D=null,curDay=null,ssMode=false,ss1=null,mf='all';
 let tI=null,tS=0,tT=0,tR=false;
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).substr(2,5);
 const exDef=id=>EX_DB.find(e=>e.id===id);
-const exGif=e=>e.gif||(e.img||'');
+const exGif = e => (e.gif && e.gif.endsWith('.gif')) ? e.gif : '';
 function calc1RM(w,r){if(!w||!r)return 0;return r===1?w:Math.round(w*(1+r/30));}
+let myExChart = null;
 
+function showExProgression(exId, exName) {
+    document.getElementById('mProg').style.display = 'flex';
+    document.getElementById('progTitle').textContent = exName;
+
+    // 1. Estrai dati dalla cronologia
+    const stats = [];
+    D.hist.forEach(w => {
+        const found = w.exs.find(e => e.exerciseId === exId);
+        if (found) {
+            // Calcoliamo il miglior carico di quella sessione
+            const maxW = found.sd.reduce((max, s) => s.w > max ? s.w : max, 0);
+            stats.push({ date: w.date, weight: maxW });
+        }
+    });
+
+    if (stats.length === 0) {
+        alert("Dati insufficienti per generare un grafico. Completa più allenamenti!");
+        return;
+    }
+
+    // Ordina per data
+    stats.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    const ctx = document.getElementById('exChart').getContext('2d');
+    if (myExChart) myExChart.destroy();
+
+    myExChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: stats.map(s => new Date(s.date).toLocaleDateString()),
+            datasets: [{
+                label: 'Carico Max (kg)',
+                data: stats.map(s => s.weight),
+                borderColor: '#03dac6',
+                backgroundColor: 'rgba(3, 218, 198, 0.1)',
+                tension: 0.3,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                y: { grid: { color: '#333' }, ticks: { color: '#aaa' } },
+                x: { grid: { display: false }, ticks: { color: '#aaa' } }
+            }
+        }
+    });
+}
 // =============================================
 // FIREBASE LOAD/SAVE
 // =============================================
@@ -516,7 +532,7 @@ function goDay(id){
 // =============================================
 // RENDER ALL
 // =============================================
-function renderAll(){if(!D)return;renSt();renDays();renAch();renGoals();renHist();renVol();renMuscle();}
+function renderAll(){if(!D)return;renSt();renDays();renAch();renHist();renVol();renMuscle();}
 
 function renSt(){
     const s=D.st;
@@ -526,15 +542,50 @@ function renSt(){
     document.getElementById('s3').textContent=Object.keys(s.pr||{}).length;
 }
 
-function renDays(){
-    const c=document.getElementById('dList');
-    if(!D.days.length){c.innerHTML='<div class="emp"><div class="eic">📋</div>Nessuna giornata</div>';return;}
-    c.innerHTML=D.days.map(d=>{
-        const n=d.exs?d.exs.length:0;
-        const ss=d.exs?.some(e=>e.ssG);
-        const pg=d.exs?.some(e=>e.pF);
-        return`<div class="dc" onclick="goDay('${d.id}')"><div><h4>📅 ${d.name}</h4><span>${n} esercizi${ss?' • 🔗':''}${pg?' • ⬆️':''}</span></div><div class="da"><button class="bp" onclick="event.stopPropagation();goDay('${d.id}')">Apri →</button><button class="bd" onclick="event.stopPropagation();remDay('${d.id}')" style="padding:6px 10px;font-size:.72rem;">🗑️</button></div></div>`;
+function renDays() {
+    const c = document.getElementById('dList');
+    if (!D.days.length) {
+        c.innerHTML = `<div class="emp"><div class="eic">📋</div>Nessuna giornata creata</div>`;
+        return;
+    }
+    c.innerHTML = D.days.map(d => {
+        const n = d.exs ? d.exs.length : 0;
+        const ss = d.exs?.some(e => e.ssG);
+        const pg = d.exs?.some(e => e.pF);
+        return `
+        <div class="dc" onclick="goDay('${d.id}')">
+            <div>
+                <h4>📅 ${d.name}</h4>
+                <span>${n} esercizi ${ss ? '• 🔗' : ''} ${pg ? '• ⬆️' : ''}</span>
+            </div>
+            <div class="da" style="display:flex;gap:4px;">
+                <button class="bs" onclick="event.stopPropagation();dupDay('${d.id}')" style="padding:6px 10px;font-size:0.75rem;">📋</button>
+                <button class="bp" onclick="event.stopPropagation();goDay('${d.id}')" style="padding:6px 14px;">Apri</button>
+                <button class="bd" onclick="event.stopPropagation();remDay('${d.id}')" style="padding:6px 10px;">🗑️</button>
+            </div>
+        </div>`;
     }).join('');
+}
+
+// Aggiungi questa funzione
+function dupDay(id) {
+    const day = D.days.find(d => d.id === id);
+    if (!day) return;
+    const newName = prompt("Nome della nuova giornata:", day.name + " (copia)");
+    if (!newName) return;
+    
+    const copy = {
+        id: uid(),
+        name: newName,
+        exs: day.exs.map(ex => ({
+            ...ex,
+            uid: uid(),
+            sd: ex.sd ? ex.sd.map(s => ({...s, done: false})) : []
+        }))
+    };
+    D.days.push(copy);
+    save();
+    renDays();
 }
 
 // =============================================
@@ -542,14 +593,6 @@ function renDays(){
 // =============================================
 function addDay(){const i=document.getElementById('iDay'),n=i.value.trim();if(!n)return;D.days.push({id:uid(),name:n,exs:[]});i.value='';save();renDays();}
 function remDay(id){if(!confirm('Eliminare questa giornata?'))return;D.days=D.days.filter(d=>d.id!==id);save();renDays();}
-function dupDay(){
-    const d=gD();if(!d)return;
-    const nm=prompt('Nome della giornata duplicata:',d.name+' (copia)');
-    if(!nm)return;
-    const nd={id:uid(),name:nm,exs:d.exs.map(e=>({...e,uid:uid(),sd:e.sd?e.sd.map(s=>({...s,done:false})):[]  }))};
-    D.days.push(nd);save();renderAll();
-    alert('✅ Giornata duplicata!');
-}
 document.getElementById('iDay').addEventListener('keydown',e=>{if(e.key==='Enter')addDay();});
 
 // =============================================
@@ -585,7 +628,7 @@ function renDay(){
 function renEC(ex,inSS){
     const d=exDef(ex.exerciseId);
     const last=getLast(ex.exerciseId);
-    const gifSrc=d?exGif(d):'';
+	const media = d ? getMediaTag(d.media) : '';
     const sc=ssMode?(ss1===ex.uid?'ssel2':'ssel'):'';
     const hc=inSS?'hss':'';
     const ck=ssMode?`onclick="ssClk('${ex.uid}')"`:'';
@@ -599,21 +642,29 @@ function renEC(ex,inSS){
     // 1RM calc from best set
     const bestSet=ex.sd.reduce((b,s)=>(!b||s.w>b.w)?s:b,null);
     const rm=bestSet?calc1RM(bestSet.w,bestSet.r):0;
-
+	const sug = suggestWeight(ex);
+	${sug?`<span class="rm-badge">Suggerito ${sug}kg</span>`:''}
     let h=`<div class="ec ${sc} ${hc}" id="ex-${ex.uid}" ${ck}>`;
 
     // Header
     h+=`<div class="eh">`;
-    if(gifSrc) h+=`<img src="${gifSrc}" alt="${ex.name}" onclick="event.stopPropagation();togGif('${ex.uid}')" loading="lazy" onerror="this.style.display='none'">`;
-    h+=`<div class="ei"><h4>${ex.name}</h4><div class="em">${d?d.bp+' • '+d.eq:''}${ex.ssG?' <span class="tss">SS</span>':''}${rm?' <span class="rm-badge">1RM ≈ '+rm+'kg</span>':''}</div></div>`;
+    if(media) h+=media;
+    // Calcola il volume attuale della sessione
+const currentVol = calcVolume(ex);
+
+h+=`<div class="ei" onclick="showExProgression('${ex.exerciseId}', '${ex.name.replace(/'/g, "\\'")}')" style="cursor:pointer">
+        <h4>${ex.name} 📈</h4>
+        <div class="em">
+            ${d ? d.bp + ' • ' + d.eq : ''}
+            ${rm ? ' <span class="rm-badge">1RM: ' + rm + 'kg</span>' : ''}
+            <span class="badge" style="background:var(--pur2);color:#000;margin-left:4px;">Vol: ${vol}kg</span>
+        </div>
+    </div>`;
     h+=`<div class="ea">
         <button onclick="event.stopPropagation();togP('${ex.uid}')" style="opacity:${ex.pF?1:.3}">⬆️</button>
         <button onclick="event.stopPropagation();togE('${ex.uid}')">⚙️</button>
         <button onclick="event.stopPropagation();remEx('${ex.uid}')">🗑️</button>
     </div></div>`;
-
-    // GIF expanded
-    if(gifSrc) h+=`<div class="egif" id="gif-${ex.uid}"><img src="${gifSrc}" alt="${ex.name}" loading="lazy"></div>`;
 
     // Progression
     if(ex.pF) h+=`<div class="bprog">⬆️ <b>Progressione:</b> +2.5kg e -1 rep al completamento</div>`;
@@ -633,28 +684,77 @@ function renEC(ex,inSS){
     </div>`;
 
     // SET-BY-SET TRACKING
-    h+=`<div class="sets-track"><div class="sets-header"><span>Set</span><span>Kg</span><span>Reps</span><span style="width:32px;"></span></div>`;
-    ex.sd.forEach((s,i)=>{
-        h+=`<div class="set-row ${s.done?'done':''}" id="sr-${ex.uid}-${i}">
+    const completedSets = ex.sd.filter(x => x.done).length;
+    h += `<div class="sets-track">
+        <div class="sets-header"><span>Set</span><span>Kg</span><span>Reps</span><span>OK</span></div>`;
+    
+    ex.sd.forEach((s, i) => {
+        h += `<div class="set-row ${s.done?'done':''}">
             <span class="set-num">${i+1}</span>
-            <input type="number" value="${s.w}" onchange="updSet('${ex.uid}',${i},'w',parseFloat(this.value)||0)" onclick="event.stopPropagation()">
-            <span class="set-x">×</span>
-            <input type="number" value="${s.r}" onchange="updSet('${ex.uid}',${i},'r',parseInt(this.value)||0)" onclick="event.stopPropagation()">
-            <button class="set-chk" onclick="event.stopPropagation();chkSet('${ex.uid}',${i})">${s.done?'✓':'○'}</button>
-            <button onclick="event.stopPropagation();remSet('${ex.uid}',${i})" style="background:none;border:none;font-size:.7rem;color:var(--red);padding:4px;">✕</button>
+            <input type="number" inputmode="decimal" value="${s.w}" onchange="updSet('${ex.uid}',${i},'w',parseFloat(this.value)||0)" onclick="event.stopPropagation()">
+            <span style="color:var(--tx3); font-size:0.7rem;">×</span>
+            <input type="number" inputmode="numeric" value="${s.r}" onchange="updSet('${ex.uid}',${i},'r',parseInt(this.value)||0)" onclick="event.stopPropagation()">
+            <button class="set-chk" onclick="event.stopPropagation(); chkSet('${ex.uid}',${i})">${s.done?'✓':'○'}</button>
         </div>`;
     });
+
+    h += `<div style="display:flex;gap:8px;margin-top:10px;">
+        <button onclick="event.stopPropagation();addSet('${ex.uid}')" class="bs" style="flex:1; font-size:0.75rem;">+ Serie</button>
+        <button onclick="event.stopPropagation();loadL('${ex.uid}')" class="bp" style="flex:1; font-size:0.75rem;">⟲ Carica Ultimo</button>
+    </div>
+    <div style="text-align:center;margin-top:8px;font-size:0.7rem;color:var(--acc);font-weight:bold;">
+        PROGRESSO: ${completedSets} / ${ex.sd.length}
+    </div></div>`;
     h+=`</div>`;
 
     // Extra
     h+=`<div class="eex" id="eex-${ex.uid}">
         <label>📌 Piolo / Sedile</label>
         <input value="${ex.seat||''}" onchange="uEx('${ex.uid}','seat',this.value)" onclick="event.stopPropagation()" placeholder="Es: piolo 3, sedile 5...">
-        <label>📝 Note</label>
-        <textarea rows="2" onchange="uEx('${ex.uid}','notes',this.value)" onclick="event.stopPropagation()" placeholder="Note...">${ex.notes||''}</textarea>
     </div>`;
 
     h+=`</div>`;return h;
+}
+function calcVolume(ex){
+
+let v=0;
+
+if(!ex.sd) return 0;
+
+ex.sd.forEach(s=>{
+if(s.done)
+v+=s.w*s.r;
+});
+
+return v;
+
+}
+
+function getEmoji(bp) {
+    const em = {'Petto':'🍒','Schiena':'🐢','Spalle':'🦅','Bicipiti':'💪','Tricipiti':'🐎','Gambe':'🍗','Core':'🧱'};
+    return em[bp] || '🏋️';
+}
+
+function getMediaTag(mediaArray){
+
+if(!mediaArray || !mediaArray.length) return '';
+
+return mediaArray.map(file=>{
+
+const src = MEDIA_PATH + file;
+
+return `
+<video
+src="${src}"
+preload="none"
+playsinline
+controls
+style="width:100%;max-height:260px;border-radius:12px;background:#111;margin-bottom:6px;">
+</video>
+`;
+
+}).join('');
+
 }
 
 // =============================================
@@ -680,11 +780,17 @@ function getLast(eid){
 
 // SET-BY-SET
 function updSet(u,i,f,v){const e=fEx(u);if(!e||!e.sd[i])return;e.sd[i][f]=v;save();renDay();}
-function chkSet(u,i){
-    const e=fEx(u);if(!e||!e.sd[i])return;
-    e.sd[i].done=!e.sd[i].done;save();renDay();
-    // Auto-start timer
-    if(e.sd[i].done) openTmr(e.rest||90);
+function chkSet(u, i) {
+    const e = fEx(u);
+    if (!e || !e.sd[i]) return;
+    e.sd[i].done = !e.sd[i].done;
+    save();
+    renDay();
+    // UX: Se la serie è completata, attiva il rest e fallo partire subito
+    if (e.sd[i].done) {
+        openTmr(e.rest || 90);
+        tStart();
+    }
 }
 function addSet(u){const e=fEx(u);if(!e)return;const last=e.sd.length?e.sd[e.sd.length-1]:{r:10,w:0};e.sd.push({r:last.r,w:last.w,done:false});save();renDay();}
 function remSet(u,i){const e=fEx(u);if(!e||e.sd.length<=1)return;e.sd.splice(i,1);save();renDay();}
@@ -703,16 +809,75 @@ function openSel(){
     filEx();
 }
 function closeSel(){document.getElementById('mSel').style.display='none';document.getElementById('exQ').value='';mf='all';}
+function suggestWeight(ex){
+
+const last=getLast(ex.exerciseId);
+
+if(!last) return 0;
+
+let w=last.w;
+
+const completed=ex.sd.filter(s=>s.done).length;
+
+if(completed===ex.sd.length)
+w+=2.5;
+
+else if(completed<ex.sd.length/2)
+w*=0.95;
+
+return Math.round(w*10)/10;
+
+}
+function fuzzyMatch(text,query){
+
+text=text.toLowerCase();
+query=query.toLowerCase();
+
+let ti=0;
+let qi=0;
+
+while(ti<text.length && qi<query.length){
+
+if(text[ti]===query[qi]) qi++;
+
+ti++;
+
+}
+
+return qi===query.length;
+
+}
+
 function filEx(){
-    const q=document.getElementById('exQ').value.toLowerCase();
-    const res=EX_DB.filter(e=>{
-        const mt=!q||e.name.toLowerCase().includes(q)||(e.eq||'').toLowerCase().includes(q)||(e.tgt||'').toLowerCase().includes(q)||(e.bp||'').toLowerCase().includes(q);
-        const mm=mf==='all'||(e.bp||'').toLowerCase()===mf;
-        return mt&&mm;
-    }).slice(0,60);
-    document.getElementById('exR').innerHTML=res.length
-        ?res.map(e=>{const src=exGif(e);return`<div class="exo" onclick="addEx('${e.id}')"><img src="${src}" alt="${e.name}" loading="lazy" onerror="this.style.display='none'"><div style="flex:1;min-width:0;"><div class="on">${e.name}</div><div class="om">${e.bp} • ${e.eq} • ${e.tgt}</div></div><span style="color:var(--acc);font-size:.72rem;white-space:nowrap;">+ Aggiungi</span></div>`;}).join('')
-        :'<div class="emp">Nessun risultato</div>';
+
+const q=document.getElementById('exQ').value.toLowerCase();
+
+const res=EX_DB.filter(e=>{
+
+if(!q) return true;
+
+const fields = [
+e.name,
+e.bp,
+e.eq,
+e.tgt
+].join(" ").toLowerCase();
+
+return fuzzyMatch(fields,q);
+
+});
+
+document.getElementById('exR').innerHTML=res.length
+?res.map(e=>`
+<div class="exo" onclick="addEx('${e.id}')">
+<div style="flex:1">
+<div class="on">${e.name}</div>
+<div class="om">${e.bp} • ${e.eq}</div>
+</div>
+<span style="color:var(--acc)">+ Aggiungi</span>
+</div>`).join('')
+:'<div class="emp">Nessun risultato</div>';
+
 }
 function addEx(eid){
     const d=exDef(eid),day=gD();if(!d||!day)return;
@@ -750,8 +915,6 @@ function complWO(){
         D.hist.push({eid:e.exerciseId,name:e.name,dt:new Date().toISOString(),s:completedSets.length,r:avgR,w:maxW,rest:e.rest,seat:e.seat,notes:e.notes,sd:e.sd.map(x=>({r:x.r,w:x.w}))});
     });
 
-    if(D.goals)D.goals.forEach(g=>{const e=day.exs.find(x=>x.exerciseId===g.eid);if(e){const mw=Math.max(...e.sd.map(x=>x.w));if(mw>(g.cw||0))g.cw=mw;}});
-
     // Progressions
     day.exs.forEach(e=>{
         if(e.pF&&e.sd){
@@ -776,21 +939,6 @@ function renAch(){
         return`<div class="ac ${ok?'ok':'no'}"><div class="aci">${ok?a.i:'🔒'}</div><div class="act">${a.t}</div><div class="acd">${a.d}</div></div>`;
     }).join('');
 }
-
-// =============================================
-// GOALS
-// =============================================
-function renGoals(){
-    const c=document.getElementById('gList');
-    if(!D.goals?.length){c.innerHTML='<div style="text-align:center;color:var(--tx3);font-size:.78rem;padding:10px;">Nessun obiettivo</div>';return;}
-    c.innerHTML=D.goals.map(g=>{
-        const p=g.tw>0?Math.min(100,Math.round(((g.cw||0)/g.tw)*100)):0;
-        return`<div class="gc"><div class="gh"><strong>${g.en}</strong><button class="bd" onclick="remGoal('${g.id}')" style="padding:4px 8px;font-size:.65rem;">✕</button></div><div class="gs">${g.cw||0}kg → ${g.tw}kg${g.dl?' • Entro '+g.dl:''}</div><div class="gb"><div class="gf" style="width:${p}%;background:${p>=100?'var(--grn)':'var(--acc)'};"></div></div><div style="text-align:right;font-size:.58rem;color:var(--tx2);margin-top:2px;">${p}%</div></div>`;
-    }).join('');
-}
-function togGF(){const f=document.getElementById('gForm');f.style.display=f.style.display==='none'?'block':'none';if(f.style.display==='block'){document.getElementById('gEx').innerHTML='<option value="">Seleziona esercizio...</option>'+EX_DB.slice(0,200).map(e=>`<option value="${e.id}">${e.name}</option>`).join('');}}
-function saveGoal(){const eid=document.getElementById('gEx').value,tw=parseFloat(document.getElementById('gTgt').value),dl=document.getElementById('gDl').value;if(!eid||!tw)return alert('Compila!');const d=exDef(eid);D.goals.push({id:uid(),eid,en:d?d.name:eid,tw,cw:D.st.pr?.[eid]||0,dl:dl||''});save();renGoals();document.getElementById('gForm').style.display='none';}
-function remGoal(id){D.goals=D.goals.filter(g=>g.id!==id);save();renGoals();}
 
 // =============================================
 // HISTORY
@@ -844,60 +992,80 @@ function calcPlate(){
 // =============================================
 // 📈 VOLUME CHART (ultimi 7 giorni)
 // =============================================
-function renVol(){
-    const canvas=document.getElementById('vol-chart');
-    if(!canvas)return;
-    const ctx=canvas.getContext('2d');
-    const dpr=window.devicePixelRatio||1;
-    canvas.width=canvas.offsetWidth*dpr;
-    canvas.height=120*dpr;
-    ctx.scale(dpr,dpr);
-    const W=canvas.offsetWidth,H=120;
-    ctx.clearRect(0,0,W,H);
+function renVol() {
+    const canvas = document.getElementById('vol-chart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = canvas.offsetWidth * dpr;
+    canvas.height = 130 * dpr;
+    ctx.scale(dpr, dpr);
+    const W = canvas.offsetWidth, H = 130;
 
-    // Raccoglie volume per giorno (ultimi 7)
-    const days=[];
-    for(let i=6;i>=0;i--){
-        const d=new Date(Date.now()-i*864e5);
-        const key=d.toISOString().split('T')[0];
-        const label=['Dom','Lun','Mar','Mer','Gio','Ven','Sab'][d.getDay()];
-        let vol=0;
-        if(D.hist){D.hist.filter(l=>l.dt.startsWith(key)).forEach(l=>{vol+=(l.s||0)*(l.r||0)*(l.w||0);});}
-        days.push({label,vol,today:i===0});
+    // Trova il lunedì della settimana corrente
+    const now = new Date();
+    const dow = now.getDay(); // 0=dom..6=sab
+    const diffToMon = dow === 0 ? -6 : 1 - dow; // distanza da lunedì
+    const monday = new Date(now);
+    monday.setDate(now.getDate() + diffToMon);
+    monday.setHours(0,0,0,0);
+
+    const labels = ['Lun','Mar','Mer','Gio','Ven'];
+    const days = [];
+
+    for (let i = 0; i < 5; i++) {
+        const d = new Date(monday);
+        d.setDate(monday.getDate() + i);
+        const key = d.toISOString().split('T')[0];
+        const today = now.toISOString().split('T')[0];
+
+        let vol = 0;
+        if (D.hist) {
+            D.hist.filter(l => l.dt && l.dt.startsWith(key)).forEach(l => {
+                vol += (l.s || 0) * (l.r || 0) * (l.w || 0);
+            });
+        }
+        days.push({ label: labels[i], vol, isToday: key === today });
     }
 
-    const maxV=Math.max(...days.map(d=>d.vol),1);
-    const barW=W/7-8;
-    const pad=4;
+    const maxV = Math.max(...days.map(d => d.vol), 1);
+    const barW = (W / 5) - 12;
+    ctx.clearRect(0, 0, W, H);
 
-    const isDark=document.documentElement.getAttribute('data-theme')!=='light';
+    days.forEach((d, i) => {
+        const x = i * (W / 5) + 8;
+        const barH = Math.max(4, (d.vol / maxV) * (H - 45));
+        const y = H - 30 - barH;
 
-    days.forEach((d,i)=>{
-        const x=i*(W/7)+pad;
-        const barH=Math.max(2,(d.vol/maxV)*(H-35));
-        const y=H-20-barH;
+        const grad = ctx.createLinearGradient(x, y, x, H - 25);
+        if (d.isToday) {
+            grad.addColorStop(0, '#f1c40f');
+            grad.addColorStop(1, '#e67e22');
+        } else if (d.vol > 0) {
+            grad.addColorStop(0, '#03dac6');
+            grad.addColorStop(1, '#018786');
+        } else {
+            grad.addColorStop(0, '#333');
+            grad.addColorStop(1, '#222');
+        }
 
-        // Bar
-        const grad=ctx.createLinearGradient(x,y,x,H-20);
-        if(d.today){grad.addColorStop(0,'#f1c40f');grad.addColorStop(1,'#e67e22');}
-        else{grad.addColorStop(0,'#03dac6');grad.addColorStop(1,'#018786');}
-        ctx.fillStyle=grad;
+        ctx.fillStyle = grad;
         ctx.beginPath();
-        ctx.roundRect(x,y,barW,barH,4);
+        ctx.roundRect(x, y, barW, barH, 6);
         ctx.fill();
 
         // Label
-        ctx.fillStyle=isDark?'#666':'#999';
-        ctx.font='bold 9px sans-serif';
-        ctx.textAlign='center';
-        ctx.fillText(d.label,x+barW/2,H-6);
+        ctx.fillStyle = d.isToday ? '#f1c40f' : '#888';
+        ctx.font = (d.isToday ? 'bold ' : '') + '10px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(d.label, x + barW / 2, H - 8);
 
-        // Value
-        if(d.vol>0){
-            ctx.fillStyle=d.today?'#f1c40f':'#03dac6';
-            ctx.font='bold 8px sans-serif';
-            const volK=d.vol>=1000?Math.round(d.vol/1000)+'k':d.vol;
-            ctx.fillText(volK,x+barW/2,y-4);
+        // Valore
+        if (d.vol > 0) {
+            ctx.fillStyle = d.isToday ? '#f1c40f' : '#03dac6';
+            ctx.font = 'bold 9px sans-serif';
+            const txt = d.vol >= 10000 ? (d.vol / 1000).toFixed(0) + 'k' : Math.round(d.vol);
+            ctx.fillText(txt, x + barW / 2, y - 6);
         }
     });
 }
