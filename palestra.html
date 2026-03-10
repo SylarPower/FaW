@@ -118,7 +118,19 @@
         .dc h4 { color:var(--acc);font-size:.95rem;margin-bottom:4px; }
         .dc span { font-size:.73rem;color:var(--tx2); }
         .dc .da { display:flex;gap:6px;align-items:center; }
-
+			.dc.dc-done {
+				 opacity:0.55;border-color:var(--grn);
+				 background:rgba(39,174,96,0.06);
+			}
+			[data-theme="light"] .dc.dc-done {
+				 background:rgba(39,174,96,0.08);
+			}
+			.dc.dc-done h4 { color:var(--grn); }
+			.done-week-badge {
+				 padding:4px 10px;border-radius:12px;font-size:.65rem;
+				 font-weight:700;background:rgba(39,174,96,.15);
+				 color:var(--grn);white-space:nowrap;
+			}
         /* ===== EXERCISE CARDS ===== */
         .ex-card {
             background:var(--c1);border-radius:16px;margin:14px 0;
@@ -153,23 +165,34 @@
             background:linear-gradient(90deg,var(--grn),var(--acc));
         }
 
-        /* ===== MEDIA CONTAINER ===== */
-        .media-box {
-            max-height:0;overflow:hidden;transition:max-height .4s ease,padding .4s ease;
-            padding:0 16px;
-        }
-        .media-box.open { max-height:350px;padding:0 16px 12px; }
-        .media-box video,.media-box img,.media-box iframe {
-            width:100%;border-radius:12px;background:#000;display:block;
-        }
-        .media-box iframe { aspect-ratio:16/9;border:none; }
-        .yt-search {
-            display:flex;align-items:center;justify-content:center;gap:8px;
-            padding:20px;background:var(--c2);border-radius:12px;
-            color:var(--tx2);font-size:.82rem;cursor:pointer;
-            border:1px dashed var(--brd);transition:all .2s;
-        }
-        .yt-search:active { background:var(--c3);border-color:var(--acc);color:var(--acc); }
+			/* ===== MEDIA VIDEO ===== */
+			.media-box {
+				 max-height:0;overflow:hidden;
+				 transition:max-height .4s ease,padding .4s ease;
+				 padding:0 16px;
+			}
+			.media-box.open { max-height:500px;padding:0 16px 12px; }
+
+			.media-scroll {
+				 display:flex;gap:10px;overflow-x:auto;
+				 scroll-snap-type:x mandatory;
+				 -webkit-overflow-scrolling:touch;
+				 padding:4px 0;
+			}
+			.media-scroll::-webkit-scrollbar { display:none; }
+
+			.media-video {
+				 min-width:85%;max-width:100%;border-radius:12px;
+				 background:#000;scroll-snap-align:center;
+				 flex-shrink:0;
+			}
+			/* Se c'è un solo video, occupa tutto */
+			.media-scroll video:only-child { min-width:100%; }
+
+			.media-hint {
+				 text-align:center;padding:6px;
+				 color:var(--tx3);font-size:.65rem;
+			}
 
         /* ===== SET ROWS ===== */
         .sets-container { padding:0 16px 16px; }
@@ -238,7 +261,35 @@
         }
         .prog-badge.incomplete { background:rgba(241,196,15,.12);color:var(--yel); }
         .prog-badge.complete { background:rgba(39,174,96,.15);color:var(--grn); }
-
+			
+			/* ===== ACCORDION ESERCIZI ===== */
+			.ex-body {
+				 max-height:0;overflow:hidden;
+				 transition:max-height .35s ease,padding .35s ease,opacity .25s ease;
+				 padding:0 16px;opacity:0;
+			}
+			.ex-body.open {
+				 max-height:2000px; /* Abbastanza per qualsiasi contenuto */
+				 padding:0 16px 16px;opacity:1;
+			}
+			.ex-summary {
+				 display:flex;align-items:center;gap:8px;
+				 padding:0 16px 12px;
+			}
+			.ex-summary-badges {
+				 display:flex;gap:6px;flex-wrap:wrap;flex:1;
+			}
+			.ex-summary-badge {
+				 padding:3px 10px;border-radius:15px;font-size:.68rem;
+				 font-weight:600;background:var(--c2);color:var(--tx2);
+				 border:1px solid var(--brd);
+			}
+			.ex-summary-badge.done-badge { background:rgba(39,174,96,.15);color:var(--grn);border-color:rgba(39,174,96,.3); }
+			.ex-summary-badge.todo-badge { background:rgba(241,196,15,.1);color:var(--yel);border-color:rgba(241,196,15,.2); }
+			.ex-arrow {
+				 font-size:.8rem;color:var(--tx3);transition:transform .3s;
+				 min-width:30px;text-align:center;
+			}
         /* ===== ADD SET BTN ===== */
         .add-set-btn {
             width:100%;padding:12px;border-radius:10px;
@@ -330,19 +381,49 @@
         /* ===== VOLUME CHART ===== */
         #vol-chart { width:100%;height:130px;border-radius:10px;background:var(--c2); }
 
-        /* ===== MUSCLE MAP ===== */
-        .mm-grid { display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px; }
-        .mm-col { text-align:center; }
-        .mm-col h4 { font-size:.72rem;color:var(--tx2);margin-bottom:8px;text-transform:uppercase; }
-        .mm-part {
-            display:inline-block;padding:6px 12px;margin:3px;border-radius:20px;
-            font-size:.65rem;font-weight:600;border:1px solid var(--brd);
-            background:var(--c2);color:var(--tx2);transition:all .3s;
-        }
-        .mm-part.active { color:#fff;border-color:transparent; }
-        .mm-part.low { background:#1b5e20; }
-        .mm-part.med { background:#e65100; }
-        .mm-part.high { background:#b71c1c; }
+			/* ===== MAPPA MUSCOLARE SVG ===== */
+			.body-map-wrap {
+				 display:flex;justify-content:center;gap:12px;
+				 margin-top:10px;flex-wrap:wrap;
+			}
+			.body-svg { width:48%;max-width:180px; }
+			.body-svg .body-outline {
+				 fill:#1a1a1a;stroke:#333;stroke-width:1.2;
+			}
+			[data-theme="light"] .body-svg .body-outline {
+				 fill:#e0e0e0;stroke:#bbb;
+			}
+			.body-svg .m-area {
+				 fill:rgba(80,80,80,0.25);stroke:none;
+				 transition:fill 0.5s ease;cursor:default;
+			}
+			.body-svg .m-area.low  { fill:rgba(46,213,115,0.55); }
+			.body-svg .m-area.med  { fill:rgba(255,165,2,0.65); }
+			.body-svg .m-area.high { fill:rgba(231,76,60,0.75); }
+			.muscle-legend {
+				 display:flex;justify-content:center;gap:14px;
+				 margin-top:14px;font-size:.68rem;color:var(--tx2);
+				 flex-wrap:wrap;
+			}
+			.muscle-legend span {
+				 display:flex;align-items:center;gap:5px;
+			}
+			.legend-dot {
+				 width:12px;height:12px;border-radius:50%;display:inline-block;
+			}
+			.muscle-list {
+				 display:flex;flex-wrap:wrap;justify-content:center;
+				 gap:6px;margin-top:10px;
+			}
+			.muscle-tag {
+				 padding:4px 10px;border-radius:15px;font-size:.65rem;
+				 font-weight:600;border:1px solid var(--brd);
+				 background:var(--c2);color:var(--tx2);
+			}
+			.muscle-tag.active { color:#fff;border-color:transparent; }
+			.muscle-tag.low  { background:rgba(46,213,115,0.4); }
+			.muscle-tag.med  { background:rgba(255,165,2,0.5); }
+			.muscle-tag.high { background:rgba(231,76,60,0.6); }
 
         /* ===== BOTTOM NAV ===== */
         .bn {
@@ -438,15 +519,23 @@
             <button class="mode-btn" id="modeView" onclick="setMode(true)">📖 Solo Scheda</button>
         </div>
 
-        <div class="abar" id="trackActions">
-            <button class="bs" onclick="goHome()">← Indietro</button>
-            <button class="bp" onclick="openSel()">+ Esercizio</button>
-            <button class="bg" onclick="complWO()" id="btnComplete">✅ Completa</button>
-        </div>
-        <div class="abar" id="viewActions" style="display:none;">
-            <button class="bs" onclick="goHome()">← Indietro</button>
-            <button class="bp" onclick="openSel()">+ Esercizio</button>
-        </div>
+			<div class="abar" id="trackActions">
+				 <button class="bs" onclick="goHome()">← Indietro</button>
+				 <button class="bp" onclick="openSel()">+ Esercizio</button>
+				 <button class="bg" onclick="complWO()" id="btnComplete">✅ Completa</button>
+			</div>
+			<div style="display:flex;gap:6px;margin-bottom:12px;">
+				 <button class="tb" onclick="openAllEx()" style="flex:1;">📂 Apri Tutti</button>
+				 <button class="tb" onclick="closeAllEx()" style="flex:1;">📁 Chiudi Tutti</button>
+			</div>
+			<div class="abar" id="viewActions" style="display:none;">
+				 <button class="bs" onclick="goHome()">← Indietro</button>
+				 <button class="bp" onclick="openSel()">+ Esercizio</button>
+			</div>
+			<div id="expandBtns" style="display:flex;gap:6px;margin-bottom:12px;">
+				 <button class="tb" onclick="openAllEx()" style="flex:1;">📂 Apri Tutti</button>
+				 <button class="tb" onclick="closeAllEx()" style="flex:1;">📁 Chiudi Tutti</button>
+			</div>
 
         <div id="eList"></div>
     </div>
@@ -531,6 +620,7 @@ function toLocalDate(d) {
 // 📦 STATE
 // ============================================================
 let D = null, EX_DB = [], curDay = null, ssMode = false, ss1 = null, mf = 'all';
+let openExercises = new Set(); // Tiene traccia di quali esercizi sono aperti
 let viewMode = localStorage.getItem('gym-viewmode') === 'true';
 let myExChart = null;
 
@@ -538,6 +628,90 @@ const uid = () => Date.now().toString(36) + Math.random().toString(36).substr(2,
 const exDef = id => EX_DB.find(e => e.id === id);
 
 const BPARTS = ['all','back','cardio','chest','lower arms','lower legs','neck','shoulders','upper arms','upper legs','waist'];
+// ===== SVG CORPO + MAPPATURA MUSCOLI =====
+const BODY_FRONT = `
+<svg viewBox="0 0 200 400" class="body-svg">
+  <text x="100" y="14" text-anchor="middle" fill="#666" font-size="10" font-weight="bold">ANTERIORE</text>
+  <ellipse cx="100" cy="40" rx="18" ry="22" class="body-outline"/>
+  <path class="body-outline" d="M82,60 L82,66 L50,78 C42,82 36,94 35,106 L32,138 L34,173 L28,193 L22,208
+    L35,203 L52,198 L62,202 L65,228 L60,258 L56,298 L58,338 L62,363 L75,368
+    L82,363 L90,308 L96,273 L100,268 L104,273 L110,308 L118,363 L125,368
+    L138,363 L142,338 L144,298 L140,258 L135,228 L138,202 L148,198 L165,203
+    L178,208 L172,193 L166,173 L168,138 L165,106 C164,94 158,82 150,78
+    L118,66 L118,60"/>
+  <ellipse data-muscle="front_delts" cx="48" cy="86" rx="15" ry="12" class="m-area"/>
+  <ellipse data-muscle="front_delts" cx="152" cy="86" rx="15" ry="12" class="m-area"/>
+  <ellipse data-muscle="pectorals" cx="76" cy="106" rx="20" ry="14" class="m-area"/>
+  <ellipse data-muscle="pectorals" cx="124" cy="106" rx="20" ry="14" class="m-area"/>
+  <ellipse data-muscle="biceps" cx="34" cy="140" rx="9" ry="22" class="m-area"/>
+  <ellipse data-muscle="biceps" cx="166" cy="140" rx="9" ry="22" class="m-area"/>
+  <ellipse data-muscle="forearms" cx="28" cy="188" rx="7" ry="18" class="m-area"/>
+  <ellipse data-muscle="forearms" cx="172" cy="188" rx="7" ry="18" class="m-area"/>
+  <rect data-muscle="abs" x="84" y="126" width="32" height="48" rx="6" class="m-area"/>
+  <ellipse data-muscle="obliques" cx="78" cy="148" rx="8" ry="18" class="m-area"/>
+  <ellipse data-muscle="obliques" cx="122" cy="148" rx="8" ry="18" class="m-area"/>
+  <ellipse data-muscle="quads" cx="82" cy="268" rx="17" ry="38" class="m-area"/>
+  <ellipse data-muscle="quads" cx="118" cy="268" rx="17" ry="38" class="m-area"/>
+  <ellipse data-muscle="tibialis" cx="76" cy="342" rx="9" ry="22" class="m-area"/>
+  <ellipse data-muscle="tibialis" cx="124" cy="342" rx="9" ry="22" class="m-area"/>
+</svg>`;
+
+const BODY_BACK = `
+<svg viewBox="0 0 200 400" class="body-svg">
+  <text x="100" y="14" text-anchor="middle" fill="#666" font-size="10" font-weight="bold">POSTERIORE</text>
+  <ellipse cx="100" cy="40" rx="18" ry="22" class="body-outline"/>
+  <path class="body-outline" d="M82,60 L82,66 L50,78 C42,82 36,94 35,106 L32,138 L34,173 L28,193 L22,208
+    L35,203 L52,198 L62,202 L65,228 L60,258 L56,298 L58,338 L62,363 L75,368
+    L82,363 L90,308 L96,273 L100,268 L104,273 L110,308 L118,363 L125,368
+    L138,363 L142,338 L144,298 L140,258 L135,228 L138,202 L148,198 L165,203
+    L178,208 L172,193 L166,173 L168,138 L165,106 C164,94 158,82 150,78
+    L118,66 L118,60"/>
+  <path data-muscle="traps" d="M85,70 L100,66 L115,70 L138,84 L115,94 L85,94 L62,84 Z" class="m-area"/>
+  <ellipse data-muscle="rear_delts" cx="48" cy="86" rx="15" ry="12" class="m-area"/>
+  <ellipse data-muscle="rear_delts" cx="152" cy="86" rx="15" ry="12" class="m-area"/>
+  <ellipse data-muscle="lats" cx="72" cy="132" rx="20" ry="30" class="m-area"/>
+  <ellipse data-muscle="lats" cx="128" cy="132" rx="20" ry="30" class="m-area"/>
+  <ellipse data-muscle="lower_back" cx="100" cy="170" rx="18" ry="14" class="m-area"/>
+  <ellipse data-muscle="triceps" cx="34" cy="140" rx="9" ry="22" class="m-area"/>
+  <ellipse data-muscle="triceps" cx="166" cy="140" rx="9" ry="22" class="m-area"/>
+  <ellipse data-muscle="glutes" cx="84" cy="210" rx="18" ry="16" class="m-area"/>
+  <ellipse data-muscle="glutes" cx="116" cy="210" rx="18" ry="16" class="m-area"/>
+  <ellipse data-muscle="hamstrings" cx="82" cy="270" rx="16" ry="36" class="m-area"/>
+  <ellipse data-muscle="hamstrings" cx="118" cy="270" rx="16" ry="36" class="m-area"/>
+  <ellipse data-muscle="calves" cx="76" cy="345" rx="10" ry="22" class="m-area"/>
+  <ellipse data-muscle="calves" cx="124" cy="345" rx="10" ry="22" class="m-area"/>
+</svg>`;
+
+// Mappa: nomi usati nei JSON → nome del muscolo nell'SVG
+const MUSCLE_MAP = {
+    // Target diretti (come nel tuo JSON)
+    'front_delts':'front_delts', 'rear_delts':'rear_delts',
+    'pectorals':'pectorals', 'upper_chest':'pectorals', 'lower_chest':'pectorals',
+    'biceps':'biceps', 'bicep':'biceps',
+    'triceps':'triceps', 'tricep':'triceps',
+    'forearms':'forearms', 'wrist_flexors':'forearms', 'wrist_extensors':'forearms',
+    'abs':'abs', 'abdominals':'abs', 'rectus_abdominis':'abs', 'core':'abs',
+    'obliques':'obliques', 'external_oblique':'obliques',
+    'quads':'quads', 'quadriceps':'quads',
+    'tibialis':'tibialis',
+    'traps':'traps', 'trapezius':'traps',
+    'lats':'lats', 'latissimus_dorsi':'lats',
+    'lower_back':'lower_back', 'erector_spinae':'lower_back',
+    'glutes':'glutes', 'gluteus':'glutes', 'gluteus_maximus':'glutes',
+    'hamstrings':'hamstrings', 'hamstring':'hamstrings',
+    'calves':'calves', 'gastrocnemius':'calves', 'soleus':'calves',
+    // Body part (bp) → muscolo principale
+    'Chest':'pectorals', 'Petto':'pectorals',
+    'Back':'lats', 'Schiena':'lats',
+    'Shoulders':'front_delts', 'Spalle':'front_delts',
+    'Upper Arms':'biceps', 'Upper Legs':'quads',
+    'Lower Arms':'forearms', 'Lower Legs':'calves',
+    'Waist':'abs', 'Neck':'traps', 'Cardio':null,
+    'chest':'pectorals', 'back':'lats', 'shoulders':'front_delts',
+    'upper arms':'biceps', 'upper legs':'quads',
+    'lower arms':'forearms', 'lower legs':'calves',
+    'waist':'abs', 'neck':'traps', 'cardio':null,
+};
 const ACHS = [
     {id:'a1',t:'Prima Sessione! 💪',d:'Completa 1 allenamento',i:'🏅',c:s=>s.tw>=1},
     {id:'a2',t:'Costanza 🔥',d:'10 allenamenti',i:'🔥',c:s=>s.tw>=10},
@@ -614,6 +788,12 @@ function goHome() {
 }
 
 function goDay(id) {
+    // Avvisa se già fatto questa settimana
+    if (isDoneThisWeek(id)) {
+        if (!confirm('Hai già fatto questo allenamento questa settimana.\n\nVuoi rifarlo comunque?')) {
+            return; // L'utente ha detto no → resta sulla home
+        }
+    }
     curDay = id;
     document.getElementById('vHome').style.display = 'none';
     document.getElementById('vDay').style.display = 'block';
@@ -668,19 +848,21 @@ function renDays() {
         c.innerHTML = '<div class="emp"><div class="eic">📋</div>Nessuna giornata creata.<br><small style="color:var(--tx3)">Scrivi un nome e premi "+ Giorno"</small></div>';
         return;
     }
-    c.innerHTML = D.days.map(d => {
-        const n = d.exs ? d.exs.length : 0;
-        return `
-        <div class="dc fade-in" onclick="goDay('${d.id}')">
-            <div>
-                <h4>📅 ${d.name}</h4>
-                <span>${n} eserciz${n===1?'io':'i'}</span>
-            </div>
-            <div class="da">
-                <button class="bd" onclick="event.stopPropagation();remDay('${d.id}')" style="padding:8px 12px;">🗑️</button>
-            </div>
-        </div>`;
-    }).join('');
+	c.innerHTML = D.days.map(d => {
+		 const n = d.exs ? d.exs.length : 0;
+		 const doneWeek = isDoneThisWeek(d.id);
+		 return `
+		 <div class="dc fade-in ${doneWeek ? 'dc-done' : ''}" onclick="goDay('${d.id}')">
+			  <div>
+					<h4>${doneWeek ? '✅' : '📅'} ${d.name}</h4>
+					<span>${n} eserciz${n === 1 ? 'io' : 'i'}${doneWeek ? ' • fatto questa settimana' : ''}</span>
+			  </div>
+			  <div class="da" style="display:flex;gap:6px;align-items:center;">
+					${doneWeek ? '<span class="done-week-badge">✅ Fatto</span>' : ''}
+					<button class="bd" onclick="event.stopPropagation();remDay('${d.id}')" style="padding:8px 12px;">🗑️</button>
+			  </div>
+		 </div>`;
+	}).join('');
 }
 
 // ============================================================
@@ -721,7 +903,24 @@ document.getElementById('iDay').addEventListener('keydown', e => { if (e.key ===
 // 📋 DAY VIEW - RENDER
 // ============================================================
 function gD() { return D.days.find(d => d.id === curDay); }
+function isDoneThisWeek(dayId) {
+    if (!D.hist || !D.hist.length) return false;
+    // Calcola il lunedì di questa settimana
+    const now = new Date();
+    const dow = now.getDay(); // 0=dom..6=sab
+    const diffToMon = dow === 0 ? -6 : 1 - dow;
+    const monday = new Date(now);
+    monday.setDate(now.getDate() + diffToMon);
+    monday.setHours(0, 0, 0, 0);
+    const mondayStr = toLocalDate(monday);
 
+    // Cerca nella cronologia se c'è un log con questo dayId dopo lunedì
+    return D.hist.some(l => {
+        if (l.dayId !== dayId) return false;
+        const logDate = toLocalDate(l.dt);
+        return logDate >= mondayStr;
+    });
+}
 function renDay() {
     const day = gD();
     if (!day) return;
@@ -766,46 +965,60 @@ function renEC(ex) {
     const d = exDef(ex.exerciseId);
     const mColor = d ? getMuscleColor(d.bp) : 'var(--acc)';
     const safeName = (ex.name || '').replace(/'/g, "\\'");
-    const hasMedia = d && (d.video || d.gif || d.gifUrl);
+    const hasMedia = d && d.media && d.media.length > 0;
 
-    // Progress calculation
+    // Calcolo progresso
     const total = ex.sd ? ex.sd.length : 0;
     const done = ex.sd ? ex.sd.filter(s => s.done).length : 0;
     const pct = total > 0 ? Math.round((done / total) * 100) : 0;
     const allDone = done === total && total > 0;
+    const isOpen = openExercises.has(ex.uid);
 
     let h = `<div class="ex-card fade-in" style="border-left:5px solid ${mColor};">`;
 
-    // Header
-    h += `<div class="ex-header">
-        <div class="ex-info" onclick="showProgression('${ex.exerciseId}','${safeName}')" style="cursor:pointer;">
-            <h4>${ex.name}</h4>
-            <small>${d ? d.bp + ' • ' + d.eq : ''}</small>
+    // === HEADER (sempre visibile, cliccabile) ===
+    h += `<div class="ex-header" onclick="togEx('${ex.uid}')" style="cursor:pointer;">
+        <div class="ex-info">
+            <h4 style="margin:0;font-size:1.05rem;">${ex.name}</h4>
+            <small>${d ? d.bp : ''}</small>
         </div>
-        <div class="ex-actions">
-            ${hasMedia ? `<button class="btn-icon" onclick="togVid('${ex.uid}')">🎬</button>` :
-            `<button class="btn-icon" onclick="searchYT('${safeName}')">🔍</button>`}
-            <button class="btn-icon" onclick="remEx('${ex.uid}')" style="color:var(--red);">🗑️</button>
+        <div style="display:flex;align-items:center;gap:8px;">
+            <span class="ex-summary-badge ${allDone ? 'done-badge' : 'todo-badge'}">
+                ${allDone ? '✅' : done + '/' + total}
+            </span>
+            <span class="ex-arrow" id="exarrow-${ex.uid}">${isOpen ? '▲' : '▼'}</span>
         </div>
     </div>`;
 
-    // Progress bar (solo in track mode, gestito via CSS)
-    h += `<div class="ex-progress"><div class="ex-progress-fill${allDone?' complete':''}" style="width:${pct}%"></div></div>`;
+    // === BARRA PROGRESSO (sempre visibile) ===
+    h += `<div class="ex-progress"><div class="ex-progress-fill${allDone ? ' complete' : ''}" style="width:${pct}%"></div></div>`;
 
-    // Progress info
-    if (!viewMode) {
-        h += `<div class="progress-info">
-            <span class="prog-text"><strong>${done}</strong>/${total} serie</span>
-            <span class="prog-badge ${allDone?'complete':'incomplete'}">${allDone?'✅ Completato':'⏳ In corso'}</span>
-        </div>`;
+    // === BODY (collassabile) ===
+    h += `<div class="ex-body${isOpen ? ' open' : ''}" id="exbody-${ex.uid}">`;
+
+    // Bottoni azione
+    h += `<div style="display:flex;gap:6px;padding:12px 0 8px;flex-wrap:wrap;">`;
+    if (hasMedia) {
+        h += `<button class="btn-icon" onclick="event.stopPropagation();togVid('${ex.uid}')" style="border-radius:10px;padding:0 12px;font-size:.78rem;min-width:auto;width:auto;">🎬 Video</button>`;
     }
+    h += `<button class="btn-icon" onclick="event.stopPropagation();showProgression('${ex.exerciseId}','${safeName}')" style="border-radius:10px;padding:0 12px;font-size:.78rem;min-width:auto;width:auto;">📈 Grafico</button>`;
+    h += `<button class="btn-icon" onclick="event.stopPropagation();remEx('${ex.uid}')" style="border-radius:10px;padding:0 12px;font-size:.78rem;min-width:auto;width:auto;color:var(--red);">🗑️</button>`;
+    h += `</div>`;
 
-    // Media container
+    // Media (video)
     h += buildMediaBox(ex.uid, d);
 
-    // Sets
-    h += `<div class="sets-container">`;
-    h += `<div class="sets-grid-header"><span>SET</span><span>KG</span><span>REPS</span>${!viewMode?'<span></span>':''}</div>`;
+    // Target muscoli
+    if (d && d.tgt && Array.isArray(d.tgt) && d.tgt.length > 0) {
+        h += `<div style="display:flex;gap:4px;flex-wrap:wrap;padding:4px 0 8px;">`;
+        d.tgt.forEach(t => {
+            h += `<span style="padding:3px 8px;border-radius:12px;font-size:.62rem;background:rgba(3,218,198,.1);color:var(--acc);border:1px solid rgba(3,218,198,.2);">${t.replace(/_/g,' ')}</span>`;
+        });
+        h += `</div>`;
+    }
+
+    // Tabella serie
+    h += `<div class="sets-grid-header"><span>SET</span><span>KG</span><span>REPS</span>${!viewMode ? '<span></span>' : ''}</div>`;
 
     ex.sd.forEach((s, i) => {
         const isDone = s.done;
@@ -816,14 +1029,16 @@ function renEC(ex) {
             <input type="number" inputmode="numeric" class="set-input" value="${s.r || ''}"
                    placeholder="0" oninput="updS('${ex.uid}',${i},'r',this.value)">
             ${!viewMode ? `
-            <button class="set-check${isDone?' done':''}" onclick="chkSet('${ex.uid}',${i},this)">
+            <button class="set-check${isDone ? ' done' : ''}" onclick="chkSet('${ex.uid}',${i},this)">
                 ${isDone ? '✓' : ''}
             </button>` : ''}
         </div>`;
     });
 
     h += `<button class="add-set-btn" onclick="addSet('${ex.uid}')">+ Aggiungi Serie</button>`;
-    h += `</div></div>`;
+
+    h += `</div>`; // chiude ex-body
+    h += `</div>`; // chiude ex-card
 
     return h;
 }
@@ -842,34 +1057,22 @@ function getMuscleColor(bp) {
 }
 
 function buildMediaBox(exUid, def) {
-    if (!def) return '';
-    const vid = def.video;
-    const gif = def.gifUrl || def.gif;
+    if (!def || !def.media || !def.media.length) return '';
 
-    if (!vid && !gif) return '';
+    let content = '<div class="media-scroll">';
+    def.media.forEach(url => {
+        content += `<video loop muted playsinline controls preload="none" class="media-video">
+            <source src="${url}" type="video/mp4">
+        </video>`;
+    });
+    content += '</div>';
 
-    let content = '';
-
-    if (vid) {
-        const url = vid.startsWith('http') ? vid : MEDIA_PATH + vid;
-        if (url.includes('youtube.com') || url.includes('youtu.be')) {
-            let embed = url;
-            if (url.includes('youtu.be/')) embed = url.replace('youtu.be/', 'youtube.com/embed/');
-            else if (url.includes('watch?v=')) embed = url.replace('watch?v=', 'embed/');
-            content = `<iframe data-src="${embed}" allowfullscreen style="aspect-ratio:16/9;"></iframe>`;
-        } else {
-            content = `<video loop muted playsinline controls preload="none"><source src="${url}" type="video/mp4"></video>`;
-        }
-    } else if (gif) {
-        const url = gif.startsWith('http') ? gif : MEDIA_PATH + gif;
-        content = `<img src="${url}" alt="Demo" loading="lazy" style="max-height:280px;object-fit:contain;">`;
+    // Se c'è più di un video, mostra hint per scrollare
+    if (def.media.length > 1) {
+        content += `<div class="media-hint">⟵ Scorri per altre angolazioni ⟶</div>`;
     }
 
     return `<div class="media-box" id="media-${exUid}">${content}</div>`;
-}
-
-function searchYT(name) {
-    window.open('https://www.youtube.com/results?search_query=' + encodeURIComponent(name + ' exercise form'), '_blank');
 }
 
 // ============================================================
@@ -879,22 +1082,11 @@ function togVid(exUid) {
     const box = document.getElementById('media-' + exUid);
     if (!box) return;
     const isOpen = box.classList.toggle('open');
-
-    if (isOpen) {
-        const video = box.querySelector('video');
-        if (video) video.play().catch(() => {});
-
-        const iframe = box.querySelector('iframe');
-        if (iframe && iframe.dataset.src && !iframe.src.includes('http')) {
-            iframe.src = iframe.dataset.src;
-        }
-    } else {
-        const video = box.querySelector('video');
-        if (video) video.pause();
-
-        const iframe = box.querySelector('iframe');
-        if (iframe) iframe.src = '';
-    }
+    // Play/pausa TUTTI i video nel contenitore
+    box.querySelectorAll('video').forEach(v => {
+        if (isOpen) v.play().catch(() => {});
+        else v.pause();
+    });
 }
 
 // ============================================================
@@ -955,7 +1147,31 @@ function chkSet(exUid, idx, btn) {
         toast('💪 ' + ex.name + ' completato!', 'ok', 1800);
     }
 }
+// ===== ACCORDION ESERCIZI =====
+function togEx(uid) {
+    const body = document.getElementById('exbody-' + uid);
+    const arrow = document.getElementById('exarrow-' + uid);
+    if (!body) return;
+    const isOpen = body.classList.toggle('open');
+    if (arrow) arrow.textContent = isOpen ? '▲' : '▼';
+    // Aggiorna il Set
+    if (isOpen) openExercises.add(uid);
+    else openExercises.delete(uid);
+}
 
+function openAllEx() {
+    const day = gD();
+    if (!day) return;
+    day.exs.forEach(ex => openExercises.add(ex.uid));
+    renDay();
+    toast('📂 Tutti aperti', 'info', 1200);
+}
+
+function closeAllEx() {
+    openExercises.clear();
+    renDay();
+    toast('📁 Tutti chiusi', 'info', 1200);
+}
 function addSet(u) {
     const e = fEx(u);
     if (!e) return;
@@ -1081,12 +1297,13 @@ function complWO() {
         const maxW = doneS.length ? Math.max(...doneS.map(x => parseFloat(x.w) || 0)) : 0;
         if (maxW > (s.pr[e.exerciseId] || 0)) { s.pr[e.exerciseId] = maxW; newPR = true; }
         const avgR = doneS.length ? Math.round(doneS.reduce((a, x) => a + (parseInt(x.r) || 0), 0) / doneS.length) : 0;
-        D.hist.push({
-            eid: e.exerciseId, name: e.name, dt: new Date().toISOString(),
-            s: doneS.length, r: avgR, w: maxW, rest: e.rest,
-            seat: e.seat, notes: e.notes,
-            sd: e.sd.map(x => ({r: x.r, w: x.w}))
-        });
+			D.hist.push({
+				 eid: e.exerciseId, name: e.name, dt: new Date().toISOString(),
+				 dayId: curDay,  // ← AGGIUNTO: salva quale giornata
+				 s: doneS.length, r: avgR, w: maxW, rest: e.rest,
+				 seat: e.seat, notes: e.notes,
+				 sd: e.sd.map(x => ({r: x.r, w: x.w}))
+			});
     });
 
     // Reset sets
@@ -1271,39 +1488,72 @@ window.addEventListener('resize', () => { if(D) renVol(); });
 function renMuscle() {
     const c = document.getElementById('muscle-map');
     if (!c) return;
+
     const today = toLocalDate(new Date());
     const todayLogs = D.hist ? D.hist.filter(l => toLocalDate(l.dt) === today) : [];
-    const bpVol = {};
-    todayLogs.forEach(l => {
-        const def = exDef(l.eid);
-        if (!def) return;
-        const vol = (l.s||0) * (l.r||0) * (l.w||1);
-        const bp = def.bp || 'other';
-        bpVol[bp] = (bpVol[bp]||0) + vol;
-        if (def.tgt) bpVol[def.tgt] = (bpVol[def.tgt]||0) + vol;
-    });
-    const maxVol = Math.max(...Object.values(bpVol), 1);
-    function intensity(name) {
-        const v = bpVol[name] || bpVol[name.toLowerCase()] || 0;
-        if (!v) return '';
-        const pct = v / maxVol;
-        if (pct > .6) return 'active high';
-        if (pct > .3) return 'active med';
-        return 'active low';
-    }
-    const front = ['chest','shoulders','upper arms','lower arms','waist','upper legs','lower legs'];
-    const back = ['back','neck','waist','upper legs','lower legs','glutes'];
 
     if (!todayLogs.length) {
         c.innerHTML = '<div class="emp" style="padding:15px;"><div class="eic">💪</div>Allena oggi per vedere la mappa muscolare</div>';
         return;
     }
-    let h = `<div class="mm-grid"><div class="mm-col"><h4>Anteriore</h4>`;
-    front.forEach(m => { h += `<span class="mm-part ${intensity(m)}">${m}</span> `; });
-    h += `</div><div class="mm-col"><h4>Posteriore</h4>`;
-    back.forEach(m => { h += `<span class="mm-part ${intensity(m)}">${m}</span> `; });
-    h += `</div></div>`;
-    c.innerHTML = h;
+
+    // Calcola volume per ogni muscolo
+    const muscleVol = {};
+    todayLogs.forEach(l => {
+        const def = exDef(l.eid);
+        if (!def) return;
+        const vol = (l.s || 0) * (l.r || 0) * (l.w || 1);
+
+        // Da body part (bp)
+        const bpMuscle = MUSCLE_MAP[def.bp];
+        if (bpMuscle) muscleVol[bpMuscle] = (muscleVol[bpMuscle] || 0) + vol;
+
+        // Da target array (tgt)
+        if (def.tgt && Array.isArray(def.tgt)) {
+            def.tgt.forEach(t => {
+                const mapped = MUSCLE_MAP[t];
+                if (mapped) muscleVol[mapped] = (muscleVol[mapped] || 0) + vol;
+            });
+        } else if (def.tgt && typeof def.tgt === 'string') {
+            const mapped = MUSCLE_MAP[def.tgt];
+            if (mapped) muscleVol[mapped] = (muscleVol[mapped] || 0) + vol;
+        }
+    });
+
+    const maxVol = Math.max(...Object.values(muscleVol), 1);
+
+    // Inserisci SVG
+    c.innerHTML = `
+        <div class="body-map-wrap">${BODY_FRONT}${BODY_BACK}</div>
+        <div class="muscle-legend">
+            <span><span class="legend-dot" style="background:rgba(46,213,115,0.55);"></span> Leggero</span>
+            <span><span class="legend-dot" style="background:rgba(255,165,2,0.65);"></span> Medio</span>
+            <span><span class="legend-dot" style="background:rgba(231,76,60,0.75);"></span> Intenso</span>
+        </div>
+        <div class="muscle-list" id="muscleTagList"></div>
+    `;
+
+    // Colora le aree SVG
+    Object.entries(muscleVol).forEach(([muscle, vol]) => {
+        const pct = vol / maxVol;
+        const level = pct > 0.6 ? 'high' : pct > 0.3 ? 'med' : 'low';
+        // Seleziona TUTTI gli elementi SVG con quel muscolo (fronte + retro)
+        document.querySelectorAll(`[data-muscle="${muscle}"]`).forEach(el => {
+            el.classList.add(level);
+        });
+    });
+
+    // Mostra anche lista testuale dei muscoli attivati
+    const tagList = document.getElementById('muscleTagList');
+    if (tagList) {
+        tagList.innerHTML = Object.entries(muscleVol)
+            .sort((a, b) => b[1] - a[1])
+            .map(([m, v]) => {
+                const pct = v / maxVol;
+                const level = pct > 0.6 ? 'high' : pct > 0.3 ? 'med' : 'low';
+                return `<span class="muscle-tag active ${level}">${m.replace(/_/g, ' ')}</span>`;
+            }).join('');
+    }
 }
 
 // ============================================================
