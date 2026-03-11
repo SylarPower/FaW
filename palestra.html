@@ -718,12 +718,6 @@ body.in-session .ctn { padding:0;max-width:100%; }
     <div class="card">
         <h3 id="dTitle" style="margin-bottom:10px;">📅 Giornata</h3>
 
-        <!-- Mode Toggle -->
-        <div class="mode-toggle">
-            <button class="mode-btn active" id="modeTrack" onclick="setMode(false)">✅ Tracking</button>
-            <button class="mode-btn" id="modeView" onclick="setMode(true)">📖 Solo Scheda</button>
-        </div>
-
 <div class="abar" id="trackActions">
     <button class="bs" onclick="goHome()">← Indietro</button>
     <button class="bp" onclick="openSel()">+ Esercizio</button>
@@ -737,10 +731,6 @@ body.in-session .ctn { padding:0;max-width:100%; }
         ▶️ INIZIA ALLENAMENTO
     </button>
 </div>
-			<div class="abar" id="viewActions" style="display:none;">
-				 <button class="bs" onclick="goHome()">← Indietro</button>
-				 <button class="bp" onclick="openSel()">+ Esercizio</button>
-			</div>
 			<div style="display:flex;gap:6px;margin-bottom:12px;">
 				 <button class="tb" onclick="openAllEx()" style="flex:1;">📂 Apri Tutti</button>
 				 <button class="tb" onclick="closeAllEx()" style="flex:1;">📁 Chiudi Tutti</button>
@@ -963,7 +953,6 @@ let sesActive = false;
 let sesExIdx = 0;
 let sesStartTime = null;
 let openExercises = new Set(); // Tiene traccia di quali esercizi sono aperti
-let viewMode = localStorage.getItem('gym-viewmode') === 'true';
 let myExChart = null;
 
 const uid = () => Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
@@ -1036,45 +1025,10 @@ function goHome() {
 }
 
 function goDay(id) {
-    // Avvisa se già fatto questa settimana
-/*    if (isDoneThisWeek(id)) {
-        if (!confirm('Hai già fatto questo allenamento questa settimana.\n\nVuoi rifarlo comunque?')) {
-            return; // L'utente ha detto no → resta sulla home
-        }
-    }*/
     curDay = id;
     document.getElementById('vHome').style.display = 'none';
     document.getElementById('vDay').style.display = 'block';
-    updateModeUI();
     renDay();
-}
-
-// ============================================================
-// 👁️ VIEW / TRACK MODE
-// ============================================================
-function setMode(isView) {
-    viewMode = isView;
-    localStorage.setItem('gym-viewmode', viewMode);
-    updateModeUI();
-    renDay();
-}
-
-function updateModeUI() {
-    const track = document.getElementById('modeTrack');
-    const view = document.getElementById('modeView');
-    const trackActs = document.getElementById('trackActions');
-    const viewActs = document.getElementById('viewActions');
-    if (viewMode) {
-        track.classList.remove('active');
-        view.classList.add('active');
-        trackActs.style.display = 'none';
-        viewActs.style.display = 'flex';
-    } else {
-        track.classList.add('active');
-        view.classList.remove('active');
-        trackActs.style.display = 'flex';
-        viewActs.style.display = 'none';
-    }
 }
 
 // ============================================================
@@ -1258,7 +1212,6 @@ function renDay() {
     });
 
     cont.innerHTML = h;
-    cont.className = viewMode ? 'view-only' : '';
 }
 
 // ============================================================
@@ -1327,7 +1280,7 @@ function renEC(ex) {
     }
 
     // Tabella serie
-h += `<div class="sets-grid-header"><span>SET</span><span>REPS</span><span>KG</span>${!viewMode ? '<span></span>' : ''}<span></span></div>`;
+h += `<div class="sets-grid-header"><span>SET</span><span>REPS</span><span>KG</span><span></span><span></span></div>`;
 
     ex.sd.forEach((s, i) => {
         const isDone = s.done;
@@ -1337,10 +1290,9 @@ h += `<div class="sets-grid-header"><span>SET</span><span>REPS</span><span>KG</s
 							 placeholder="0" oninput="updS('${ex.uid}',${i},'r',this.value)">
 					<input type="number" inputmode="decimal" class="set-input" value="${s.w || ''}"
 							 placeholder="0" oninput="updS('${ex.uid}',${i},'w',this.value)">
-            ${!viewMode ? `
             <button class="set-check${isDone ? ' done' : ''}" onclick="chkSet('${ex.uid}',${i},this)">
                 ${isDone ? '✓' : ''}
-            </button>` : ''}
+            </button>
             <button class="set-del" onclick="remSet('${ex.uid}',${i})" title="Elimina serie">✕</button>
         </div>`;
     });
@@ -1859,9 +1811,8 @@ function sesRender() {
     });
     const globalPct = totalSets > 0 ? Math.round((doneSets / totalSets) * 100) : 0;
 
-    document.getElementById('sesProgFill').style.width = globalPct + '%';
-    document.getElementById('sesPct').textContent = globalPct + '%';
-    document.getElementById('sesExCount').textContent = (sesExIdx + 1) + '/' + exs.length;
+	document.getElementById('sesProgFill').style.width = globalPct + '%';
+	document.getElementById('sesExCount').textContent = (sesExIdx + 1) + '/' + exs.length;
 
     // Nome esercizio
     document.getElementById('sesExName').textContent = ex.name;
@@ -2096,7 +2047,7 @@ function sesShowSummary() {
     if (sesNav) sesNav.style.display = 'none';
     if (motivArea) motivArea.style.display = 'none';
 
-    document.getElementById('sesSumMsg').textContent = SES_MSGS.done;
+    document.getElementById('sesSumMsg').textContent = 'Ottimo lavoro! 💪';
 
     // Genera la griglia di riepilogo (Senza il calcolo del volume)
     document.getElementById('sesSumGrid').innerHTML = `
