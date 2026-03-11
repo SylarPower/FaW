@@ -3178,18 +3178,19 @@ function toggleTheme() {
         console.log('5. Done!');
         toast('👋 Ciao ' + MIO + '!', 'info', 2000);
     } catch(e) {
-    console.error('❌ ERRORE INIT:', e);
+        console.error('❌ ERRORE INIT:', e);
 
-    const loader = document.getElementById('vLoad');
-    if (loader) {
-        loader.innerHTML = `
-            <div style="color:var(--red);font-size:.85rem;padding:20px;text-align:left;">
-                <b>❌ Errore di caricamento:</b><br><br>
-                <code style="font-size:.75rem;color:var(--tx2);word-break:break-all;">${e.message}</code><br><br>
-                <small>Apri la console (F12) per dettagli</small>
-            </div>`;
-    }
-}});
+        const loader = document.getElementById('vLoad');
+        if (loader) {
+            loader.innerHTML = `
+                <div style="color:var(--red);font-size:.85rem;padding:20px;text-align:left;">
+                    <b>❌ Errore di caricamento:</b><br><br>
+                    <code style="font-size:.75rem;color:var(--tx2);word-break:break-all;">${e.message}</code><br><br>
+                    <small>Apri la console (F12) per dettagli</small>
+                </div>`;
+        } // Chiude l'if
+    } // Chiude il catch
+})(); // Chiude la funzione async iniziale e la esegue
 </script>
 </body>
 </html>
