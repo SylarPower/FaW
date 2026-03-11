@@ -467,99 +467,54 @@
         /* ===== VOLUME CHART ===== */
         #vol-chart { width:100%;height:130px;border-radius:10px;background:var(--c2); }
 
-/* ===== MAPPA MUSCOLARE SVG ===== */
-.body-map-wrap {
-    display:flex;justify-content:center;gap:20px;
-    margin-top:12px;flex-wrap:nowrap;
-}
-.body-svg {
-    width:46%;max-width:165px;height:auto;
-    filter:drop-shadow(0 2px 8px rgba(0,0,0,.15));
-}
+			/* ===== MAPPA MUSCOLARE PRO ===== */
+			.body-map-wrap {
+				 display:flex;justify-content:center;gap:12px;
+				 margin-top:12px;flex-wrap:nowrap;
+			}
+			.body-svg {
+				 width:48%;max-width:170px;height:auto;
+			}
 
-/* Outline corpo e arti */
-.body-svg .body-fill {
-    fill:#1a1a1a;stroke:none;
-}
-.body-svg .body-stroke {
-    fill:none;stroke:#333;stroke-width:0.6;
-    stroke-linejoin:round;stroke-linecap:round;
-}
-.body-svg .limb-fill {
-    fill:#1a1a1a;stroke:none;
-}
-.body-svg .limb-stroke {
-    fill:none;stroke:#333;stroke-width:0.5;
-    stroke-linejoin:round;stroke-linecap:round;
-}
-[data-theme="light"] .body-svg .body-fill,
-[data-theme="light"] .body-svg .limb-fill {
-    fill:#ddd;
-}
-[data-theme="light"] .body-svg .body-stroke,
-[data-theme="light"] .body-svg .limb-stroke {
-    stroke:#bbb;
-}
+			/* Corpo unito e silhouette */
+			.body-base {
+				 fill:#2a2a2a; stroke:#444; stroke-width:1.5;
+				 stroke-linejoin:round; stroke-linecap:round;
+			}
+			[data-theme="light"] .body-base {
+				 fill:#e8eaed; stroke:#6c757d;
+			}
 
-/* Muscoli inattivi — quasi invisibili, solo contorno sottile */
-.body-svg .m {
-    fill:rgba(50,50,50,0.04);
-    stroke:rgba(120,120,120,0.08);stroke-width:0.35;
-    transition:all 0.6s ease;cursor:default;
-}
-[data-theme="light"] .body-svg .m {
-    fill:rgba(0,0,0,0.02);
-    stroke:rgba(0,0,0,0.05);
-}
+			/* Muscoli (invisibili di base) */
+			.m {
+				 fill:transparent; stroke:none;
+				 transition:fill 0.4s ease, filter 0.4s ease;
+			}
 
-/* Leggero */
-.body-svg .m.low {
-    fill:rgba(46,213,115,0.3);
-    stroke:rgba(46,213,115,0.5);stroke-width:0.6;
-    filter:drop-shadow(0 0 3px rgba(46,213,115,0.15));
-}
-/* Medio */
-.body-svg .m.med {
-    fill:rgba(255,165,2,0.38);
-    stroke:rgba(255,165,2,0.6);stroke-width:0.7;
-    filter:drop-shadow(0 0 5px rgba(255,165,2,0.2));
-}
-/* Intenso */
-.body-svg .m.high {
-    fill:rgba(231,76,60,0.45);
-    stroke:rgba(231,76,60,0.7);stroke-width:0.8;
-    filter:drop-shadow(0 0 8px rgba(231,76,60,0.3));
-    animation:muscleGlow 2.5s ease-in-out infinite alternate;
-}
-@keyframes muscleGlow {
-    from { filter:drop-shadow(0 0 4px rgba(231,76,60,0.2)); }
-    to   { filter:drop-shadow(0 0 12px rgba(231,76,60,0.45)); }
-}
+			/* Colori intensità (come da screenshot: giallo -> arancio -> rosso) */
+			.m.low  { fill:rgba(241,196,15,0.65); }
+			.m.med  { fill:rgba(230,126,34,0.85); filter:drop-shadow(0 0 3px rgba(230,126,34,0.4)); }
+			.m.high { fill:rgba(231,76,60,0.95); filter:drop-shadow(0 0 6px rgba(231,76,60,0.6)); }
 
-/* Legenda */
-.muscle-legend {
-    display:flex;justify-content:center;gap:16px;
-    margin-top:16px;font-size:.7rem;color:var(--tx2);flex-wrap:wrap;
-}
-.muscle-legend span { display:flex;align-items:center;gap:6px; }
-.legend-dot {
-    width:14px;height:14px;border-radius:50%;display:inline-block;
-    border:1px solid rgba(255,255,255,.08);
-}
-
-/* Tag muscoli */
-.muscle-list {
-    display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin-top:12px;
-}
-.muscle-tag {
-    padding:5px 12px;border-radius:20px;font-size:.68rem;
-    font-weight:600;border:1px solid var(--brd);
-    background:var(--c2);color:var(--tx2);transition:all .3s;
-}
-.muscle-tag.active { color:#fff;border-color:transparent; }
-.muscle-tag.low { background:rgba(46,213,115,0.25);border-color:rgba(46,213,115,0.35); }
-.muscle-tag.med { background:rgba(255,165,2,0.3);border-color:rgba(255,165,2,0.45);box-shadow:0 0 6px rgba(255,165,2,0.12); }
-.muscle-tag.high { background:rgba(231,76,60,0.35);border-color:rgba(231,76,60,0.5);box-shadow:0 0 8px rgba(231,76,60,0.15); }
+			/* Legenda & Tag */
+			.muscle-legend {
+				 display:flex;justify-content:center;gap:16px;
+				 margin-top:16px;font-size:.7rem;color:var(--tx2);flex-wrap:wrap;
+			}
+			.muscle-legend span { display:flex;align-items:center;gap:6px; }
+			.legend-dot { width:12px;height:12px;border-radius:50%;display:inline-block; }
+			.muscle-list {
+				 display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin-top:12px;
+			}
+			.muscle-tag {
+				 padding:5px 12px;border-radius:20px;font-size:.65rem;
+				 font-weight:600;border:1px solid var(--brd);
+				 background:var(--c2);color:var(--tx2);
+			}
+			.muscle-tag.active { color:#fff;border-color:transparent; }
+			.muscle-tag.low  { background:rgba(241,196,15,0.4); border-color:rgba(241,196,15,0.6); }
+			.muscle-tag.med  { background:rgba(230,126,34,0.5); border-color:rgba(230,126,34,0.7); }
+			.muscle-tag.high { background:rgba(231,76,60,0.6); border-color:rgba(231,76,60,0.8); }
 
         /* ===== BOTTOM NAV ===== */
         .bn {
@@ -1126,483 +1081,86 @@ const BW_FACTOR = 15;
 	
 // ===== SVG CORPO + MAPPATURA MUSCOLI =====
 const BODY_FRONT = `
-<svg viewBox="0 0 200 440" class="body-svg">
-  <text x="100" y="12" text-anchor="middle" fill="#555" font-size="9" font-weight="bold">ANTERIORE</text>
+<svg viewBox="0 0 100 220" class="body-svg">
+  <!-- Silhouette base unita -->
+  <path class="body-base" d="
+    M45,15 C45,10 55,10 55,15 C55,22 53,26 53,26 C53,26 58,26 63,29
+    C72,33 76,40 78,50 L83,75 C85,85 83,95 78,100 C75,102 72,102 70,100
+    C68,96 68,90 68,85 L65,55 C65,55 62,65 60,75 C58,85 62,100 62,110
+    C62,115 58,118 55,118 L55,160 C55,175 58,195 58,205 C58,210 52,212 50,210
+    C48,205 48,180 50,165 L50,130 L50,165 C52,180 52,205 50,210
+    C48,212 42,210 42,205 C42,195 45,175 45,160 L45,118 C42,118 38,115 38,110
+    C38,100 42,85 40,75 C38,65 35,55 35,55 L32,85 C32,90 32,96 30,100
+    C28,102 25,102 22,100 C17,95 15,85 17,75 L22,50 C24,40 28,33 37,29
+    C42,26 47,26 47,26 C47,26 45,22 45,15 Z"/>
 
-  <!-- === STRUCTURAL SHAPES (silhouette) === -->
-  <!-- Head -->
-  <ellipse cx="100" cy="34" rx="14" ry="17" class="body-fill"/>
-  <ellipse cx="100" cy="34" rx="14" ry="17" class="body-stroke"/>
-  <!-- Neck -->
-  <path class="body-fill" d="M94,51 C94,55 93,60 93,65 L107,65 C107,60 106,55 106,51Z"/>
-
-  <!-- Torso -->
-  <path class="body-fill" d="
-    M90,65 C80,65 68,68 60,74
-    C54,79 52,86 56,94
-    L58,98 C58,102 60,112 62,124
-    C64,138 66,150 70,160
-    C72,168 74,176 74,186
-    C74,196 76,208 82,218
-    L90,224 C96,227 100,228 100,228
-    C100,228 104,227 110,224
-    L118,218 C124,208 126,196 126,186
-    C126,176 128,168 130,160
-    C134,150 136,138 138,124
-    C140,112 142,102 142,98
-    L144,94 C148,86 146,79 140,74
-    C132,68 120,65 110,65 Z"/>
-  <path class="body-stroke" d="
-    M90,65 C80,65 68,68 60,74
-    C54,79 52,86 56,94
-    L58,98 C58,102 60,112 62,124
-    C64,138 66,150 70,160
-    C72,168 74,176 74,186
-    C74,196 76,208 82,218
-    L90,224 C96,227 100,228 100,228
-    C100,228 104,227 110,224
-    L118,218 C124,208 126,196 126,186
-    C126,176 128,168 130,160
-    C134,150 136,138 138,124
-    C140,112 142,102 142,98
-    L144,94 C148,86 146,79 140,74
-    C132,68 120,65 110,65 Z"/>
-
-  <!-- Left upper arm -->
-  <path class="limb-fill" d="
-    M48,76 C42,80 38,92 36,108
-    C34,126 33,144 34,158
-    C35,166 38,172 42,174
-    L52,174 C54,172 56,166 56,158
-    C56,144 56,128 54,112
-    C52,96 52,84 50,78 Z"/>
-  <path class="limb-stroke" d="
-    M48,76 C42,80 38,92 36,108
-    C34,126 33,144 34,158
-    C35,166 38,172 42,174
-    L52,174 C54,172 56,166 56,158
-    C56,144 56,128 54,112
-    C52,96 52,84 50,78 Z"/>
-
-  <!-- Left forearm -->
-  <path class="limb-fill" d="
-    M34,180 C32,192 30,206 30,216
-    C30,224 32,230 36,234
-    L46,234 C50,230 52,224 50,216
-    C48,206 48,192 48,180 Z"/>
-  <path class="limb-stroke" d="
-    M34,180 C32,192 30,206 30,216
-    C30,224 32,230 36,234
-    L46,234 C50,230 52,224 50,216
-    C48,206 48,192 48,180 Z"/>
-
-  <!-- Right upper arm -->
-  <path class="limb-fill" d="
-    M152,76 C158,80 162,92 164,108
-    C166,126 167,144 166,158
-    C165,166 162,172 158,174
-    L148,174 C146,172 144,166 144,158
-    C144,144 144,128 146,112
-    C148,96 148,84 150,78 Z"/>
-  <path class="limb-stroke" d="
-    M152,76 C158,80 162,92 164,108
-    C166,126 167,144 166,158
-    C165,166 162,172 158,174
-    L148,174 C146,172 144,166 144,158
-    C144,144 144,128 146,112
-    C148,96 148,84 150,78 Z"/>
-
-  <!-- Right forearm -->
-  <path class="limb-fill" d="
-    M166,180 C168,192 170,206 170,216
-    C170,224 168,230 164,234
-    L154,234 C150,230 148,224 150,216
-    C152,206 152,192 152,180 Z"/>
-  <path class="limb-stroke" d="
-    M166,180 C168,192 170,206 170,216
-    C170,224 168,230 164,234
-    L154,234 C150,230 148,224 150,216
-    C152,206 152,192 152,180 Z"/>
-
-  <!-- Left thigh -->
-  <path class="limb-fill" d="
-    M74,228 C70,244 66,266 64,290
-    C62,310 64,322 68,328
-    L88,328 C92,322 94,312 92,294
-    C90,270 88,248 86,228 Z"/>
-  <path class="limb-stroke" d="
-    M74,228 C70,244 66,266 64,290
-    C62,310 64,322 68,328
-    L88,328 C92,322 94,312 92,294
-    C90,270 88,248 86,228 Z"/>
-
-  <!-- Left calf -->
-  <path class="limb-fill" d="
-    M66,334 C62,350 60,368 62,386
-    C64,398 70,408 76,412
-    C80,414 84,412 86,408
-    C90,400 92,388 90,372
-    C88,356 86,342 84,334 Z"/>
-  <path class="limb-stroke" d="
-    M66,334 C62,350 60,368 62,386
-    C64,398 70,408 76,412
-    C80,414 84,412 86,408
-    C90,400 92,388 90,372
-    C88,356 86,342 84,334 Z"/>
-
-  <!-- Right thigh -->
-  <path class="limb-fill" d="
-    M126,228 C130,244 134,266 136,290
-    C138,310 136,322 132,328
-    L112,328 C108,322 106,312 108,294
-    C110,270 112,248 114,228 Z"/>
-  <path class="limb-stroke" d="
-    M126,228 C130,244 134,266 136,290
-    C138,310 136,322 132,328
-    L112,328 C108,322 106,312 108,294
-    C110,270 112,248 114,228 Z"/>
-
-  <!-- Right calf -->
-  <path class="limb-fill" d="
-    M134,334 C138,350 140,368 138,386
-    C136,398 130,408 124,412
-    C120,414 116,412 114,408
-    C110,400 108,388 110,372
-    C112,356 114,342 116,334 Z"/>
-  <path class="limb-stroke" d="
-    M134,334 C138,350 140,368 138,386
-    C136,398 130,408 124,412
-    C120,414 116,412 114,408
-    C110,400 108,388 110,372
-    C112,356 114,342 116,334 Z"/>
-
-  <!-- === MUSCLE OVERLAYS === -->
-
-  <!-- Deltoidi anteriori — cappuccio arrotondato sulla spalla -->
-  <path data-muscle="front_delts" class="m" d="
-    M52,76 C46,78 42,86 40,96
-    C38,106 42,112 50,108
-    C54,104 56,94 56,86
-    C56,80 54,76 52,76Z"/>
-  <path data-muscle="front_delts" class="m" d="
-    M148,76 C154,78 158,86 160,96
-    C162,106 158,112 150,108
-    C146,104 144,94 144,86
-    C144,80 146,76 148,76Z"/>
-
-  <!-- Pettorali — ventaglio dallo sterno alla spalla -->
-  <path data-muscle="pectorals" class="m" d="
-    M66,88 C72,82 88,80 98,90
-    L98,98 C96,108 92,116 84,120
-    C76,122 68,116 64,108
-    C62,100 64,92 66,88Z"/>
-  <path data-muscle="pectorals" class="m" d="
-    M134,88 C128,82 112,80 102,90
-    L102,98 C104,108 108,116 116,120
-    C124,122 132,116 136,108
-    C138,100 136,92 134,88Z"/>
-
-  <!-- Bicipiti — fuso sulla parte frontale del braccio -->
-  <path data-muscle="biceps" class="m" d="
-    M48,104 C44,114 40,130 38,148
-    C36,158 40,162 44,158
-    C48,150 50,134 52,118
-    C54,108 52,100 48,104Z"/>
-  <path data-muscle="biceps" class="m" d="
-    M152,104 C156,114 160,130 162,148
-    C164,158 160,162 156,158
-    C152,150 150,134 148,118
-    C146,108 148,100 152,104Z"/>
-
+  <!-- Muscoli -->
+  <!-- Pettorali -->
+  <path data-muscle="pectorals" class="m" d="M38,36 C42,32 48,34 49,38 L49,46 C48,52 44,55 38,55 C34,55 31,50 31,44 C31,38 34,38 38,36 Z"/>
+  <path data-muscle="pectorals" class="m" d="M62,36 C58,32 52,34 51,38 L51,46 C52,52 56,55 62,55 C66,55 69,50 69,44 C69,38 66,38 62,36 Z"/>
+  <!-- Deltoidi anteriori -->
+  <path data-muscle="front_delts" class="m" d="M30,34 C26,35 23,40 21,48 C20,53 23,58 26,56 C30,53 31,45 30,34 Z"/>
+  <path data-muscle="front_delts" class="m" d="M70,34 C74,35 77,40 79,48 C80,53 77,58 74,56 C70,53 69,45 70,34 Z"/>
+  <!-- Bicipiti -->
+  <path data-muscle="biceps" class="m" d="M25,58 C22,65 20,74 21,80 C22,83 25,84 27,80 C29,74 30,64 28,58 Z"/>
+  <path data-muscle="biceps" class="m" d="M75,58 C78,65 80,74 79,80 C78,83 75,84 73,80 C71,74 70,64 72,58 Z"/>
   <!-- Avambracci -->
-  <path data-muscle="forearms" class="m" d="
-    M36,184 C34,194 32,208 32,218
-    C32,224 36,226 40,222
-    C44,214 44,198 44,188
-    C44,182 40,180 36,184Z"/>
-  <path data-muscle="forearms" class="m" d="
-    M164,184 C166,194 168,208 168,218
-    C168,224 164,226 160,222
-    C156,214 156,198 156,188
-    C156,182 160,180 164,184Z"/>
-
-  <!-- Addominali — 6 blocchi anatomici -->
-  <rect data-muscle="abs" x="91" y="122" width="7.5" height="9" rx="1.5" class="m"/>
-  <rect data-muscle="abs" x="101.5" y="122" width="7.5" height="9" rx="1.5" class="m"/>
-  <rect data-muscle="abs" x="91" y="134" width="7.5" height="9" rx="1.5" class="m"/>
-  <rect data-muscle="abs" x="101.5" y="134" width="7.5" height="9" rx="1.5" class="m"/>
-  <rect data-muscle="abs" x="91" y="146" width="7.5" height="9" rx="1.5" class="m"/>
-  <rect data-muscle="abs" x="101.5" y="146" width="7.5" height="9" rx="1.5" class="m"/>
-
-  <!-- Obliqui — strisce diagonali ai lati -->
-  <path data-muscle="obliques" class="m" d="
-    M82,124 C78,136 76,152 78,168
-    C80,174 84,170 84,158
-    C84,142 84,130 82,124Z"/>
-  <path data-muscle="obliques" class="m" d="
-    M118,124 C122,136 124,152 122,168
-    C120,174 116,170 116,158
-    C116,142 116,130 118,124Z"/>
-
-  <!-- Quadricipiti — goccia allungata -->
-  <path data-muscle="quads" class="m" d="
-    M76,234 C72,254 68,278 66,300
-    C64,316 70,324 80,324
-    C88,324 92,318 90,302
-    C88,280 86,256 84,234Z"/>
-  <path data-muscle="quads" class="m" d="
-    M124,234 C128,254 132,278 134,300
-    C136,316 130,324 120,324
-    C112,324 108,318 110,302
-    C112,280 114,256 116,234Z"/>
-
-  <!-- Tibiale anteriore -->
-  <path data-muscle="tibialis" class="m" d="
-    M70,340 C68,354 66,370 68,386
-    C70,392 76,390 78,384
-    C80,370 78,354 76,340Z"/>
-  <path data-muscle="tibialis" class="m" d="
-    M130,340 C132,354 134,370 132,386
-    C130,392 124,390 122,384
-    C120,370 122,354 124,340Z"/>
+  <path data-muscle="forearms" class="m" d="M21,86 C18,92 18,98 21,100 C23,101 26,98 26,94 C26,88 25,86 21,86 Z"/>
+  <path data-muscle="forearms" class="m" d="M79,86 C82,92 82,98 79,100 C77,101 74,98 74,94 C74,88 75,86 79,86 Z"/>
+  <!-- Addominali -->
+  <rect data-muscle="abs" x="46" y="58" width="3.5" height="4.5" rx="1" class="m"/>
+  <rect data-muscle="abs" x="50.5" y="58" width="3.5" height="4.5" rx="1" class="m"/>
+  <rect data-muscle="abs" x="46" y="63.5" width="3.5" height="4.5" rx="1" class="m"/>
+  <rect data-muscle="abs" x="50.5" y="63.5" width="3.5" height="4.5" rx="1" class="m"/>
+  <rect data-muscle="abs" x="46" y="69" width="3.5" height="4.5" rx="1" class="m"/>
+  <rect data-muscle="abs" x="50.5" y="69" width="3.5" height="4.5" rx="1" class="m"/>
+  <!-- Obliqui -->
+  <path data-muscle="obliques" class="m" d="M42,58 C39,66 38,76 40,82 C41,84 44,82 44,76 C44,66 43,60 42,58 Z"/>
+  <path data-muscle="obliques" class="m" d="M58,58 C61,66 62,76 60,82 C59,84 56,82 56,76 C56,66 57,60 58,58 Z"/>
+  <!-- Quadricipiti -->
+  <path data-muscle="quads" class="m" d="M39,120 C36,135 34,145 34,158 C34,162 38,164 42,162 C46,160 47,155 45,145 C43,130 42,120 39,120 Z"/>
+  <path data-muscle="quads" class="m" d="M61,120 C64,135 66,145 66,158 C66,162 62,164 58,162 C54,160 53,155 55,145 C57,130 58,120 61,120 Z"/>
+  <!-- Tibiali -->
+  <path data-muscle="tibialis" class="m" d="M37,172 C35,185 36,198 38,206 C39,208 42,206 42,200 C42,190 40,180 37,172 Z"/>
+  <path data-muscle="tibialis" class="m" d="M63,172 C65,185 64,198 62,206 C61,208 58,206 58,200 C58,190 60,180 63,172 Z"/>
 </svg>`;
 
 const BODY_BACK = `
-<svg viewBox="0 0 200 440" class="body-svg">
-  <text x="100" y="12" text-anchor="middle" fill="#555" font-size="9" font-weight="bold">POSTERIORE</text>
+<svg viewBox="0 0 100 220" class="body-svg">
+  <!-- Silhouette identica ma vista da dietro -->
+  <path class="body-base" d="
+    M45,15 C45,10 55,10 55,15 C55,22 53,26 53,26 C53,26 58,26 63,29
+    C72,33 76,40 78,50 L83,75 C85,85 83,95 78,100 C75,102 72,102 70,100
+    C68,96 68,90 68,85 L65,55 C65,55 62,65 60,75 C58,85 62,100 62,110
+    C62,115 58,118 55,118 L55,160 C55,175 58,195 58,205 C58,210 52,212 50,210
+    C48,205 48,180 50,165 L50,130 L50,165 C52,180 52,205 50,210
+    C48,212 42,210 42,205 C42,195 45,175 45,160 L45,118 C42,118 38,115 38,110
+    C38,100 42,85 40,75 C38,65 35,55 35,55 L32,85 C32,90 32,96 30,100
+    C28,102 25,102 22,100 C17,95 15,85 17,75 L22,50 C24,40 28,33 37,29
+    C42,26 47,26 47,26 C47,26 45,22 45,15 Z"/>
 
-  <!-- === STRUCTURAL SHAPES === -->
-  <!-- Head -->
-  <ellipse cx="100" cy="34" rx="14" ry="17" class="body-fill"/>
-  <ellipse cx="100" cy="34" rx="14" ry="17" class="body-stroke"/>
-  <!-- Neck -->
-  <path class="body-fill" d="M94,51 C94,55 93,60 93,65 L107,65 C107,60 106,55 106,51Z"/>
-
-  <!-- Torso (identico al front) -->
-  <path class="body-fill" d="
-    M90,65 C80,65 68,68 60,74
-    C54,79 52,86 56,94
-    L58,98 C58,102 60,112 62,124
-    C64,138 66,150 70,160
-    C72,168 74,176 74,186
-    C74,196 76,208 82,218
-    L90,224 C96,227 100,228 100,228
-    C100,228 104,227 110,224
-    L118,218 C124,208 126,196 126,186
-    C126,176 128,168 130,160
-    C134,150 136,138 138,124
-    C140,112 142,102 142,98
-    L144,94 C148,86 146,79 140,74
-    C132,68 120,65 110,65 Z"/>
-  <path class="body-stroke" d="
-    M90,65 C80,65 68,68 60,74
-    C54,79 52,86 56,94
-    L58,98 C58,102 60,112 62,124
-    C64,138 66,150 70,160
-    C72,168 74,176 74,186
-    C74,196 76,208 82,218
-    L90,224 C96,227 100,228 100,228
-    C100,228 104,227 110,224
-    L118,218 C124,208 126,196 126,186
-    C126,176 128,168 130,160
-    C134,150 136,138 138,124
-    C140,112 142,102 142,98
-    L144,94 C148,86 146,79 140,74
-    C132,68 120,65 110,65 Z"/>
-
-  <!-- Left upper arm -->
-  <path class="limb-fill" d="
-    M48,76 C42,80 38,92 36,108
-    C34,126 33,144 34,158
-    C35,166 38,172 42,174
-    L52,174 C54,172 56,166 56,158
-    C56,144 56,128 54,112
-    C52,96 52,84 50,78 Z"/>
-  <path class="limb-stroke" d="
-    M48,76 C42,80 38,92 36,108
-    C34,126 33,144 34,158
-    C35,166 38,172 42,174
-    L52,174 C54,172 56,166 56,158
-    C56,144 56,128 54,112
-    C52,96 52,84 50,78 Z"/>
-
-  <!-- Left forearm -->
-  <path class="limb-fill" d="
-    M34,180 C32,192 30,206 30,216
-    C30,224 32,230 36,234
-    L46,234 C50,230 52,224 50,216
-    C48,206 48,192 48,180 Z"/>
-  <path class="limb-stroke" d="
-    M34,180 C32,192 30,206 30,216
-    C30,224 32,230 36,234
-    L46,234 C50,230 52,224 50,216
-    C48,206 48,192 48,180 Z"/>
-
-  <!-- Right upper arm -->
-  <path class="limb-fill" d="
-    M152,76 C158,80 162,92 164,108
-    C166,126 167,144 166,158
-    C165,166 162,172 158,174
-    L148,174 C146,172 144,166 144,158
-    C144,144 144,128 146,112
-    C148,96 148,84 150,78 Z"/>
-  <path class="limb-stroke" d="
-    M152,76 C158,80 162,92 164,108
-    C166,126 167,144 166,158
-    C165,166 162,172 158,174
-    L148,174 C146,172 144,166 144,158
-    C144,144 144,128 146,112
-    C148,96 148,84 150,78 Z"/>
-
-  <!-- Right forearm -->
-  <path class="limb-fill" d="
-    M166,180 C168,192 170,206 170,216
-    C170,224 168,230 164,234
-    L154,234 C150,230 148,224 150,216
-    C152,206 152,192 152,180 Z"/>
-  <path class="limb-stroke" d="
-    M166,180 C168,192 170,206 170,216
-    C170,224 168,230 164,234
-    L154,234 C150,230 148,224 150,216
-    C152,206 152,192 152,180 Z"/>
-
-  <!-- Left thigh -->
-  <path class="limb-fill" d="
-    M74,228 C70,244 66,266 64,290
-    C62,310 64,322 68,328
-    L88,328 C92,322 94,312 92,294
-    C90,270 88,248 86,228 Z"/>
-  <path class="limb-stroke" d="
-    M74,228 C70,244 66,266 64,290
-    C62,310 64,322 68,328
-    L88,328 C92,322 94,312 92,294
-    C90,270 88,248 86,228 Z"/>
-
-  <!-- Left calf -->
-  <path class="limb-fill" d="
-    M66,334 C62,350 60,368 62,386
-    C64,398 70,408 76,412
-    C80,414 84,412 86,408
-    C90,400 92,388 90,372
-    C88,356 86,342 84,334 Z"/>
-  <path class="limb-stroke" d="
-    M66,334 C62,350 60,368 62,386
-    C64,398 70,408 76,412
-    C80,414 84,412 86,408
-    C90,400 92,388 90,372
-    C88,356 86,342 84,334 Z"/>
-
-  <!-- Right thigh -->
-  <path class="limb-fill" d="
-    M126,228 C130,244 134,266 136,290
-    C138,310 136,322 132,328
-    L112,328 C108,322 106,312 108,294
-    C110,270 112,248 114,228 Z"/>
-  <path class="limb-stroke" d="
-    M126,228 C130,244 134,266 136,290
-    C138,310 136,322 132,328
-    L112,328 C108,322 106,312 108,294
-    C110,270 112,248 114,228 Z"/>
-
-  <!-- Right calf -->
-  <path class="limb-fill" d="
-    M134,334 C138,350 140,368 138,386
-    C136,398 130,408 124,412
-    C120,414 116,412 114,408
-    C110,400 108,388 110,372
-    C112,356 114,342 116,334 Z"/>
-  <path class="limb-stroke" d="
-    M134,334 C138,350 140,368 138,386
-    C136,398 130,408 124,412
-    C120,414 116,412 114,408
-    C110,400 108,388 110,372
-    C112,356 114,342 116,334 Z"/>
-
-  <!-- === MUSCLE OVERLAYS === -->
-
-  <!-- Trapezio — diamante ampio dal collo alle spalle -->
-  <path data-muscle="traps" class="m" d="
-    M86,68 C92,65 100,64 100,64
-    C100,64 108,65 114,68
-    L136,82 C134,92 124,96 100,94
-    C76,96 66,92 64,82 Z"/>
-
+  <!-- Trapezio -->
+  <path data-muscle="traps" class="m" d="M44,30 C48,28 52,28 56,30 L64,36 C62,42 56,46 50,45 C44,46 38,42 36,36 Z"/>
+  <!-- Dorsali -->
+  <path data-muscle="lats" class="m" d="M33,48 C30,58 32,70 34,80 C36,86 42,86 48,82 C46,70 44,58 40,48 Z"/>
+  <path data-muscle="lats" class="m" d="M67,48 C70,58 68,70 66,80 C64,86 58,86 52,82 C54,70 56,58 60,48 Z"/>
+  <!-- Bassa schiena -->
+  <path data-muscle="lower_back" class="m" d="M45,82 C43,88 43,95 46,100 C48,102 52,102 54,100 C57,95 57,88 55,82 Z"/>
   <!-- Deltoidi posteriori -->
-  <path data-muscle="rear_delts" class="m" d="
-    M52,76 C46,78 42,86 40,96
-    C38,106 42,112 50,108
-    C54,104 56,94 56,86
-    C56,80 54,76 52,76Z"/>
-  <path data-muscle="rear_delts" class="m" d="
-    M148,76 C154,78 158,86 160,96
-    C162,106 158,112 150,108
-    C146,104 144,94 144,86
-    C144,80 146,76 148,76Z"/>
-
-  <!-- Dorsali — grande V che definisce la schiena -->
-  <path data-muscle="lats" class="m" d="
-    M64,96 C62,110 60,130 62,152
-    C64,162 72,168 82,162
-    C88,156 86,134 84,114
-    C82,102 74,96 64,96Z"/>
-  <path data-muscle="lats" class="m" d="
-    M136,96 C138,110 140,130 138,152
-    C136,162 128,168 118,162
-    C112,156 114,134 116,114
-    C118,102 126,96 136,96Z"/>
-
-  <!-- Bassa schiena (erettori spinali) -->
-  <path data-muscle="lower_back" class="m" d="
-    M88,160 C86,168 86,180 90,190
-    C96,198 104,198 110,190
-    C114,180 114,168 112,160
-    C106,154 94,154 88,160Z"/>
-
-  <!-- Tricipiti — fuso sulla parte posteriore del braccio -->
-  <path data-muscle="triceps" class="m" d="
-    M48,104 C44,114 40,130 38,148
-    C36,158 40,162 44,158
-    C48,150 50,134 52,118
-    C54,108 52,100 48,104Z"/>
-  <path data-muscle="triceps" class="m" d="
-    M152,104 C156,114 160,130 162,148
-    C164,158 160,162 156,158
-    C152,150 150,134 148,118
-    C146,108 148,100 152,104Z"/>
-
-  <!-- Glutei — forma arrotondata anatomica -->
-  <path data-muscle="glutes" class="m" d="
-    M76,204 C70,210 68,222 74,232
-    C80,240 90,240 96,232
-    C100,224 98,214 94,208
-    C88,202 82,200 76,204Z"/>
-  <path data-muscle="glutes" class="m" d="
-    M124,204 C130,210 132,222 126,232
-    C120,240 110,240 104,232
-    C100,224 102,214 106,208
-    C112,202 118,200 124,204Z"/>
-
-  <!-- Femorali — goccia allungata sul retro della coscia -->
-  <path data-muscle="hamstrings" class="m" d="
-    M76,242 C72,262 68,286 66,306
-    C64,318 72,324 82,324
-    C90,324 92,320 90,308
-    C88,286 86,264 84,242Z"/>
-  <path data-muscle="hamstrings" class="m" d="
-    M124,242 C128,262 132,286 134,306
-    C136,318 128,324 118,324
-    C110,324 108,320 110,308
-    C112,286 114,264 116,242Z"/>
-
-  <!-- Polpacci — diamante (gastrocnemio) -->
-  <path data-muscle="calves" class="m" d="
-    M70,338 C64,350 62,366 66,382
-    C68,390 76,392 80,386
-    C84,374 82,354 78,340Z"/>
-  <path data-muscle="calves" class="m" d="
-    M130,338 C136,350 138,366 134,382
-    C132,390 124,392 120,386
-    C116,374 118,354 122,340Z"/>
+  <path data-muscle="rear_delts" class="m" d="M30,34 C26,35 23,40 21,48 C20,53 23,58 26,56 C30,53 31,45 30,34 Z"/>
+  <path data-muscle="rear_delts" class="m" d="M70,34 C74,35 77,40 79,48 C80,53 77,58 74,56 C70,53 69,45 70,34 Z"/>
+  <!-- Tricipiti -->
+  <path data-muscle="triceps" class="m" d="M25,58 C22,65 20,74 21,80 C22,83 25,84 27,80 C29,74 30,64 28,58 Z"/>
+  <path data-muscle="triceps" class="m" d="M75,58 C78,65 80,74 79,80 C78,83 75,84 73,80 C71,74 70,64 72,58 Z"/>
+  <!-- Glutei -->
+  <path data-muscle="glutes" class="m" d="M37,105 C33,110 32,118 36,122 C40,126 48,126 50,120 C50,115 48,108 45,106 Z"/>
+  <path data-muscle="glutes" class="m" d="M63,105 C67,110 68,118 64,122 C60,126 52,126 50,120 C50,115 52,108 55,106 Z"/>
+  <!-- Femorali -->
+  <path data-muscle="hamstrings" class="m" d="M38,126 C35,140 34,152 34,160 C34,164 38,165 42,162 C46,155 45,145 42,126 Z"/>
+  <path data-muscle="hamstrings" class="m" d="M62,126 C65,140 66,152 66,160 C66,164 62,165 58,162 C54,155 55,145 58,126 Z"/>
+  <!-- Polpacci -->
+  <path data-muscle="calves" class="m" d="M36,172 C32,180 32,192 36,200 C38,202 42,200 42,194 C42,185 41,175 39,172 Z"/>
+  <path data-muscle="calves" class="m" d="M64,172 C68,180 68,192 64,200 C62,202 58,200 58,194 C58,185 59,175 61,172 Z"/>
 </svg>`;
 	
 // Mappa: nomi usati nei JSON → nome del muscolo nell'SVG
@@ -2549,11 +2107,33 @@ function startSession() {
         toast('⚠️ Aggiungi esercizi prima!', 'warn');
         return;
     }
+
+    // Conta i set totali e fatti
+    const totalSets = day.exs.reduce((a, e) => a + (e.sd ? e.sd.length : 0), 0);
+    const doneSets = day.exs.reduce((a, e) => a + (e.sd ? e.sd.filter(s => s.done).length : 0), 0);
+
+    if (totalSets === 0) {
+        toast('⚠️ Aggiungi almeno una serie agli esercizi!', 'warn');
+        return;
+    }
+
+    // Se l'allenamento è già tutto spuntato (es. fatto in precedenza), lo azzera in automatico
+    if (doneSets === totalSets) {
+        day.exs.forEach(e => { if (e.sd) e.sd.forEach(s => s.done = false); });
+        save();
+    } 
+    // Se c'è un parziale, chiede all'utente
+    else if (doneSets > 0) {
+        if (confirm('Hai delle serie già completate. Vuoi azzerarle per ricominciare da capo?')) {
+            day.exs.forEach(e => { if (e.sd) e.sd.forEach(s => s.done = false); });
+            save();
+        }
+    }
+
     sesActive = true;
     sesExIdx = 0;
     sesStartTime = Date.now();
 
-    // Trova il primo esercizio non completato
     const firstUndone = day.exs.findIndex(ex => ex.sd && ex.sd.some(s => !s.done));
     if (firstUndone >= 0) sesExIdx = firstUndone;
 
@@ -2702,7 +2282,7 @@ function sesFlashMotivation(msg) {
     el.classList.add('flash');
 }
 
-// ===== Check set =====
+// ===== Check set (con Logica Superserie Alternate) =====
 function sesCheck() {
     const day = gD();
     const ex = day.exs[sesExIdx];
@@ -2712,7 +2292,7 @@ function sesCheck() {
     const s = ex.sd[setIdx];
     if (!s || s.done) return;
 
-    // Salva valori dagli input
+    // Salva valori
     s.r = parseInt(document.getElementById('sesReps').value) || 0;
     s.w = parseFloat(document.getElementById('sesKg').value) || 0;
     s.done = true;
@@ -2720,31 +2300,58 @@ function sesCheck() {
 
     if (navigator.vibrate) navigator.vibrate([30, 15, 30]);
 
-    // Controlla se l'esercizio è completato
-    const allDone = ex.sd.every(x => x.done);
+    let nextExIdx = sesExIdx;
+    
+    // Controlla se TUTTO l'allenamento è finito
+    const allExDone = day.exs.every(e => e.sd && e.sd.length > 0 && e.sd.every(x => x.done));
 
-    if (allDone) {
-        // Esercizio completato
+    if (!allExDone) {
+        if (ex.ssG) {
+            // LOGICA SUPERSERIE: Trova tutti gli ex in questo gruppo
+            const ssGroup = day.exs.map((e, i) => ({e, i})).filter(x => x.e.ssG === ex.ssG);
+            const myPos = ssGroup.findIndex(x => x.i === sesExIdx);
+            
+            let foundNextInSS = false;
+            // Cerca il prossimo nel loop del superset che ha serie non fatte
+            for (let j = 1; j <= ssGroup.length; j++) {
+                const checkPos = (myPos + j) % ssGroup.length;
+                const checkEx = ssGroup[checkPos].e;
+                if (checkEx.sd.some(x => !x.done)) {
+                    nextExIdx = ssGroup[checkPos].i;
+                    foundNextInSS = true;
+                    break;
+                }
+            }
+            
+            // Se l'intero superset è finito, passa al primo esercizio non fatto fuori dal gruppo
+            if (!foundNextInSS) {
+                nextExIdx = day.exs.findIndex((e, i) => i > ssGroup[ssGroup.length-1].i && e.sd && e.sd.some(x => !x.done));
+            }
+        } else {
+            // LOGICA NORMALE: Se questo esercizio è finito, passa al prossimo
+            const exDone = ex.sd.every(x => x.done);
+            if (exDone) {
+                nextExIdx = day.exs.findIndex((e, i) => i > sesExIdx && e.sd && e.sd.some(x => !x.done));
+            }
+        }
+    }
+
+    if (allExDone) {
         sesFlashMotivation(randomFrom(SES_MSGS.exDone));
         sesCleanTimer();
         sesRender();
-
-        // Auto-avanza dopo 1.5s se ci sono altri esercizi
-        const nextUndone = day.exs.findIndex((e, i) => i > sesExIdx && e.sd && e.sd.some(x => !x.done));
-        if (nextUndone >= 0) {
-            setTimeout(() => {
-                sesExIdx = nextUndone;
-                sesRender();
-            }, 1500);
-        } else {
-            // Controlla se TUTTI gli esercizi sono fatti
-            const allExDone = day.exs.every(e => e.sd && e.sd.every(x => x.done));
-            if (allExDone) {
-                setTimeout(() => sesShowSummary(), 1500);
-            }
-        }
+        setTimeout(() => sesShowSummary(), 1500);
+    } else if (nextExIdx !== sesExIdx && nextExIdx !== -1) {
+        // Stiamo cambiando esercizio (o per superserie o per esercizio successivo)
+        sesFlashMotivation(ex.ssG ? "🔄 Superserie! Passa all'altro!" : randomFrom(SES_MSGS.exDone));
+        sesStartTimer(ex.rest || 90);
+        sesRender();
+        setTimeout(() => {
+            sesExIdx = nextExIdx;
+            sesRender();
+        }, 1500);
     } else {
-        // Set completato, non ultimo
+        // Stesso esercizio, prossima serie
         sesFlashMotivation(randomFrom(SES_MSGS.set));
         sesStartTimer(ex.rest || 90);
         sesRender();
