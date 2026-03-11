@@ -467,54 +467,87 @@
         /* ===== VOLUME CHART ===== */
         #vol-chart { width:100%;height:130px;border-radius:10px;background:var(--c2); }
 
-			/* ===== MAPPA MUSCOLARE PRO ===== */
-			.body-map-wrap {
-				 display:flex;justify-content:center;gap:12px;
-				 margin-top:12px;flex-wrap:nowrap;
-			}
-			.body-svg {
-				 width:48%;max-width:170px;height:auto;
-			}
+/* ===== MAPPA MUSCOLARE PRO ===== */
+.body-map-wrap {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+  margin-top: 12px;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+}
+.body-svg {
+  width: 48%;
+  max-width: 210px;
+  height: auto;
+}
 
-			/* Corpo unito e silhouette */
-			.body-base {
-				 fill:#2a2a2a; stroke:#444; stroke-width:1.5;
-				 stroke-linejoin:round; stroke-linecap:round;
-			}
-			[data-theme="light"] .body-base {
-				 fill:#e8eaed; stroke:#6c757d;
-			}
+/* Sfondo corpo */
+.body-fill {
+  fill: #e8eaef;
+  stroke: none;
+}
+[data-theme="dark"] .body-fill { fill: #2a2d36; }
 
-			/* Muscoli (invisibili di base) */
-			.m {
-				 fill:transparent; stroke:none;
-				 transition:fill 0.4s ease, filter 0.4s ease;
-			}
+/* Contorno esterno */
+.body-outline {
+  fill: none;
+  stroke: #7c819a;
+  stroke-width: 0.7;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+[data-theme="dark"] .body-outline { stroke: #5a5f72; }
 
-			/* Colori intensità (come da screenshot: giallo -> arancio -> rosso) */
-			.m.low  { fill:rgba(241,196,15,0.65); }
-			.m.med  { fill:rgba(230,126,34,0.85); filter:drop-shadow(0 0 3px rgba(230,126,34,0.4)); }
-			.m.high { fill:rgba(231,76,60,0.95); filter:drop-shadow(0 0 6px rgba(231,76,60,0.6)); }
+/* Linee separazione interne */
+.ml {
+  fill: none;
+  stroke: #7c819a;
+  stroke-width: 0.4;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+[data-theme="dark"] .ml { stroke: #4e5264; }
 
-			/* Legenda & Tag */
-			.muscle-legend {
-				 display:flex;justify-content:center;gap:16px;
-				 margin-top:16px;font-size:.7rem;color:var(--tx2);flex-wrap:wrap;
-			}
-			.muscle-legend span { display:flex;align-items:center;gap:6px; }
-			.legend-dot { width:12px;height:12px;border-radius:50%;display:inline-block; }
-			.muscle-list {
-				 display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin-top:12px;
-			}
-			.muscle-tag {
-				 padding:5px 12px;border-radius:20px;font-size:.65rem;
-				 font-weight:600;border:1px solid var(--brd);
-				 background:var(--c2);color:var(--tx2);
-			}
-			.muscle-tag.active { color:#fff;border-color:transparent; }
-			.muscle-tag.low  { background:rgba(241,196,15,0.4); border-color:rgba(241,196,15,0.6); }
-			.muscle-tag.med  { background:rgba(230,126,34,0.5); border-color:rgba(230,126,34,0.7); }
-			.muscle-tag.high { background:rgba(231,76,60,0.6); border-color:rgba(231,76,60,0.8); }
+/* Zone muscolari — visibili a riposo */
+.m {
+  fill: #e8eaef;
+  stroke: #7c819a;
+  stroke-width: 0.4;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  transition: fill .4s ease, filter .4s ease;
+}
+[data-theme="dark"] .m { fill: #2a2d36; stroke: #4e5264; }
+
+/* Highlight rosa (come screenshot) */
+.m.low  { fill: rgba(246,140,155,0.50); }
+.m.med  { fill: rgba(241,95,115,0.72); }
+.m.high { fill: rgba(234,60,82,0.88); filter: drop-shadow(0 0 3px rgba(234,60,82,0.25)); }
+[data-theme="dark"] .m.low  { fill: rgba(246,140,155,0.38); }
+[data-theme="dark"] .m.med  { fill: rgba(241,95,115,0.55); }
+[data-theme="dark"] .m.high { fill: rgba(234,60,82,0.72); }
+
+/* Legenda */
+.muscle-legend {
+  display: flex; justify-content: center; gap: 16px;
+  margin-top: 14px; font-size: .7rem; color: var(--tx2); flex-wrap: wrap;
+}
+.muscle-legend span { display: flex; align-items: center; gap: 6px; }
+.legend-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+
+/* Tag */
+.muscle-list {
+  display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-top: 10px;
+}
+.muscle-tag {
+  padding: 5px 12px; border-radius: 20px; font-size: .65rem;
+  font-weight: 600; border: 1px solid var(--brd);
+  background: var(--c2); color: var(--tx2);
+}
+.muscle-tag.low  { background: rgba(246,140,155,0.25); border-color: rgba(246,140,155,0.5); }
+.muscle-tag.med  { background: rgba(241,95,115,0.30); border-color: rgba(241,95,115,0.55); color: #fff; }
+.muscle-tag.high { background: rgba(234,60,82,0.45);  border-color: rgba(234,60,82,0.65);  color: #fff; }
 
         /* ===== BOTTOM NAV ===== */
         .bn {
@@ -592,35 +625,6 @@ body.in-session .ctn { padding:0;max-width:100%; }
 @keyframes motivFlash {
     0%{opacity:0;transform:translateY(8px);}
     100%{opacity:1;transform:translateY(0);}
-}
-
-/* Timer */
-.ses-timer {
-    display:none;flex-direction:column;align-items:center;
-    padding:20px;gap:12px;
-}
-.ses-timer.active { display:flex; }
-.ses-timer-circle {
-    width:140px;height:140px;border-radius:50%;
-    border:4px solid var(--acc);
-    display:flex;flex-direction:column;align-items:center;justify-content:center;
-    background:rgba(3,218,198,.05);
-    transition:border-color .3s;
-}
-.ses-timer-circle.warn { border-color:var(--yel); }
-.ses-timer-circle.urgent { border-color:var(--red);animation:pulse .6s infinite; }
-.ses-timer-icon { font-size:1.2rem; }
-.ses-timer-text {
-    font-size:2rem;font-weight:900;color:var(--acc);
-    font-family:'SF Mono',Menlo,monospace;
-}
-.ses-timer-circle.warn .ses-timer-text { color:var(--yel); }
-.ses-timer-circle.urgent .ses-timer-text { color:var(--red); }
-.ses-timer-label { font-size:.6rem;color:var(--tx3);text-transform:uppercase;letter-spacing:1px; }
-.ses-timer-skip {
-    padding:8px 24px;border-radius:10px;border:1px solid var(--brd);
-    background:var(--c2);color:var(--tx);font-size:.8rem;font-weight:600;
-    cursor:pointer;min-height:40px;
 }
 
 /* Esercizio corrente */
@@ -892,16 +896,6 @@ body.in-session .ctn { padding:0;max-width:100%; }
         <div class="ses-motiv" id="sesMotiv">💪 Pronto? Spacca tutto!</div>
     </div>
 
-    <!-- Timer recupero -->
-    <div class="ses-timer" id="sesTimer">
-        <div class="ses-timer-circle" id="sesTimerCircle">
-            <span class="ses-timer-icon">⏱️</span>
-            <span class="ses-timer-text" id="sesTimerText">01:30</span>
-            <span class="ses-timer-label">RECUPERO</span>
-        </div>
-        <button class="ses-timer-skip" onclick="sesSkipTimer()">Salta ▶</button>
-    </div>
-
     <!-- Esercizio corrente -->
     <div class="ses-exercise" id="sesExCard">
         <div class="ses-ex-name" id="sesExName">—</div>
@@ -1065,9 +1059,6 @@ let ssTarget = null;
 let sesActive = false;
 let sesExIdx = 0;
 let sesStartTime = null;
-let sesTimerInterval = null;
-let sesTimerSec = 0;
-let sesTimerTotal = 0;
 let openExercises = new Set(); // Tiene traccia di quali esercizi sono aperti
 let viewMode = localStorage.getItem('gym-viewmode') === 'true';
 let myExChart = null;
@@ -1081,86 +1072,349 @@ const BW_FACTOR = 15;
 	
 // ===== SVG CORPO + MAPPATURA MUSCOLI =====
 const BODY_FRONT = `
-<svg viewBox="0 0 100 220" class="body-svg">
-  <!-- Silhouette base unita -->
-  <path class="body-base" d="
-    M45,15 C45,10 55,10 55,15 C55,22 53,26 53,26 C53,26 58,26 63,29
-    C72,33 76,40 78,50 L83,75 C85,85 83,95 78,100 C75,102 72,102 70,100
-    C68,96 68,90 68,85 L65,55 C65,55 62,65 60,75 C58,85 62,100 62,110
-    C62,115 58,118 55,118 L55,160 C55,175 58,195 58,205 C58,210 52,212 50,210
-    C48,205 48,180 50,165 L50,130 L50,165 C52,180 52,205 50,210
-    C48,212 42,210 42,205 C42,195 45,175 45,160 L45,118 C42,118 38,115 38,110
-    C38,100 42,85 40,75 C38,65 35,55 35,55 L32,85 C32,90 32,96 30,100
-    C28,102 25,102 22,100 C17,95 15,85 17,75 L22,50 C24,40 28,33 37,29
-    C42,26 47,26 47,26 C47,26 45,22 45,15 Z"/>
+<svg viewBox="0 0 260 480" class="body-svg">
+<defs>
+  <path id="fB" d="
+    M130,16 C120,16 115,21 113,28 C111,35 112,42 114,46 L115,48
+    C110,49 104,50 98,53 C86,58 76,66 70,78
+    L62,100 L52,134 L42,168 L34,194
+    C32,204 32,212 34,218 C36,224 42,226 46,222
+    C48,220 50,214 52,208 L56,190 L62,164 L68,142 L70,134
+    C70,138 70,144 69,152 L66,176 L64,198 L62,216
+    C60,226 58,236 58,244 L58,254 L56,272 L54,290
+    C53,298 55,302 58,302 L60,302
+    C62,298 64,290 66,278 L70,250 L74,230 L76,218
+    C78,208 80,198 84,188 L88,176 L92,166 L94,158
+    L96,172 L98,190 L98,212 L96,242 L94,274
+    L92,308 L90,340 L86,374 L84,400 L82,420
+    C80,432 80,442 84,448 C88,454 94,454 98,450
+    L104,442 L108,432 L114,414 L120,394 L126,372 L128,356 L130,342
+    L132,356 L134,372 L140,394 L146,414 L152,432 L156,442 L162,450
+    C166,454 172,454 176,448 C180,442 180,432 178,420
+    L176,400 L174,374 L170,340 L168,308 L166,274 L164,242
+    L162,212 L162,190 L164,172 L166,158
+    L168,166 L172,176 L176,188 C180,198 182,208 184,218
+    L186,230 L190,250 L194,278 C196,290 198,298 200,302
+    L202,302 C205,302 207,298 206,290
+    L204,272 L202,254 L202,244 C202,236 200,226 198,216
+    L196,198 L194,176 L191,152 C190,144 190,138 190,134
+    L192,142 L198,164 L204,190 L208,208
+    C210,214 212,220 214,222 C218,226 224,224 226,218
+    C228,212 228,204 226,194 L218,168 L208,134 L198,100
+    L190,78 C184,66 174,58 162,53 C156,50 150,49 145,48
+    L146,46 C148,42 149,35 147,28 C145,21 140,16 130,16 Z"/>
+</defs>
 
-  <!-- Muscoli -->
-  <!-- Pettorali -->
-  <path data-muscle="pectorals" class="m" d="M38,36 C42,32 48,34 49,38 L49,46 C48,52 44,55 38,55 C34,55 31,50 31,44 C31,38 34,38 38,36 Z"/>
-  <path data-muscle="pectorals" class="m" d="M62,36 C58,32 52,34 51,38 L51,46 C52,52 56,55 62,55 C66,55 69,50 69,44 C69,38 66,38 62,36 Z"/>
-  <!-- Deltoidi anteriori -->
-  <path data-muscle="front_delts" class="m" d="M30,34 C26,35 23,40 21,48 C20,53 23,58 26,56 C30,53 31,45 30,34 Z"/>
-  <path data-muscle="front_delts" class="m" d="M70,34 C74,35 77,40 79,48 C80,53 77,58 74,56 C70,53 69,45 70,34 Z"/>
-  <!-- Bicipiti -->
-  <path data-muscle="biceps" class="m" d="M25,58 C22,65 20,74 21,80 C22,83 25,84 27,80 C29,74 30,64 28,58 Z"/>
-  <path data-muscle="biceps" class="m" d="M75,58 C78,65 80,74 79,80 C78,83 75,84 73,80 C71,74 70,64 72,58 Z"/>
-  <!-- Avambracci -->
-  <path data-muscle="forearms" class="m" d="M21,86 C18,92 18,98 21,100 C23,101 26,98 26,94 C26,88 25,86 21,86 Z"/>
-  <path data-muscle="forearms" class="m" d="M79,86 C82,92 82,98 79,100 C77,101 74,98 74,94 C74,88 75,86 79,86 Z"/>
-  <!-- Addominali -->
-  <rect data-muscle="abs" x="46" y="58" width="3.5" height="4.5" rx="1" class="m"/>
-  <rect data-muscle="abs" x="50.5" y="58" width="3.5" height="4.5" rx="1" class="m"/>
-  <rect data-muscle="abs" x="46" y="63.5" width="3.5" height="4.5" rx="1" class="m"/>
-  <rect data-muscle="abs" x="50.5" y="63.5" width="3.5" height="4.5" rx="1" class="m"/>
-  <rect data-muscle="abs" x="46" y="69" width="3.5" height="4.5" rx="1" class="m"/>
-  <rect data-muscle="abs" x="50.5" y="69" width="3.5" height="4.5" rx="1" class="m"/>
-  <!-- Obliqui -->
-  <path data-muscle="obliques" class="m" d="M42,58 C39,66 38,76 40,82 C41,84 44,82 44,76 C44,66 43,60 42,58 Z"/>
-  <path data-muscle="obliques" class="m" d="M58,58 C61,66 62,76 60,82 C59,84 56,82 56,76 C56,66 57,60 58,58 Z"/>
-  <!-- Quadricipiti -->
-  <path data-muscle="quads" class="m" d="M39,120 C36,135 34,145 34,158 C34,162 38,164 42,162 C46,160 47,155 45,145 C43,130 42,120 39,120 Z"/>
-  <path data-muscle="quads" class="m" d="M61,120 C64,135 66,145 66,158 C66,162 62,164 58,162 C54,160 53,155 55,145 C57,130 58,120 61,120 Z"/>
-  <!-- Tibiali -->
-  <path data-muscle="tibialis" class="m" d="M37,172 C35,185 36,198 38,206 C39,208 42,206 42,200 C42,190 40,180 37,172 Z"/>
-  <path data-muscle="tibialis" class="m" d="M63,172 C65,185 64,198 62,206 C61,208 58,206 58,200 C58,190 60,180 63,172 Z"/>
+<use href="#fB" class="body-fill"/>
+<use href="#fB" class="body-outline"/>
+
+<defs><clipPath id="cF"><use href="#fB"/></clipPath></defs>
+<g clip-path="url(#cF)">
+
+<!-- ══ TRAPEZIO frontale ══ -->
+<path data-muscle="traps" class="m" d="
+  M115,48 C110,49 104,51 98,54 L92,60 L98,66 L106,62 L114,56 L118,52 L118,48 Z"/>
+<path data-muscle="traps" class="m" d="
+  M145,48 C150,49 156,51 162,54 L168,60 L162,66 L154,62 L146,56 L142,52 L142,48 Z"/>
+
+<!-- ══ PETTORALI ══ -->
+<path data-muscle="pectorals" class="m" d="
+  M98,66 L92,60 L84,66 L78,74 L72,86 L70,98
+  L72,108 L78,118 L86,126 L96,132 L108,136
+  L118,138 L126,136 L130,130 L130,100 L130,76
+  L128,70 L124,66 L118,62 L114,56 L106,62 Z"/>
+<path data-muscle="pectorals" class="m" d="
+  M162,66 L168,60 L176,66 L182,74 L188,86 L190,98
+  L188,108 L182,118 L174,126 L164,132 L152,136
+  L142,138 L134,136 L130,130 L130,100 L130,76
+  L132,70 L136,66 L142,62 L146,56 L154,62 Z"/>
+
+<!-- ══ DELTOIDI ANTERIORI ══ -->
+<path data-muscle="front_delts" class="m" d="
+  M92,60 L84,64 L76,72 L70,82 L64,98 L60,114
+  L60,124 L62,132 L66,138 L70,142 L70,134
+  L68,122 L68,112 L70,100 L74,88 L80,76 L86,68 Z"/>
+<path data-muscle="front_delts" class="m" d="
+  M168,60 L176,64 L184,72 L190,82 L196,98 L200,114
+  L200,124 L198,132 L194,138 L190,142 L190,134
+  L192,122 L192,112 L190,100 L186,88 L180,76 L174,68 Z"/>
+
+<!-- ══ BICIPITI ══ -->
+<path data-muscle="biceps" class="m" d="
+  M70,142 L66,154 L62,170 L58,186 L56,198
+  L56,206 L60,210 L64,208 L68,200
+  L72,184 L74,168 L76,152 L76,144 L74,140 Z"/>
+<path data-muscle="biceps" class="m" d="
+  M190,142 L194,154 L198,170 L202,186 L204,198
+  L204,206 L200,210 L196,208 L192,200
+  L188,184 L186,168 L184,152 L184,144 L186,140 Z"/>
+
+<!-- ══ AVAMBRACCI ══ -->
+<path data-muscle="forearms" class="m" d="
+  M56,210 L54,226 L54,244 L54,262 L54,280
+  L54,290 L56,298 L58,302 L60,302
+  L62,296 L64,284 L66,270 L68,256
+  L70,240 L72,226 L72,216 L70,212
+  L66,210 L62,212 Z"/>
+<path data-muscle="forearms" class="m" d="
+  M204,210 L206,226 L206,244 L206,262 L206,280
+  L206,290 L204,298 L202,302 L200,302
+  L198,296 L196,284 L194,270 L192,256
+  L190,240 L188,226 L188,216 L190,212
+  L194,210 L198,212 Z"/>
+
+<!-- ══ ADDOMINALI 6-pack ══ -->
+<rect data-muscle="abs" class="m" x="120" y="138" width="9" height="12" rx="2"/>
+<rect data-muscle="abs" class="m" x="131" y="138" width="9" height="12" rx="2"/>
+<rect data-muscle="abs" class="m" x="120" y="152" width="9" height="12" rx="2"/>
+<rect data-muscle="abs" class="m" x="131" y="152" width="9" height="12" rx="2"/>
+<rect data-muscle="abs" class="m" x="120" y="166" width="9" height="12" rx="2"/>
+<rect data-muscle="abs" class="m" x="131" y="166" width="9" height="12" rx="2"/>
+<!-- Basso ventre -->
+<path data-muscle="abs" class="m" d="
+  M121,180 L120,190 L123,196 L130,198 L137,196 L140,190 L139,180 Z"/>
+<!-- Linea alba -->
+<line class="ml" x1="130" y1="134" x2="130" y2="198"/>
+
+<!-- ══ OBLIQUI ══ -->
+<path data-muscle="obliques" class="m" d="
+  M108,136 L96,132 L90,130 L86,134 L84,144
+  L84,156 L86,170 L90,182 L94,192
+  L98,198 L104,200 L110,196 L114,188
+  L116,178 L118,166 L118,154 L118,142 L116,136 Z"/>
+<path data-muscle="obliques" class="m" d="
+  M152,136 L164,132 L170,130 L174,134 L176,144
+  L176,156 L174,170 L170,182 L166,192
+  L162,198 L156,200 L150,196 L146,188
+  L144,178 L142,166 L142,154 L142,142 L144,136 Z"/>
+
+<!-- ══ QUADRICIPITI — esterno ══ -->
+<path data-muscle="quads" class="m" d="
+  M94,210 L88,228 L84,248 L82,270
+  L80,292 L80,310 L82,324 L86,336
+  L92,344 L100,348 L106,346
+  L110,340 L112,330 L112,316
+  L112,296 L110,274 L108,252
+  L106,234 L102,218 L98,210 Z"/>
+<path data-muscle="quads" class="m" d="
+  M166,210 L172,228 L176,248 L178,270
+  L180,292 L180,310 L178,324 L174,336
+  L168,344 L160,348 L154,346
+  L150,340 L148,330 L148,316
+  L148,296 L150,274 L152,252
+  L154,234 L158,218 L162,210 Z"/>
+
+<!-- ══ QUADRICIPITI — interno ══ -->
+<path data-muscle="quads" class="m" d="
+  M130,342 L128,334 L124,322 L120,312
+  L116,306 L112,314 L110,326
+  L112,338 L116,348 L122,356
+  L126,358 L130,356 Z"/>
+<path data-muscle="quads" class="m" d="
+  M130,342 L132,334 L136,322 L140,312
+  L144,306 L148,314 L150,326
+  L148,338 L144,348 L138,356
+  L134,358 L130,356 Z"/>
+
+<!-- ══ GINOCCHIO ══ -->
+<path class="ml" d="M86,336 C92,348 100,352 106,346"/>
+<path class="ml" d="M174,336 C168,348 160,352 154,346"/>
+
+<!-- ══ TIBIALI ══ -->
+<path data-muscle="tibialis" class="m" d="
+  M86,360 L82,378 L80,396 L78,416 L78,432
+  L80,442 C82,450 86,454 90,452
+  C94,450 98,446 102,440
+  L106,430 L110,418 L114,404
+  L116,390 L116,378 L114,368
+  L110,360 L104,356 L98,356 L92,358 Z"/>
+<path data-muscle="tibialis" class="m" d="
+  M174,360 L178,378 L180,396 L182,416 L182,432
+  L180,442 C178,450 174,454 170,452
+  C166,450 162,446 158,440
+  L154,430 L150,418 L146,404
+  L144,390 L144,378 L146,368
+  L150,360 L156,356 L162,356 L168,358 Z"/>
+
+</g>
 </svg>`;
 
 const BODY_BACK = `
-<svg viewBox="0 0 100 220" class="body-svg">
-  <!-- Silhouette identica ma vista da dietro -->
-  <path class="body-base" d="
-    M45,15 C45,10 55,10 55,15 C55,22 53,26 53,26 C53,26 58,26 63,29
-    C72,33 76,40 78,50 L83,75 C85,85 83,95 78,100 C75,102 72,102 70,100
-    C68,96 68,90 68,85 L65,55 C65,55 62,65 60,75 C58,85 62,100 62,110
-    C62,115 58,118 55,118 L55,160 C55,175 58,195 58,205 C58,210 52,212 50,210
-    C48,205 48,180 50,165 L50,130 L50,165 C52,180 52,205 50,210
-    C48,212 42,210 42,205 C42,195 45,175 45,160 L45,118 C42,118 38,115 38,110
-    C38,100 42,85 40,75 C38,65 35,55 35,55 L32,85 C32,90 32,96 30,100
-    C28,102 25,102 22,100 C17,95 15,85 17,75 L22,50 C24,40 28,33 37,29
-    C42,26 47,26 47,26 C47,26 45,22 45,15 Z"/>
+<svg viewBox="0 0 260 480" class="body-svg">
+<defs>
+  <path id="bB" d="
+    M130,16 C120,16 115,21 113,28 C111,35 112,42 114,46 L115,48
+    C110,49 104,50 98,53 C86,58 76,66 70,78
+    L62,100 L52,134 L42,168 L34,194
+    C32,204 32,212 34,218 C36,224 42,226 46,222
+    C48,220 50,214 52,208 L56,190 L62,164 L68,142 L70,134
+    C70,138 70,144 69,152 L66,176 L64,198 L62,216
+    C60,226 58,236 58,244 L58,254 L56,272 L54,290
+    C53,298 55,302 58,302 L60,302
+    C62,298 64,290 66,278 L70,250 L74,230 L76,218
+    C78,208 80,198 84,188 L88,176 L92,166 L94,158
+    L96,172 L98,190 L98,212 L96,242 L94,274
+    L92,308 L90,340 L86,374 L84,400 L82,420
+    C80,432 80,442 84,448 C88,454 94,454 98,450
+    L104,442 L108,432 L114,414 L120,394 L126,372 L128,356 L130,342
+    L132,356 L134,372 L140,394 L146,414 L152,432 L156,442 L162,450
+    C166,454 172,454 176,448 C180,442 180,432 178,420
+    L176,400 L174,374 L170,340 L168,308 L166,274 L164,242
+    L162,212 L162,190 L164,172 L166,158
+    L168,166 L172,176 L176,188 C180,198 182,208 184,218
+    L186,230 L190,250 L194,278 C196,290 198,298 200,302
+    L202,302 C205,302 207,298 206,290
+    L204,272 L202,254 L202,244 C202,236 200,226 198,216
+    L196,198 L194,176 L191,152 C190,144 190,138 190,134
+    L192,142 L198,164 L204,190 L208,208
+    C210,214 212,220 214,222 C218,226 224,224 226,218
+    C228,212 228,204 226,194 L218,168 L208,134 L198,100
+    L190,78 C184,66 174,58 162,53 C156,50 150,49 145,48
+    L146,46 C148,42 149,35 147,28 C145,21 140,16 130,16 Z"/>
+</defs>
 
-  <!-- Trapezio -->
-  <path data-muscle="traps" class="m" d="M44,30 C48,28 52,28 56,30 L64,36 C62,42 56,46 50,45 C44,46 38,42 36,36 Z"/>
-  <!-- Dorsali -->
-  <path data-muscle="lats" class="m" d="M33,48 C30,58 32,70 34,80 C36,86 42,86 48,82 C46,70 44,58 40,48 Z"/>
-  <path data-muscle="lats" class="m" d="M67,48 C70,58 68,70 66,80 C64,86 58,86 52,82 C54,70 56,58 60,48 Z"/>
-  <!-- Bassa schiena -->
-  <path data-muscle="lower_back" class="m" d="M45,82 C43,88 43,95 46,100 C48,102 52,102 54,100 C57,95 57,88 55,82 Z"/>
-  <!-- Deltoidi posteriori -->
-  <path data-muscle="rear_delts" class="m" d="M30,34 C26,35 23,40 21,48 C20,53 23,58 26,56 C30,53 31,45 30,34 Z"/>
-  <path data-muscle="rear_delts" class="m" d="M70,34 C74,35 77,40 79,48 C80,53 77,58 74,56 C70,53 69,45 70,34 Z"/>
-  <!-- Tricipiti -->
-  <path data-muscle="triceps" class="m" d="M25,58 C22,65 20,74 21,80 C22,83 25,84 27,80 C29,74 30,64 28,58 Z"/>
-  <path data-muscle="triceps" class="m" d="M75,58 C78,65 80,74 79,80 C78,83 75,84 73,80 C71,74 70,64 72,58 Z"/>
-  <!-- Glutei -->
-  <path data-muscle="glutes" class="m" d="M37,105 C33,110 32,118 36,122 C40,126 48,126 50,120 C50,115 48,108 45,106 Z"/>
-  <path data-muscle="glutes" class="m" d="M63,105 C67,110 68,118 64,122 C60,126 52,126 50,120 C50,115 52,108 55,106 Z"/>
-  <!-- Femorali -->
-  <path data-muscle="hamstrings" class="m" d="M38,126 C35,140 34,152 34,160 C34,164 38,165 42,162 C46,155 45,145 42,126 Z"/>
-  <path data-muscle="hamstrings" class="m" d="M62,126 C65,140 66,152 66,160 C66,164 62,165 58,162 C54,155 55,145 58,126 Z"/>
-  <!-- Polpacci -->
-  <path data-muscle="calves" class="m" d="M36,172 C32,180 32,192 36,200 C38,202 42,200 42,194 C42,185 41,175 39,172 Z"/>
-  <path data-muscle="calves" class="m" d="M64,172 C68,180 68,192 64,200 C62,202 58,200 58,194 C58,185 59,175 61,172 Z"/>
+<use href="#bB" class="body-fill"/>
+<use href="#bB" class="body-outline"/>
+
+<defs><clipPath id="cB"><use href="#bB"/></clipPath></defs>
+<g clip-path="url(#cB)">
+
+<!-- ══ TRAPEZIO — sinistra ══ -->
+<path data-muscle="traps" class="m" d="
+  M115,48 C110,49 104,52 98,56
+  L90,62 L82,70 L78,78
+  L84,80 L92,76 L100,70 L108,64
+  L116,58 L120,54 L122,50 L118,48 Z"/>
+<!-- ══ TRAPEZIO — destra ══ -->
+<path data-muscle="traps" class="m" d="
+  M145,48 C150,49 156,52 162,56
+  L170,62 L178,70 L182,78
+  L176,80 L168,76 L160,70 L152,64
+  L144,58 L140,54 L138,50 L142,48 Z"/>
+<!-- ══ TRAPEZIO — centro ══ -->
+<path data-muscle="traps" class="m" d="
+  M118,48 L122,50 L126,52 L130,54
+  L134,52 L138,50 L142,48
+  L142,56 L140,62 L136,68 L130,70
+  L124,68 L120,62 L118,56 Z"/>
+
+<!-- ══ DELTOIDI POSTERIORI ══ -->
+<path data-muscle="rear_delts" class="m" d="
+  M90,62 L82,68 L76,76 L70,88 L64,104
+  L60,118 L60,128 L62,136 L66,142 L70,146
+  L70,134 L68,120 L68,110 L70,98
+  L76,84 L82,74 L88,66 Z"/>
+<path data-muscle="rear_delts" class="m" d="
+  M170,62 L178,68 L184,76 L190,88 L196,104
+  L200,118 L200,128 L198,136 L194,142 L190,146
+  L190,134 L192,120 L192,110 L190,98
+  L184,84 L178,74 L172,66 Z"/>
+
+<!-- ══ DORSALI ══ -->
+<path data-muscle="lats" class="m" d="
+  M84,80 L78,78 L76,84 L74,96
+  L72,110 L70,122 L70,134
+  L70,146 L74,154 L80,162
+  L88,168 L98,172 L110,174
+  L120,172 L126,168 L130,160
+  L130,108 L130,84 L130,70
+  L126,66 L120,60 L110,64
+  L102,68 L94,74 Z"/>
+<path data-muscle="lats" class="m" d="
+  M176,80 L182,78 L184,84 L186,96
+  L188,110 L190,122 L190,134
+  L190,146 L186,154 L180,162
+  L172,168 L162,172 L150,174
+  L140,172 L134,168 L130,160
+  L130,108 L130,84 L130,70
+  L134,66 L140,60 L150,64
+  L158,68 L166,74 Z"/>
+
+<!-- ══ BASSA SCHIENA ══ -->
+<path data-muscle="lower_back" class="m" d="
+  M110,174 L98,172 L90,170 L84,172
+  L82,180 L82,190 L84,200
+  L90,208 L100,214 L112,216
+  L122,216 L130,214
+  L130,214 L138,216 L148,216
+  L160,214 L170,208 L176,200
+  L178,190 L178,180 L176,172
+  L170,170 L162,172 L150,174
+  L142,176 L130,178 L118,176 Z"/>
+
+<!-- ══ TRICIPITI ══ -->
+<path data-muscle="triceps" class="m" d="
+  M70,146 L66,158 L62,174 L58,190 L56,204
+  L56,212 L60,216 L64,214 L68,206
+  L72,190 L74,174 L76,158 L76,148 L74,144 Z"/>
+<path data-muscle="triceps" class="m" d="
+  M190,146 L194,158 L198,174 L202,190 L204,204
+  L204,212 L200,216 L196,214 L192,206
+  L188,190 L186,174 L184,158 L184,148 L186,144 Z"/>
+
+<!-- ══ AVAMBRACCI ══ -->
+<path data-muscle="forearms" class="m" d="
+  M56,216 L54,232 L54,250 L54,268 L54,284
+  L54,294 L56,300 L58,302 L60,302
+  L62,296 L64,284 L66,270 L68,256
+  L70,240 L72,226 L72,218 L70,214
+  L66,212 L62,214 Z"/>
+<path data-muscle="forearms" class="m" d="
+  M204,216 L206,232 L206,250 L206,268 L206,284
+  L206,294 L204,300 L202,302 L200,302
+  L198,296 L196,284 L194,270 L192,256
+  L190,240 L188,226 L188,218 L190,214
+  L194,212 L198,214 Z"/>
+
+<!-- ══ GLUTEI ══ -->
+<path data-muscle="glutes" class="m" d="
+  M98,214 L90,210 L84,214 L80,222
+  L78,234 L78,244 L80,254
+  L86,262 L94,268 L104,270
+  L114,268 L122,262 L126,254
+  L128,244 L128,232 L126,222
+  L122,216 L116,214 L108,216 Z"/>
+<path data-muscle="glutes" class="m" d="
+  M162,214 L170,210 L176,214 L180,222
+  L182,234 L182,244 L180,254
+  L174,262 L166,268 L156,270
+  L146,268 L138,262 L134,254
+  L132,244 L132,232 L134,222
+  L138,216 L144,214 L152,216 Z"/>
+
+<!-- ══ FEMORALI ══ -->
+<path data-muscle="hamstrings" class="m" d="
+  M80,272 L78,290 L76,310 L76,328
+  L78,342 L82,354 L88,362
+  L96,366 L104,364 L110,358
+  L114,348 L116,336 L116,318
+  L114,298 L112,278 L110,266
+  L106,272 L100,274 L94,272 L88,268 Z"/>
+<path data-muscle="hamstrings" class="m" d="
+  M180,272 L182,290 L184,310 L184,328
+  L182,342 L178,354 L172,362
+  L164,366 L156,364 L150,358
+  L146,348 L144,336 L144,318
+  L146,298 L148,278 L150,266
+  L154,272 L160,274 L166,272 L172,268 Z"/>
+
+<!-- ══ POLPACCI ══ -->
+<path data-muscle="calves" class="m" d="
+  M82,370 L78,388 L76,406 L76,424
+  L78,436 L80,444 C82,450 86,454 90,452
+  C94,450 98,446 102,440
+  L106,430 L110,418 L112,404
+  L114,390 L114,378 L112,370
+  L108,364 L102,362 L96,362 L90,366 Z"/>
+<path data-muscle="calves" class="m" d="
+  M178,370 L182,388 L184,406 L184,424
+  L182,436 L180,444 C178,450 174,454 170,452
+  C166,450 162,446 158,440
+  L154,430 L150,418 L148,404
+  L146,390 L146,378 L148,370
+  L152,364 L158,362 L164,362 L170,366 Z"/>
+
+</g>
 </svg>`;
 	
 // Mappa: nomi usati nei JSON → nome del muscolo nell'SVG
@@ -2042,16 +2296,16 @@ function renMuscle() {
     });
     const maxVol = Math.max(...Object.values(muscleVol), 1);
 
-    // Inserisci SVG
-    c.innerHTML = `
-        <div class="body-map-wrap">${BODY_FRONT}${BODY_BACK}</div>
-        <div class="muscle-legend">
-            <span><span class="legend-dot" style="background:rgba(46,213,115,0.45);"></span> Leggero</span>
-            <span><span class="legend-dot" style="background:rgba(255,165,2,0.5);box-shadow:0 0 4px rgba(255,165,2,.3);"></span> Medio</span>
-            <span><span class="legend-dot" style="background:rgba(231,76,60,0.6);box-shadow:0 0 6px rgba(231,76,60,.3);"></span> Intenso</span>
-        </div>
-        <div class="muscle-list" id="muscleTagList"></div>
-    `;
+	// Inserisci SVG
+	c.innerHTML = `
+		 <div class="body-map-wrap">${BODY_FRONT}${BODY_BACK}</div>
+		 <div class="muscle-legend">
+			  <span><span class="legend-dot" style="background:rgba(246,140,155,0.55);"></span> Leggero</span>
+			  <span><span class="legend-dot" style="background:rgba(241,95,115,0.72); box-shadow:0 0 4px rgba(241,95,115,.3);"></span> Medio</span>
+			  <span><span class="legend-dot" style="background:rgba(234,60,82,0.88); box-shadow:0 0 6px rgba(234,60,82,.3);"></span> Intenso</span>
+		 </div>
+		 <div class="muscle-list" id="muscleTagList"></div>
+	`;
 
     // Colora le aree SVG con intensità basata su SERIE + VOLUME
     Object.entries(muscleVol).forEach(([muscle, vol]) => {
@@ -2155,14 +2409,7 @@ function exitSession() {
     renDay();
 }
 
-function sesCleanup() {
-    if (sesTimerInterval) clearInterval(sesTimerInterval);
-    sesTimerInterval = null;
-    document.getElementById('sesTimer').classList.remove('active');
-}
-
 function sesClose() {
-    sesCleanup();
     sesActive = false;
     document.body.classList.remove('in-session');
     document.getElementById('vSession').style.display = 'none';
@@ -2338,13 +2585,11 @@ function sesCheck() {
 
     if (allExDone) {
         sesFlashMotivation(randomFrom(SES_MSGS.exDone));
-        sesCleanTimer();
         sesRender();
         setTimeout(() => sesShowSummary(), 1500);
     } else if (nextExIdx !== sesExIdx && nextExIdx !== -1) {
         // Stiamo cambiando esercizio (o per superserie o per esercizio successivo)
         sesFlashMotivation(ex.ssG ? "🔄 Superserie! Passa all'altro!" : randomFrom(SES_MSGS.exDone));
-        sesStartTimer(ex.rest || 90);
         sesRender();
         setTimeout(() => {
             sesExIdx = nextExIdx;
@@ -2353,62 +2598,14 @@ function sesCheck() {
     } else {
         // Stesso esercizio, prossima serie
         sesFlashMotivation(randomFrom(SES_MSGS.set));
-        sesStartTimer(ex.rest || 90);
         sesRender();
     }
 }
 
-// ===== Timer =====
-function sesStartTimer(seconds) {
-    sesCleanTimer();
-    sesTimerSec = seconds;
-    sesTimerTotal = seconds;
-    const timerEl = document.getElementById('sesTimer');
-    timerEl.classList.add('active');
-    sesUpdateTimer();
-
-    sesTimerInterval = setInterval(() => {
-        sesTimerSec--;
-        sesUpdateTimer();
-        if (sesTimerSec <= 0) {
-            sesCleanTimer();
-            timerEl.classList.remove('active');
-            if (navigator.vibrate) navigator.vibrate([200, 80, 200]);
-            sesFlashMotivation("⏱️ Vai! Prossima serie!");
-        }
-    }, 1000);
-}
-
-function sesUpdateTimer() {
-    const m = Math.floor(sesTimerSec / 60);
-    const s = sesTimerSec % 60;
-    document.getElementById('sesTimerText').textContent =
-        String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
-
-    const circle = document.getElementById('sesTimerCircle');
-    circle.className = 'ses-timer-circle';
-    if (sesTimerSec <= 5) circle.classList.add('urgent');
-    else if (sesTimerSec <= 15) circle.classList.add('warn');
-}
-
-function sesSkipTimer() {
-    sesCleanTimer();
-    document.getElementById('sesTimer').classList.remove('active');
-    sesFlashMotivation("⚡ Niente pausa? Bestia!");
-}
-
-function sesCleanTimer() {
-    if (sesTimerInterval) clearInterval(sesTimerInterval);
-    sesTimerInterval = null;
-}
-
 // ===== Navigazione =====
 function sesPrevEx() {
-    const day = gD();
     if (sesExIdx > 0) {
         sesExIdx--;
-        sesCleanTimer();
-        document.getElementById('sesTimer').classList.remove('active');
         sesRender();
     }
 }
@@ -2417,8 +2614,6 @@ function sesNextEx() {
     const day = gD();
     if (sesExIdx < day.exs.length - 1) {
         sesExIdx++;
-        sesCleanTimer();
-        document.getElementById('sesTimer').classList.remove('active');
         sesRender();
     }
 }
@@ -2491,7 +2686,6 @@ function sesCompleteSave() {
 }
 
 function sesShowSummary() {
-    sesCleanTimer();
     const day = gD();
     const duration = Math.round((Date.now() - sesStartTime) / 60000);
     const doneSets = day.exs.reduce((a, e) => a + (e.sd ? e.sd.filter(s => s.done).length : 0), 0);
@@ -2511,7 +2705,6 @@ function sesShowSummary() {
 
     // Nascondi tutto tranne summary
     document.getElementById('sesExCard').style.display = 'none';
-    document.getElementById('sesTimer').classList.remove('active');
     document.querySelector('.ses-nav').style.display = 'none';
     document.querySelector('.ses-motiv-area').style.display = 'none';
 
