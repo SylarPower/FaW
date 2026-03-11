@@ -2417,60 +2417,6 @@ function addEx(eid) {
 }
 
 // ============================================================
-// ✅ COMPLETE WORKOUT
-// ============================================================
-    const totalSetsAll = day.exs.reduce((a, e) => a + (e.sd ? e.sd.length : 0), 0);
-    const doneSetsAll = day.exs.reduce((a, e) => a + (e.sd ? e.sd.filter(x => x.done).length : 0), 0);
-
-    if (doneSetsAll === 0) {
-        if (!confirm('Nessuna serie segnata come fatta. Completare comunque?')) return;
-    } else if (doneSetsAll < totalSetsAll) {
-        if (!confirm(`Hai completato ${doneSetsAll}/${totalSetsAll} serie. Terminare l'allenamento?`)) return;
-    } else {
-        if (!confirm('Tutte le serie completate! Salvare?')) return;
-    }
-
-    const today = toLocalDate(new Date());
-    const yest = toLocalDate(new Date(Date.now() - 864e5));
-    const s = D.st;
-    let newPR = false;
-
-    if (s.lwd === yest) s.sk = (s.sk || 0) + 1;
-    else if (s.lwd !== today) s.sk = 1;
-    s.lwd = today;
-    s.tw = (s.tw || 0) + 1;
-    s.ts = (s.ts || 0) + doneSetsAll;
-    s.te = (s.te || 0) + day.exs.length;
-    if (!s.pr) s.pr = {};
-
-    day.exs.forEach(e => {
-        const doneS = e.sd ? e.sd.filter(x => x.done) : [];
-        const maxW = doneS.length ? Math.max(...doneS.map(x => parseFloat(x.w) || 0)) : 0;
-        if (maxW > (s.pr[e.exerciseId] || 0)) { s.pr[e.exerciseId] = maxW; newPR = true; }
-        const avgR = doneS.length ? Math.round(doneS.reduce((a, x) => a + (parseInt(x.r) || 0), 0) / doneS.length) : 0;
-        D.hist.push({
-            eid: e.exerciseId, name: e.name, dt: new Date().toISOString(),
-            dayId: curDay,
-            s: doneS.length, r: avgR, w: maxW, rest: e.rest,
-            seat: e.seat,
-            sd: e.sd.map(x => ({r: x.r, w: x.w}))
-        });
-    });
-
-    // Reset sets
-    day.exs.forEach(e => { if (e.sd) e.sd.forEach(s => s.done = false); });
-
-    save(); goHome();
-
-    if (newPR) {
-        toast('🎉 NUOVO PERSONAL RECORD!', 'ok', 3500);
-        fireConfetti();
-    } else {
-        toast('✅ Allenamento salvato! 💪', 'ok', 2500);
-    }
-}
-
-// ============================================================
 // 📊 PROGRESSION CHART
 // ============================================================
 function showProgression(exId, exName) {
