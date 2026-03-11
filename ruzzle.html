@@ -1545,6 +1545,7 @@
 			let unsubscribeEliminazioni = null;
 			let pendingEliminazioni = new Map(); // parola -> dati proposta in corso
 			let currentWinner = null;
+			let currentBannerPriority = 0; // 0=nessuno, 1=stato, 10=votazione
 			// --- TRIE ---
 			class TrieNode {
 			  constructor() {
@@ -1642,6 +1643,10 @@
 			const gameEndModal = document.getElementById('game-end-modal');
 			// --- BANNER SYSTEM ---
 			function showGameBanner(options) {
+			    const priority = options.priority || 1;
+			    if (currentBannerPriority > priority) return; // Non sovrascrivere banner più importanti
+			    currentBannerPriority = priority;
+			
 			    let banner = document.getElementById('game-banner');
 			    const isNewBanner = !banner;
 			    
@@ -1691,9 +1696,7 @@
 			    `;
 			    
 			    // ✅ Aggiorna solo se il contenuto è diverso
-			    if (banner.innerHTML !== newContent) {
-			        banner.innerHTML = newContent;
-			    }
+			    banner.innerHTML = newContent;
 			    
 			    // Rimuovi vecchi banner se esistono
 			    const oldBanner = document.getElementById('wait-banner');
@@ -1701,6 +1704,7 @@
 			}
 			
 			function removeGameBanner() {
+			  currentBannerPriority = 0;
 			  const existing = document.getElementById('game-banner');
 			  if (existing) existing.remove();
 			  const oldBanner = document.getElementById('wait-banner');
@@ -3940,17 +3944,18 @@ if (data.stato === "in_corso") {
 			      if (change.type === "added" || change.type === "modified") {
 			        const prop = change.doc.data();
 						if (!prop.voti.includes(mioNome)) {
-							 const azione = prop.tipo === 'extra' ? 'AGGIUNGERE' : 'RIMUOVERE';
-							 showGameBanner({
-								  icon: '📢',
-								  title: 'MODIFICA DIZIONARIO',
-								  subtitle: `${prop.proponente} vuole ${azione} "${prop.parola}"`,
-								  color: '#3498db',
-								  buttons: [
-										{ text: '👍 APPROVA', onclick: `votaDizionario('${prop.parola}', true)` },
-										{ text: '👎 RIFIUTA', onclick: `removeGameBanner()` }
-								  ]
-							 });
+						     const azione = prop.tipo === 'extra' ? 'AGGIUNGERE' : 'RIMUOVERE';
+						     showGameBanner({
+						          icon: '📢',
+						          title: 'MODIFICA DIZIONARIO',
+						          subtitle: `${prop.proponente} vuole ${azione} "${prop.parola}"`,
+						          color: '#3498db',
+						          priority: 10,
+						          buttons: [
+						                { text: '👍 APPROVA', onclick: `votaDizionario('${prop.parola}', true)` },
+						                { text: '👎 RIFIUTA', onclick: `removeGameBanner()` }
+						          ]
+						     });
 						}
 			        if (currentGameData && currentGameData.partecipanti) {
 			          const numPartecipanti = currentGameData.partecipanti.length;
@@ -4096,13 +4101,7 @@ async function votaDizionario(parola, approva) {
             voti: firebase.firestore.FieldValue.arrayUnion(mioNome)
         });
     }
-    removeGameBanner();
-}async function votaDizionario(parola, approva) {
-    if (approva) {
-        await db.collection("partite").doc(matchId).collection("proposte").doc(parola).update({
-            voti: firebase.firestore.FieldValue.arrayUnion(mioNome)
-        });
-    }
+    currentBannerPriority = 0;
     removeGameBanner();
 }
 
@@ -4580,7 +4579,7 @@ function startEliminazioniListener() {
     // Evita listener duplicati
     if (unsubscribeEliminazioni) unsubscribeEliminazioni();
 
-    unsubscribeEliminazioni = db.collection("partite").doc(matchId).collection("eliminazioni").onSnapshot(snap => {
+    unsubscribeEliminazioni = db.collection("partite").doc(matchId).collection("eliminazioni").onSnapshot(async snap => {
         // Aggiorna mappa locale delle proposte pendenti
         pendingEliminazioni.clear();
 
@@ -4592,7 +4591,7 @@ function startEliminazioniListener() {
         });
 
         // Gestisci le modifiche
-        snap.docChanges().forEach(async change => {
+        for (const change of snap.docChanges()) {
             const proposta = change.doc.data();
 
             if (change.type === "added" || change.type === "modified") {
@@ -4616,24 +4615,40 @@ function startEliminazioniListener() {
 
 					// Cerca questo blocco dentro startEliminazioniListener e sostituiscilo:
 					if (!proposta.accettati.includes(mioNome) && !proposta.rifiutati.includes(mioNome)) {
-						 showGameBanner({
-							  icon: '📢',
-							  title: 'VOTAZIONE ELIMINAZIONE',
-							  subtitle: `${proposta.proponente} vuole eliminare "${proposta.parola}" di ${proposta.giocatoreTarget}`,
-							  color: '#e67e22',
-							  buttons: [
-									{ text: '✅ ACCETTA', onclick: `votaEliminazione('${proposta.parola}', true)` },
-									{ text: '❌ RIFIUTA', onclick: `votaEliminazione('${proposta.parola}', false)` }
-							  ]
-						 });
+					     showGameBanner({
+					          icon: '📢',
+					          title: 'VOTAZIONE ELIMINAZIONE',
+					          subtitle: `${proposta.proponente} vuole eliminare "${proposta.parola}" di ${proposta.giocatoreTarget}`,
+					          color: '#e67e22',
+					          priority: 10,
+					          buttons: [
+					                { text: '✅ ACCETTA', onclick: `votaEliminazione('${proposta.parola}', true)` },
+					                { text: '❌ RIFIUTA', onclick: `votaEliminazione('${proposta.parola}', false)` }
+					          ]
+					     });
 					}
             }
-        });
+        }
 
         // ✅ Aggiorna la vista corrente per mostrare/nascondere badge pendenti
         const sel = document.getElementById('sel-analisi');
         if (sel && currentGameData) {
             renderizzaAnalisiPlayerSilent(sel.value, currentGameData, getConteggioGlobale());
+        }
+
+        // ✅ Se non ci sono più proposte da votare, ripristina il banner di stato
+        let hasMyPendingVotes = false;
+        for (const [, prop] of pendingEliminazioni) {
+            if (!prop.accettati.includes(mioNome) && !prop.rifiutati.includes(mioNome)) {
+                hasMyPendingVotes = true;
+                break;
+            }
+        }
+        if (!hasMyPendingVotes && currentBannerPriority >= 10) {
+            currentBannerPriority = 0;
+            if (currentGameData && currentGameData.stato === 'conclusa') {
+                aggiornaFesteggiamentoVincitore(currentGameData);
+            }
         }
     });
 }
@@ -4641,15 +4656,49 @@ function startEliminazioniListener() {
 async function votaEliminazione(parola, accetta) {
     try {
         const campo = accetta ? 'accettati' : 'rifiutati';
+
+        // Aggiornamento ottimistico locale
+        const proposta = pendingEliminazioni.get(parola);
+        if (proposta) {
+            if (accetta) { if (!proposta.accettati.includes(mioNome)) proposta.accettati.push(mioNome); }
+            else { if (!proposta.rifiutati.includes(mioNome)) proposta.rifiutati.push(mioNome); }
+        }
+
         await db.collection("partite").doc(matchId).collection("eliminazioni").doc(parola).update({
             [campo]: firebase.firestore.FieldValue.arrayUnion(mioNome)
         });
-        removeGameBanner(); // Chiude il banner dopo il voto
+
+        currentBannerPriority = 0;
+        removeGameBanner();
+        checkPendingEliminazioni();
     } catch (e) {
         console.error("Errore durante il voto:", e);
     }
 }
-
+function checkPendingEliminazioni() {
+    for (const [parola, proposta] of pendingEliminazioni) {
+        if (proposta.stato === 'pending' &&
+            !proposta.accettati.includes(mioNome) &&
+            !proposta.rifiutati.includes(mioNome)) {
+            showGameBanner({
+                icon: '📢',
+                title: 'VOTAZIONE ELIMINAZIONE',
+                subtitle: `${proposta.proponente} vuole eliminare "${proposta.parola}" di ${proposta.giocatoreTarget}`,
+                color: '#e67e22',
+                priority: 10,
+                buttons: [
+                    { text: '✅ ACCETTA', onclick: `votaEliminazione('${proposta.parola}', true)` },
+                    { text: '❌ RIFIUTA', onclick: `votaEliminazione('${proposta.parola}', false)` }
+                ]
+            });
+            return; // Mostra solo la prima pendente
+        }
+    }
+    // Nessuna proposta pendente: ripristina banner di stato
+    if (currentGameData && currentGameData.stato === 'conclusa') {
+        aggiornaFesteggiamentoVincitore(currentGameData);
+    }
+}
 // ✅ APPLICA ELIMINAZIONE PAROLA (tutti hanno accettato)
 async function applicaEliminazioneParola(parola) {
     if (!currentGameData) return;
@@ -4781,4 +4830,5 @@ async function applicaEliminazioneParola(parola) {
 		</div>
 	</body>
 </html>
+
 
