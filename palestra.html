@@ -1738,12 +1738,17 @@ h += `<div class="sets-grid-header"><span>SET</span><span>REPS</span><span>KG</s
 // ============================================================
 function getMuscleFatigue() {
     const GROUP_EFFORT = {
-        'Gambe':1.0, 'Schiena':1.1, 'Petto':1.4, 'Core':2.5,
-        'Spalle':2.0, 'Tricipiti':2.8, 'Bicipiti':3.2, 'Avambracci':4,
+        'Gambe':1.0, 'Schiena':1.1, 'Petto':1.4, 'Spalle':2.0,
+        'Core':2.5, 'Tricipiti':2.8, 'Bicipiti':3.2, 'Avambracci':4.0,
+    };
+
+    // Soglie di volume "alto" per gruppo (reps × kg × fattore per settimana tipica)
+    const HIGH_VOLUME = {
+        'Gambe':6000, 'Schiena':5500, 'Petto':5000, 'Spalle':3500,
+        'Core':2500, 'Tricipiti':2500, 'Bicipiti':2200, 'Avambracci':1800,
     };
 
     const volume = {};
-    let hasWeights = false;
 
     D.days.forEach(day => {
         day.exs.forEach(ex => {
@@ -1756,33 +1761,22 @@ function getMuscleFatigue() {
                 const r = parseInt(s.r) || 0;
                 const w = parseFloat(s.w) || 0;
                 if (r > 0 && w > 0) {
-                    hasWeights = true;
                     volume[def.group] = (volume[def.group] || 0) + (r * w * factor);
                 } else if (r > 0) {
-                    // Bodyweight o peso non inserito: usa 15kg nominali
-                    volume[def.group] = (volume[def.group] || 0) + (r * 15 * factor);
+                    // Solo reps senza peso: contributo minimo
+                    volume[def.group] = (volume[def.group] || 0) + (r * factor);
+                } else {
+                    // Nessun dato: contributo quasi nullo
+                    volume[def.group] = (volume[def.group] || 0) + factor;
                 }
             });
         });
     });
 
-    // Fallback: se nessun peso è stato inserito, conta solo le serie × fattore
-    if (!hasWeights) {
-        Object.keys(volume).length === 0 && D.days.forEach(day => {
-            day.exs.forEach(ex => {
-                const def = exDef(ex.exerciseId);
-                if (!def || !def.group || def.group === 'Cardio') return;
-                const factor = GROUP_EFFORT[def.group] || 1.0;
-                const n = ex.sd ? ex.sd.length : 0;
-                volume[def.group] = (volume[def.group] || 0) + (n * factor);
-            });
-        });
-    }
-
-    const maxVol = Math.max(...Object.values(volume), 1);
     const fatigue = {};
     Object.keys(volume).forEach(g => {
-        fatigue[g] = Math.min(1, volume[g] / maxVol);
+        const threshold = HIGH_VOLUME[g] || 3000;
+        fatigue[g] = Math.min(1, volume[g] / threshold);
     });
     return fatigue;
 }
@@ -2759,7 +2753,10 @@ function sesCompleteSave() {
 
 function sesShowSummary() {
     const day = gD();
-    const duration = Math.round((Date.now() - sesStartTime) / 60000);
+    const totalSeconds = Math.floor((Date.now() - sesStartTime) / 1000);
+    const mins = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
+    const durationStr = mins + ':' + String(secs).padStart(2, '0');
     const doneSets = day.exs.reduce((a, e) => a + (e.sd ? e.sd.filter(s => s.done).length : 0), 0);
 
     // Se non ancora salvato (chiamato dall'auto-completamento), salva ora
@@ -2782,8 +2779,8 @@ function sesShowSummary() {
     // Genera la griglia di riepilogo (Senza il calcolo del volume)
     document.getElementById('sesSumGrid').innerHTML = `
         <div class="ses-sum-box">
-            <div class="ses-sum-val">⏱️ ${duration || '<1'}</div>
-            <div class="ses-sum-label">Minuti</div>
+            <div class="ses-sum-val">⏱️ ${durationStr}</div>
+            <div class="ses-sum-label">Durata</div>
         </div>
         <div class="ses-sum-box">
             <div class="ses-sum-val">🏋️ ${day.exs.length}</div>
