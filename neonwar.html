@@ -76,6 +76,30 @@
 			display: none; background: rgba(0,0,0,0.8);
 			backdrop-filter: blur(5px);
 			}
+			#fixed-home-btn {
+			position: fixed;
+			bottom: 20px;
+			right: 20px;
+			z-index: 99999;
+			display: block;
+			}
+			#fixed-home-btn button {
+			background: #1e1e1e;
+			color: #fff;
+			border: 2px solid #555;
+			padding: 12px 20px;
+			border-radius: 50px;
+			font-weight: bold;
+			font-size: 0.7rem;
+			cursor: pointer;
+			box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+			transition: all 0.2s ease;
+			font-family: 'Press Start 2P', monospace;
+			}
+			#fixed-home-btn button:hover {
+			transform: scale(1.05);
+			box-shadow: 0 6px 20px rgba(0,0,0,0.7);
+			}
 		</style>
 	</head>
 	<body>
@@ -126,6 +150,9 @@
 				<button class="btn btn-play" onclick="startGame()">RIPROVA</button>
 				<button class="btn btn-shop" onclick="openShop()">NEGOZIO</button>
 			</div>
+		</div>
+		<div id="fixed-home-btn">
+			<button onclick="window.location.href='index.html'">🏠 HOME</button>
 		</div>
 		<canvas id="gameCanvas"></canvas>
 		<script>
@@ -251,6 +278,7 @@
 			    isPaused = true;
 			    document.body.classList.remove('gaming');
 			    document.getElementById('pause-screen').style.display = 'flex';
+				document.getElementById('fixed-home-btn').style.display = 'block';
 			}
 			
 			function resumeGame() {
@@ -258,6 +286,7 @@
 			    isPaused = false;
 			    document.body.classList.add('gaming');
 			    document.getElementById('pause-screen').style.display = 'none';
+				document.getElementById('fixed-home-btn').style.display = 'none';
 			    loop();
 			}
 			
@@ -381,7 +410,7 @@
 			
 			    enemies = []; particles = []; powerups = []; bullets = []; floatingTexts = [];
 			    gameActive = true; isPaused = false;
-			    
+			    document.getElementById('fixed-home-btn').style.display = 'none';
 			    requestAnimationFrame(loop);
 			}
 			
@@ -403,6 +432,7 @@
 				document.getElementById('earnedCoins').innerText = coinsEarned;
 				
 				document.getElementById('game-over-screen').style.display = 'flex';
+				document.getElementById('fixed-home-btn').style.display = 'block';
 				shakeIntensity = 20;
 				draw(); 
 			}
