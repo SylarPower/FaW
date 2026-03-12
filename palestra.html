@@ -1019,11 +1019,6 @@ body.in-session .ctn { padding:0;max-width:100%; }
     <button class="bs" onclick="document.getElementById('mProg').style.display='none'" style="width:100%;margin-top:12px;">Chiudi</button>
 </div>
 </div>
-<!-- MUSCLE MAP TEMPLATE (nascosto) -->
-<div id="muscleMapTpl" style="display:none;">
-<!-- Le due SVG (frontale e posteriore) vanno qui dentro.
-     Vedi istruzioni sotto per le modifiche ai <g> -->
-</div>
 
 <!-- MUSCLE MAP TEMPLATE (nascosto) -->
 <div id="muscleMapTpl" style="display:none;">
@@ -1134,7 +1129,7 @@ const exDef = id => EX_DB.find(e => e.id === id);
 const MUSCLE_COLORS = {
     'Spalle':'#ffa502','Petto':'#ff4757','Schiena':'#3742fa',
     'Core':'#eccc68','Bicipiti':'#ff6b81','Tricipiti':'#e17055',
-    'Avambracci':'#fd79a8','Gambe':'#2ed573','Cardio':'#e74c3c',
+    'Avambracci':'#fd79a8','Gambe':'#2ed573',
 };
 let BPARTS = ['all'];
 
@@ -1227,7 +1222,7 @@ function deduplicateExDB() {
         }
     });
     EX_DB = Object.values(map);
-    const GROUP_ORDER = ['Spalle','Petto','Schiena','Core','Bicipiti','Tricipiti','Avambracci','Gambe','Cardio'];
+    const GROUP_ORDER = ['Spalle','Petto','Tricipiti','Avambracci','Core','Schiena','Bicipiti','Gambe','Cardio'];
     const allGroups = [...new Set(EX_DB.map(e => e.group))];
     const ordered = GROUP_ORDER.filter(g => allGroups.includes(g));
     allGroups.forEach(g => { if (!ordered.includes(g) && g !== 'Altro') ordered.push(g); });
