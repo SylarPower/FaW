@@ -528,6 +528,24 @@ body.in-session .ctn { padding:0;max-width:100%; }
 .ses-media video {
     width:100%;border-radius:12px;background:#000;max-height:240px;
 }
+.ses-video-box {
+    border-radius:14px;overflow:hidden;border:1px solid var(--brd);
+    background:#000;position:relative;
+}
+.ses-video-box video {
+    width:100%;display:block;border-radius:14px;max-height:220px;
+}
+.ses-video-scroll {
+    display:flex;gap:8px;overflow-x:auto;scroll-snap-type:x mandatory;
+    -webkit-overflow-scrolling:touch;
+}
+.ses-video-scroll::-webkit-scrollbar { display:none; }
+.ses-video-scroll .ses-video-box {
+    min-width:100%;scroll-snap-align:center;flex-shrink:0;
+}
+.ses-video-hint {
+    text-align:center;padding:4px;color:var(--tx3);font-size:.6rem;margin-top:4px;
+}
 
 /* Dots dei set */
 .ses-set-dots {
@@ -853,11 +871,6 @@ body.in-session .ctn { padding:0;max-width:100%; }
         <div class="ses-ex-name" id="sesExName">—</div>
         <div class="ses-ex-detail" id="sesExDetail">—</div>
 
-        <!-- Video button -->
-        <div id="sesMediaBtn"></div>
-        <!-- Media container -->
-        <div class="ses-media" id="sesMedia"></div>
-
         <!-- Dots dei set -->
         <div class="ses-set-dots" id="sesSetDots"></div>
 
@@ -894,6 +907,9 @@ body.in-session .ctn { padding:0;max-width:100%; }
                 <span>FATTO</span>
             </button>
         </div>
+
+        <!-- Video sotto il pulsante fatto -->
+        <div id="sesVideoArea" style="width:100%;max-width:380px;margin-top:16px;"></div>
     </div>
 
 	<!-- Navigazione esercizi -->
@@ -2343,6 +2359,8 @@ function sesClose() {
 function sesRender() {
     const day = gD();
     if (!day) return;
+    // Ferma tutti i video del precedente esercizio
+    document.querySelectorAll('#sesVideoArea video').forEach(v => v.pause());
     const exs = day.exs;
     const ex = exs[sesExIdx];
     if (!ex) return;
@@ -2368,26 +2386,28 @@ function sesRender() {
     document.getElementById('sesExName').textContent = ex.name;
     document.getElementById('sesExDetail').textContent = def ? (def.group + ' • ' + def.eq) : '';
 
-    // Media button
-    const mediaBtn = document.getElementById('sesMediaBtn');
-    if (def && def.media && def.media.length) {
-        mediaBtn.innerHTML = `<button class="tb" onclick="sesToggleMedia()" style="margin:10px 0;font-size:.75rem;">🎬 Video</button>`;
-    } else {
-        mediaBtn.innerHTML = '';
+    // Video area (sotto il pulsante fatto)
+    const videoArea = document.getElementById('sesVideoArea');
+    if (videoArea) {
+        if (def && def.media && def.media.length) {
+            const multi = def.media.length > 1;
+            videoArea.innerHTML = `
+                <div class="ses-video-scroll">
+                    ${def.media.map(url =>
+                        `<div class="ses-video-box">
+                            <video loop muted playsinline preload="metadata"
+                                poster="" onclick="sesToggleVideo(this)">
+                                <source src="${url}" type="video/mp4">
+                            </video>
+                        </div>`
+                    ).join('')}
+                </div>
+                ${multi ? '<div class="ses-video-hint">⟵ Scorri per altre angolazioni ⟶</div>' : ''}
+            `;
+        } else {
+            videoArea.innerHTML = '';
+        }
     }
-
-    // Media content
-    const mediaBox = document.getElementById('sesMedia');
-    if (def && def.media && def.media.length) {
-        mediaBox.innerHTML = def.media.map(url =>
-            `<video loop muted playsinline controls preload="none" style="width:100%;border-radius:12px;background:#000;">
-                <source src="${url}" type="video/mp4">
-            </video>`
-        ).join('');
-    } else {
-        mediaBox.innerHTML = '';
-    }
-    mediaBox.classList.remove('open');
 
     // Set dots
     const dotsEl = document.getElementById('sesSetDots');
@@ -2511,21 +2531,23 @@ function sesNextEx() {
         sesRender();
     }
 }
+function sesToggleVideo(videoEl) {
+    if (videoEl.paused) {
+        // Pausa tutti gli altri video nella sessione
+        document.querySelectorAll('#sesVideoArea video').forEach(v => {
+            if (v !== videoEl) v.pause();
+        });
+        videoEl.play().catch(() => {});
+    } else {
+        videoEl.pause();
+    }
+}
 function sesAdj(inputId, delta) {
     const el = document.getElementById(inputId);
     let val = parseFloat(el.value) || 0;
     val = Math.max(0, val + delta);
     el.value = val % 1 === 0 ? parseInt(val) : parseFloat(val.toFixed(1));
     if (navigator.vibrate) navigator.vibrate(10);
-}
-// ===== Media =====
-function sesToggleMedia() {
-    const box = document.getElementById('sesMedia');
-    const isOpen = box.classList.toggle('open');
-    box.querySelectorAll('video').forEach(v => {
-        if (isOpen) v.play().catch(() => {});
-        else v.pause();
-    });
 }
 
 // ===== Termina sessione =====
