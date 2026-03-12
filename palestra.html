@@ -1760,13 +1760,10 @@ function getMuscleFatigue() {
             ex.sd.forEach(s => {
                 const r = parseInt(s.r) || 0;
                 const w = parseFloat(s.w) || 0;
-                if (r > 0 && w > 0) {
-                    volume[def.group] = (volume[def.group] || 0) + (r * w * factor);
-                } else if (r > 0) {
-                    // Solo reps senza peso: contributo minimo
-                    volume[def.group] = (volume[def.group] || 0) + (r * factor);
+                const effectiveW = w > 0 ? w : (r > 0 ? 8 : 0);
+                if (r > 0) {
+                    volume[def.group] = (volume[def.group] || 0) + (r * effectiveW * factor);
                 } else {
-                    // Nessun dato: contributo quasi nullo
                     volume[def.group] = (volume[def.group] || 0) + factor;
                 }
             });
@@ -2304,13 +2301,11 @@ function closeSel() {
 }
 
 function fuzzyMatch(text, query) {
-    text = text.toLowerCase(); query = query.toLowerCase();
-    let ti = 0, qi = 0;
-    while (ti < text.length && qi < query.length) {
-        if (text[ti] === query[qi]) qi++;
-        ti++;
-    }
-    return qi === query.length;
+    text = text.toLowerCase();
+    query = query.toLowerCase().trim();
+    // Splitta la query in parole e verifica che ogni parola sia contenuta nel testo
+    const words = query.split(/\s+/);
+    return words.every(w => text.includes(w));
 }
 
 function filEx() {
