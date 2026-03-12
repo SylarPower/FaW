@@ -572,7 +572,7 @@ body.in-session .ctn { padding:0;max-width:100%; }
     display:flex;gap:12px;align-items:center;justify-content:center;
 }
 .ses-input-group {
-    flex:1;max-width:140px;text-align:center;
+    flex:1;max-width:210px;text-align:center;
 }
 .ses-input-group label {
     display:block;font-size:.65rem;font-weight:700;
@@ -592,6 +592,17 @@ body.in-session .ctn { padding:0;max-width:100%; }
     font-size:1.4rem;color:var(--tx3);font-weight:300;
     padding-bottom:20px;
 }
+.ses-adj-row {
+    display:flex;gap:6px;align-items:center;
+}
+.ses-adj-btn {
+    width:48px;height:58px;border-radius:14px;border:2px solid var(--brd);
+    background:var(--c2);color:var(--acc);font-size:1.5rem;font-weight:800;
+    display:flex;align-items:center;justify-content:center;
+    cursor:pointer;padding:0;transition:all .15s;flex-shrink:0;
+    min-height:48px;user-select:none;-webkit-user-select:none;
+}
+.ses-adj-btn:active { background:var(--acc);color:#000;transform:scale(.9);border-color:var(--acc); }
 
 /* Check button */
 .ses-check-btn {
@@ -780,12 +791,20 @@ body.in-session .ctn { padding:0;max-width:100%; }
             <div class="ses-set-label" id="sesSetLabel">SET 1</div>
             <div class="ses-inputs">
                 <div class="ses-input-group">
-                    <input type="number" inputmode="numeric" id="sesReps" class="ses-input" placeholder="0">
+                    <div class="ses-adj-row">
+                        <button class="ses-adj-btn" onclick="sesAdj('sesReps',-1)">−</button>
+                        <input type="number" inputmode="numeric" id="sesReps" class="ses-input" placeholder="0">
+                        <button class="ses-adj-btn" onclick="sesAdj('sesReps',1)">+</button>
+                    </div>
                     <label>REPS</label>
                 </div>
                 <div class="ses-input-sep">×</div>
                 <div class="ses-input-group">
-                    <input type="number" inputmode="decimal" id="sesKg" class="ses-input" placeholder="0">
+                    <div class="ses-adj-row">
+                        <button class="ses-adj-btn" onclick="sesAdj('sesKg',-2.5)">−</button>
+                        <input type="number" inputmode="decimal" id="sesKg" class="ses-input" placeholder="0">
+                        <button class="ses-adj-btn" onclick="sesAdj('sesKg',2.5)">+</button>
+                    </div>
                     <label>KG</label>
                 </div>
             </div>
@@ -993,7 +1012,100 @@ let myExChart = null;
 const uid = () => Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
 const exDef = id => EX_DB.find(e => e.id === id);
 
-const BPARTS = ['all','back','cardio','chest','lower arms','lower legs','neck','shoulders','upper arms','upper legs','waist'];
+let BPARTS = ['all'];
+
+const MUSCLE_GROUP_MAP = {
+    // Bicipiti
+    'bicipiti':'Bicipiti',
+    'capo lungo del bicipite':'Bicipiti',
+    'capo breve del bicipite':'Bicipiti',
+
+    // Tricipiti
+    'tricipiti':'Tricipiti',
+    'capo laterale del tricipite':'Tricipiti',
+    'capo mediale del tricipite':'Tricipiti',
+    'capo lungo del tricipite':'Tricipiti',
+
+    // Avambracci
+    'avambracci':'Avambracci',
+    'estensori del polso':'Avambracci',
+    'flessori del polso':'Avambracci',
+    'mani':'Avambracci',
+
+    // Schiena
+    'dorsali':'Schiena',
+    'muscoli trapezi (zona media della schiena)':'Schiena',
+    'zona lombare':'Schiena',
+    'trapezi inferiori':'Schiena',
+    'trapezio superiore':'Schiena',
+    'trappole':'Schiena',
+    'schiena':'Schiena',
+
+    // Spalle
+    'spalle':'Spalle',
+    'deltoide posteriore':'Spalle',
+    'deltoidi posteriori':'Spalle',
+    'deltoide laterale':'Spalle',
+    'deltoide anteriore':'Spalle',
+    'spalle anteriori':'Spalle',
+
+    // Petto
+    'petto':'Petto',
+    'pettorale superiore':'Petto',
+    'petto medio e inferiore':'Petto',
+
+    // Gambe
+    'glutei':'Gambe',
+    'gluteo medio':'Gambe',
+    'grande gluteo':'Gambe',
+    'quadricipiti':'Gambe',
+    'retto femorale':'Gambe',
+    'vasto laterale':'Gambe',
+    'interno del quadricipite':'Gambe',
+    'femorali':'Gambe',
+    'bicipiti femorali laterali':'Gambe',
+    'muscoli posteriori della coscia (porzione mediale)':'Gambe',
+    'polpacci':'Gambe',
+    'polpaccio':'Gambe',
+    'soleo':'Gambe',
+    'tibiale':'Gambe',
+    'interno coscia':'Gambe',
+    'inguine':'Gambe',
+
+    // Core
+    'addominali':'Core',
+    'addominali inferiori':'Core',
+    'addominali superiori':'Core',
+    'obliqui':'Core',
+
+    // Cardio
+    'cardio':'Cardio',
+};
+
+function getMuscleGroup(muscle) {
+    if (!muscle) return 'Altro';
+    return MUSCLE_GROUP_MAP[muscle.toLowerCase()] || muscle;
+}
+
+function deduplicateExDB() {
+    const map = {};
+    EX_DB.forEach(e => {
+        if (!map[e.id]) {
+            map[e.id] = {
+                ...e,
+                muscles: e.muscle ? [e.muscle] : [],
+                group: getMuscleGroup(e.muscle)
+            };
+        } else {
+            if (e.muscle && !map[e.id].muscles.includes(e.muscle)) {
+                map[e.id].muscles.push(e.muscle);
+            }
+        }
+    });
+    EX_DB = Object.values(map);
+    const allGroups = [...new Set(EX_DB.map(e => e.group))].sort();
+    BPARTS = ['all', ...allGroups];
+}
 
 // ============================================================
 // 🗄️ LOAD EXERCISE DB
@@ -1003,16 +1115,18 @@ async function loadExDB() {
         const r = await fetch('./exercises.json', { cache: "no-cache" });
         if (!r.ok) throw new Error('404');
         EX_DB = await r.json();
-        console.log('✅ Archivio: ' + EX_DB.length + ' esercizi');
+        deduplicateExDB();
+        console.log('✅ Archivio: ' + EX_DB.length + ' esercizi (deduplicati)');
     } catch(e) {
         console.warn("Fallback locale per exercises.json");
         EX_DB = [
-            {id:"panca_piana",name:"Panca Piana",bp:"Chest",eq:"Barbell",video:"panca.mp4"},
-            {id:"squat",name:"Squat",bp:"Upper Legs",eq:"Barbell",video:"squat.mp4"},
-            {id:"stacco",name:"Stacco da Terra",bp:"Back",eq:"Barbell"},
-            {id:"military_press",name:"Military Press",bp:"Shoulders",eq:"Barbell"},
-            {id:"curl_bilanciere",name:"Curl Bilanciere",bp:"Upper Arms",eq:"Barbell"},
+            {id:"panca_piana",name:"Panca Piana",muscle:"Petto",eq:"Bilanciere"},
+            {id:"squat",name:"Squat",muscle:"Quadricipiti",eq:"Bilanciere"},
+            {id:"stacco",name:"Stacco da Terra",muscle:"Schiena",eq:"Bilanciere"},
+            {id:"military_press",name:"Military Press",muscle:"Spalle",eq:"Bilanciere"},
+            {id:"curl_bilanciere",name:"Curl Bilanciere",muscle:"Bicipiti",eq:"Bilanciere"},
         ];
+        deduplicateExDB();
     }
 }
 
@@ -1217,7 +1331,7 @@ function renDay() {
     // Muscle overview
     const muscles = [...new Set(day.exs.map(e => {
         const d = exDef(e.exerciseId);
-        return d ? d.bp : null;
+        return d ? d.group : null;
     }).filter(Boolean))];
 
     let h = `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;" class="fade-in">
@@ -1254,7 +1368,7 @@ function renDay() {
 // ============================================================
 function renEC(ex) {
     const d = exDef(ex.exerciseId);
-    const mColor = d ? getMuscleColor(d.bp) : 'var(--acc)';
+    const mColor = d ? getMuscleColor(d.group) : 'var(--acc)';
     const safeName = (ex.name || '').replace(/'/g, "\\'");
     const hasMedia = d && d.media && d.media.length > 0;
 
@@ -1271,7 +1385,7 @@ function renEC(ex) {
     h += `<div class="ex-header" onclick="togEx('${ex.uid}')" style="cursor:pointer;">
         <div class="ex-info">
             <h4 style="margin:0;font-size:1.05rem;">${ex.name}</h4>
-            <small>${d ? d.bp : ''}</small>
+            <small>${d ? d.group : ''}</small>
         </div>
         <div style="display:flex;align-items:center;gap:8px;">
             <span class="ex-summary-badge ${allDone ? 'done-badge' : 'todo-badge'}">
@@ -1305,11 +1419,11 @@ function renEC(ex) {
     // Media (video)
     h += buildMediaBox(ex.uid, d);
 
-    // Target muscoli
-    if (d && d.tgt && Array.isArray(d.tgt) && d.tgt.length > 0) {
+    // Muscoli coinvolti
+    if (d && d.muscles && d.muscles.length > 1) {
         h += `<div style="display:flex;gap:4px;flex-wrap:wrap;padding:4px 0 8px;">`;
-        d.tgt.forEach(t => {
-            h += `<span style="padding:3px 8px;border-radius:12px;font-size:.62rem;background:rgba(3,218,198,.1);color:var(--acc);border:1px solid rgba(3,218,198,.2);">${t.replace(/_/g,' ')}</span>`;
+        d.muscles.forEach(m => {
+            h += `<span style="padding:3px 8px;border-radius:12px;font-size:.62rem;background:rgba(3,218,198,.1);color:var(--acc);border:1px solid rgba(3,218,198,.2);">${m}</span>`;
         });
         h += `</div>`;
     }
@@ -1343,14 +1457,15 @@ h += `<div class="sets-grid-header"><span>SET</span><span>REPS</span><span>KG</s
 // ============================================================
 // 🎨 HELPERS
 // ============================================================
-function getMuscleColor(bp) {
+function getMuscleColor(muscle) {
     const map = {
-        'Chest':'#ff4757','Back':'#3742fa','Shoulders':'#ffa502',
-        'Upper Arms':'#ff6b81','Upper Legs':'#2ed573','Lower Legs':'#7bed9f',
-        'Waist':'#eccc68','Cardio':'#e74c3c','Neck':'#a29bfe',
-        'Lower Arms':'#fd79a8'
+        'Petto':'#ff4757','Schiena':'#3742fa','Spalle':'#ffa502',
+        'Bicipiti':'#ff6b81','Tricipiti':'#e17055','Quadricipiti':'#2ed573',
+        'Glutei':'#a29bfe','Polpacci':'#7bed9f','Addominali':'#eccc68',
+        'Cardio':'#e74c3c','Avambracci':'#fd79a8','Dorsali':'#3742fa',
+        'Trapezio':'#ffa502','Femorali':'#00b894',
     };
-    return map[bp] || '#03dac6';
+    return map[muscle] || '#03dac6';
 }
 
 function buildMediaBox(exUid, def) {
@@ -1642,14 +1757,8 @@ function remSet(u, i) {
 // ============================================================
 function openSel() {
     document.getElementById('mSel').style.display = 'flex';
-		const chipLabels = {
-			 'all':'🏷️ Tutti','back':'🔙 Schiena','cardio':'❤️ Cardio',
-			 'chest':'🫁 Petto','lower arms':'💪 Avambr.','lower legs':'🦵 Polp.',
-			 'neck':'🦒 Collo','shoulders':'🤷 Spalle','upper arms':'💪 Braccia',
-			 'upper legs':'🦵 Gambe','waist':'🎯 Core'
-		};
 		document.getElementById('mChips').innerHTML = BPARTS.map(m =>
-			 `<span class="mch${mf===m?' on':''}" onclick="mf='${m}';openSel();">${chipLabels[m] || m}</span>`
+			 `<span class="mch${mf===m?' on':''}" onclick="mf='${m}';openSel();">${m === 'all' ? '🏷️ Tutti' : m}</span>`
 		).join('');
     filEx();
     setTimeout(() => document.getElementById('exQ').focus(), 350);
@@ -1674,15 +1783,15 @@ function fuzzyMatch(text, query) {
 function filEx() {
     const q = document.getElementById('exQ').value.toLowerCase();
     let res = EX_DB;
-    if (mf !== 'all') res = res.filter(e => (e.bp || '').toLowerCase() === mf);
-    if (q) res = res.filter(e => fuzzyMatch([e.name, e.bp, e.eq, e.tgt || ''].join(' '), q));
+    if (mf !== 'all') res = res.filter(e => e.group === mf);
+    if (q) res = res.filter(e => fuzzyMatch([e.name, e.muscles ? e.muscles.join(' ') : '', e.eq].join(' '), q));
 
     document.getElementById('exR').innerHTML = res.length
         ? res.slice(0, 50).map(e => `
         <div class="exo" onclick="addEx('${e.id}')">
             <div style="flex:1">
                 <div class="on">${e.name}</div>
-                <div class="om">${e.bp} • ${e.eq}</div>
+                <div class="om">${e.group} • ${e.eq}${e.muscles.length > 1 ? ' • ' + e.muscles.join(', ') : ''}</div>
             </div>
             <span style="color:var(--acc);font-weight:bold;font-size:.82rem;">+ Aggiungi</span>
         </div>`).join('')
@@ -1884,7 +1993,7 @@ function sesRender() {
 
     // Nome esercizio
     document.getElementById('sesExName').textContent = ex.name;
-    document.getElementById('sesExDetail').textContent = def ? (def.bp + ' • ' + def.eq) : '';
+    document.getElementById('sesExDetail').textContent = def ? (def.group + ' • ' + def.eq) : '';
 
     // Media button
     const mediaBtn = document.getElementById('sesMediaBtn');
@@ -2029,7 +2138,13 @@ function sesNextEx() {
         sesRender();
     }
 }
-
+function sesAdj(inputId, delta) {
+    const el = document.getElementById(inputId);
+    let val = parseFloat(el.value) || 0;
+    val = Math.max(0, val + delta);
+    el.value = val % 1 === 0 ? parseInt(val) : parseFloat(val.toFixed(1));
+    if (navigator.vibrate) navigator.vibrate(10);
+}
 // ===== Media =====
 function sesToggleMedia() {
     const box = document.getElementById('sesMedia');
