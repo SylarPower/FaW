@@ -1323,7 +1323,7 @@ function getWeeklyData() {
         day.exs.forEach(ex => {
             totalExercises++;
             const def = exDef(ex.exerciseId);
-            if (def && def.group) allGroups.add(def.group);
+            if (def && def.group && def.group !== 'Cardio') allGroups.add(def.group);
         });
     });
 
@@ -1353,6 +1353,7 @@ function getWeeklyData() {
 
 function renderWeeklyOverview() {
     const wd = getWeeklyData();
+    const fatigue = getMuscleFatigue();
 
     // Stats
     document.getElementById('wkDays').textContent = wd.totalDays;
@@ -1395,19 +1396,27 @@ function renderWeeklyOverview() {
         }
     }
 
-    // Muscle map
-    renderMuscleMap('weeklyMuscleMap', wd.allGroups, 220);
+    // Muscle map con gradiente affaticamento
+    renderMuscleMap('weeklyMuscleMap', fatigue, 220);
 
-    // Legend
+    // Legend con scala affaticamento
     const legendEl = document.getElementById('mmLegend');
     if (legendEl) {
-        if (wd.allGroups.length > 0) {
-            legendEl.innerHTML = wd.allGroups.map(g =>
+        const sortedGroups = Object.entries(fatigue).sort((a, b) => b[1] - a[1]);
+        if (sortedGroups.length > 0) {
+            let legendHTML = `<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;width:100%;justify-content:center;">
+                <span style="font-size:.6rem;color:var(--tx3);">Basso</span>
+                <div style="height:8px;width:100px;border-radius:4px;
+                    background:linear-gradient(90deg,hsl(48,85%,58%),hsl(24,90%,52%),hsl(0,95%,48%));"></div>
+                <span style="font-size:.6rem;color:var(--tx3);">Alto</span>
+            </div>`;
+            legendHTML += sortedGroups.map(([g, ratio]) =>
                 `<div class="mm-legend-item">
-                    <div class="mm-legend-dot" style="background:${MUSCLE_COLORS[g] || '#03dac6'}"></div>
+                    <div class="mm-legend-dot" style="background:${fatigueColor(ratio)}"></div>
                     <span>${g}</span>
                 </div>`
             ).join('');
+            legendEl.innerHTML = legendHTML;
         } else {
             legendEl.innerHTML = '';
         }
@@ -1584,13 +1593,16 @@ function renDay() {
 
     // Render mini muscle maps per esercizi aperti
     if (day) {
+        const fatigue = getMuscleFatigue();
         day.exs.forEach(ex => {
             if (!openExercises.has(ex.uid)) return;
             const mmEl = document.getElementById('exmm-' + ex.uid);
             if (!mmEl || mmEl.hasChildNodes()) return;
             const def = exDef(ex.exerciseId);
-            if (!def || !def.group) return;
-            renderMuscleMap(mmEl, [def.group], 100);
+            if (!def || !def.group || def.group === 'Cardio') return;
+            const exFatigue = {};
+            exFatigue[def.group] = fatigue[def.group] || 0.5;
+            renderMuscleMap(mmEl, exFatigue, 100);
         });
     }
 }
@@ -1692,7 +1704,33 @@ h += `<div class="sets-grid-header"><span>SET</span><span>REPS</span><span>KG</s
 // ============================================================
 // 🎨 HELPERS
 // ============================================================
-function renderMuscleMap(container, activeGroups, height) {
+function getMuscleFatigue() {
+    const sets = {};
+    D.days.forEach(day => {
+        day.exs.forEach(ex => {
+            const def = exDef(ex.exerciseId);
+            if (!def || !def.group || def.group === 'Cardio') return;
+            const n = ex.sd ? ex.sd.length : 0;
+            sets[def.group] = (sets[def.group] || 0) + n;
+        });
+    });
+    const maxSets = Math.max(...Object.values(sets), 1);
+    const fatigue = {};
+    Object.keys(sets).forEach(g => {
+        fatigue[g] = sets[g] / maxSets;
+    });
+    return fatigue;
+}
+
+function fatigueColor(ratio) {
+    // 0 = giallo (hue 48), 1 = rosso (hue 0)
+    const hue = Math.round(48 * (1 - ratio));
+    const sat = 85 + Math.round(10 * ratio);
+    const lum = 58 - Math.round(10 * ratio);
+    return 'hsl(' + hue + ',' + sat + '%,' + lum + '%)';
+}
+
+function renderMuscleMap(container, fatigueMap, height) {
     const tpl = document.getElementById('muscleMapTpl');
     if (!tpl) { console.warn('MM: template non trovato'); return; }
     const svgs = tpl.querySelectorAll('svg.mm-svg');
@@ -1719,12 +1757,14 @@ function renderMuscleMap(container, activeGroups, height) {
 
         svg.querySelectorAll('[data-group]').forEach(g => {
             const group = g.getAttribute('data-group');
-            if (activeGroups.includes(group)) {
-                const c = MUSCLE_COLORS[group] || '#03dac6';
+            const ratio = fatigueMap[group];
+            if (ratio !== undefined && ratio > 0) {
+                const c = fatigueColor(ratio);
                 g.setAttribute('fill', c);
-                g.style.filter = 'drop-shadow(0 0 6px ' + c + '80)';
+                g.style.filter = 'drop-shadow(0 0 ' + (4 + ratio * 6) + 'px ' + c + ')';
             } else {
                 g.setAttribute('fill', inactiveColor);
+                g.style.filter = 'none';
             }
         });
 
@@ -1854,7 +1894,12 @@ function togEx(uid) {
             const ex = fEx(uid);
             if (ex) {
                 const def = exDef(ex.exerciseId);
-                if (def && def.group) renderMuscleMap(mmEl, [def.group], 100);
+                if (def && def.group && def.group !== 'Cardio') {
+                    const fatigue = getMuscleFatigue();
+                    const exFatigue = {};
+                    exFatigue[def.group] = fatigue[def.group] || 0.5;
+                    renderMuscleMap(mmEl, exFatigue, 100);
+                }
             }
         }
     } else {
@@ -2592,7 +2637,10 @@ function toggleTheme() {
     localStorage.setItem('gym-theme', next);
     document.getElementById('thBtn').textContent = next === 'dark' ? '🌙' : '☀️';
     // Rigenera muscle map con i colori del nuovo tema
-    if (D) { try { renderWeeklyOverview(); } catch(e) {} }
+    if (D) {
+        try { renderWeeklyOverview(); } catch(e) {}
+        if (curDay) { try { renDay(); } catch(e) {} }
+    }
 }
 (function() {
     const t = localStorage.getItem('gym-theme') || 'dark';
