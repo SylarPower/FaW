@@ -572,7 +572,7 @@ body.in-session .ctn { padding:0;max-width:100%; }
     display:flex;gap:12px;align-items:center;justify-content:center;
 }
 .ses-input-group {
-    flex:1;max-width:210px;text-align:center;
+    flex:1;max-width:240px;text-align:center;
 }
 .ses-input-group label {
     display:block;font-size:.65rem;font-weight:700;
@@ -580,27 +580,29 @@ body.in-session .ctn { padding:0;max-width:100%; }
     letter-spacing:1px;margin-top:6px;
 }
 .ses-input {
-    width:100%;padding:18px 8px;text-align:center;
+    width:100%;padding:14px 4px;text-align:center;
     border-radius:16px;border:2px solid var(--brd);
     background:var(--c2);color:var(--tx);
-    font-size:2rem;font-weight:800;
+    font-size:1.5rem;font-weight:800;
     font-family:'SF Mono',Menlo,monospace;
     transition:border-color .2s;
+    font-variant-numeric:tabular-nums;
 }
 .ses-input:focus { border-color:var(--acc); }
 .ses-input-sep {
-    font-size:1.4rem;color:var(--tx3);font-weight:300;
-    padding-bottom:20px;
+    font-size:1.2rem;color:var(--tx3);font-weight:300;
+    padding-bottom:20px;flex-shrink:0;
 }
+@media(max-width:360px) { .ses-input-sep { display:none; } }
 .ses-adj-row {
     display:flex;gap:6px;align-items:center;
 }
 .ses-adj-btn {
-    width:48px;height:58px;border-radius:14px;border:2px solid var(--brd);
-    background:var(--c2);color:var(--acc);font-size:1.5rem;font-weight:800;
+    width:40px;height:52px;border-radius:12px;border:2px solid var(--brd);
+    background:var(--c2);color:var(--acc);font-size:1.3rem;font-weight:800;
     display:flex;align-items:center;justify-content:center;
     cursor:pointer;padding:0;transition:all .15s;flex-shrink:0;
-    min-height:48px;user-select:none;-webkit-user-select:none;
+    min-height:40px;user-select:none;-webkit-user-select:none;
 }
 .ses-adj-btn:active { background:var(--acc);color:#000;transform:scale(.9);border-color:var(--acc); }
 
@@ -1705,19 +1707,52 @@ h += `<div class="sets-grid-header"><span>SET</span><span>REPS</span><span>KG</s
 // 🎨 HELPERS
 // ============================================================
 function getMuscleFatigue() {
-    const sets = {};
+    const GROUP_EFFORT = {
+        'Gambe':1.0, 'Schiena':1.1, 'Petto':1.4, 'Core':2.5,
+        'Spalle':2.0, 'Tricipiti':2.8, 'Bicipiti':3.2, 'Avambracci':4,
+    };
+
+    const volume = {};
+    let hasWeights = false;
+
     D.days.forEach(day => {
         day.exs.forEach(ex => {
             const def = exDef(ex.exerciseId);
             if (!def || !def.group || def.group === 'Cardio') return;
-            const n = ex.sd ? ex.sd.length : 0;
-            sets[def.group] = (sets[def.group] || 0) + n;
+            const factor = GROUP_EFFORT[def.group] || 1.0;
+            if (!ex.sd) return;
+
+            ex.sd.forEach(s => {
+                const r = parseInt(s.r) || 0;
+                const w = parseFloat(s.w) || 0;
+                if (r > 0 && w > 0) {
+                    hasWeights = true;
+                    volume[def.group] = (volume[def.group] || 0) + (r * w * factor);
+                } else if (r > 0) {
+                    // Bodyweight o peso non inserito: usa 15kg nominali
+                    volume[def.group] = (volume[def.group] || 0) + (r * 15 * factor);
+                }
+            });
         });
     });
-    const maxSets = Math.max(...Object.values(sets), 1);
+
+    // Fallback: se nessun peso è stato inserito, conta solo le serie × fattore
+    if (!hasWeights) {
+        Object.keys(volume).length === 0 && D.days.forEach(day => {
+            day.exs.forEach(ex => {
+                const def = exDef(ex.exerciseId);
+                if (!def || !def.group || def.group === 'Cardio') return;
+                const factor = GROUP_EFFORT[def.group] || 1.0;
+                const n = ex.sd ? ex.sd.length : 0;
+                volume[def.group] = (volume[def.group] || 0) + (n * factor);
+            });
+        });
+    }
+
+    const maxVol = Math.max(...Object.values(volume), 1);
     const fatigue = {};
-    Object.keys(sets).forEach(g => {
-        fatigue[g] = sets[g] / maxSets;
+    Object.keys(volume).forEach(g => {
+        fatigue[g] = Math.min(1, volume[g] / maxVol);
     });
     return fatigue;
 }
