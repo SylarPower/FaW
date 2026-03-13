@@ -1270,7 +1270,24 @@ function deduplicateExDB() {
     });
 
     EX_DB = Object.values(map);
-    EX_DB.forEach(e => { if (!e.group) e.group = 'Altro'; });
+    EX_DB.forEach(e => {
+        if (e.eq && e.eq.toLowerCase() === 'cardio') {
+            e.groups = ['Cardio'];
+            // Aggiungi anche i gruppi muscolari coinvolti
+            if (e.muscles) {
+                e.muscles.forEach(m => {
+                    const g = getMuscleGroup(m);
+                    if (g && g !== 'Altro' && !e.groups.includes(g)) {
+                        e.groups.push(g);
+                    }
+                });
+            }
+            e.group = 'Cardio';
+        } else {
+            e.group = e.group || 'Altro';
+            e.groups = [e.group];
+        }
+    });
 
     const GROUP_ORDER = ['Spalle','Petto','Bicipiti','Tricipiti','Avambracci','Schiena','Core','Gambe','Cardio'];
     const allGroups = [...new Set(EX_DB.map(e => e.group))];
@@ -2384,7 +2401,7 @@ function fuzzyMatch(text, query) {
 function filEx() {
     const q = document.getElementById('exQ').value.toLowerCase();
     let res = EX_DB;
-    if (mf !== 'all') res = res.filter(e => e.group === mf);
+    if (mf !== 'all') res = res.filter(e => e.groups && e.groups.includes(mf));
     if (q) res = res.filter(e => fuzzyMatch([e.name, e.muscles ? e.muscles.join(' ') : '', e.eq].join(' '), q));
 
     res.sort((a, b) => a.name.localeCompare(b.name, 'it'));
