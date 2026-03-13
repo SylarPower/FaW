@@ -1269,7 +1269,7 @@ function deduplicateExDB() {
         }
     });
     EX_DB = Object.values(map);
-    const GROUP_ORDER = ['Spalle','Petto','Tricipiti','Avambracci','Core','Schiena','Bicipiti','Gambe','Cardio'];
+    const GROUP_ORDER = ['Spalle','Petto','Tricipiti','Bicipiti','Avambracci','Core','Schiena','Gambe','Cardio'];
     const allGroups = [...new Set(EX_DB.map(e => e.group))];
     const ordered = GROUP_ORDER.filter(g => allGroups.includes(g));
     allGroups.forEach(g => { if (!ordered.includes(g) && g !== 'Altro') ordered.push(g); });
