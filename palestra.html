@@ -1268,7 +1268,9 @@ function deduplicateExDB() {
             }
         }
     });
+    // Assicura che ogni esercizio abbia un gruppo valido
     EX_DB = Object.values(map);
+    EX_DB.forEach(e => { if (!e.group) e.group = 'Altro'; });
     const GROUP_ORDER = ['Spalle','Petto','Tricipiti','Bicipiti','Avambracci','Core','Schiena','Gambe','Cardio'];
     const allGroups = [...new Set(EX_DB.map(e => e.group))];
     const ordered = GROUP_ORDER.filter(g => allGroups.includes(g));
@@ -2381,6 +2383,7 @@ function filEx() {
     if (mf !== 'all') res = res.filter(e => e.group === mf);
     if (q) res = res.filter(e => fuzzyMatch([e.name, e.muscles ? e.muscles.join(' ') : '', e.eq].join(' '), q));
 
+    res.sort((a, b) => a.name.localeCompare(b.name, 'it'));
     document.getElementById('exR').innerHTML = res.length
         ? res.slice(0, 50).map(e => `
         <div class="exo" onclick="addEx('${e.id}')">
