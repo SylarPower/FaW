@@ -1271,22 +1271,21 @@ function deduplicateExDB() {
 
     EX_DB = Object.values(map);
     EX_DB.forEach(e => {
+        // Costruisci tutti i gruppi muscolari coinvolti
+        const allGroups = new Set();
+        if (e.muscles) {
+            e.muscles.forEach(m => {
+                const g = getMuscleGroup(m);
+                if (g && g !== 'Altro') allGroups.add(g);
+            });
+        }
         if (e.eq && e.eq.toLowerCase() === 'cardio') {
-            e.groups = ['Cardio'];
-            // Aggiungi anche i gruppi muscolari coinvolti
-            if (e.muscles) {
-                e.muscles.forEach(m => {
-                    const g = getMuscleGroup(m);
-                    if (g && g !== 'Altro' && !e.groups.includes(g)) {
-                        e.groups.push(g);
-                    }
-                });
-            }
+            allGroups.add('Cardio');
             e.group = 'Cardio';
         } else {
-            e.group = e.group || 'Altro';
-            e.groups = [e.group];
+            e.group = e.group || [...allGroups][0] || 'Altro';
         }
+        e.groups = allGroups.size > 0 ? [...allGroups] : [e.group];
     });
 
     const GROUP_ORDER = ['Spalle','Petto','Bicipiti','Tricipiti','Avambracci','Schiena','Core','Gambe','Cardio'];
