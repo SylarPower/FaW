@@ -196,18 +196,18 @@
 
         /* ===== SET ROWS ===== */
         .sets-container { padding:0 16px 16px; }
-			.sets-grid-header {
-				 display:grid;grid-template-columns:36px 1fr 1fr 52px 32px;gap:8px;
-            padding:0 4px 8px;color:var(--tx3);font-size:.65rem;
-            text-transform:uppercase;font-weight:700;letter-spacing:.5px;
-            text-align:center;
-        }
-			.set-row {
-				 display:grid;grid-template-columns:36px 1fr 1fr 52px 32px;gap:8px;
-            align-items:center;margin-bottom:8px;padding:8px 4px;
-            border-radius:12px;transition:all .3s ease;
-            background:transparent;
-        }
+		.sets-grid-header {
+		    display:grid;grid-template-columns:36px 1fr 1fr 32px;gap:8px;
+		    padding:0 4px 8px;color:var(--tx3);font-size:.65rem;
+		    text-transform:uppercase;font-weight:700;letter-spacing:.5px;
+		    text-align:center;
+		}
+		.set-row {
+		    display:grid;grid-template-columns:36px 1fr 1fr 32px;gap:8px;
+		    align-items:center;margin-bottom:8px;padding:8px 4px;
+		    border-radius:12px;transition:all .3s ease;
+		    background:transparent;
+		}
         .set-row.done {
             background:rgba(39,174,96,.1);
         }
@@ -872,6 +872,11 @@ body.in-session .ctn { padding:0;max-width:100%; }
 				 <button class="tb" onclick="openAllEx()" style="flex:1;">📂 Apri Tutti</button>
 				 <button class="tb" onclick="closeAllEx()" style="flex:1;">📁 Chiudi Tutti</button>
 			</div>
+
+        <div class="mm-bg" style="margin-bottom:14px;">
+            <div class="mm-breathe" id="dayMuscleMap"></div>
+        </div>
+        <div id="dayMmLegend" class="mm-legend"></div>
 
         <div id="eList"></div>
     </div>
@@ -1637,7 +1642,23 @@ function renDay() {
     });
 
     cont.innerHTML = h;
-
+    // Mappa muscolare della giornata
+    const dayFatigue = getDayFatigue(day);
+    renderMuscleMap('dayMuscleMap', dayFatigue, 180);
+    const dayLegendEl = document.getElementById('dayMmLegend');
+    if (dayLegendEl) {
+        const sorted = Object.entries(dayFatigue).filter(([,v]) => v > 0).sort((a,b) => b[1] - a[1]);
+        if (sorted.length > 0) {
+            dayLegendEl.innerHTML = sorted.map(([g, ratio]) =>
+                `<div class="mm-legend-item">
+                    <div class="mm-legend-dot" style="background:${fatigueColor(ratio)}"></div>
+                    <span>${g}</span>
+                </div>`
+            ).join('');
+        } else {
+            dayLegendEl.innerHTML = '';
+        }
+    }
     // Render mini muscle maps per esercizi aperti
     if (day) {
         const fatigue = getMuscleFatigue();
@@ -1722,19 +1743,15 @@ function renEC(ex, showDrag, dragIdx) {
     h += `<div class="mm-mini" id="exmm-${ex.uid}"></div>`;
 	 
     // Tabella serie
-h += `<div class="sets-grid-header"><span>SET</span><span>REPS</span><span>KG</span><span></span><span></span></div>`;
+	h += `<div class="sets-grid-header"><span>SET</span><span>REPS</span><span>KG</span><span></span></div>`;
 
     ex.sd.forEach((s, i) => {
-        const isDone = s.done;
-        h += `<div class="set-row${isDone ? ' done' : ''}" id="sr-${ex.uid}-${i}">
+        h += `<div class="set-row" id="sr-${ex.uid}-${i}">
             <div class="set-num">${i + 1}</div>
-					<input type="number" inputmode="numeric" class="set-input" value="${s.r || ''}"
-							 placeholder="0" oninput="updS('${ex.uid}',${i},'r',this.value)">
-					<input type="number" inputmode="decimal" class="set-input" value="${s.w || ''}"
-							 placeholder="0" oninput="updS('${ex.uid}',${i},'w',this.value)">
-            <button class="set-check${isDone ? ' done' : ''}" onclick="chkSet('${ex.uid}',${i},this)">
-                ${isDone ? '✓' : ''}
-            </button>
+            <input type="number" inputmode="numeric" class="set-input" value="${s.r || ''}"
+                placeholder="0" oninput="updS('${ex.uid}',${i},'r',this.value)">
+            <input type="number" inputmode="decimal" class="set-input" value="${s.w || ''}"
+                placeholder="0" oninput="updS('${ex.uid}',${i},'w',this.value)">
             <button class="set-del" onclick="remSet('${ex.uid}',${i})" title="Elimina serie">✕</button>
         </div>`;
     });
@@ -1791,7 +1808,43 @@ function getMuscleFatigue() {
     });
     return fatigue;
 }
+function getDayFatigue(day) {
+    const GROUP_EFFORT = {
+        'Gambe':1.0, 'Schiena':1.1, 'Petto':1.4, 'Spalle':2.0,
+        'Core':2.5, 'Tricipiti':2.8, 'Bicipiti':3.2, 'Avambracci':4.0,
+    };
+    const HIGH_VOLUME = {
+        'Gambe':6000, 'Schiena':5500, 'Petto':5000, 'Spalle':3500,
+        'Core':2500, 'Tricipiti':2500, 'Bicipiti':2200, 'Avambracci':1800,
+    };
 
+    const volume = {};
+    if (!day || !day.exs) return volume;
+
+    day.exs.forEach(ex => {
+        const def = exDef(ex.exerciseId);
+        if (!def || !def.group || def.group === 'Cardio') return;
+        const factor = GROUP_EFFORT[def.group] || 1.0;
+        if (!ex.sd) return;
+        ex.sd.forEach(s => {
+            const r = parseInt(s.r) || 0;
+            const w = parseFloat(s.w) || 0;
+            const effectiveW = w > 0 ? w : (r > 0 ? 8 : 0);
+            if (r > 0) {
+                volume[def.group] = (volume[def.group] || 0) + (r * effectiveW * factor);
+            } else {
+                volume[def.group] = (volume[def.group] || 0) + factor;
+            }
+        });
+    });
+
+    const fatigue = {};
+    Object.keys(volume).forEach(g => {
+        const threshold = HIGH_VOLUME[g] || 3000;
+        fatigue[g] = Math.min(1, volume[g] / threshold);
+    });
+    return fatigue;
+}
 function fatigueColor(ratio) {
     // 0 = giallo (hue 48), 1 = rosso (hue 0)
     const hue = Math.round(48 * (1 - ratio));
