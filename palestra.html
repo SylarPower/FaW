@@ -568,8 +568,9 @@ body.in-session .topbar { display:none; }
 body.in-session .bn { display:none; }
 body.in-session { padding-bottom:0; }
 body.in-session .ctn { padding:0;max-width:100%; }
-.ses-nav { display:none; }
 body.in-session .ses-nav { display:flex; }
+.ses-nav {
+    display:none;gap:8px;padding:12px 16px;
 		
 #vSession {
     min-height:100vh;min-height:100dvh;
@@ -611,6 +612,7 @@ body.in-session .ses-nav { display:flex; }
     flex:1;padding:8px 16px;
     display:flex;flex-direction:column;align-items:center;
     overflow-y:auto;-webkit-overflow-scrolling:touch;
+    gap:0;
 }
 .ses-ex-name {
     font-size:1.4rem;font-weight:800;color:var(--tx);
@@ -740,7 +742,7 @@ body.in-session .ses-nav { display:flex; }
 
 /* Check button */
 .ses-check-btn {
-    width:100%;padding:18px;margin-top:16px;
+    width:100%;padding:14px;margin-top:10px;
     border-radius:16px;border:none;
     background:var(--acc);color:#000;
     font-size:1.1rem;font-weight:800;
@@ -892,12 +894,6 @@ body.in-session .ses-nav { display:flex; }
 
 <!-- ===== HOME ===== -->
 <div id="vHome" style="display:none;">
-    <div class="card"><div class="sg">
-        <div class="sb"><div class="sn" id="s0">0</div><div class="sd">Workouts</div></div>
-        <div class="sb"><div class="sn" id="s1">0</div><div class="sd">Serie</div></div>
-        <div class="sb"><div class="sn" id="s2">0</div><div class="sd">🔥 Streak</div></div>
-        <div class="sb hl"><div class="sn" id="s3">0</div><div class="sd">🎯 PRs</div></div>
-    </div></div>
     <div class="card">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
             <h3>📅 Fase di Allenamento</h3>
@@ -932,10 +928,6 @@ body.in-session .ses-nav { display:flex; }
             </div>
         </div>
 
-        <div class="sg" style="grid-template-columns:repeat(2,1fr);margin-bottom:16px;">
-            <div class="sb"><div class="sn" id="wkDays">0</div><div class="sd">Giorni</div></div>
-            <div class="sb"><div class="sn" id="wkExs">0</div><div class="sd">Esercizi</div></div>
-        </div>
         <div id="missingGroups" style="margin-bottom:16px;"></div>
 
         <div class="mm-bg">
@@ -1587,10 +1579,6 @@ function renderWeeklyOverview() {
     const wd = getWeeklyData();
     const fatigue = getMuscleFatigue();
 
-    // Stats
-    document.getElementById('wkDays').textContent = wd.totalDays;
-    document.getElementById('wkExs').textContent = wd.totalExercises;
-
     // Coverage ring
     const pct = wd.coverage;
     const circumference = 2 * Math.PI * 33;
@@ -1746,21 +1734,10 @@ function renderPhaseIndicator() {
 	
 function renderAll() {
     if (!D) return;
-    try { renSt(); } catch(e) { console.error('renSt:', e); }
     try { renDays(); } catch(e) { console.error('renDays:', e); }
     try { renderWeeklyOverview(); } catch(e) { console.error('renderWeeklyOverview:', e); }
     try { renderPhaseIndicator(); } catch(e) { console.error('renderPhaseIndicator:', e); }
 }
-
-function renSt() {
-    const s = D.st;
-    const live = getLiveStats();
-    document.getElementById('s0').textContent = s.tw || 0;
-    document.getElementById('s1').textContent = (s.ts || 0) + live.liveSets;
-    document.getElementById('s2').textContent = s.sk || 0;
-    document.getElementById('s3').textContent = Object.keys(s.pr || {}).length;
-}
-
 function renDays() {
     const c = document.getElementById('dList');
     if (!D.days.length) {
@@ -3196,25 +3173,16 @@ function sesToggleVideo(videoEl) {
 }
 function updateRpeColor(el) {
     const val = parseInt(el.value) || 0;
-    if (val === 0) {
-        el.style.color = 'var(--tx)';
-        el.style.borderColor = 'var(--brd)';
-    } else if (val <= 6) {
-        el.style.color = '#27ae60';
-        el.style.borderColor = '#27ae60';
-    } else if (val <= 7) {
-        el.style.color = '#03dac6';
-        el.style.borderColor = '#03dac6';
-    } else if (val <= 8) {
-        el.style.color = '#f1c40f';
-        el.style.borderColor = '#f1c40f';
-    } else if (val <= 9) {
-        el.style.color = '#e67e22';
-        el.style.borderColor = '#e67e22';
-    } else {
-        el.style.color = '#cf6679';
-        el.style.borderColor = '#cf6679';
-    }
+    let c = 'var(--tx)';
+    let bc = 'var(--brd)';
+    if (val >= 1 && val <= 5) { c = '#2ecc71'; bc = '#2ecc71'; }
+    else if (val === 6) { c = '#27ae60'; bc = '#27ae60'; }
+    else if (val === 7) { c = '#a8d948'; bc = '#a8d948'; }
+    else if (val === 8) { c = '#f1c40f'; bc = '#f1c40f'; }
+    else if (val === 9) { c = '#e67e22'; bc = '#e67e22'; }
+    else if (val === 10) { c = '#e74c3c'; bc = '#e74c3c'; }
+    el.style.color = c;
+    el.style.borderColor = bc;
 }
 function sesAdj(inputId, delta) {
     const el = document.getElementById(inputId);
