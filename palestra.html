@@ -502,12 +502,13 @@
             z-index:10000;justify-content:center;align-items:flex-end;
         }
         @media(min-width:600px) { .modal { align-items:center; } }
-        .mc {
-            background:var(--c1);border-radius:22px 22px 0 0;width:100%;max-width:600px;
-            max-height:90vh;overflow:hidden;display:flex;flex-direction:column;
-            padding:20px 16px;padding-bottom:calc(16px + env(safe-area-inset-bottom));
-            animation:slideUp .35s ease;
-        }
+		.mc {
+		    background:var(--c1);border-radius:22px 22px 0 0;width:100%;max-width:600px;
+		    max-height:90vh;overflow:hidden;display:flex;flex-direction:column;
+		    padding:20px 16px;padding-bottom:calc(16px + env(safe-area-inset-bottom));
+		    animation:slideUp .35s ease;
+		}
+		.mc > [style*="overflow-y"] { flex:1;min-height:0; }
         @media(min-width:600px) { .mc { border-radius:22px;max-height:85vh; } }
         @keyframes slideUp { from{transform:translateY(30px);opacity:0;} to{transform:translateY(0);opacity:1;} }
         .mc h2 { color:var(--acc);text-align:center;margin-bottom:14px;font-size:1.1rem; }
@@ -612,10 +613,9 @@ body.in-session .ses-nav { display:flex; }
 
 /* Esercizio corrente */
 .ses-exercise {
-    flex:1;padding:8px 16px;
+    padding:8px 16px;
     display:flex;flex-direction:column;align-items:center;
     overflow-y:auto;-webkit-overflow-scrolling:touch;
-    gap:0;
 }
 .ses-ex-name {
     font-size:1.4rem;font-weight:800;color:var(--tx);
@@ -1084,7 +1084,7 @@ body.in-session .ses-nav { display:flex; }
     <h2>📋 Seleziona Esercizio</h2>
     <input id="exQ" placeholder="Cerca esercizio, muscolo, attrezzatura..." style="margin:0 0 10px;" oninput="filEx()">
     <div id="mChips" class="chips"></div>
-    <div id="exR" style="overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch;margin-top:8px;"></div>
+    <div id="exR" style="overflow-y:auto;flex:1;min-height:0;-webkit-overflow-scrolling:touch;margin-top:8px;"></div>
     <button class="bs" onclick="closeSel()" style="width:100%;margin-top:12px;">Chiudi</button>
 </div>
 </div>
@@ -2698,7 +2698,7 @@ function filEx() {
 
     res.sort((a, b) => a.name.localeCompare(b.name, 'it'));
     document.getElementById('exR').innerHTML = res.length
-        ? res.slice(0, 50).map(e => `
+        ? res.slice(0, 300).map(e => `
         <div class="exo" onclick="addEx('${e.id}')">
             <div style="flex:1">
                 <div class="on">${e.name}</div>
