@@ -197,13 +197,13 @@
         /* ===== SET ROWS ===== */
         .sets-container { padding:0 16px 16px; }
 		.sets-grid-header {
-		    display:grid;grid-template-columns:36px 1fr 1fr 32px;gap:8px;
+		    display:grid;grid-template-columns:36px 1fr 1fr 50px 44px;gap:8px;
 		    padding:0 4px 8px;color:var(--tx3);font-size:.65rem;
 		    text-transform:uppercase;font-weight:700;letter-spacing:.5px;
 		    text-align:center;
 		}
 		.set-row {
-		    display:grid;grid-template-columns:36px 1fr 1fr 32px;gap:8px;
+		    display:grid;grid-template-columns:36px 1fr 1fr 50px 44px;gap:8px;
 		    align-items:center;margin-bottom:8px;padding:8px 4px;
 		    border-radius:12px;transition:all .3s ease;
 		    background:transparent;
@@ -249,10 +249,10 @@
         }
         .set-check.done:active { transform:scale(.95); }
 			.set-del {
-				 width:32px;height:32px;border-radius:50%;border:none;
-				 background:none;color:var(--tx3);font-size:.85rem;
-				 display:flex;align-items:center;justify-content:center;
-				 cursor:pointer;padding:0;transition:all .15s;
+			     width:44px;height:44px;border-radius:50%;border:none;
+			     background:none;color:var(--tx3);font-size:.95rem;
+			     display:flex;align-items:center;justify-content:center;
+			     cursor:pointer;padding:0;transition:all .15s;
 			}
 			.set-del:active { color:var(--red);transform:scale(.85); }
 
@@ -381,7 +381,93 @@
             margin-top:4px;transition:all .2s;min-height:44px;
         }
         .add-set-btn:active { border-color:var(--acc);color:var(--acc); }
-
+		/* ===== RPE & TEMPO ===== */
+		.rpe-input {
+		    width:100%;padding:8px 2px;text-align:center;border-radius:8px;
+		    border:1px solid var(--brd);background:var(--c2);color:var(--tx);
+		    font-size:16px;font-weight:700;font-family:inherit;min-height:36px;
+		}
+		.rpe-input:focus { border-color:var(--acc); }
+		.tempo-field {
+		    display:flex;align-items:center;gap:8px;padding:8px 0;
+		}
+		.tempo-field label {
+		    font-size:.72rem;color:var(--tx2);font-weight:600;white-space:nowrap;
+		}
+		.tempo-field input {
+		    width:100px;padding:8px 10px;font-size:.85rem;text-align:center;
+		    font-family:'SF Mono',Menlo,monospace;
+		}
+		/* ===== SUGGESTION BANNER ===== */
+		.ses-suggestion {
+			width:100%;max-width:380px;margin-bottom:6px;padding:8px 12px;
+			border-radius:14px;background:var(--c2);border:1px solid var(--brd);
+			text-align:center;
+		}
+		.ses-sug-last {
+		    font-size:.72rem;color:var(--tx2);margin-bottom:4px;
+		}
+		.ses-sug-tip {
+		    font-size:.82rem;font-weight:700;color:var(--acc);
+		}
+		/* ===== RPE SESSION ===== */
+		.ses-rpe-wrap {
+		    display:flex;flex-direction:column;align-items:center;gap:4px;
+		    max-width:80px;
+		}
+		.ses-rpe-wrap label {
+		    font-size:.65rem;font-weight:700;color:var(--tx3);
+		    text-transform:uppercase;letter-spacing:1px;margin-top:6px;
+		}
+		.ses-rpe-input {
+		    width:60px;padding:14px 4px;text-align:center;border-radius:14px;
+		    border:2px solid var(--brd);background:var(--c2);color:var(--tx);
+		    font-size:1.3rem;font-weight:800;font-family:'SF Mono',Menlo,monospace;
+		    transition:all .2s;
+		}
+		.ses-rpe-input:focus { border-color:var(--yel); }
+		.ses-rpe-adj {
+		    width:60px;height:36px;border-radius:8px;border:2px solid var(--brd);
+		    background:var(--c2);color:var(--yel);font-size:1rem;font-weight:800;
+		    display:flex;align-items:center;justify-content:center;
+		    cursor:pointer;padding:0;min-height:36px;
+		}
+		.ses-rpe-adj:active { background:var(--yel);color:#000; }
+		/* ===== PHASE INDICATOR ===== */
+		.phase-card {
+		    display:flex;align-items:center;gap:14px;
+		    padding:14px;background:var(--c2);border-radius:14px;
+		    border:1px solid var(--brd);margin-bottom:12px;
+		}
+		.phase-week {
+		    width:52px;height:52px;border-radius:50%;
+		    display:flex;flex-direction:column;align-items:center;justify-content:center;
+		    font-weight:800;flex-shrink:0;
+		}
+		.phase-week .pw-num { font-size:1.3rem;line-height:1; }
+		.phase-week .pw-label { font-size:.5rem;text-transform:uppercase;letter-spacing:.5px; }
+		.phase-normal { background:rgba(3,218,198,.15);color:var(--acc);border:2px solid var(--acc); }
+		.phase-deload { background:rgba(241,196,15,.15);color:var(--yel);border:2px solid var(--yel); }
+		.phase-info { flex:1;min-width:0; }
+		.phase-info h4 { font-size:.88rem;margin:0 0 2px; }
+		.phase-info small { font-size:.7rem;color:var(--tx2); }
+		/* ===== LEGEND ===== */
+		.legend-section { margin-bottom:16px; }
+		.legend-section h4 {
+		    font-size:.85rem;color:var(--acc);margin-bottom:8px;
+		    display:flex;align-items:center;gap:6px;
+		}
+		.legend-table {
+		    width:100%;font-size:.75rem;border-collapse:collapse;
+		}
+		.legend-table td {
+		    padding:6px 8px;border-bottom:1px solid var(--brd);
+		    vertical-align:top;
+		}
+		.legend-table td:first-child {
+		    font-weight:700;color:var(--tx);white-space:nowrap;width:60px;
+		}
+		.legend-table td:last-child { color:var(--tx2); }
         /* ===== ACTION BAR (Day view) ===== */
         .abar { display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px; }
         .abar button { flex:1;min-width:0;padding:12px 6px;font-size:.72rem;white-space:nowrap; }
@@ -404,8 +490,8 @@
 
         /* ===== VIEW MODE STYLES ===== */
         .view-only .set-check { display:none; }
-			.view-only .sets-grid-header { grid-template-columns:36px 1fr 1fr 32px; }
-			.view-only .set-row { grid-template-columns:36px 1fr 1fr 32px; }
+		.view-only .sets-grid-header { grid-template-columns:36px 1fr 1fr 44px; }
+		.view-only .set-row { grid-template-columns:36px 1fr 1fr 44px; }
         .view-only .add-set-btn { display:none; }
         .view-only .ex-progress { display:none; }
         .view-only .progress-info { display:none; }
@@ -416,12 +502,13 @@
             z-index:10000;justify-content:center;align-items:flex-end;
         }
         @media(min-width:600px) { .modal { align-items:center; } }
-        .mc {
-            background:var(--c1);border-radius:22px 22px 0 0;width:100%;max-width:600px;
-            max-height:90vh;overflow:hidden;display:flex;flex-direction:column;
-            padding:20px 16px;padding-bottom:calc(16px + env(safe-area-inset-bottom));
-            animation:slideUp .35s ease;
-        }
+		.mc {
+		    background:var(--c1);border-radius:22px 22px 0 0;width:100%;max-width:600px;
+		    max-height:90vh;overflow:hidden;display:flex;flex-direction:column;
+		    padding:20px 16px;padding-bottom:calc(16px + env(safe-area-inset-bottom));
+		    animation:slideUp .35s ease;
+		}
+		.mc > [style*="overflow-y"] { flex:1;min-height:0; }
         @media(min-width:600px) { .mc { border-radius:22px;max-height:85vh; } }
         @keyframes slideUp { from{transform:translateY(30px);opacity:0;} to{transform:translateY(0);opacity:1;} }
         .mc h2 { color:var(--acc);text-align:center;margin-bottom:14px;font-size:1.1rem; }
@@ -478,15 +565,18 @@
         .bn button .ni { font-size:1.2rem; }
         .bn button.on { color:var(--acc); }
 /* ===== SESSION MODE ===== */
+.ses-nav { display:none; }
 body.in-session .topbar { display:none; }
 body.in-session .bn { display:none; }
 body.in-session { padding-bottom:0; }
 body.in-session .ctn { padding:0;max-width:100%; }
-
+body.in-session .ses-nav { display:flex; }
+		
 #vSession {
-    min-height:100vh;min-height:100dvh;
+    height:100vh;height:100dvh;
     display:flex;flex-direction:column;
     background:var(--bg);
+    overflow:hidden;
 }
 
 /* Top bar */
@@ -520,11 +610,13 @@ body.in-session .ctn { padding:0;max-width:100%; }
 
 /* Esercizio corrente */
 .ses-exercise {
-    flex:1;padding:12px 20px;
+    flex:1;min-height:0;padding:4px 12px 0;
     display:flex;flex-direction:column;align-items:center;
+    justify-content:center;
+    overflow-y:auto;-webkit-overflow-scrolling:touch;
 }
 .ses-ex-name {
-    font-size:1.4rem;font-weight:800;color:var(--tx);
+    font-size:1.15rem;font-weight:800;color:var(--tx);
     text-align:center;line-height:1.2;
 }
 .ses-ex-detail {
@@ -536,14 +628,15 @@ body.in-session .ctn { padding:0;max-width:100%; }
 }
 .ses-media.open { max-height:260px; }
 .ses-media video {
-    width:100%;border-radius:12px;background:#000;max-height:240px;
+    width:100%;border-radius:12px;background:#000;max-height:300px;
 }
 .ses-video-box {
     border-radius:14px;overflow:hidden;border:1px solid var(--brd);
     background:#000;position:relative;
 }
 .ses-video-box video {
-    width:100%;display:block;border-radius:14px;max-height:220px;
+    width:100%;display:block;border-radius:14px;max-height:190px;
+    object-fit:contain;
 }
 .ses-video-scroll {
     display:flex;gap:8px;overflow-x:auto;scroll-snap-type:x mandatory;
@@ -560,7 +653,7 @@ body.in-session .ctn { padding:0;max-width:100%; }
 /* Dots dei set */
 .ses-set-dots {
     display:flex;gap:8px;justify-content:center;
-    margin:16px 0 12px;flex-wrap:wrap;
+    margin:8px 0 6px;flex-wrap:wrap;
 }
 .ses-dot {
     width:14px;height:14px;border-radius:50%;
@@ -584,9 +677,9 @@ body.in-session .ctn { padding:0;max-width:100%; }
 
 /* Esercizio completato */
 .ses-ex-done {
-    text-align:center;padding:30px 20px;
+    text-align:center;padding:16px 20px;
 }
-.ses-ex-done-icon { font-size:3rem;margin-bottom:8px; }
+.ses-ex-done-icon { font-size:2rem;margin-bottom:6px; }
 .ses-ex-done-text { font-size:1rem;color:var(--grn);font-weight:700; }
 .ses-exercise.ses-superserie {
     border:2px solid rgba(155,89,182,.5);
@@ -608,10 +701,10 @@ body.in-session .ctn { padding:0;max-width:100%; }
 .ses-set-label {
     text-align:center;font-size:.75rem;font-weight:800;
     color:var(--tx3);text-transform:uppercase;letter-spacing:2px;
-    margin-bottom:12px;
+    margin-bottom:6px;
 }
 .ses-inputs {
-    display:flex;gap:12px;align-items:center;justify-content:center;
+    display:flex;gap:8px;align-items:center;justify-content:center;
 }
 .ses-input-group {
     flex:1;max-width:240px;text-align:center;
@@ -619,13 +712,13 @@ body.in-session .ctn { padding:0;max-width:100%; }
 .ses-input-group label {
     display:block;font-size:.65rem;font-weight:700;
     color:var(--tx3);text-transform:uppercase;
-    letter-spacing:1px;margin-top:6px;
+    letter-spacing:1px;margin-top:3px;
 }
 .ses-input {
-    width:100%;padding:14px 4px;text-align:center;
+    width:100%;padding:10px 4px;text-align:center;
     border-radius:16px;border:2px solid var(--brd);
     background:var(--c2);color:var(--tx);
-    font-size:1.5rem;font-weight:800;
+    font-size:1.3rem;font-weight:800;
     font-family:'SF Mono',Menlo,monospace;
     transition:border-color .2s;
     font-variant-numeric:tabular-nums;
@@ -640,22 +733,22 @@ body.in-session .ctn { padding:0;max-width:100%; }
     display:flex;flex-direction:column;gap:4px;align-items:center;
 }
 .ses-adj-btn {
-    width:100%;height:36px;border-radius:10px;border:2px solid var(--brd);
-    background:var(--c2);color:var(--acc);font-size:1.2rem;font-weight:800;
+    width:100%;height:30px;border-radius:10px;border:2px solid var(--brd);
+    background:var(--c2);color:var(--acc);font-size:1.1rem;font-weight:800;
     display:flex;align-items:center;justify-content:center;
     cursor:pointer;padding:0;transition:all .15s;flex-shrink:0;
-    min-height:36px;user-select:none;-webkit-user-select:none;
+    min-height:30px;user-select:none;-webkit-user-select:none;
 }
 .ses-adj-btn:active { background:var(--acc);color:#000;transform:scale(.9);border-color:var(--acc); }
 
 /* Check button */
 .ses-check-btn {
-    width:100%;padding:18px;margin-top:16px;
+    width:100%;padding:10px;margin-top:4px;
     border-radius:16px;border:none;
     background:var(--acc);color:#000;
-    font-size:1.1rem;font-weight:800;
+    font-size:1rem;font-weight:800;
     display:flex;align-items:center;justify-content:center;gap:10px;
-    cursor:pointer;transition:all .2s;min-height:60px;
+    cursor:pointer;transition:all .2s;min-height:48px;
     box-shadow:0 4px 20px rgba(3,218,198,.3);
 }
 .ses-check-btn:active {
@@ -666,9 +759,10 @@ body.in-session .ctn { padding:0;max-width:100%; }
 
 /* Navigazione */
 .ses-nav {
-    display:flex;gap:8px;padding:12px 16px;
+    gap:8px;padding:12px 16px;
     padding-bottom:calc(12px + env(safe-area-inset-bottom,0px));
     background:var(--c1);border-top:1px solid var(--brd);
+    flex-shrink:0;
 }
 .ses-nav-btn {
     flex:1;padding:14px 8px;border-radius:12px;
@@ -691,7 +785,7 @@ body.in-session .ctn { padding:0;max-width:100%; }
 .ses-summary {
     flex:1;display:flex;flex-direction:column;
     align-items:center;justify-content:center;
-    padding:30px 20px;text-align:center;
+    padding:20px;text-align:center;
 }
 .ses-summary-icon { font-size:4rem;margin-bottom:12px; }
 .ses-summary-title {
@@ -764,7 +858,73 @@ body.in-session .ctn { padding:0;max-width:100%; }
 
 .mm-mini { margin:8px 0; }
 .mm-mini .muscle-map-wrap { gap:2px; }
-        /* ===== MISC ===== */
+/* ===== REST TIMER ===== */
+.ses-timer {
+    position:fixed;inset:0;z-index:9999;
+    background:rgba(18,18,18,.96);
+    backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+    display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:6px;
+}
+[data-theme="light"] .ses-timer { background:rgba(240,242,245,.96); }
+.ses-timer-label {
+    font-size:.7rem;font-weight:800;color:var(--tx3);
+    text-transform:uppercase;letter-spacing:3px;margin-bottom:8px;
+}
+.ses-timer-ring-wrap {
+    position:relative;width:200px;height:200px;
+}
+.ses-timer-ring-wrap svg { position:absolute;inset:0; }
+.ses-timer-svg { transform:rotate(-90deg); }
+.ses-timer-track { fill:none;stroke:var(--c3);stroke-width:8; }
+.ses-timer-fill {
+    fill:none;stroke:var(--acc);stroke-width:8;
+    stroke-linecap:round;
+    transition:stroke-dashoffset 1s linear, stroke .3s;
+}
+.ses-timer-time {
+    position:absolute;inset:0;
+    display:flex;align-items:center;justify-content:center;
+    font-size:3rem;font-weight:900;color:var(--tx);
+    font-family:'SF Mono',Menlo,monospace;
+    font-variant-numeric:tabular-nums;
+}
+.ses-timer-next {
+    font-size:.82rem;color:var(--tx2);margin-top:12px;
+    text-align:center;max-width:280px;
+}
+.ses-timer-btns {
+    display:flex;gap:10px;margin-top:20px;align-items:center;
+}
+.ses-timer-adj {
+    padding:12px 20px;border-radius:12px;border:2px solid var(--brd);
+    background:var(--c2);color:var(--tx);font-weight:700;
+    font-size:.85rem;cursor:pointer;min-height:48px;
+    font-family:inherit;
+}
+.ses-timer-adj:active { background:var(--c3);transform:scale(.95); }
+.ses-timer-skip {
+    padding:14px 36px;border-radius:14px;border:none;
+    background:var(--acc);color:#000;font-weight:800;
+    font-size:1rem;cursor:pointer;min-height:52px;
+    box-shadow:0 4px 20px rgba(3,218,198,.3);
+    font-family:inherit;
+}
+.ses-timer-skip:active { transform:scale(.95);opacity:.85; }
+/* ===== TIMER TOGGLE ===== */
+.ses-timer-toggle {
+    width:40px;height:40px;border-radius:50%;border:2px solid var(--brd);
+    background:var(--c2);color:var(--tx3);font-size:1rem;
+    display:flex;align-items:center;justify-content:center;
+    cursor:pointer;padding:0;min-height:40px;transition:all .2s;
+    flex-shrink:0;
+}
+.ses-timer-toggle.active {
+    border-color:var(--acc);color:var(--acc);
+    background:rgba(3,218,198,.1);
+    box-shadow:0 0 10px rgba(3,218,198,.2);
+}
+		/* ===== MISC ===== */
         #confetti { position:fixed;inset:0;z-index:99999;pointer-events:none; }
         .emp { text-align:center;padding:30px;color:var(--tx3); }
         .emp .eic { font-size:2.5rem;margin-bottom:8px; }
@@ -787,7 +947,8 @@ body.in-session .ctn { padding:0;max-width:100%; }
     <h1>GymTracker <span>Pro</span></h1>
     <div style="display:flex;gap:6px;align-items:center;">
         <button class="tb" onclick="toggleTheme()" id="thBtn" style="padding:8px 10px;">🌙</button>
-        <span class="badge" id="ubadge"></span>
+        <button class="tb" onclick="document.getElementById('mLegend').style.display='flex'" style="padding:8px 10px;">📖</button>
+		<span class="badge" id="ubadge"></span>
     </div>
 </div>
 
@@ -801,37 +962,23 @@ body.in-session .ctn { padding:0;max-width:100%; }
 
 <!-- ===== HOME ===== -->
 <div id="vHome" style="display:none;">
-    <div class="card"><div class="sg">
-        <div class="sb"><div class="sn" id="s0">0</div><div class="sd">Workouts</div></div>
-        <div class="sb"><div class="sn" id="s1">0</div><div class="sd">Serie</div></div>
-        <div class="sb"><div class="sn" id="s2">0</div><div class="sd">🔥 Streak</div></div>
-        <div class="sb hl"><div class="sn" id="s3">0</div><div class="sd">🎯 PRs</div></div>
-    </div></div>
-
+    <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <h3>📅 Fase di Allenamento</h3>
+            <div style="display:flex;gap:6px;align-items:center;">
+                <input type="date" id="programDateInput" 
+                    style="padding:6px 10px;border-radius:8px;border:1px solid var(--brd);
+                    background:var(--c2);color:var(--tx);font-size:.75rem;font-family:inherit;
+                    min-height:34px;max-width:140px;"
+                    onchange="setProgramDate(this.value)">
+                <button class="tb" onclick="clearProgramDate()" style="padding:6px 8px;font-size:.65rem;min-height:34px;" title="Rimuovi">✕</button>
+            </div>
+        </div>
+        <div id="phaseIndicator"></div>
+    </div>
     <div class="card" id="weeklyCard">
         <h3>📊 Panoramica Settimanale</h3>
 
-        <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px;">
-            <div class="cov-ring-wrap">
-                <svg width="76" height="76" class="cov-ring">
-                    <circle cx="38" cy="38" r="33" class="cov-ring-track"></circle>
-                    <circle cx="38" cy="38" r="33" class="cov-ring-fill" id="covRingFill"></circle>
-                </svg>
-                <div class="cov-center">
-                    <span class="cov-pct" id="covPct">0%</span>
-                    <span class="cov-label">Coverage</span>
-                </div>
-            </div>
-            <div style="flex:1;">
-                <div id="covCount" style="font-size:.88rem;font-weight:700;color:var(--tx);">0/8 gruppi</div>
-                <div style="font-size:.72rem;color:var(--tx2);margin-top:2px;">Coperti dalla tua scheda</div>
-            </div>
-        </div>
-
-        <div class="sg" style="grid-template-columns:repeat(2,1fr);margin-bottom:16px;">
-            <div class="sb"><div class="sn" id="wkDays">0</div><div class="sd">Giorni</div></div>
-            <div class="sb"><div class="sn" id="wkExs">0</div><div class="sd">Esercizi</div></div>
-        </div>
         <div id="missingGroups" style="margin-bottom:16px;"></div>
 
         <div class="mm-bg">
@@ -893,13 +1040,30 @@ body.in-session .ctn { padding:0;max-width:100%; }
             </div>
         </div>
         <span class="ses-counter" id="sesExCount">1/5</span>
+        <button class="ses-timer-toggle" id="sesTimerToggle" onclick="toggleSesTimer()">⏱️</button>
     </div>
-
+    <!-- Rest Timer Overlay -->
+    <div class="ses-timer" id="sesTimer" style="display:none;">
+        <div class="ses-timer-label">RECUPERO</div>
+        <div class="ses-timer-ring-wrap">
+            <svg width="200" height="200" class="ses-timer-svg">
+                <circle cx="100" cy="100" r="88" class="ses-timer-track"/>
+                <circle cx="100" cy="100" r="88" class="ses-timer-fill" id="sesTimerCircle"
+                    stroke-dasharray="553" stroke-dashoffset="0"/>
+            </svg>
+            <div class="ses-timer-time" id="sesTimerTime">1:30</div>
+        </div>
+        <div class="ses-timer-next" id="sesTimerNext"></div>
+        <div class="ses-timer-btns">
+            <button class="ses-timer-adj" onclick="adjRestTimer(-15)">−15s</button>
+            <button class="ses-timer-skip" onclick="skipRestTimer()">SALTA ▶</button>
+            <button class="ses-timer-adj" onclick="adjRestTimer(+15)">+15s</button>
+        </div>
+    </div>
     <!-- Esercizio corrente -->
     <div class="ses-exercise" id="sesExCard">
         <div class="ses-ex-name" id="sesExName">—</div>
         <div class="ses-ex-detail" id="sesExDetail">—</div>
-
         <!-- Dots dei set -->
         <div class="ses-set-dots" id="sesSetDots"></div>
 
@@ -911,6 +1075,7 @@ body.in-session .ctn { padding:0;max-width:100%; }
 
         <!-- Input set corrente -->
         <div class="ses-set-area" id="sesSetArea">
+            <div id="sesSuggestion"></div>
             <div class="ses-set-label" id="sesSetLabel">SET 1</div>
             <div class="ses-inputs">
                 <div class="ses-input-group">
@@ -930,15 +1095,32 @@ body.in-session .ctn { padding:0;max-width:100%; }
                     </div>
                     <label>KG</label>
                 </div>
+                <div class="ses-rpe-wrap">
+                    <button class="ses-rpe-adj" onclick="sesAdj('sesRpe',1)">+</button>
+                     <input type="number" inputmode="numeric" id="sesRpe" class="ses-rpe-input" placeholder="-" min="1" max="10" oninput="updateRpeColor(this)">
+                    <button class="ses-rpe-adj" onclick="sesAdj('sesRpe',-1)">−</button>
+                    <label style="display:flex;align-items:center;justify-content:center;gap:3px;">
+                        RPE
+                        <span onclick="document.getElementById('mLegend').style.display='flex'" 
+                            style="font-size:.55rem;background:var(--c2);color:var(--tx3);padding:1px 4px;
+                            border-radius:4px;border:1px solid var(--brd);cursor:pointer;">❓</span>
+                    </label>
+                </div>
             </div>
+            <div id="sesTempoInfo" style="display:none;text-align:center;margin-top:6px;
+                padding:4px 8px;border-radius:8px;background:rgba(241,196,15,.08);
+                border:1px solid rgba(241,196,15,.15);max-width:380px;width:100%;"></div>
+            <div id="sesNoteInline" style="display:none;margin-top:4px;padding:6px 12px;
+                border-radius:10px;background:var(--c2);border:1px solid var(--brd);
+                font-size:.72rem;color:var(--tx2);text-align:center;max-width:380px;
+                width:100%;white-space:pre-wrap;"></div>
             <button class="ses-check-btn" id="sesCheckBtn" onclick="sesCheck()">
                 <span class="ses-check-icon">✓</span>
                 <span>FATTO</span>
             </button>
+            <!-- Video sotto il pulsante fatto -->
+            <div id="sesVideoArea" style="width:100%;max-width:340px;margin:4px auto 0;"></div>
         </div>
-
-        <!-- Video sotto il pulsante fatto -->
-        <div id="sesVideoArea" style="width:100%;max-width:380px;margin-top:16px;"></div>
     </div>
 
 	<!-- Navigazione esercizi -->
@@ -973,7 +1155,7 @@ body.in-session .ctn { padding:0;max-width:100%; }
     <h2>📋 Seleziona Esercizio</h2>
     <input id="exQ" placeholder="Cerca esercizio, muscolo, attrezzatura..." style="margin:0 0 10px;" oninput="filEx()">
     <div id="mChips" class="chips"></div>
-    <div id="exR" style="overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch;margin-top:8px;"></div>
+    <div id="exR" style="overflow-y:auto;flex:1;min-height:0;-webkit-overflow-scrolling:touch;margin-top:8px;"></div>
     <button class="bs" onclick="closeSel()" style="width:100%;margin-top:12px;">Chiudi</button>
 </div>
 </div>
@@ -1058,6 +1240,53 @@ body.in-session .ctn { padding:0;max-width:100%; }
     </div>
 </div>
 </div>
+<!-- MODAL: LEGENDA -->
+<div id="mLegend" class="modal" onclick="if(event.target===this)this.style.display='none'">
+<div class="mc" style="max-width:500px;">
+    <h2>📖 Guida Rapida</h2>
+    <div style="overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch;">
+
+    <div class="legend-section">
+        <h4>🎯 RPE (Rate of Perceived Exertion)</h4>
+        <p style="font-size:.75rem;color:var(--tx2);margin-bottom:8px;">Quanto è stata dura la serie? Quante reps avevi ancora "in riserva".</p>
+        <table class="legend-table">
+            <tr><td style="color:var(--grn);">6</td><td>Facile — Potevi fare 4+ reps in più</td></tr>
+            <tr><td style="color:var(--acc);">7</td><td>Moderato — 3 reps in riserva. Buono per volume.</td></tr>
+            <tr><td style="color:var(--yel);">8</td><td>Impegnativo — 2 reps in riserva. Ideale per ipertrofia.</td></tr>
+            <tr><td style="color:var(--red);">9</td><td>Molto duro — 1 sola rep in riserva.</td></tr>
+            <tr><td style="color:var(--red);">10</td><td>Massimale — Non potevi fare un'altra rep.</td></tr>
+        </table>
+    </div>
+
+    <div class="legend-section">
+        <h4>⏱️ Tempo (Eccentrica-Pausa-Concentrica)</h4>
+        <p style="font-size:.75rem;color:var(--tx2);margin-bottom:8px;">Controlla la velocità del movimento in secondi.</p>
+        <table class="legend-table">
+            <tr><td>3-1-2</td><td><b>3s</b> fase negativa, <b>1s</b> pausa, <b>2s</b> fase positiva</td></tr>
+            <tr><td>2-0-1</td><td><b>2s</b> negativa, <b>nessuna</b> pausa, <b>1s</b> positiva (esplosiva)</td></tr>
+            <tr><td>4-2-1</td><td><b>4s</b> negativa lenta, <b>2s</b> isometria, <b>1s</b> positiva</td></tr>
+        </table>
+        <p style="font-size:.7rem;color:var(--tx3);margin-top:6px;">Esempio panca: 3-1-2 = scendi in 3s, pausa 1s al petto, spingi in 2s</p>
+    </div>
+
+    <div class="legend-section">
+        <h4>💡 Suggerimenti Progressione</h4>
+        <table class="legend-table">
+            <tr><td>📈</td><td>Tutte le reps completate con RPE ≤ 8 → <b>+2.5kg</b> suggeriti</td></tr>
+            <tr><td>➡️</td><td>RPE 9 o reps mancate → <b>stesso carico</b>, consolida</td></tr>
+            <tr><td>📉</td><td>Settimana di deload (ogni 4ª) → <b>-15% carico</b></td></tr>
+        </table>
+    </div>
+
+    <div class="legend-section">
+        <h4>🔗 Superserie</h4>
+        <p style="font-size:.75rem;color:var(--tx2);">Due o più esercizi eseguiti consecutivamente senza pausa. Recupero solo dopo aver completato tutti gli esercizi del gruppo.</p>
+    </div>
+
+    </div>
+    <button class="bs" onclick="document.getElementById('mLegend').style.display='none'" style="width:100%;margin-top:12px;">Chiudi</button>
+</div>
+</div>
 <!-- MODAL: PROGRESSIONE -->
 <div id="mProg" class="modal" onclick="if(event.target===this)this.style.display='none'">
 <div class="mc" style="max-width:500px;">
@@ -1102,7 +1331,6 @@ body.in-session .ctn { padding:0;max-width:100%; }
 </svg>
 
 </div><!-- fine #muscleMapTpl -->
-
 <script>
 // ============================================================
 // 🔧 CONFIGURAZIONE
@@ -1415,7 +1643,6 @@ function getWeeklyData() {
         totalExercises,
         weekDaysDone: weekDayIds.size,
         allGroups: [...allGroups],
-        coverage: totalPossibleGroups > 0 ? Math.round((allGroups.size / totalPossibleGroups) * 100) : 0,
         totalPossibleGroups
     };
 }
@@ -1423,21 +1650,6 @@ function getWeeklyData() {
 function renderWeeklyOverview() {
     const wd = getWeeklyData();
     const fatigue = getMuscleFatigue();
-
-    // Stats
-    document.getElementById('wkDays').textContent = wd.totalDays;
-    document.getElementById('wkExs').textContent = wd.totalExercises;
-
-    // Coverage ring
-    const pct = wd.coverage;
-    const circumference = 2 * Math.PI * 33;
-    const offset = circumference * (1 - pct / 100);
-    const ringFill = document.getElementById('covRingFill');
-    if (ringFill) ringFill.setAttribute('stroke-dashoffset', offset);
-    const covPct = document.getElementById('covPct');
-    if (covPct) covPct.textContent = pct + '%';
-    const covCount = document.getElementById('covCount');
-    if (covCount) covCount.textContent = wd.allGroups.length + '/' + wd.totalPossibleGroups + ' gruppi';
 
     // Gruppi mancanti
     const allPossible = Object.keys(MUSCLE_COLORS);
@@ -1491,22 +1703,102 @@ function renderWeeklyOverview() {
         }
     }
 }
+// ============================================================
+// 📅 PHASE / WEEK SYSTEM
+// ============================================================
+function getProgramWeek() {
+    const start = D.st.programStart;
+    if (!start) return null;
+    const startDate = new Date(start);
+    const now = new Date();
+    const diffDays = Math.floor((now - startDate) / 86400000);
+    if (diffDays < 0) return null;
+    return Math.floor(diffDays / 7) + 1;
+}
+
+function getProgramPhase(week) {
+    if (!week) return null;
+    return Math.ceil(week / 4);
+}
+
+function isDeloadWeek(week) {
+    if (!week) return false;
+    return week % 4 === 0;
+}
+
+function setProgramDate(val) {
+    if (!val) return;
+    D.st.programStart = val;
+    save().then(() => {
+        renderPhaseIndicator();
+        toast('📅 Programma dal ' + val, 'ok');
+    });
+}
+
+function clearProgramDate() {
+    if (!D.st.programStart) return;
+    if (!confirm('Rimuovere la data di inizio programma?')) return;
+    delete D.st.programStart;
+    const input = document.getElementById('programDateInput');
+    if (input) input.value = '';
+    save().then(() => {
+        renderPhaseIndicator();
+        toast('📅 Fase rimossa', 'info');
+    });
+}
+
+function renderPhaseIndicator() {
+    const el = document.getElementById('phaseIndicator');
+    if (!el) return;
+    // Sync input date
+    const dateInput = document.getElementById('programDateInput');
+    if (dateInput) dateInput.value = D.st.programStart || '';
+    const week = getProgramWeek();
+    if (!week) {
+        el.innerHTML = `<div style="text-align:center;color:var(--tx3);font-size:.8rem;padding:8px;">
+            Premi ⚙️ per impostare la data di inizio programma
+        </div>`;
+        return;
+    }
+    const phase = getProgramPhase(week);
+    const deload = isDeloadWeek(week);
+    const weekInPhase = ((week - 1) % 4) + 1;
+    const totalPhases = 3;
+
+    el.innerHTML = `
+        <div class="phase-card">
+            <div class="phase-week ${deload ? 'phase-deload' : 'phase-normal'}">
+                <span class="pw-num">${week}</span>
+                <span class="pw-label">Sett.</span>
+            </div>
+            <div class="phase-info">
+                <h4 style="color:${deload ? 'var(--yel)' : 'var(--acc)'}">
+                    ${deload ? '📉 Settimana di Deload' : 'Fase ' + phase + ' — Settimana ' + weekInPhase + '/4'}
+                </h4>
+                <small>${deload
+                    ? 'Riduci il carico del 15%. Stesse serie e reps. Recupero attivo.'
+                    : 'Settimana ' + week + ' del programma • Fase ' + phase + '/' + totalPhases
+                }</small>
+            </div>
+        </div>
+        <div style="display:flex;gap:4px;margin-top:8px;">
+            ${[1,2,3].map(p => {
+                const active = phase === p;
+                const done = phase > p;
+                return `<div style="flex:1;height:6px;border-radius:3px;
+                    background:${done ? 'var(--grn)' : active ? 'var(--acc)' : 'var(--c3)'};
+                    transition:all .3s;"></div>`;
+            }).join('')}
+        </div>
+    `;
+}
+	
 function renderAll() {
     if (!D) return;
-    try { renSt(); } catch(e) { console.error('renSt:', e); }
     try { renDays(); } catch(e) { console.error('renDays:', e); }
     try { renderWeeklyOverview(); } catch(e) { console.error('renderWeeklyOverview:', e); }
+    try { renderPhaseIndicator(); } catch(e) { console.error('renderPhaseIndicator:', e); }
 }
-
-function renSt() {
-    const s = D.st;
-    const live = getLiveStats();
-    document.getElementById('s0').textContent = s.tw || 0;
-    document.getElementById('s1').textContent = (s.ts || 0) + live.liveSets;
-    document.getElementById('s2').textContent = s.sk || 0;
-    document.getElementById('s3').textContent = Object.keys(s.pr || {}).length;
-}
-
 function renDays() {
     const c = document.getElementById('dList');
     if (!D.days.length) {
@@ -1719,12 +2011,12 @@ function renEC(ex, showDrag, dragIdx) {
     // === HEADER (sempre visibile, cliccabile) ===
     const dragHandle = showDrag ? `<span class="drag-handle" ontouchstart="dragStart(event,'ex')" onmousedown="dragStart(event,'ex')" onclick="event.stopPropagation()">☰</span>` : '';
     h += `<div class="ex-header" onclick="togEx('${ex.uid}')" style="cursor:pointer;">
-        <div class="ex-info">
+        ${dragHandle}
+        <div class="ex-info" style="flex:1;min-width:0;">
             <h4 style="margin:0;font-size:1.05rem;">${ex.name}</h4>
             <small>${d ? d.group : ''}</small>
         </div>
         <div style="display:flex;align-items:center;gap:8px;">
-            ${dragHandle}
             <span class="ex-summary-badge ${allDone ? 'done-badge' : 'todo-badge'}">
                 ${allDone ? '✅' : done + '/' + total}
             </span>
@@ -1765,7 +2057,7 @@ function renEC(ex, showDrag, dragIdx) {
     h += `<div class="mm-mini" id="exmm-${ex.uid}"></div>`;
 	 
     // Tabella serie
-	h += `<div class="sets-grid-header"><span>SET</span><span>REPS</span><span>KG</span><span></span></div>`;
+	h += `<div class="sets-grid-header"><span>SET</span><span>REPS</span><span>KG</span><span>RPE</span><span></span></div>`;
 
     ex.sd.forEach((s, i) => {
         h += `<div class="set-row" id="sr-${ex.uid}-${i}">
@@ -1774,10 +2066,65 @@ function renEC(ex, showDrag, dragIdx) {
                 placeholder="0" oninput="updS('${ex.uid}',${i},'r',this.value)">
             <input type="number" inputmode="decimal" class="set-input" value="${s.w || ''}"
                 placeholder="0" oninput="updS('${ex.uid}',${i},'w',this.value)">
+            <input type="number" inputmode="numeric" class="rpe-input" value="${s.rpe || ''}"
+                placeholder="-" min="1" max="10" oninput="updS('${ex.uid}',${i},'rpe',this.value)">
             <button class="set-del" onclick="remSet('${ex.uid}',${i})" title="Elimina serie">✕</button>
         </div>`;
     });
-
+    // Campo tempo smart
+    const tp = (ex.tempo || '').split('-');
+    const tEcc = tp[0] || '';
+    const tPau = tp[1] || '';
+    const tCon = tp[2] || '';
+    h += `<div style="margin-top:8px;">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+            <span style="font-size:.75rem;font-weight:700;color:var(--tx2);">⏱️ Tempo</span>
+            <button class="tb" onclick="event.stopPropagation();document.getElementById('mLegend').style.display='flex'"
+                style="padding:2px 6px;font-size:.6rem;min-height:22px;border-radius:6px;">❓</button>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;">
+            <div style="flex:1;text-align:center;">
+                <input type="number" inputmode="numeric" class="set-input" value="${tEcc}"
+                    placeholder="0" min="0" max="10" style="font-size:16px;padding:8px 2px;"
+                    oninput="updTempoField('${ex.uid}',0,this.value)">
+                <div style="font-size:.58rem;color:var(--tx3);margin-top:3px;">Eccentrica</div>
+            </div>
+            <span style="color:var(--tx3);font-weight:700;">-</span>
+            <div style="flex:1;text-align:center;">
+                <input type="number" inputmode="numeric" class="set-input" value="${tPau}"
+                    placeholder="0" min="0" max="10" style="font-size:16px;padding:8px 2px;"
+                    oninput="updTempoField('${ex.uid}',1,this.value)">
+                <div style="font-size:.58rem;color:var(--tx3);margin-top:3px;">Pausa</div>
+            </div>
+            <span style="color:var(--tx3);font-weight:700;">-</span>
+            <div style="flex:1;text-align:center;">
+                <input type="number" inputmode="numeric" class="set-input" value="${tCon}"
+                    placeholder="0" min="0" max="10" style="font-size:16px;padding:8px 2px;"
+                    oninput="updTempoField('${ex.uid}',2,this.value)">
+                <div style="font-size:.58rem;color:var(--tx3);margin-top:3px;">Concentrica</div>
+            </div>
+        </div>
+    </div>`;
+    // Campo recupero
+    h += `<div style="margin-top:8px;">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+            <span style="font-size:.75rem;font-weight:700;color:var(--tx2);">⏱️ Recupero tra serie</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+            <input type="number" inputmode="numeric" class="set-input" value="${ex.rest || ''}"
+                placeholder="—" min="0" max="600"
+                style="font-size:16px;padding:8px;max-width:100px;text-align:center;"
+                oninput="updRest('${ex.uid}',this.value)">
+            <span style="font-size:.75rem;color:var(--tx3);">secondi</span>
+        </div>
+    </div>`;
+	// Campo note
+    const noteVal = (ex.note || '').replace(/"/g, '&quot;');
+    h += `<div style="margin-top:10px;">
+        <textarea rows="2" placeholder="Note (es. tecnica, sensazioni, varianti...)"
+            style="font-size:.8rem;padding:10px 12px;"
+            oninput="updNote('${ex.uid}',this.value)">${ex.note || ''}</textarea>
+    </div>`;
     h += `<button class="add-set-btn" onclick="addSet('${ex.uid}')">+ Aggiungi Serie</button>`;
 
     h += `</div>`; // chiude ex-body
@@ -1972,7 +2319,31 @@ function togVid(exUid) {
 // ✏️ SET OPERATIONS
 // ============================================================
 function fEx(u) { const d = gD(); return d?.exs?.find(e => e.uid === u); }
-
+function updTempoField(exUid, partIdx, val) {
+    const ex = fEx(exUid);
+    if (!ex) return;
+    const parts = (ex.tempo || '0-0-0').split('-');
+    while (parts.length < 3) parts.push('0');
+    parts[partIdx] = val || '0';
+    ex.tempo = parts.join('-');
+    // Se tutto è 0, svuota
+    if (parts.every(p => p === '0' || p === '')) ex.tempo = '';
+    save();
+}
+function updNote(exUid, val) {
+    const ex = fEx(exUid);
+    if (ex) {
+        ex.note = val;
+        save();
+    }
+}
+function updRest(exUid, val) {
+    const ex = fEx(exUid);
+    if (ex) {
+        ex.rest = parseInt(val) || 0;
+        save();
+    }
+}
 function updS(exUid, idx, field, val) {
     const ex = fEx(exUid);
     if (ex && ex.sd[idx]) {
@@ -2405,7 +2776,7 @@ function filEx() {
 
     res.sort((a, b) => a.name.localeCompare(b.name, 'it'));
     document.getElementById('exR').innerHTML = res.length
-        ? res.slice(0, 50).map(e => `
+        ? res.slice(0, 300).map(e => `
         <div class="exo" onclick="addEx('${e.id}')">
             <div style="flex:1">
                 <div class="on">${e.name}</div>
@@ -2430,8 +2801,9 @@ function addEx(eid) {
         : [{r:10,w:0,done:false}, {r:10,w:0,done:false}, {r:10,w:0,done:false}];
     day.exs.push({
         uid: uid(), exerciseId: eid, name: d.name, sd,
-        rest: l?.rest || 90, seat: l?.seat || '',
-        ssG: null, pF: false
+        rest: l?.rest || 0, seat: l?.seat || '',
+        ssG: null, pF: false, note: l?.note || '',
+        tempo: l?.tempo || ''
     });
     save(); closeSel(); renDay();
     toast('✅ ' + d.name + ' aggiunto!', 'ok', 1500);
@@ -2561,6 +2933,7 @@ function launchSession() {
     document.getElementById('vDay').style.display = 'none';
     document.getElementById('vSession').style.display = 'flex';
 
+    updateTimerToggleUI();
     sesRender();
     if (navigator.vibrate) navigator.vibrate(30);
 }
@@ -2568,7 +2941,8 @@ function launchSession() {
 function exitSession() {
     if (!confirm('Uscire dalla sessione?\nI progressi sono salvati.')) return;
     
-    // Ripristina la UI alla schermata della giornata
+    clearInterval(restTimerId);
+    document.getElementById('sesTimer').style.display = 'none';
     document.getElementById('vSession').style.display = 'none';
     document.getElementById('vDay').style.display = 'block';
     document.body.classList.remove('in-session');
@@ -2641,7 +3015,6 @@ function sesRender() {
             detailHTML += `<div class="ses-ss-badge">Superserie ${myPos}/${ssGroup.length}: ${ssNames.join(' + ')}</div>`;
         }
         document.getElementById('sesExDetail').innerHTML = detailHTML;
-
         // Video
         const videoArea = document.getElementById('sesVideoArea');
         if (videoArea) {
@@ -2665,7 +3038,108 @@ function sesRender() {
             }
         }
     }
+// ============================================================
+// ⏱️ REST TIMER
+// ============================================================
+let restTimerId = null;
+let restTimeLeft = 0;
+let restTimeTotal = 0;
 
+// ============================================================
+// ⏱️ TIMER TOGGLE
+// ============================================================
+let sesTimerEnabled = localStorage.getItem('gym-timer') === '1';
+
+function toggleSesTimer() {
+    sesTimerEnabled = !sesTimerEnabled;
+    localStorage.setItem('gym-timer', sesTimerEnabled ? '1' : '0');
+    updateTimerToggleUI();
+    toast(sesTimerEnabled ? '⏱️ Timer recupero abilitato' : '⏱️ Timer recupero disabilitato', 'info', 1500);
+    if (navigator.vibrate) navigator.vibrate(15);
+}
+
+function updateTimerToggleUI() {
+    const btn = document.getElementById('sesTimerToggle');
+    if (btn) {
+        btn.classList.toggle('active', sesTimerEnabled);
+    }
+}
+
+function tryStartRestTimer(ex) {
+    if (!sesTimerEnabled) return;
+    const restTime = parseInt(ex.rest) || 0;
+    if (restTime <= 0) {
+        toast('⏱️ Recupero non impostato per "' + ex.name + '"', 'warn');
+        return;
+    }
+    startRestTimer(restTime);
+}
+	
+function startRestTimer(seconds) {
+    if (seconds <= 0) return;
+    restTimeTotal = seconds;
+    restTimeLeft = seconds;
+    const overlay = document.getElementById('sesTimer');
+    const circle = document.getElementById('sesTimerCircle');
+    const circumference = 2 * Math.PI * 88;
+    circle.style.transition = 'none';
+    circle.style.strokeDasharray = circumference;
+    circle.style.strokeDashoffset = '0';
+    circle.style.stroke = 'var(--acc)';
+    overlay.style.display = 'flex';
+
+    // Mostra prossimo esercizio/set
+    const day = gD();
+    if (day && day.exs[sesExIdx]) {
+        const nextEx = day.exs[sesExIdx];
+        const nextSetIdx = sesGetCurrentSetIdx(nextEx);
+        const allDone = nextEx.sd.every(s => s.done);
+        document.getElementById('sesTimerNext').textContent = allDone
+            ? 'Prossimo → ' + nextEx.name + ' ✅'
+            : 'Prossimo → ' + nextEx.name + ' • Set ' + (nextSetIdx + 1);
+    }
+
+    // Forza reflow per l'animazione
+    void circle.offsetWidth;
+    circle.style.transition = 'stroke-dashoffset 1s linear, stroke .3s';
+
+    updateTimerDisplay();
+    clearInterval(restTimerId);
+    restTimerId = setInterval(() => {
+        restTimeLeft--;
+        updateTimerDisplay();
+        if (restTimeLeft <= 0) {
+            clearInterval(restTimerId);
+            overlay.style.display = 'none';
+            if (navigator.vibrate) navigator.vibrate([100, 50, 100, 50, 200]);
+        }
+    }, 1000);
+}
+
+function updateTimerDisplay() {
+    const mins = Math.floor(restTimeLeft / 60);
+    const secs = restTimeLeft % 60;
+    document.getElementById('sesTimerTime').textContent =
+        mins + ':' + String(secs).padStart(2, '0');
+    const circle = document.getElementById('sesTimerCircle');
+    const circumference = 2 * Math.PI * 88;
+    const progress = restTimeLeft / restTimeTotal;
+    circle.style.strokeDashoffset = circumference * (1 - progress);
+    circle.style.stroke = restTimeLeft <= 5 ? 'var(--red)' : 'var(--acc)';
+}
+
+function skipRestTimer() {
+    clearInterval(restTimerId);
+    document.getElementById('sesTimer').style.display = 'none';
+    if (navigator.vibrate) navigator.vibrate(15);
+}
+
+function adjRestTimer(delta) {
+    restTimeLeft = Math.max(5, restTimeLeft + delta);
+    if (restTimeLeft > restTimeTotal) restTimeTotal = restTimeLeft;
+    updateTimerDisplay();
+    if (navigator.vibrate) navigator.vibrate(10);
+}
     // Set dots (aggiorna sempre)
     const curSetIdx = sesGetCurrentSetIdx(ex);
     const allSetsDone = ex.sd.every(s => s.done);
@@ -2693,9 +3167,114 @@ function sesRender() {
         document.getElementById('sesSetLabel').textContent = 'SET ' + (curSetIdx + 1);
         document.getElementById('sesReps').value = s.r || '';
         document.getElementById('sesKg').value = s.w || '';
+        const rpeEl = document.getElementById('sesRpe');
+        rpeEl.value = s.rpe || '';
+        updateRpeColor(rpeEl);
+
+        // Suggerimento
+        const sugEl = document.getElementById('sesSuggestion');
+        if (sugEl) {
+            sugEl.innerHTML = buildSuggestionHTML(curDay, ex, curSetIdx);
+        }
+
+        // Tempo sotto i controlli
+        const tempoEl = document.getElementById('sesTempoInfo');
+        if (tempoEl) {
+            if (ex.tempo && ex.tempo !== '0-0-0' && ex.tempo !== '--') {
+                const tParts = ex.tempo.split('-');
+                const tDesc = (tParts[0]||'0') + ' negativa - ' + (tParts[1]||'0') + ' pausa - ' + (tParts[2]||'0') + ' positiva';
+                tempoEl.innerHTML = `
+                    <span style="font-size:.72rem;color:var(--yel);font-weight:600;">⏱️ ${tDesc}</span>
+                    <span onclick="document.getElementById('mLegend').style.display='flex'" 
+                        style="font-size:.55rem;background:var(--c2);color:var(--tx3);padding:2px 6px;
+                        border-radius:6px;border:1px solid var(--brd);cursor:pointer;margin-left:6px;">❓</span>`;
+                tempoEl.style.display = 'block';
+            } else {
+                tempoEl.style.display = 'none';
+            }
+        }
+
+        // Note sotto il tempo
+        const noteInline = document.getElementById('sesNoteInline');
+        if (noteInline) {
+            if (ex.note) {
+                noteInline.textContent = '📝 ' + ex.note;
+                noteInline.style.display = 'block';
+            } else {
+                noteInline.style.display = 'none';
+            }
+        }
     }
 }
+// ============================================================
+// 💡 SUGGESTION SYSTEM
+// ============================================================
+function getLastSessionData(dayId, exerciseId) {
+    if (!D.hist || !D.hist.length) return null;
+    const entries = D.hist.filter(h => h.dayId === dayId && h.eid === exerciseId);
+    if (!entries.length) return null;
+    entries.sort((a, b) => new Date(b.dt) - new Date(a.dt));
+    return entries[0];
+}
 
+function generateSuggestion(lastData, setIdx) {
+    if (!lastData || !lastData.sd || !lastData.sd[setIdx]) return null;
+    const lastSet = lastData.sd[setIdx];
+    const lastR = parseInt(lastSet.r) || 0;
+    const lastW = parseFloat(lastSet.w) || 0;
+    const lastRpe = parseInt(lastSet.rpe) || 0;
+
+    const week = getProgramWeek();
+    const deload = isDeloadWeek(week);
+
+    let sugR = lastR;
+    let sugW = lastW;
+    let sugText = '';
+
+    if (deload) {
+        sugW = Math.round(lastW * 0.85 * 2) / 2;
+        sugText = '📉 Deload: -15% carico';
+    } else if (lastRpe && lastRpe <= 7) {
+        sugW = lastW + 2.5;
+        sugText = '📈 RPE basso → prova +2.5kg';
+    } else if (lastRpe && lastRpe <= 8) {
+        sugW = lastW + 2.5;
+        sugText = '📈 Buono! Prova +2.5kg';
+    } else if (lastRpe && lastRpe >= 9) {
+        sugText = '➡️ RPE alto → consolida stesso carico';
+    } else if (lastW > 0) {
+        sugW = lastW + 2.5;
+        sugText = '📈 Prova +2.5kg';
+    } else {
+        sugText = '➡️ Completa e registra RPE per suggerimenti';
+    }
+
+    return {
+        lastR, lastW, lastRpe,
+        sugR, sugW: Math.round(sugW * 2) / 2,
+        sugText
+    };
+}
+
+function buildSuggestionHTML(dayId, ex, setIdx) {
+    const last = getLastSessionData(dayId, ex.exerciseId);
+    if (!last) return '';
+    const sug = generateSuggestion(last, setIdx);
+    if (!sug) return '';
+
+    const rpeStr = sug.lastRpe ? ' @ RPE ' + sug.lastRpe : '';
+    const lastDate = new Date(last.dt);
+    const giorni = ['Dom','Lun','Mar','Mer','Gio','Ven','Sab'];
+    const giorno = giorni[lastDate.getDay()];
+    const dateStr = giorno + ' ' + lastDate.getDate() + '/' + (lastDate.getMonth()+1);
+    const daysAgo = Math.floor((Date.now() - lastDate.getTime()) / 86400000);
+    const agoStr = daysAgo === 0 ? 'oggi' : daysAgo === 1 ? 'ieri' : daysAgo + 'gg fa';
+
+    return `<div class="ses-suggestion">
+        <div class="ses-sug-last">📊 ${dateStr} (${agoStr}): ${sug.lastR} reps × ${sug.lastW}kg${rpeStr}</div>
+        <div class="ses-sug-tip">${sug.sugText}</div>
+    </div>`;
+}
 function sesGetCurrentSetIdx(ex) {
     if (!ex.sd) return 0;
     const idx = ex.sd.findIndex(s => !s.done);
@@ -2715,6 +3294,7 @@ function sesCheck() {
     // Salva valori
     s.r = parseInt(document.getElementById('sesReps').value) || 0;
     s.w = parseFloat(document.getElementById('sesKg').value) || 0;
+    s.rpe = parseInt(document.getElementById('sesRpe').value) || null;
     s.done = true;
     save();
 
@@ -2760,15 +3340,16 @@ function sesCheck() {
         sesRender();
         setTimeout(() => sesShowSummary(), 500);
     } else if (nextExIdx !== sesExIdx && nextExIdx !== -1) {
-        // Superserie → transizione rapida, esercizio normale → un po' più lenta
         const delay = ex.ssG ? 150 : 400;
         sesRender();
         setTimeout(() => {
             sesExIdx = nextExIdx;
             sesRender();
+            tryStartRestTimer(ex);
         }, delay);
     } else {
         sesRender();
+        tryStartRestTimer(ex);
     }
 }
 
@@ -2787,6 +3368,33 @@ function sesNextEx() {
         sesRender();
     }
 }
+// ============================================================
+// 👆 SWIPE GESTURES (Session)
+// ============================================================
+(function() {
+    let touchStartX = 0, touchStartY = 0, swiping = false;
+
+    document.addEventListener('touchstart', e => {
+        if (!sesActive) return;
+        // Ignora swipe su video e timer
+        if (e.target.closest('.ses-video-scroll, .ses-timer, .ses-inputs')) return;
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+        swiping = true;
+    }, { passive: true });
+
+    document.addEventListener('touchend', e => {
+        if (!swiping || !sesActive) return;
+        swiping = false;
+        const dx = e.changedTouches[0].clientX - touchStartX;
+        const dy = e.changedTouches[0].clientY - touchStartY;
+        // Solo swipe prevalentemente orizzontali e > 60px
+        if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+            if (dx < 0) sesNextEx();  // swipe sinistra → prossimo
+            else sesPrevEx();          // swipe destra → precedente
+        }
+    }, { passive: true });
+})();
 function sesToggleVideo(videoEl) {
     if (videoEl.paused) {
         // Pausa tutti gli altri video nella sessione
@@ -2798,11 +3406,30 @@ function sesToggleVideo(videoEl) {
         videoEl.pause();
     }
 }
+function updateRpeColor(el) {
+    const val = parseInt(el.value) || 0;
+    let c = 'var(--tx)';
+    let bc = 'var(--brd)';
+    if (val >= 1 && val <= 5) { c = '#2ecc71'; bc = '#2ecc71'; }
+    else if (val === 6) { c = '#27ae60'; bc = '#27ae60'; }
+    else if (val === 7) { c = '#a8d948'; bc = '#a8d948'; }
+    else if (val === 8) { c = '#f1c40f'; bc = '#f1c40f'; }
+    else if (val === 9) { c = '#e67e22'; bc = '#e67e22'; }
+    else if (val === 10) { c = '#e74c3c'; bc = '#e74c3c'; }
+    el.style.color = c;
+    el.style.borderColor = bc;
+}
 function sesAdj(inputId, delta) {
     const el = document.getElementById(inputId);
     let val = parseFloat(el.value) || 0;
-    val = Math.max(0, val + delta);
+    val = val + delta;
+    if (inputId === 'sesRpe') {
+        val = Math.min(10, Math.max(1, val));
+    } else {
+        val = Math.max(0, val);
+    }
     el.value = val % 1 === 0 ? parseInt(val) : parseFloat(val.toFixed(1));
+    if (inputId === 'sesRpe') updateRpeColor(el);
     if (navigator.vibrate) navigator.vibrate(10);
 }
 
@@ -2852,7 +3479,7 @@ function sesCompleteSave() {
             eid: e.exerciseId, name: e.name, dt: new Date().toISOString(),
             dayId: curDay, s: doneS.length, r: avgR, w: maxW,
             rest: e.rest, seat: e.seat,
-            sd: e.sd.map(x => ({r: x.r, w: x.w}))
+            sd: e.sd.map(x => ({r: x.r, w: x.w, rpe: x.rpe || null}))
         });
     });
 
@@ -2880,11 +3507,11 @@ function sesShowSummary() {
     // Nascondi UI Sessione e mostra il Summary
     const exCard = document.getElementById('sesExCard');
     const sesNav = document.querySelector('.ses-nav');
-    const motivArea = document.querySelector('.ses-motiv-area');
+    const videoArea = document.getElementById('sesVideoArea');
     
     if (exCard) exCard.style.display = 'none';
     if (sesNav) sesNav.style.display = 'none';
-    if (motivArea) motivArea.style.display = 'none';
+    if (videoArea) videoArea.innerHTML = '';
 
     document.getElementById('sesSumMsg').textContent = 'Ottimo lavoro! 💪';
 
@@ -2978,7 +3605,13 @@ function toggleTheme() {
         document.getElementById('vHome').style.display = 'block';
         console.log('4. Rendering...');
         renderAll();
-        console.log('5. Done!');
+        // Auto-select input values on focus (faster data entry)
+        document.addEventListener('focus', e => {
+            if (e.target.matches('.ses-input, .set-input, .rpe-input, .ses-rpe-input')) {
+                setTimeout(() => e.target.select(), 50);
+            }
+        }, true);
+		console.log('5. Done!');
         toast('👋 Ciao ' + MIO + '!', 'info', 2000);
         // Registra Service Worker per PWA
         if ('serviceWorker' in navigator) {
