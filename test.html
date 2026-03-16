@@ -197,13 +197,13 @@
         /* ===== SET ROWS ===== */
         .sets-container { padding:0 16px 16px; }
 		.sets-grid-header {
-		    display:grid;grid-template-columns:36px 1fr 1fr 50px 32px;gap:8px;
+		    display:grid;grid-template-columns:36px 1fr 1fr 50px 44px;gap:8px;
 		    padding:0 4px 8px;color:var(--tx3);font-size:.65rem;
 		    text-transform:uppercase;font-weight:700;letter-spacing:.5px;
 		    text-align:center;
 		}
 		.set-row {
-		    display:grid;grid-template-columns:36px 1fr 1fr 50px 32px;gap:8px;
+		    display:grid;grid-template-columns:36px 1fr 1fr 50px 44px;gap:8px;
 		    align-items:center;margin-bottom:8px;padding:8px 4px;
 		    border-radius:12px;transition:all .3s ease;
 		    background:transparent;
@@ -249,10 +249,10 @@
         }
         .set-check.done:active { transform:scale(.95); }
 			.set-del {
-				 width:32px;height:32px;border-radius:50%;border:none;
-				 background:none;color:var(--tx3);font-size:.85rem;
-				 display:flex;align-items:center;justify-content:center;
-				 cursor:pointer;padding:0;transition:all .15s;
+			     width:44px;height:44px;border-radius:50%;border:none;
+			     background:none;color:var(--tx3);font-size:.95rem;
+			     display:flex;align-items:center;justify-content:center;
+			     cursor:pointer;padding:0;transition:all .15s;
 			}
 			.set-del:active { color:var(--red);transform:scale(.85); }
 
@@ -385,7 +385,7 @@
 		.rpe-input {
 		    width:100%;padding:8px 2px;text-align:center;border-radius:8px;
 		    border:1px solid var(--brd);background:var(--c2);color:var(--tx);
-		    font-size:.85rem;font-weight:700;font-family:inherit;min-height:36px;
+		    font-size:16px;font-weight:700;font-family:inherit;min-height:36px;
 		}
 		.rpe-input:focus { border-color:var(--acc); }
 		.tempo-field {
@@ -427,10 +427,10 @@
 		}
 		.ses-rpe-input:focus { border-color:var(--yel); }
 		.ses-rpe-adj {
-		    width:60px;height:30px;border-radius:8px;border:2px solid var(--brd);
+		    width:60px;height:36px;border-radius:8px;border:2px solid var(--brd);
 		    background:var(--c2);color:var(--yel);font-size:1rem;font-weight:800;
 		    display:flex;align-items:center;justify-content:center;
-		    cursor:pointer;padding:0;min-height:30px;
+		    cursor:pointer;padding:0;min-height:36px;
 		}
 		.ses-rpe-adj:active { background:var(--yel);color:#000; }
 		/* ===== PHASE INDICATOR ===== */
@@ -490,8 +490,8 @@
 
         /* ===== VIEW MODE STYLES ===== */
         .view-only .set-check { display:none; }
-			.view-only .sets-grid-header { grid-template-columns:36px 1fr 1fr 32px; }
-			.view-only .set-row { grid-template-columns:36px 1fr 1fr 32px; }
+		.view-only .sets-grid-header { grid-template-columns:36px 1fr 1fr 44px; }
+		.view-only .set-row { grid-template-columns:36px 1fr 1fr 44px; }
         .view-only .add-set-btn { display:none; }
         .view-only .ex-progress { display:none; }
         .view-only .progress-info { display:none; }
@@ -628,7 +628,7 @@ body.in-session .ses-nav { display:flex; }
 }
 .ses-media.open { max-height:260px; }
 .ses-media video {
-    width:100%;border-radius:12px;background:#000;max-height:240px;
+    width:100%;border-radius:12px;background:#000;max-height:300px;
 }
 .ses-video-box {
     border-radius:14px;overflow:hidden;border:1px solid var(--brd);
@@ -858,6 +858,59 @@ body.in-session .ses-nav { display:flex; }
 
 .mm-mini { margin:8px 0; }
 .mm-mini .muscle-map-wrap { gap:2px; }
+/* ===== REST TIMER ===== */
+.ses-timer {
+    position:fixed;inset:0;z-index:9999;
+    background:rgba(18,18,18,.96);
+    backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+    display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:6px;
+}
+[data-theme="light"] .ses-timer { background:rgba(240,242,245,.96); }
+.ses-timer-label {
+    font-size:.7rem;font-weight:800;color:var(--tx3);
+    text-transform:uppercase;letter-spacing:3px;margin-bottom:8px;
+}
+.ses-timer-ring-wrap {
+    position:relative;width:200px;height:200px;
+}
+.ses-timer-ring-wrap svg { position:absolute;inset:0; }
+.ses-timer-svg { transform:rotate(-90deg); }
+.ses-timer-track { fill:none;stroke:var(--c3);stroke-width:8; }
+.ses-timer-fill {
+    fill:none;stroke:var(--acc);stroke-width:8;
+    stroke-linecap:round;
+    transition:stroke-dashoffset 1s linear, stroke .3s;
+}
+.ses-timer-time {
+    position:absolute;inset:0;
+    display:flex;align-items:center;justify-content:center;
+    font-size:3rem;font-weight:900;color:var(--tx);
+    font-family:'SF Mono',Menlo,monospace;
+    font-variant-numeric:tabular-nums;
+}
+.ses-timer-next {
+    font-size:.82rem;color:var(--tx2);margin-top:12px;
+    text-align:center;max-width:280px;
+}
+.ses-timer-btns {
+    display:flex;gap:10px;margin-top:20px;align-items:center;
+}
+.ses-timer-adj {
+    padding:12px 20px;border-radius:12px;border:2px solid var(--brd);
+    background:var(--c2);color:var(--tx);font-weight:700;
+    font-size:.85rem;cursor:pointer;min-height:48px;
+    font-family:inherit;
+}
+.ses-timer-adj:active { background:var(--c3);transform:scale(.95); }
+.ses-timer-skip {
+    padding:14px 36px;border-radius:14px;border:none;
+    background:var(--acc);color:#000;font-weight:800;
+    font-size:1rem;cursor:pointer;min-height:52px;
+    box-shadow:0 4px 20px rgba(3,218,198,.3);
+    font-family:inherit;
+}
+.ses-timer-skip:active { transform:scale(.95);opacity:.85; }
         /* ===== MISC ===== */
         #confetti { position:fixed;inset:0;z-index:99999;pointer-events:none; }
         .emp { text-align:center;padding:30px;color:var(--tx3); }
@@ -975,7 +1028,24 @@ body.in-session .ses-nav { display:flex; }
         </div>
         <span class="ses-counter" id="sesExCount">1/5</span>
     </div>
-
+    <!-- Rest Timer Overlay -->
+    <div class="ses-timer" id="sesTimer" style="display:none;">
+        <div class="ses-timer-label">RECUPERO</div>
+        <div class="ses-timer-ring-wrap">
+            <svg width="200" height="200" class="ses-timer-svg">
+                <circle cx="100" cy="100" r="88" class="ses-timer-track"/>
+                <circle cx="100" cy="100" r="88" class="ses-timer-fill" id="sesTimerCircle"
+                    stroke-dasharray="553" stroke-dashoffset="0"/>
+            </svg>
+            <div class="ses-timer-time" id="sesTimerTime">1:30</div>
+        </div>
+        <div class="ses-timer-next" id="sesTimerNext"></div>
+        <div class="ses-timer-btns">
+            <button class="ses-timer-adj" onclick="adjRestTimer(-15)">−15s</button>
+            <button class="ses-timer-skip" onclick="skipRestTimer()">SALTA ▶</button>
+            <button class="ses-timer-adj" onclick="adjRestTimer(+15)">+15s</button>
+        </div>
+    </div>
     <!-- Esercizio corrente -->
     <div class="ses-exercise" id="sesExCard">
         <div class="ses-ex-name" id="sesExName">—</div>
@@ -1999,21 +2069,21 @@ function renEC(ex, showDrag, dragIdx) {
         <div style="display:flex;gap:6px;align-items:center;">
             <div style="flex:1;text-align:center;">
                 <input type="number" inputmode="numeric" class="set-input" value="${tEcc}"
-                    placeholder="0" min="0" max="10" style="font-size:.9rem;padding:8px 2px;"
+                    placeholder="0" min="0" max="10" style="font-size:16px;padding:8px 2px;"
                     oninput="updTempoField('${ex.uid}',0,this.value)">
                 <div style="font-size:.58rem;color:var(--tx3);margin-top:3px;">Eccentrica</div>
             </div>
             <span style="color:var(--tx3);font-weight:700;">-</span>
             <div style="flex:1;text-align:center;">
                 <input type="number" inputmode="numeric" class="set-input" value="${tPau}"
-                    placeholder="0" min="0" max="10" style="font-size:.9rem;padding:8px 2px;"
+                    placeholder="0" min="0" max="10" style="font-size:16px;padding:8px 2px;"
                     oninput="updTempoField('${ex.uid}',1,this.value)">
                 <div style="font-size:.58rem;color:var(--tx3);margin-top:3px;">Pausa</div>
             </div>
             <span style="color:var(--tx3);font-weight:700;">-</span>
             <div style="flex:1;text-align:center;">
                 <input type="number" inputmode="numeric" class="set-input" value="${tCon}"
-                    placeholder="0" min="0" max="10" style="font-size:.9rem;padding:8px 2px;"
+                    placeholder="0" min="0" max="10" style="font-size:16px;padding:8px 2px;"
                     oninput="updTempoField('${ex.uid}',2,this.value)">
                 <div style="font-size:.58rem;color:var(--tx3);margin-top:3px;">Concentrica</div>
             </div>
@@ -2834,7 +2904,8 @@ function launchSession() {
 function exitSession() {
     if (!confirm('Uscire dalla sessione?\nI progressi sono salvati.')) return;
     
-    // Ripristina la UI alla schermata della giornata
+    clearInterval(restTimerId);
+    document.getElementById('sesTimer').style.display = 'none';
     document.getElementById('vSession').style.display = 'none';
     document.getElementById('vDay').style.display = 'block';
     document.body.classList.remove('in-session');
@@ -2948,7 +3019,78 @@ function sesRender() {
             }
         }
     }
+// ============================================================
+// ⏱️ REST TIMER
+// ============================================================
+let restTimerId = null;
+let restTimeLeft = 0;
+let restTimeTotal = 0;
 
+function startRestTimer(seconds) {
+    if (seconds <= 0) return;
+    restTimeTotal = seconds;
+    restTimeLeft = seconds;
+    const overlay = document.getElementById('sesTimer');
+    const circle = document.getElementById('sesTimerCircle');
+    const circumference = 2 * Math.PI * 88;
+    circle.style.transition = 'none';
+    circle.style.strokeDasharray = circumference;
+    circle.style.strokeDashoffset = '0';
+    circle.style.stroke = 'var(--acc)';
+    overlay.style.display = 'flex';
+
+    // Mostra prossimo esercizio/set
+    const day = gD();
+    if (day && day.exs[sesExIdx]) {
+        const nextEx = day.exs[sesExIdx];
+        const nextSetIdx = sesGetCurrentSetIdx(nextEx);
+        const allDone = nextEx.sd.every(s => s.done);
+        document.getElementById('sesTimerNext').textContent = allDone
+            ? 'Prossimo → ' + nextEx.name + ' ✅'
+            : 'Prossimo → ' + nextEx.name + ' • Set ' + (nextSetIdx + 1);
+    }
+
+    // Forza reflow per l'animazione
+    void circle.offsetWidth;
+    circle.style.transition = 'stroke-dashoffset 1s linear, stroke .3s';
+
+    updateTimerDisplay();
+    clearInterval(restTimerId);
+    restTimerId = setInterval(() => {
+        restTimeLeft--;
+        updateTimerDisplay();
+        if (restTimeLeft <= 0) {
+            clearInterval(restTimerId);
+            overlay.style.display = 'none';
+            if (navigator.vibrate) navigator.vibrate([100, 50, 100, 50, 200]);
+        }
+    }, 1000);
+}
+
+function updateTimerDisplay() {
+    const mins = Math.floor(restTimeLeft / 60);
+    const secs = restTimeLeft % 60;
+    document.getElementById('sesTimerTime').textContent =
+        mins + ':' + String(secs).padStart(2, '0');
+    const circle = document.getElementById('sesTimerCircle');
+    const circumference = 2 * Math.PI * 88;
+    const progress = restTimeLeft / restTimeTotal;
+    circle.style.strokeDashoffset = circumference * (1 - progress);
+    circle.style.stroke = restTimeLeft <= 5 ? 'var(--red)' : 'var(--acc)';
+}
+
+function skipRestTimer() {
+    clearInterval(restTimerId);
+    document.getElementById('sesTimer').style.display = 'none';
+    if (navigator.vibrate) navigator.vibrate(15);
+}
+
+function adjRestTimer(delta) {
+    restTimeLeft = Math.max(5, restTimeLeft + delta);
+    if (restTimeLeft > restTimeTotal) restTimeTotal = restTimeLeft;
+    updateTimerDisplay();
+    if (navigator.vibrate) navigator.vibrate(10);
+}
     // Set dots (aggiorna sempre)
     const curSetIdx = sesGetCurrentSetIdx(ex);
     const allSetsDone = ex.sd.every(s => s.done);
@@ -3121,15 +3263,16 @@ function sesCheck() {
         sesRender();
         setTimeout(() => sesShowSummary(), 500);
     } else if (nextExIdx !== sesExIdx && nextExIdx !== -1) {
-        // Superserie → transizione rapida, esercizio normale → un po' più lenta
         const delay = ex.ssG ? 150 : 400;
         sesRender();
         setTimeout(() => {
             sesExIdx = nextExIdx;
             sesRender();
+            startRestTimer(ex.ssG ? 15 : (ex.rest || 90));
         }, delay);
     } else {
         sesRender();
+        startRestTimer(ex.rest || 90);
     }
 }
 
@@ -3148,6 +3291,33 @@ function sesNextEx() {
         sesRender();
     }
 }
+// ============================================================
+// 👆 SWIPE GESTURES (Session)
+// ============================================================
+(function() {
+    let touchStartX = 0, touchStartY = 0, swiping = false;
+
+    document.addEventListener('touchstart', e => {
+        if (!sesActive) return;
+        // Ignora swipe su video e timer
+        if (e.target.closest('.ses-video-scroll, .ses-timer, .ses-inputs')) return;
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+        swiping = true;
+    }, { passive: true });
+
+    document.addEventListener('touchend', e => {
+        if (!swiping || !sesActive) return;
+        swiping = false;
+        const dx = e.changedTouches[0].clientX - touchStartX;
+        const dy = e.changedTouches[0].clientY - touchStartY;
+        // Solo swipe prevalentemente orizzontali e > 60px
+        if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+            if (dx < 0) sesNextEx();  // swipe sinistra → prossimo
+            else sesPrevEx();          // swipe destra → precedente
+        }
+    }, { passive: true });
+})();
 function sesToggleVideo(videoEl) {
     if (videoEl.paused) {
         // Pausa tutti gli altri video nella sessione
@@ -3358,7 +3528,13 @@ function toggleTheme() {
         document.getElementById('vHome').style.display = 'block';
         console.log('4. Rendering...');
         renderAll();
-        console.log('5. Done!');
+        // Auto-select input values on focus (faster data entry)
+        document.addEventListener('focus', e => {
+            if (e.target.matches('.ses-input, .set-input, .rpe-input, .ses-rpe-input')) {
+                setTimeout(() => e.target.select(), 50);
+            }
+        }, true);
+		console.log('5. Done!');
         toast('👋 Ciao ' + MIO + '!', 'info', 2000);
         // Registra Service Worker per PWA
         if ('serviceWorker' in navigator) {
