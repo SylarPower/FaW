@@ -982,6 +982,10 @@ body.in-session .ses-nav { display:flex; }
             <input id="iDay" placeholder="es. Push, Pull, Gambe..." style="flex:1;margin:0;">
             <button class="bp" onclick="addDay()" style="white-space:nowrap;">+ Giorno</button>
         </div>
+        <div style="display:flex;gap:6px;margin-bottom:14px;">
+            <button class="tb" onclick="exportAll()" style="flex:1;font-size:.72rem;">📤 Esporta Tutto</button>
+            <button class="tb" onclick="openImport()" style="flex:1;font-size:.72rem;">📥 Importa</button>
+        </div>
         <div id="dList"></div>
     </div>
 </div>
@@ -999,6 +1003,10 @@ body.in-session .ses-nav { display:flex; }
                 display:flex;align-items:center;justify-content:center;gap:10px;">
                 ▶️ INIZIA ALLENAMENTO
             </button>
+        </div>
+        <div style="display:flex;gap:6px;margin-bottom:14px;">
+            <button class="tb" onclick="exportDay()" style="flex:1;font-size:.72rem;">📤 Esporta Giornata</button>
+            <button class="tb" onclick="openImport()" style="flex:1;font-size:.72rem;">📥 Importa</button>
         </div>
 
         <div class="mm-bg" style="margin-bottom:14px;">
@@ -1306,7 +1314,38 @@ body.in-session .ses-nav { display:flex; }
     <button class="bs" onclick="document.getElementById('mProg').style.display='none'" style="width:100%;margin-top:12px;">Chiudi</button>
 </div>
 </div>
+<!-- MODAL: EXPORT -->
+<div id="mExport" class="modal" onclick="if(event.target===this)this.style.display='none'">
+<div class="mc">
+    <h2 id="expTitle">📤 Esporta Scheda</h2>
+    <textarea id="expText" rows="12" readonly
+        style="font-size:.72rem;font-family:'SF Mono',Menlo,monospace;
+        line-height:1.5;-webkit-user-select:all;user-select:all;"></textarea>
+    <div style="display:flex;gap:8px;margin-top:12px;">
+        <button class="bs" onclick="document.getElementById('mExport').style.display='none'" style="flex:1;">Chiudi</button>
+        <button class="bp" onclick="copyExport()" style="flex:1;">📋 Copia</button>
+    </div>
+</div>
+</div>
 
+<!-- MODAL: IMPORT -->
+<div id="mImport" class="modal" onclick="if(event.target===this)this.style.display='none'">
+<div class="mc">
+    <h2>📥 Importa Scheda</h2>
+    <p style="font-size:.72rem;color:var(--tx2);text-align:center;margin-bottom:8px;">
+        Incolla il testo di una scheda esportata. Le giornate verranno aggiunte a quelle esistenti.
+    </p>
+    <textarea id="impText" rows="12" placeholder="Incolla qui il testo della scheda..."
+        style="font-size:.72rem;font-family:'SF Mono',Menlo,monospace;line-height:1.5;"></textarea>
+    <div id="impPreview" style="display:none;margin-top:8px;padding:10px;border-radius:10px;
+        background:var(--c2);border:1px solid var(--brd);font-size:.75rem;color:var(--tx2);"></div>
+    <div style="display:flex;gap:8px;margin-top:12px;">
+        <button class="bs" onclick="document.getElementById('mImport').style.display='none'" style="flex:1;">Annulla</button>
+        <button class="tb" onclick="previewImport()" style="flex:1;">👁️ Anteprima</button>
+        <button class="bp" onclick="doImport()" style="flex:1;">📥 Importa</button>
+    </div>
+</div>
+</div>
 <!-- MUSCLE MAP TEMPLATE (nascosto) -->
 <div id="muscleMapTpl" style="display:none;">
 
@@ -3616,6 +3655,249 @@ function sesShowSummary() {
 
     document.getElementById('sesSummary').style.display = 'flex';
     fireConfetti();
+}
+// ============================================================
+// 📤📥 IMPORT / EXPORT
+// ============================================================
+
+// ============================================================
+// 📤📥 IMPORT / EXPORT (formato CSV)
+// ============================================================
+const CSV_SEP = ';';
+const CSV_HEADER = 'GIORNO;ESERCIZIO;ID;SERIE;REPS;KG;RPE;TEMPO;RECUPERO;SUPERSERIE;NOTE';
+
+function exportDay() {
+    const day = gD();
+    if (!day) return;
+    document.getElementById('expTitle').textContent = '📤 ' + day.name;
+    document.getElementById('expText').value = CSV_HEADER + '\n' + exportDayToCSV(day);
+    document.getElementById('mExport').style.display = 'flex';
+}
+
+function exportAll() {
+    if (!D.days.length) { toast('Nessuna giornata da esportare', 'warn'); return; }
+    let csv = CSV_HEADER + '\n';
+    D.days.forEach(d => { csv += exportDayToCSV(d) + '\n'; });
+    document.getElementById('expTitle').textContent = '📤 Tutte le Giornate (' + D.days.length + ')';
+    document.getElementById('expText').value = csv.trim();
+    document.getElementById('mExport').style.display = 'flex';
+}
+
+function exportDayToCSV(day) {
+    const lines = [];
+    // Mappa superserie → lettera (A, B, C...)
+    const ssMap = {};
+    let ssCounter = 0;
+    day.exs.forEach(ex => {
+        if (ex.ssG && !ssMap[ex.ssG]) {
+            ssMap[ex.ssG] = String.fromCharCode(65 + ssCounter);
+            ssCounter++;
+        }
+    });
+
+    day.exs.forEach(ex => {
+        const ssLabel = ex.ssG ? ssMap[ex.ssG] : '';
+        const tempo = ex.tempo || '';
+        const rest = ex.rest || '';
+        const note = (ex.note || '').replace(/;/g, ',').replace(/\n/g, ' ');
+
+        if (ex.sd && ex.sd.length) {
+            ex.sd.forEach((s, i) => {
+                lines.push([
+                    day.name,
+                    ex.name,
+                    ex.exerciseId,
+                    i + 1,
+                    s.r || 0,
+                    s.w || 0,
+                    s.rpe || '',
+                    i === 0 ? tempo : '',
+                    i === 0 ? rest : '',
+                    i === 0 ? ssLabel : '',
+                    i === 0 ? note : ''
+                ].join(CSV_SEP));
+            });
+        } else {
+            lines.push([
+                day.name, ex.name, ex.exerciseId,
+                1, 0, 0, '', tempo, rest, ssLabel, note
+            ].join(CSV_SEP));
+        }
+    });
+
+    return lines.join('\n');
+}
+
+function copyExport() {
+    const text = document.getElementById('expText').value;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => {
+            toast('📋 Copiato negli appunti!', 'ok');
+        }).catch(() => fallbackCopy());
+    } else {
+        fallbackCopy();
+    }
+}
+
+function fallbackCopy() {
+    const el = document.getElementById('expText');
+    el.select();
+    el.setSelectionRange(0, 99999);
+    document.execCommand('copy');
+    toast('📋 Copiato!', 'ok');
+}
+
+// === IMPORT ===
+function openImport() {
+    document.getElementById('impText').value = '';
+    document.getElementById('impPreview').style.display = 'none';
+    document.getElementById('mImport').style.display = 'flex';
+    setTimeout(() => document.getElementById('impText').focus(), 350);
+}
+
+function previewImport() {
+    const text = document.getElementById('impText').value.trim();
+    if (!text) { toast('Incolla prima il testo', 'warn'); return; }
+    try {
+        const days = parseCSVImport(text);
+        if (!days.length) { toast('Nessuna giornata trovata', 'warn'); return; }
+
+        let html = '<b style="color:var(--acc);">Trovate ' + days.length + ' giornate:</b>';
+        days.forEach(d => {
+            const nEx = d.exs.length;
+            const nSets = d.exs.reduce((a, e) => a + (e.sd ? e.sd.length : 0), 0);
+            const nSS = new Set(d.exs.filter(e => e.ssG).map(e => e.ssG)).size;
+            html += '<div style="margin-top:6px;padding:6px 10px;background:var(--c3);border-radius:8px;">';
+            html += '<b>' + d.name + '</b> — ' + nEx + ' esercizi, ' + nSets + ' serie';
+            if (nSS) html += ', ' + nSS + ' superserie';
+            html += '</div>';
+        });
+
+        document.getElementById('impPreview').innerHTML = html;
+        document.getElementById('impPreview').style.display = 'block';
+    } catch(e) {
+        toast('❌ Errore: ' + e.message, 'err');
+    }
+}
+
+function doImport() {
+    const text = document.getElementById('impText').value.trim();
+    if (!text) { toast('Incolla il testo della scheda', 'warn'); return; }
+
+    try {
+        const days = parseCSVImport(text);
+        if (!days.length) { toast('Nessuna giornata trovata', 'warn'); return; }
+
+        const names = days.map(d => d.name + ' (' + d.exs.length + ' esercizi)');
+        if (!confirm('Importare ' + days.length + ' giornate?\n\n' + names.join('\n'))) return;
+
+        days.forEach(d => D.days.push(d));
+        save();
+        document.getElementById('mImport').style.display = 'none';
+
+        if (curDay) renDay();
+        renderAll();
+
+        toast('📥 ' + days.length + ' giornate importate!', 'ok');
+        if (navigator.vibrate) navigator.vibrate([30, 15, 30]);
+    } catch(e) {
+        console.error('Import error:', e);
+        toast('❌ Errore: ' + e.message, 'err');
+    }
+}
+
+function parseCSVImport(text) {
+    const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+
+    // Salta header se presente
+    let startIdx = 0;
+    if (lines[0] && lines[0].toUpperCase().startsWith('GIORNO')) {
+        startIdx = 1;
+    }
+
+    const daysMap = {};       // name → day object
+    const dayOrder = [];      // ordine di apparizione
+    const exMap = {};         // dayName+exId+exName → exercise object
+    const exOrderMap = {};    // dayName → array di chiavi esercizi
+    const ssMapGlobal = {};   // dayName+ssLetter → ssGroupId
+
+    for (let i = startIdx; i < lines.length; i++) {
+        const cols = lines[i].split(';');
+        if (cols.length < 5) continue;
+
+        const dayName = (cols[0] || '').trim();
+        const exName  = (cols[1] || '').trim();
+        const exId    = (cols[2] || '').trim();
+        const setNum  = parseInt(cols[3]) || 1;
+        const reps    = parseInt(cols[4]) || 0;
+        const kg      = parseFloat(cols[5]) || 0;
+        const rpe     = cols[6] ? (parseInt(cols[6]) || null) : null;
+        const tempo   = (cols[7] || '').trim();
+        const rest    = parseInt(cols[8]) || 0;
+        const ssLabel = (cols[9] || '').trim();
+        const note    = (cols[10] || '').trim();
+
+        if (!dayName || !exName) continue;
+
+        // Crea giornata se non esiste
+        if (!daysMap[dayName]) {
+            daysMap[dayName] = { id: uid(), name: dayName, exs: [] };
+            dayOrder.push(dayName);
+            exOrderMap[dayName] = [];
+        }
+
+        // Chiave univoca esercizio (per raggruppare le serie)
+        const exKey = dayName + '|' + exId + '|' + exName;
+
+        if (!exMap[exKey]) {
+            // Calcola superserie
+            let ssG = null;
+            if (ssLabel) {
+                const ssKey = dayName + '|' + ssLabel;
+                if (!ssMapGlobal[ssKey]) ssMapGlobal[ssKey] = uid();
+                ssG = ssMapGlobal[ssKey];
+            }
+
+            exMap[exKey] = {
+                uid: uid(),
+                exerciseId: exId,
+                name: exName,
+                sd: [],
+                rest: rest,
+                seat: '',
+                ssG: ssG,
+                pF: false,
+                note: note,
+                tempo: tempo
+            };
+            exOrderMap[dayName].push(exKey);
+        } else {
+            // Aggiorna campi se la prima riga non li aveva
+            if (tempo && !exMap[exKey].tempo) exMap[exKey].tempo = tempo;
+            if (rest && !exMap[exKey].rest) exMap[exKey].rest = rest;
+            if (note && !exMap[exKey].note) exMap[exKey].note = note;
+        }
+
+        // Aggiungi serie
+        exMap[exKey].sd.push({
+            r: reps,
+            w: kg,
+            rpe: rpe,
+            done: false
+        });
+    }
+
+    // Assembla giornate nell'ordine corretto
+    const days = [];
+    dayOrder.forEach(dayName => {
+        const day = daysMap[dayName];
+        exOrderMap[dayName].forEach(exKey => {
+            day.exs.push(exMap[exKey]);
+        });
+        days.push(day);
+    });
+
+    return days;
 }
 // ============================================================
 // 🎊 CONFETTI
