@@ -2051,7 +2051,7 @@ function renEC(ex, showDrag, dragIdx) {
         ${dragHandle}
         <div class="ex-info" style="flex:1;min-width:0;">
             <h4 style="margin:0;font-size:.9rem;">${ex.name}</h4>
-            <small>${d ? d.group : ''}</small>
+            <small>${d && d.groups ? d.groups.join(' · ') : ''}</small>
         </div>
         <div style="display:flex;align-items:center;gap:8px;">
             <span class="ex-summary-badge ${allDone ? 'done-badge' : 'todo-badge'}">
@@ -2108,6 +2108,7 @@ function renEC(ex, showDrag, dragIdx) {
             <button class="set-del" onclick="remSet('${ex.uid}',${i})" title="Elimina serie">✕</button>
         </div>`;
     });
+    h += `<button class="add-set-btn" onclick="addSet('${ex.uid}')">+ Aggiungi Serie</button>`;
     // Campo tempo smart
     const tp = (ex.tempo || '').split('-');
     const tEcc = tp[0] || '';
@@ -2160,7 +2161,6 @@ function renEC(ex, showDrag, dragIdx) {
             style="font-size:.8rem;padding:10px 12px;"
             oninput="updNote('${ex.uid}',this.value)">${ex.note || ''}</textarea>
     </div>`;
-    h += `<button class="add-set-btn" onclick="addSet('${ex.uid}')">+ Aggiungi Serie</button>`;
 
     h += `</div>`; // chiude ex-body
     h += `</div>`; // chiude ex-card
@@ -2497,7 +2497,7 @@ function openSSModal(exUid) {
             <div class="ss-check-mark">${inSame ? '✓' : ''}</div>
             <div style="flex:1;min-width:0;">
                 <div class="ss-option-name">${e.name}</div>
-                <div class="ss-option-detail">${def ? def.group : ''} • ${e.sd ? e.sd.length : 0} serie</div>
+                <div class="ss-option-detail">${def && def.groups ? def.groups.join(' · ') : ''} • ${e.sd ? e.sd.length : 0} serie</div>
             </div>
         </div>`;
     });
@@ -2815,7 +2815,7 @@ function filEx() {
         <div class="exo" onclick="addEx('${e.id}')">
             <div style="flex:1">
                 <div class="on">${e.name}</div>
-                <div class="om">${e.group} • ${e.eq}${e.muscles.length > 1 ? ' • ' + e.muscles.join(', ') : ''}</div>
+                <div class="om">${e.groups ? e.groups.join(' · ') : e.group} • ${e.eq}</div>
             </div>
             <span style="color:var(--acc);font-weight:bold;font-size:.82rem;">+ Aggiungi</span>
         </div>`).join('')
@@ -3059,7 +3059,7 @@ function sesRender() {
         document.getElementById('sesExName').textContent = ex.name;
 
         // Dettaglio + badge superserie
-        let detailHTML = def ? (def.group + ' • ' + def.eq) : '';
+        let detailHTML = def ? ((def.groups ? def.groups.join(' · ') : def.group) + ' • ' + def.eq) : '';
         if (ex.ssG) {
             const ssGroup = day.exs.filter(e => e.ssG === ex.ssG);
             const ssNames = ssGroup.map(e => e.name);
