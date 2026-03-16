@@ -1335,7 +1335,7 @@ body.in-session .ses-nav { display:flex; }
     <p style="font-size:.72rem;color:var(--tx2);text-align:center;margin-bottom:8px;">
         Incolla il testo di una scheda esportata. Le giornate verranno aggiunte a quelle esistenti.
     </p>
-    <textarea id="impText" rows="12" placeholder="Incolla qui il testo della scheda..."
+        <textarea id="impText" rows="12" placeholder="Incolla qui dal foglio o dall'export.&#10;Formato: GIORNO  N  ESERCIZIO  ID_ES  SERIE  REP  RECUPERO  CARICO  TEMPO  RPE  NOTE&#10;Separatore TAB o ; (auto-detect)"
         style="font-size:.72rem;font-family:'SF Mono',Menlo,monospace;line-height:1.5;"></textarea>
     <div id="impPreview" style="display:none;margin-top:8px;padding:10px;border-radius:10px;
         background:var(--c2);border:1px solid var(--brd);font-size:.75rem;color:var(--tx2);"></div>
@@ -3657,75 +3657,115 @@ function sesShowSummary() {
     fireConfetti();
 }
 // ============================================================
-// 📤📥 IMPORT / EXPORT
+// 📤📥 IMPORT / EXPORT (formato unico)
 // ============================================================
+const CSV_HEADER = 'GIORNO\tN\tESERCIZIO\tID_ES\tSERIE\tREP\tRECUPERO\tCARICO\tTEMPO\tRPE\tNOTE';
 
-// ============================================================
-// 📤📥 IMPORT / EXPORT (formato CSV)
-// ============================================================
-const CSV_SEP = ';';
-const CSV_HEADER = 'GIORNO;ESERCIZIO;ID;SERIE;REPS;KG;RPE;TEMPO;RECUPERO;SUPERSERIE;NOTE';
+function detectSep(text) {
+    const first = text.split('\n')[0] || '';
+    return first.includes('\t') ? '\t' : ';';
+}
 
 function exportDay() {
     const day = gD();
     if (!day) return;
     document.getElementById('expTitle').textContent = '📤 ' + day.name;
-    document.getElementById('expText').value = CSV_HEADER + '\n' + exportDayToCSV(day);
+    document.getElementById('expText').value = CSV_HEADER + '\n' + exportDayToText(day);
     document.getElementById('mExport').style.display = 'flex';
 }
 
 function exportAll() {
     if (!D.days.length) { toast('Nessuna giornata da esportare', 'warn'); return; }
-    let csv = CSV_HEADER + '\n';
-    D.days.forEach(d => { csv += exportDayToCSV(d) + '\n'; });
+    let out = CSV_HEADER + '\n';
+    D.days.forEach(d => { out += exportDayToText(d) + '\n'; });
     document.getElementById('expTitle').textContent = '📤 Tutte le Giornate (' + D.days.length + ')';
-    document.getElementById('expText').value = csv.trim();
+    document.getElementById('expText').value = out.trim();
     document.getElementById('mExport').style.display = 'flex';
 }
 
-function exportDayToCSV(day) {
+function exportDayToText(day) {
     const lines = [];
-    // Mappa superserie → lettera (A, B, C...)
-    const ssMap = {};
-    let ssCounter = 0;
-    day.exs.forEach(ex => {
-        if (ex.ssG && !ssMap[ex.ssG]) {
-            ssMap[ex.ssG] = String.fromCharCode(65 + ssCounter);
-            ssCounter++;
-        }
-    });
+    // Mappa superserie → numero + lettera progressiva
+    const ssGroups = {};
+    let ssNum = 1;
+    const rendered = new Set();
 
     day.exs.forEach(ex => {
-        const ssLabel = ex.ssG ? ssMap[ex.ssG] : '';
-        const tempo = ex.tempo || '';
-        const rest = ex.rest || '';
-        const note = (ex.note || '').replace(/;/g, ',').replace(/\n/g, ' ');
+        if (rendered.has(ex.uid)) return;
 
-        if (ex.sd && ex.sd.length) {
-            ex.sd.forEach((s, i) => {
-                lines.push([
-                    day.name,
-                    ex.name,
-                    ex.exerciseId,
-                    i + 1,
-                    s.r || 0,
-                    s.w || 0,
-                    s.rpe || '',
-                    i === 0 ? tempo : '',
-                    i === 0 ? rest : '',
-                    i === 0 ? ssLabel : '',
-                    i === 0 ? note : ''
-                ].join(CSV_SEP));
+        if (ex.ssG) {
+            const group = day.exs.filter(e => e.ssG === ex.ssG);
+            if (!ssGroups[ex.ssG]) {
+                ssGroups[ex.ssG] = ssNum;
+                ssNum++;
+            }
+            const num = ssGroups[ex.ssG];
+            const letters = 'abcdefgh';
+            group.forEach((gex, gi) => {
+                lines.push(exportExLine(day.name, num + letters[gi], gex));
+                rendered.add(gex.uid);
             });
         } else {
-            lines.push([
-                day.name, ex.name, ex.exerciseId,
-                1, 0, 0, '', tempo, rest, ssLabel, note
-            ].join(CSV_SEP));
+            lines.push(exportExLine(day.name, String(ssNum), ex));
+            ssNum++;
+            rendered.add(ex.uid);
         }
     });
 
     return lines.join('\n');
+}
+
+function exportExLine(dayName, numField, ex) {
+    const serieCount = ex.sd ? ex.sd.length : 0;
+
+    // Reps: se tutte uguali → "10", se diverse → "10-8-6"
+    let repStr = '';
+    if (ex.sd && ex.sd.length) {
+        const reps = ex.sd.map(s => s.r || 0);
+        const allSame = reps.every(r => r === reps[0]);
+        repStr = allSame ? String(reps[0]) : reps.join('-');
+    }
+
+    // Carico: prendi dal primo set con peso > 0
+    let caricoStr = '';
+    if (ex.sd && ex.sd.length) {
+        const w = ex.sd.find(s => s.w > 0);
+        if (w) caricoStr = w.w + ' kg';
+    }
+
+    // Recupero
+    let recStr = '';
+    if (ex.rest && ex.rest > 0) recStr = ex.rest + 's';
+
+    // Tempo
+    let tempoStr = '';
+    if (ex.tempo && ex.tempo.split('-').some(p => p && p !== '0')) {
+        tempoStr = ex.tempo;
+    }
+
+    // RPE: prendi dal primo set con RPE
+    let rpeStr = '';
+    if (ex.sd && ex.sd.length) {
+        const rpeSet = ex.sd.find(s => s.rpe);
+        if (rpeSet) rpeStr = String(rpeSet.rpe);
+    }
+
+    // Note
+    const noteStr = (ex.note || '').replace(/\t/g, ' ').replace(/\n/g, ' ');
+
+    return [
+        dayName,
+        numField,
+        ex.name,
+        ex.exerciseId,
+        serieCount,
+        repStr,
+        recStr,
+        caricoStr,
+        tempoStr,
+        rpeStr,
+        noteStr
+    ].join('\t');
 }
 
 function copyExport() {
@@ -3759,7 +3799,7 @@ function previewImport() {
     const text = document.getElementById('impText').value.trim();
     if (!text) { toast('Incolla prima il testo', 'warn'); return; }
     try {
-        const days = parseCSVImport(text);
+        const days = parseImport(text);
         if (!days.length) { toast('Nessuna giornata trovata', 'warn'); return; }
 
         let html = '<b style="color:var(--acc);">Trovate ' + days.length + ' giornate:</b>';
@@ -3785,7 +3825,7 @@ function doImport() {
     if (!text) { toast('Incolla il testo della scheda', 'warn'); return; }
 
     try {
-        const days = parseCSVImport(text);
+        const days = parseImport(text);
         if (!days.length) { toast('Nessuna giornata trovata', 'warn'); return; }
 
         const names = days.map(d => d.name + ' (' + d.exs.length + ' esercizi)');
@@ -3806,98 +3846,110 @@ function doImport() {
     }
 }
 
-function parseCSVImport(text) {
+function parseImport(text) {
     const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+    if (!lines.length) return [];
 
-    // Salta header se presente
+    const sep = detectSep(text);
+
+    // Salta header
     let startIdx = 0;
-    if (lines[0] && lines[0].toUpperCase().startsWith('GIORNO')) {
+    const firstCols = lines[0].split(sep).map(c => c.trim().toUpperCase());
+    if (firstCols.includes('GIORNO') || firstCols.includes('ESERCIZIO')) {
         startIdx = 1;
     }
 
-    const daysMap = {};       // name → day object
-    const dayOrder = [];      // ordine di apparizione
-    const exMap = {};         // dayName+exId+exName → exercise object
-    const exOrderMap = {};    // dayName → array di chiavi esercizi
-    const ssMapGlobal = {};   // dayName+ssLetter → ssGroupId
+    const daysMap = {};
+    const dayOrder = [];
+    const ssMapGlobal = {};
 
     for (let i = startIdx; i < lines.length; i++) {
-        const cols = lines[i].split(';');
-        if (cols.length < 5) continue;
+        const cols = lines[i].split(sep).map(c => c.trim());
+        if (cols.length < 4) continue;
 
-        const dayName = (cols[0] || '').trim();
-        const exName  = (cols[1] || '').trim();
-        const exId    = (cols[2] || '').trim();
-        const setNum  = parseInt(cols[3]) || 1;
-        const reps    = parseInt(cols[4]) || 0;
-        const kg      = parseFloat(cols[5]) || 0;
-        const rpe     = cols[6] ? (parseInt(cols[6]) || null) : null;
-        const tempo   = (cols[7] || '').trim();
-        const rest    = parseInt(cols[8]) || 0;
-        const ssLabel = (cols[9] || '').trim();
-        const note    = (cols[10] || '').trim();
+        const dayName  = cols[0] || '';
+        const numField = cols[1] || '';
+        const exName   = cols[2] || '';
+        const exId     = cols[3] || '';
+        const serieNum = parseInt(cols[4]) || 1;
+        const repField = cols[5] || '';
+        const recField = cols[6] || '';
+        const carico   = cols[7] || '';
+        const tempo    = cols[8] || '';
+        const rpeField = cols[9] || '';
+        const note     = cols[10] || '';
 
         if (!dayName || !exName) continue;
 
-        // Crea giornata se non esiste
+        // Crea giornata
         if (!daysMap[dayName]) {
             daysMap[dayName] = { id: uid(), name: dayName, exs: [] };
             dayOrder.push(dayName);
-            exOrderMap[dayName] = [];
         }
 
-        // Chiave univoca esercizio (per raggruppare le serie)
-        const exKey = dayName + '|' + exId + '|' + exName;
+        // Detect superserie dal campo N (es. 2a, 2b, 5a, 5b)
+        let ssG = null;
+        const ssMatch = numField.match(/^(\d+)([a-z])$/i);
+        if (ssMatch) {
+            const ssKey = dayName + '|' + ssMatch[1];
+            if (!ssMapGlobal[ssKey]) ssMapGlobal[ssKey] = uid();
+            ssG = ssMapGlobal[ssKey];
+        }
 
-        if (!exMap[exKey]) {
-            // Calcola superserie
-            let ssG = null;
-            if (ssLabel) {
-                const ssKey = dayName + '|' + ssLabel;
-                if (!ssMapGlobal[ssKey]) ssMapGlobal[ssKey] = uid();
-                ssG = ssMapGlobal[ssKey];
-            }
+        // Parse reps: "10", "12-15" → prende il primo numero
+        let reps = parseInt(repField) || 0;
 
-            exMap[exKey] = {
-                uid: uid(),
-                exerciseId: exId,
-                name: exName,
-                sd: [],
-                rest: rest,
-                seat: '',
-                ssG: ssG,
-                pF: false,
-                note: note,
-                tempo: tempo
-            };
-            exOrderMap[dayName].push(exKey);
+        // Parse recupero: "120s", "60s", "120", ""
+        let rest = 0;
+        const restMatch = recField.match(/(\d+)/);
+        if (restMatch) rest = parseInt(restMatch[1]) || 0;
+
+        // Parse carico/peso: "50 kg", "14+14 kg", "50", "Corpo", "Leggero", ""
+        let weight = 0;
+        const dblMatch = carico.match(/([\d.]+)\s*\+\s*([\d.]+)/);
+        if (dblMatch) {
+            weight = parseFloat(dblMatch[1]) || 0;
         } else {
-            // Aggiorna campi se la prima riga non li aveva
-            if (tempo && !exMap[exKey].tempo) exMap[exKey].tempo = tempo;
-            if (rest && !exMap[exKey].rest) exMap[exKey].rest = rest;
-            if (note && !exMap[exKey].note) exMap[exKey].note = note;
+            const kgMatch = carico.match(/([\d.]+)/);
+            if (kgMatch) weight = parseFloat(kgMatch[1]) || 0;
         }
 
-        // Aggiungi serie
-        exMap[exKey].sd.push({
-            r: reps,
-            w: kg,
-            rpe: rpe,
-            done: false
+        // Parse tempo: "3-1-2", ""
+        let tempoClean = '';
+        if (tempo && tempo.match(/\d+-\d+-\d+/)) {
+            tempoClean = tempo;
+        }
+
+        // Parse RPE: "7", "8-9" → prende il primo numero, ""
+        let rpe = null;
+        const rpeMatch = rpeField.match(/(\d+)/);
+        if (rpeMatch) rpe = parseInt(rpeMatch[1]) || null;
+
+        // Pulisci nome (rimuovi "SS " prefix)
+        let cleanName = exName;
+        if (cleanName.match(/^SS\s+/i)) cleanName = cleanName.replace(/^SS\s+/i, '');
+
+        // Genera serie
+        const sd = [];
+        for (let s = 0; s < serieNum; s++) {
+            sd.push({ r: reps, w: weight, rpe: rpe, done: false });
+        }
+
+        daysMap[dayName].exs.push({
+            uid: uid(),
+            exerciseId: exId || cleanName.replace(/\s+/g, '_'),
+            name: cleanName,
+            sd: sd,
+            rest: rest,
+            seat: '',
+            ssG: ssG,
+            pF: false,
+            note: note,
+            tempo: tempoClean
         });
     }
 
-    // Assembla giornate nell'ordine corretto
-    const days = [];
-    dayOrder.forEach(dayName => {
-        const day = daysMap[dayName];
-        exOrderMap[dayName].forEach(exKey => {
-            day.exs.push(exMap[exKey]);
-        });
-        days.push(day);
-    });
-
-    return days;
+    return dayOrder.map(name => daysMap[name]);
 }
 // ============================================================
 // 🎊 CONFETTI
