@@ -197,13 +197,13 @@
         /* ===== SET ROWS ===== */
         .sets-container { padding:0 16px 16px; }
 		.sets-grid-header {
-		    display:grid;grid-template-columns:36px 1fr 1fr 32px;gap:8px;
+		    display:grid;grid-template-columns:36px 1fr 1fr 50px 32px;gap:8px;
 		    padding:0 4px 8px;color:var(--tx3);font-size:.65rem;
 		    text-transform:uppercase;font-weight:700;letter-spacing:.5px;
 		    text-align:center;
 		}
 		.set-row {
-		    display:grid;grid-template-columns:36px 1fr 1fr 32px;gap:8px;
+		    display:grid;grid-template-columns:36px 1fr 1fr 50px 32px;gap:8px;
 		    align-items:center;margin-bottom:8px;padding:8px 4px;
 		    border-radius:12px;transition:all .3s ease;
 		    background:transparent;
@@ -381,7 +381,93 @@
             margin-top:4px;transition:all .2s;min-height:44px;
         }
         .add-set-btn:active { border-color:var(--acc);color:var(--acc); }
-
+		/* ===== RPE & TEMPO ===== */
+		.rpe-input {
+		    width:100%;padding:8px 2px;text-align:center;border-radius:8px;
+		    border:1px solid var(--brd);background:var(--c2);color:var(--tx);
+		    font-size:.85rem;font-weight:700;font-family:inherit;min-height:36px;
+		}
+		.rpe-input:focus { border-color:var(--acc); }
+		.tempo-field {
+		    display:flex;align-items:center;gap:8px;padding:8px 0;
+		}
+		.tempo-field label {
+		    font-size:.72rem;color:var(--tx2);font-weight:600;white-space:nowrap;
+		}
+		.tempo-field input {
+		    width:100px;padding:8px 10px;font-size:.85rem;text-align:center;
+		    font-family:'SF Mono',Menlo,monospace;
+		}
+		/* ===== SUGGESTION BANNER ===== */
+		.ses-suggestion {
+		    width:100%;max-width:380px;margin-bottom:12px;padding:12px 16px;
+		    border-radius:14px;background:var(--c2);border:1px solid var(--brd);
+		    text-align:center;
+		}
+		.ses-sug-last {
+		    font-size:.72rem;color:var(--tx2);margin-bottom:4px;
+		}
+		.ses-sug-tip {
+		    font-size:.82rem;font-weight:700;color:var(--acc);
+		}
+		/* ===== RPE SESSION ===== */
+		.ses-rpe-wrap {
+		    display:flex;flex-direction:column;align-items:center;gap:4px;
+		    max-width:80px;
+		}
+		.ses-rpe-wrap label {
+		    font-size:.65rem;font-weight:700;color:var(--tx3);
+		    text-transform:uppercase;letter-spacing:1px;margin-top:6px;
+		}
+		.ses-rpe-input {
+		    width:60px;padding:14px 4px;text-align:center;border-radius:14px;
+		    border:2px solid var(--brd);background:var(--c2);color:var(--tx);
+		    font-size:1.3rem;font-weight:800;font-family:'SF Mono',Menlo,monospace;
+		    transition:all .2s;
+		}
+		.ses-rpe-input:focus { border-color:var(--yel); }
+		.ses-rpe-adj {
+		    width:60px;height:30px;border-radius:8px;border:2px solid var(--brd);
+		    background:var(--c2);color:var(--yel);font-size:1rem;font-weight:800;
+		    display:flex;align-items:center;justify-content:center;
+		    cursor:pointer;padding:0;min-height:30px;
+		}
+		.ses-rpe-adj:active { background:var(--yel);color:#000; }
+		/* ===== PHASE INDICATOR ===== */
+		.phase-card {
+		    display:flex;align-items:center;gap:14px;
+		    padding:14px;background:var(--c2);border-radius:14px;
+		    border:1px solid var(--brd);margin-bottom:12px;
+		}
+		.phase-week {
+		    width:52px;height:52px;border-radius:50%;
+		    display:flex;flex-direction:column;align-items:center;justify-content:center;
+		    font-weight:800;flex-shrink:0;
+		}
+		.phase-week .pw-num { font-size:1.3rem;line-height:1; }
+		.phase-week .pw-label { font-size:.5rem;text-transform:uppercase;letter-spacing:.5px; }
+		.phase-normal { background:rgba(3,218,198,.15);color:var(--acc);border:2px solid var(--acc); }
+		.phase-deload { background:rgba(241,196,15,.15);color:var(--yel);border:2px solid var(--yel); }
+		.phase-info { flex:1;min-width:0; }
+		.phase-info h4 { font-size:.88rem;margin:0 0 2px; }
+		.phase-info small { font-size:.7rem;color:var(--tx2); }
+		/* ===== LEGEND ===== */
+		.legend-section { margin-bottom:16px; }
+		.legend-section h4 {
+		    font-size:.85rem;color:var(--acc);margin-bottom:8px;
+		    display:flex;align-items:center;gap:6px;
+		}
+		.legend-table {
+		    width:100%;font-size:.75rem;border-collapse:collapse;
+		}
+		.legend-table td {
+		    padding:6px 8px;border-bottom:1px solid var(--brd);
+		    vertical-align:top;
+		}
+		.legend-table td:first-child {
+		    font-weight:700;color:var(--tx);white-space:nowrap;width:60px;
+		}
+		.legend-table td:last-child { color:var(--tx2); }
         /* ===== ACTION BAR (Day view) ===== */
         .abar { display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px; }
         .abar button { flex:1;min-width:0;padding:12px 6px;font-size:.72rem;white-space:nowrap; }
@@ -416,12 +502,13 @@
             z-index:10000;justify-content:center;align-items:flex-end;
         }
         @media(min-width:600px) { .modal { align-items:center; } }
-        .mc {
-            background:var(--c1);border-radius:22px 22px 0 0;width:100%;max-width:600px;
-            max-height:90vh;overflow:hidden;display:flex;flex-direction:column;
-            padding:20px 16px;padding-bottom:calc(16px + env(safe-area-inset-bottom));
-            animation:slideUp .35s ease;
-        }
+		.mc {
+		    background:var(--c1);border-radius:22px 22px 0 0;width:100%;max-width:600px;
+		    max-height:90vh;overflow:hidden;display:flex;flex-direction:column;
+		    padding:20px 16px;padding-bottom:calc(16px + env(safe-area-inset-bottom));
+		    animation:slideUp .35s ease;
+		}
+		.mc > [style*="overflow-y"] { flex:1;min-height:0; }
         @media(min-width:600px) { .mc { border-radius:22px;max-height:85vh; } }
         @keyframes slideUp { from{transform:translateY(30px);opacity:0;} to{transform:translateY(0);opacity:1;} }
         .mc h2 { color:var(--acc);text-align:center;margin-bottom:14px;font-size:1.1rem; }
@@ -482,7 +569,13 @@ body.in-session .topbar { display:none; }
 body.in-session .bn { display:none; }
 body.in-session { padding-bottom:0; }
 body.in-session .ctn { padding:0;max-width:100%; }
-
+body.in-session .ses-nav { display:flex; }
+.ses-nav {
+    display:none;gap:8px;padding:12px 16px;
+    padding-bottom:calc(12px + env(safe-area-inset-bottom,0px));
+    background:var(--c1);border-top:1px solid var(--brd);
+}
+		
 #vSession {
     min-height:100vh;min-height:100dvh;
     display:flex;flex-direction:column;
@@ -520,8 +613,9 @@ body.in-session .ctn { padding:0;max-width:100%; }
 
 /* Esercizio corrente */
 .ses-exercise {
-    flex:1;padding:12px 20px;
+    padding:8px 16px;
     display:flex;flex-direction:column;align-items:center;
+    overflow-y:auto;-webkit-overflow-scrolling:touch;
 }
 .ses-ex-name {
     font-size:1.4rem;font-weight:800;color:var(--tx);
@@ -544,6 +638,7 @@ body.in-session .ctn { padding:0;max-width:100%; }
 }
 .ses-video-box video {
     width:100%;display:block;border-radius:14px;max-height:220px;
+    object-fit:contain;
 }
 .ses-video-scroll {
     display:flex;gap:8px;overflow-x:auto;scroll-snap-type:x mandatory;
@@ -650,7 +745,7 @@ body.in-session .ctn { padding:0;max-width:100%; }
 
 /* Check button */
 .ses-check-btn {
-    width:100%;padding:18px;margin-top:16px;
+    width:100%;padding:14px;margin-top:10px;
     border-radius:16px;border:none;
     background:var(--acc);color:#000;
     font-size:1.1rem;font-weight:800;
@@ -787,7 +882,8 @@ body.in-session .ctn { padding:0;max-width:100%; }
     <h1>GymTracker <span>Pro</span></h1>
     <div style="display:flex;gap:6px;align-items:center;">
         <button class="tb" onclick="toggleTheme()" id="thBtn" style="padding:8px 10px;">🌙</button>
-        <span class="badge" id="ubadge"></span>
+        <button class="tb" onclick="document.getElementById('mLegend').style.display='flex'" style="padding:8px 10px;">📖</button>
+		<span class="badge" id="ubadge"></span>
     </div>
 </div>
 
@@ -801,13 +897,20 @@ body.in-session .ctn { padding:0;max-width:100%; }
 
 <!-- ===== HOME ===== -->
 <div id="vHome" style="display:none;">
-    <div class="card"><div class="sg">
-        <div class="sb"><div class="sn" id="s0">0</div><div class="sd">Workouts</div></div>
-        <div class="sb"><div class="sn" id="s1">0</div><div class="sd">Serie</div></div>
-        <div class="sb"><div class="sn" id="s2">0</div><div class="sd">🔥 Streak</div></div>
-        <div class="sb hl"><div class="sn" id="s3">0</div><div class="sd">🎯 PRs</div></div>
-    </div></div>
-
+    <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <h3>📅 Fase di Allenamento</h3>
+            <div style="display:flex;gap:6px;align-items:center;">
+                <input type="date" id="programDateInput" 
+                    style="padding:6px 10px;border-radius:8px;border:1px solid var(--brd);
+                    background:var(--c2);color:var(--tx);font-size:.75rem;font-family:inherit;
+                    min-height:34px;max-width:140px;"
+                    onchange="setProgramDate(this.value)">
+                <button class="tb" onclick="clearProgramDate()" style="padding:6px 8px;font-size:.65rem;min-height:34px;" title="Rimuovi">✕</button>
+            </div>
+        </div>
+        <div id="phaseIndicator"></div>
+    </div>
     <div class="card" id="weeklyCard">
         <h3>📊 Panoramica Settimanale</h3>
 
@@ -828,10 +931,6 @@ body.in-session .ctn { padding:0;max-width:100%; }
             </div>
         </div>
 
-        <div class="sg" style="grid-template-columns:repeat(2,1fr);margin-bottom:16px;">
-            <div class="sb"><div class="sn" id="wkDays">0</div><div class="sd">Giorni</div></div>
-            <div class="sb"><div class="sn" id="wkExs">0</div><div class="sd">Esercizi</div></div>
-        </div>
         <div id="missingGroups" style="margin-bottom:16px;"></div>
 
         <div class="mm-bg">
@@ -899,7 +998,11 @@ body.in-session .ctn { padding:0;max-width:100%; }
     <div class="ses-exercise" id="sesExCard">
         <div class="ses-ex-name" id="sesExName">—</div>
         <div class="ses-ex-detail" id="sesExDetail">—</div>
-
+        <div id="sesNote" style="display:none;margin-top:8px;padding:8px 14px;
+            border-radius:10px;background:var(--c2);border:1px solid var(--brd);
+            font-size:.75rem;color:var(--tx2);text-align:center;max-width:380px;
+            white-space:pre-wrap;">
+        </div>
         <!-- Dots dei set -->
         <div class="ses-set-dots" id="sesSetDots"></div>
 
@@ -911,6 +1014,7 @@ body.in-session .ctn { padding:0;max-width:100%; }
 
         <!-- Input set corrente -->
         <div class="ses-set-area" id="sesSetArea">
+            <div id="sesSuggestion"></div>
             <div class="ses-set-label" id="sesSetLabel">SET 1</div>
             <div class="ses-inputs">
                 <div class="ses-input-group">
@@ -930,6 +1034,13 @@ body.in-session .ctn { padding:0;max-width:100%; }
                     </div>
                     <label>KG</label>
                 </div>
+                <div class="ses-rpe-wrap">
+                    <button class="ses-rpe-adj" onclick="sesAdj('sesRpe',1)">+</button>
+                     <input type="number" inputmode="numeric" id="sesRpe" class="ses-rpe-input" placeholder="-" min="1" max="10" oninput="updateRpeColor(this)">
+                    <button class="ses-rpe-adj" onclick="sesAdj('sesRpe',-1)">−</button>
+                    <label>RPE</label>
+                </div>
+            </div>
             </div>
             <button class="ses-check-btn" id="sesCheckBtn" onclick="sesCheck()">
                 <span class="ses-check-icon">✓</span>
@@ -938,7 +1049,7 @@ body.in-session .ctn { padding:0;max-width:100%; }
         </div>
 
         <!-- Video sotto il pulsante fatto -->
-        <div id="sesVideoArea" style="width:100%;max-width:380px;margin-top:16px;"></div>
+        <div id="sesVideoArea" style="width:100%;max-width:380px;margin-top:10px;"></div>
     </div>
 
 	<!-- Navigazione esercizi -->
@@ -973,7 +1084,7 @@ body.in-session .ctn { padding:0;max-width:100%; }
     <h2>📋 Seleziona Esercizio</h2>
     <input id="exQ" placeholder="Cerca esercizio, muscolo, attrezzatura..." style="margin:0 0 10px;" oninput="filEx()">
     <div id="mChips" class="chips"></div>
-    <div id="exR" style="overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch;margin-top:8px;"></div>
+    <div id="exR" style="overflow-y:auto;flex:1;min-height:0;-webkit-overflow-scrolling:touch;margin-top:8px;"></div>
     <button class="bs" onclick="closeSel()" style="width:100%;margin-top:12px;">Chiudi</button>
 </div>
 </div>
@@ -1056,6 +1167,53 @@ body.in-session .ctn { padding:0;max-width:100%; }
             </div>
         </button>
     </div>
+</div>
+</div>
+<!-- MODAL: LEGENDA -->
+<div id="mLegend" class="modal" onclick="if(event.target===this)this.style.display='none'">
+<div class="mc" style="max-width:500px;">
+    <h2>📖 Guida Rapida</h2>
+    <div style="overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch;">
+
+    <div class="legend-section">
+        <h4>🎯 RPE (Rate of Perceived Exertion)</h4>
+        <p style="font-size:.75rem;color:var(--tx2);margin-bottom:8px;">Quanto è stata dura la serie? Quante reps avevi ancora "in riserva".</p>
+        <table class="legend-table">
+            <tr><td style="color:var(--grn);">6</td><td>Facile — Potevi fare 4+ reps in più</td></tr>
+            <tr><td style="color:var(--acc);">7</td><td>Moderato — 3 reps in riserva. Buono per volume.</td></tr>
+            <tr><td style="color:var(--yel);">8</td><td>Impegnativo — 2 reps in riserva. Ideale per ipertrofia.</td></tr>
+            <tr><td style="color:var(--red);">9</td><td>Molto duro — 1 sola rep in riserva.</td></tr>
+            <tr><td style="color:var(--red);">10</td><td>Massimale — Non potevi fare un'altra rep.</td></tr>
+        </table>
+    </div>
+
+    <div class="legend-section">
+        <h4>⏱️ Tempo (Eccentrica-Pausa-Concentrica)</h4>
+        <p style="font-size:.75rem;color:var(--tx2);margin-bottom:8px;">Controlla la velocità del movimento in secondi.</p>
+        <table class="legend-table">
+            <tr><td>3-1-2</td><td><b>3s</b> fase negativa, <b>1s</b> pausa, <b>2s</b> fase positiva</td></tr>
+            <tr><td>2-0-1</td><td><b>2s</b> negativa, <b>nessuna</b> pausa, <b>1s</b> positiva (esplosiva)</td></tr>
+            <tr><td>4-2-1</td><td><b>4s</b> negativa lenta, <b>2s</b> isometria, <b>1s</b> positiva</td></tr>
+        </table>
+        <p style="font-size:.7rem;color:var(--tx3);margin-top:6px;">Esempio panca: 3-1-2 = scendi in 3s, pausa 1s al petto, spingi in 2s</p>
+    </div>
+
+    <div class="legend-section">
+        <h4>💡 Suggerimenti Progressione</h4>
+        <table class="legend-table">
+            <tr><td>📈</td><td>Tutte le reps completate con RPE ≤ 8 → <b>+2.5kg</b> suggeriti</td></tr>
+            <tr><td>➡️</td><td>RPE 9 o reps mancate → <b>stesso carico</b>, consolida</td></tr>
+            <tr><td>📉</td><td>Settimana di deload (ogni 4ª) → <b>-15% carico</b></td></tr>
+        </table>
+    </div>
+
+    <div class="legend-section">
+        <h4>🔗 Superserie</h4>
+        <p style="font-size:.75rem;color:var(--tx2);">Due o più esercizi eseguiti consecutivamente senza pausa. Recupero solo dopo aver completato tutti gli esercizi del gruppo.</p>
+    </div>
+
+    </div>
+    <button class="bs" onclick="document.getElementById('mLegend').style.display='none'" style="width:100%;margin-top:12px;">Chiudi</button>
 </div>
 </div>
 <!-- MODAL: PROGRESSIONE -->
@@ -1424,10 +1582,6 @@ function renderWeeklyOverview() {
     const wd = getWeeklyData();
     const fatigue = getMuscleFatigue();
 
-    // Stats
-    document.getElementById('wkDays').textContent = wd.totalDays;
-    document.getElementById('wkExs').textContent = wd.totalExercises;
-
     // Coverage ring
     const pct = wd.coverage;
     const circumference = 2 * Math.PI * 33;
@@ -1491,22 +1645,102 @@ function renderWeeklyOverview() {
         }
     }
 }
+// ============================================================
+// 📅 PHASE / WEEK SYSTEM
+// ============================================================
+function getProgramWeek() {
+    const start = D.st.programStart;
+    if (!start) return null;
+    const startDate = new Date(start);
+    const now = new Date();
+    const diffDays = Math.floor((now - startDate) / 86400000);
+    if (diffDays < 0) return null;
+    return Math.floor(diffDays / 7) + 1;
+}
+
+function getProgramPhase(week) {
+    if (!week) return null;
+    return Math.ceil(week / 4);
+}
+
+function isDeloadWeek(week) {
+    if (!week) return false;
+    return week % 4 === 0;
+}
+
+function setProgramDate(val) {
+    if (!val) return;
+    D.st.programStart = val;
+    save().then(() => {
+        renderPhaseIndicator();
+        toast('📅 Programma dal ' + val, 'ok');
+    });
+}
+
+function clearProgramDate() {
+    if (!D.st.programStart) return;
+    if (!confirm('Rimuovere la data di inizio programma?')) return;
+    delete D.st.programStart;
+    const input = document.getElementById('programDateInput');
+    if (input) input.value = '';
+    save().then(() => {
+        renderPhaseIndicator();
+        toast('📅 Fase rimossa', 'info');
+    });
+}
+
+function renderPhaseIndicator() {
+    const el = document.getElementById('phaseIndicator');
+    if (!el) return;
+    // Sync input date
+    const dateInput = document.getElementById('programDateInput');
+    if (dateInput) dateInput.value = D.st.programStart || '';
+    const week = getProgramWeek();
+    if (!week) {
+        el.innerHTML = `<div style="text-align:center;color:var(--tx3);font-size:.8rem;padding:8px;">
+            Premi ⚙️ per impostare la data di inizio programma
+        </div>`;
+        return;
+    }
+    const phase = getProgramPhase(week);
+    const deload = isDeloadWeek(week);
+    const weekInPhase = ((week - 1) % 4) + 1;
+    const totalPhases = 3;
+
+    el.innerHTML = `
+        <div class="phase-card">
+            <div class="phase-week ${deload ? 'phase-deload' : 'phase-normal'}">
+                <span class="pw-num">${week}</span>
+                <span class="pw-label">Sett.</span>
+            </div>
+            <div class="phase-info">
+                <h4 style="color:${deload ? 'var(--yel)' : 'var(--acc)'}">
+                    ${deload ? '📉 Settimana di Deload' : 'Fase ' + phase + ' — Settimana ' + weekInPhase + '/4'}
+                </h4>
+                <small>${deload
+                    ? 'Riduci il carico del 15%. Stesse serie e reps. Recupero attivo.'
+                    : 'Settimana ' + week + ' del programma • Fase ' + phase + '/' + totalPhases
+                }</small>
+            </div>
+        </div>
+        <div style="display:flex;gap:4px;margin-top:8px;">
+            ${[1,2,3].map(p => {
+                const active = phase === p;
+                const done = phase > p;
+                return `<div style="flex:1;height:6px;border-radius:3px;
+                    background:${done ? 'var(--grn)' : active ? 'var(--acc)' : 'var(--c3)'};
+                    transition:all .3s;"></div>`;
+            }).join('')}
+        </div>
+    `;
+}
+	
 function renderAll() {
     if (!D) return;
-    try { renSt(); } catch(e) { console.error('renSt:', e); }
     try { renDays(); } catch(e) { console.error('renDays:', e); }
     try { renderWeeklyOverview(); } catch(e) { console.error('renderWeeklyOverview:', e); }
+    try { renderPhaseIndicator(); } catch(e) { console.error('renderPhaseIndicator:', e); }
 }
-
-function renSt() {
-    const s = D.st;
-    const live = getLiveStats();
-    document.getElementById('s0').textContent = s.tw || 0;
-    document.getElementById('s1').textContent = (s.ts || 0) + live.liveSets;
-    document.getElementById('s2').textContent = s.sk || 0;
-    document.getElementById('s3').textContent = Object.keys(s.pr || {}).length;
-}
-
 function renDays() {
     const c = document.getElementById('dList');
     if (!D.days.length) {
@@ -1765,7 +1999,7 @@ function renEC(ex, showDrag, dragIdx) {
     h += `<div class="mm-mini" id="exmm-${ex.uid}"></div>`;
 	 
     // Tabella serie
-	h += `<div class="sets-grid-header"><span>SET</span><span>REPS</span><span>KG</span><span></span></div>`;
+	h += `<div class="sets-grid-header"><span>SET</span><span>REPS</span><span>KG</span><span>RPE</span><span></span></div>`;
 
     ex.sd.forEach((s, i) => {
         h += `<div class="set-row" id="sr-${ex.uid}-${i}">
@@ -1774,10 +2008,52 @@ function renEC(ex, showDrag, dragIdx) {
                 placeholder="0" oninput="updS('${ex.uid}',${i},'r',this.value)">
             <input type="number" inputmode="decimal" class="set-input" value="${s.w || ''}"
                 placeholder="0" oninput="updS('${ex.uid}',${i},'w',this.value)">
+            <input type="number" inputmode="numeric" class="rpe-input" value="${s.rpe || ''}"
+                placeholder="-" min="1" max="10" oninput="updS('${ex.uid}',${i},'rpe',this.value)">
             <button class="set-del" onclick="remSet('${ex.uid}',${i})" title="Elimina serie">✕</button>
         </div>`;
     });
-
+    // Campo tempo smart
+    const tp = (ex.tempo || '').split('-');
+    const tEcc = tp[0] || '';
+    const tPau = tp[1] || '';
+    const tCon = tp[2] || '';
+    h += `<div style="margin-top:8px;">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+            <span style="font-size:.75rem;font-weight:700;color:var(--tx2);">⏱️ Tempo</span>
+            <button class="tb" onclick="event.stopPropagation();document.getElementById('mLegend').style.display='flex'"
+                style="padding:2px 6px;font-size:.6rem;min-height:22px;border-radius:6px;">❓</button>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;">
+            <div style="flex:1;text-align:center;">
+                <input type="number" inputmode="numeric" class="set-input" value="${tEcc}"
+                    placeholder="0" min="0" max="10" style="font-size:.9rem;padding:8px 2px;"
+                    oninput="updTempoField('${ex.uid}',0,this.value)">
+                <div style="font-size:.58rem;color:var(--tx3);margin-top:3px;">Eccentrica</div>
+            </div>
+            <span style="color:var(--tx3);font-weight:700;">-</span>
+            <div style="flex:1;text-align:center;">
+                <input type="number" inputmode="numeric" class="set-input" value="${tPau}"
+                    placeholder="0" min="0" max="10" style="font-size:.9rem;padding:8px 2px;"
+                    oninput="updTempoField('${ex.uid}',1,this.value)">
+                <div style="font-size:.58rem;color:var(--tx3);margin-top:3px;">Pausa</div>
+            </div>
+            <span style="color:var(--tx3);font-weight:700;">-</span>
+            <div style="flex:1;text-align:center;">
+                <input type="number" inputmode="numeric" class="set-input" value="${tCon}"
+                    placeholder="0" min="0" max="10" style="font-size:.9rem;padding:8px 2px;"
+                    oninput="updTempoField('${ex.uid}',2,this.value)">
+                <div style="font-size:.58rem;color:var(--tx3);margin-top:3px;">Concentrica</div>
+            </div>
+        </div>
+    </div>`;
+	// Campo note
+    const noteVal = (ex.note || '').replace(/"/g, '&quot;');
+    h += `<div style="margin-top:10px;">
+        <textarea rows="2" placeholder="Note (es. tecnica, sensazioni, varianti...)"
+            style="font-size:.8rem;padding:10px 12px;"
+            oninput="updNote('${ex.uid}',this.value)">${ex.note || ''}</textarea>
+    </div>`;
     h += `<button class="add-set-btn" onclick="addSet('${ex.uid}')">+ Aggiungi Serie</button>`;
 
     h += `</div>`; // chiude ex-body
@@ -1972,7 +2248,24 @@ function togVid(exUid) {
 // ✏️ SET OPERATIONS
 // ============================================================
 function fEx(u) { const d = gD(); return d?.exs?.find(e => e.uid === u); }
-
+function updTempoField(exUid, partIdx, val) {
+    const ex = fEx(exUid);
+    if (!ex) return;
+    const parts = (ex.tempo || '0-0-0').split('-');
+    while (parts.length < 3) parts.push('0');
+    parts[partIdx] = val || '0';
+    ex.tempo = parts.join('-');
+    // Se tutto è 0, svuota
+    if (parts.every(p => p === '0' || p === '')) ex.tempo = '';
+    save();
+}
+function updNote(exUid, val) {
+    const ex = fEx(exUid);
+    if (ex) {
+        ex.note = val;
+        save();
+    }
+}
 function updS(exUid, idx, field, val) {
     const ex = fEx(exUid);
     if (ex && ex.sd[idx]) {
@@ -2405,7 +2698,7 @@ function filEx() {
 
     res.sort((a, b) => a.name.localeCompare(b.name, 'it'));
     document.getElementById('exR').innerHTML = res.length
-        ? res.slice(0, 50).map(e => `
+        ? res.slice(0, 300).map(e => `
         <div class="exo" onclick="addEx('${e.id}')">
             <div style="flex:1">
                 <div class="on">${e.name}</div>
@@ -2431,7 +2724,8 @@ function addEx(eid) {
     day.exs.push({
         uid: uid(), exerciseId: eid, name: d.name, sd,
         rest: l?.rest || 90, seat: l?.seat || '',
-        ssG: null, pF: false
+        ssG: null, pF: false, note: l?.note || '',
+        tempo: l?.tempo || ''
     });
     save(); closeSel(); renDay();
     toast('✅ ' + d.name + ' aggiunto!', 'ok', 1500);
@@ -2641,7 +2935,18 @@ function sesRender() {
             detailHTML += `<div class="ses-ss-badge">Superserie ${myPos}/${ssGroup.length}: ${ssNames.join(' + ')}</div>`;
         }
         document.getElementById('sesExDetail').innerHTML = detailHTML;
-
+        // Nota esercizio
+        const noteArea = document.getElementById('sesNote');
+        if (noteArea) {
+            noteArea.textContent = ex.note || '';
+            noteArea.style.display = ex.note ? 'block' : 'none';
+        }
+        // Tempo
+        const tempoStr = ex.tempo ? '⏱️ Tempo: ' + ex.tempo : '';
+        if (tempoStr) {
+            document.getElementById('sesExDetail').innerHTML += 
+                `<div style="margin-top:4px;font-size:.72rem;color:var(--yel);font-weight:600;">${tempoStr}</div>`;
+        }
         // Video
         const videoArea = document.getElementById('sesVideoArea');
         if (videoArea) {
@@ -2693,9 +2998,79 @@ function sesRender() {
         document.getElementById('sesSetLabel').textContent = 'SET ' + (curSetIdx + 1);
         document.getElementById('sesReps').value = s.r || '';
         document.getElementById('sesKg').value = s.w || '';
+        const rpeEl = document.getElementById('sesRpe');
+        rpeEl.value = s.rpe || '';
+        updateRpeColor(rpeEl);
+
+        // Suggerimento
+        const sugEl = document.getElementById('sesSuggestion');
+        if (sugEl) {
+            sugEl.innerHTML = buildSuggestionHTML(curDay, ex, curSetIdx);
+        }
     }
 }
+// ============================================================
+// 💡 SUGGESTION SYSTEM
+// ============================================================
+function getLastSessionData(dayId, exerciseId) {
+    if (!D.hist || !D.hist.length) return null;
+    const entries = D.hist.filter(h => h.dayId === dayId && h.eid === exerciseId);
+    if (!entries.length) return null;
+    entries.sort((a, b) => new Date(b.dt) - new Date(a.dt));
+    return entries[0];
+}
 
+function generateSuggestion(lastData, setIdx) {
+    if (!lastData || !lastData.sd || !lastData.sd[setIdx]) return null;
+    const lastSet = lastData.sd[setIdx];
+    const lastR = parseInt(lastSet.r) || 0;
+    const lastW = parseFloat(lastSet.w) || 0;
+    const lastRpe = parseInt(lastSet.rpe) || 0;
+
+    const week = getProgramWeek();
+    const deload = isDeloadWeek(week);
+
+    let sugR = lastR;
+    let sugW = lastW;
+    let sugText = '';
+
+    if (deload) {
+        sugW = Math.round(lastW * 0.85 * 2) / 2;
+        sugText = '📉 Deload: -15% carico';
+    } else if (lastRpe && lastRpe <= 7) {
+        sugW = lastW + 2.5;
+        sugText = '📈 RPE basso → prova +2.5kg';
+    } else if (lastRpe && lastRpe <= 8) {
+        sugW = lastW + 2.5;
+        sugText = '📈 Buono! Prova +2.5kg';
+    } else if (lastRpe && lastRpe >= 9) {
+        sugText = '➡️ RPE alto → consolida stesso carico';
+    } else if (lastW > 0) {
+        sugW = lastW + 2.5;
+        sugText = '📈 Prova +2.5kg';
+    } else {
+        sugText = '➡️ Completa e registra RPE per suggerimenti';
+    }
+
+    return {
+        lastR, lastW, lastRpe,
+        sugR, sugW: Math.round(sugW * 2) / 2,
+        sugText
+    };
+}
+
+function buildSuggestionHTML(dayId, ex, setIdx) {
+    const last = getLastSessionData(dayId, ex.exerciseId);
+    if (!last) return '';
+    const sug = generateSuggestion(last, setIdx);
+    if (!sug) return '';
+
+    const rpeStr = sug.lastRpe ? ' @ RPE ' + sug.lastRpe : '';
+    return `<div class="ses-suggestion">
+        <div class="ses-sug-last">📊 Ultima volta: ${sug.lastR} reps × ${sug.lastW}kg${rpeStr}</div>
+        <div class="ses-sug-tip">${sug.sugText}</div>
+    </div>`;
+}
 function sesGetCurrentSetIdx(ex) {
     if (!ex.sd) return 0;
     const idx = ex.sd.findIndex(s => !s.done);
@@ -2715,6 +3090,7 @@ function sesCheck() {
     // Salva valori
     s.r = parseInt(document.getElementById('sesReps').value) || 0;
     s.w = parseFloat(document.getElementById('sesKg').value) || 0;
+    s.rpe = parseInt(document.getElementById('sesRpe').value) || null;
     s.done = true;
     save();
 
@@ -2798,11 +3174,30 @@ function sesToggleVideo(videoEl) {
         videoEl.pause();
     }
 }
+function updateRpeColor(el) {
+    const val = parseInt(el.value) || 0;
+    let c = 'var(--tx)';
+    let bc = 'var(--brd)';
+    if (val >= 1 && val <= 5) { c = '#2ecc71'; bc = '#2ecc71'; }
+    else if (val === 6) { c = '#27ae60'; bc = '#27ae60'; }
+    else if (val === 7) { c = '#a8d948'; bc = '#a8d948'; }
+    else if (val === 8) { c = '#f1c40f'; bc = '#f1c40f'; }
+    else if (val === 9) { c = '#e67e22'; bc = '#e67e22'; }
+    else if (val === 10) { c = '#e74c3c'; bc = '#e74c3c'; }
+    el.style.color = c;
+    el.style.borderColor = bc;
+}
 function sesAdj(inputId, delta) {
     const el = document.getElementById(inputId);
     let val = parseFloat(el.value) || 0;
-    val = Math.max(0, val + delta);
+    val = val + delta;
+    if (inputId === 'sesRpe') {
+        val = Math.min(10, Math.max(1, val));
+    } else {
+        val = Math.max(0, val);
+    }
     el.value = val % 1 === 0 ? parseInt(val) : parseFloat(val.toFixed(1));
+    if (inputId === 'sesRpe') updateRpeColor(el);
     if (navigator.vibrate) navigator.vibrate(10);
 }
 
@@ -2852,7 +3247,7 @@ function sesCompleteSave() {
             eid: e.exerciseId, name: e.name, dt: new Date().toISOString(),
             dayId: curDay, s: doneS.length, r: avgR, w: maxW,
             rest: e.rest, seat: e.seat,
-            sd: e.sd.map(x => ({r: x.r, w: x.w}))
+            sd: e.sd.map(x => ({r: x.r, w: x.w, rpe: x.rpe || null}))
         });
     });
 
