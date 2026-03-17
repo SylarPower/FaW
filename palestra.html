@@ -748,7 +748,7 @@ body.in-session .ses-nav { display:flex; }
 .ses-nav-btn:active { background:var(--c3); }
 .ses-nav-end {
     padding:14px 16px;border-radius:12px;border:none;
-    background:var(--grn);color:#fff;font-size:.8rem;
+    background:var(--red);color:#fff;font-size:.8rem;
     font-weight:700;cursor:pointer;min-height:52px;
     white-space:nowrap;
 }
@@ -921,6 +921,25 @@ body.in-session .ses-nav { display:flex; }
     padding:12px 24px;border-radius:12px;font-size:.85rem;
     font-weight:700;min-height:48px;font-family:inherit;
 }
+/* ===== EXERCISE STOPWATCH ===== */
+.ses-stopwatch {
+    display:flex;align-items:center;justify-content:center;
+    gap:10px;margin-top:6px;width:100%;max-width:380px;
+}
+.ses-sw-time {
+    font-size:1.8rem;font-weight:900;color:var(--acc);
+    font-family:'SF Mono',Menlo,monospace;
+    font-variant-numeric:tabular-nums;min-width:80px;text-align:center;
+}
+.ses-sw-time.running { color:var(--grn); }
+.ses-sw-btn {
+    padding:8px 18px;border-radius:10px;border:2px solid var(--brd);
+    background:var(--c2);color:var(--tx);font-weight:700;
+    font-size:.78rem;cursor:pointer;min-height:40px;font-family:inherit;
+    display:flex;align-items:center;gap:6px;
+}
+.ses-sw-btn:active { transform:scale(.95); }
+.ses-sw-btn.active { border-color:var(--grn);color:var(--grn);background:rgba(39,174,96,.1); }
 /* ===== MISC ===== */
 #confetti { position:fixed;inset:0;z-index:99999;pointer-events:none; }
 .emp { text-align:center;padding:30px;color:var(--tx3); }
@@ -997,7 +1016,10 @@ body.in-session .ses-nav { display:flex; }
 <!-- ===== DAY VIEW ===== -->
 <div id="vDay" style="display:none;">
     <div class="card">
-        <h3 id="dTitle" style="margin-bottom:10px;">📅 Giornata</h3>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+            <h3 id="dTitle" style="margin:0;">📅 Giornata</h3>
+            <button class="tb" onclick="renameDay()" style="padding:6px 8px;font-size:.7rem;min-height:30px;" title="Rinomina">✏️</button>
+        </div>
 
         <div style="margin-bottom:14px;">
             <button onclick="startSession()" style="width:100%;padding:16px;border-radius:14px;border:none;
@@ -1114,6 +1136,11 @@ body.in-session .ses-nav { display:flex; }
                 border-radius:10px;background:var(--c2);border:1px solid var(--brd);
                 font-size:.72rem;color:var(--tx2);text-align:center;max-width:380px;
                 width:100%;white-space:pre-wrap;"></div>
+            <div class="ses-stopwatch" id="sesStopwatch">
+                <button class="ses-sw-btn" id="sesSwBtn" onclick="toggleStopwatch()">⏱️ Cronometro</button>
+                <div class="ses-sw-time" id="sesSwTime" style="display:none;">0:00</div>
+                <button class="ses-sw-btn" id="sesSwReset" onclick="resetStopwatch()" style="display:none;">↺</button>
+            </div>
             <button class="ses-check-btn" id="sesCheckBtn" onclick="sesCheck()">
                 <span class="ses-check-icon">✓</span>
                 <span>FATTO</span>
@@ -1969,7 +1996,17 @@ function remDay(id) {
     save(); renDays();
     toast('🗑️ Giornata eliminata', 'info');
 }
-
+function renameDay() {
+    const day = gD();
+    if (!day) return;
+    const newName = prompt('Rinomina giornata:', day.name);
+    if (!newName || !newName.trim() || newName.trim() === day.name) return;
+    day.name = newName.trim();
+    save();
+    document.getElementById('dTitle').textContent = '📅 ' + day.name;
+    toast('✏️ Rinominata in "' + day.name + '"', 'ok');
+    if (navigator.vibrate) navigator.vibrate(15);
+}
 document.getElementById('iDay').addEventListener('keydown', e => { if (e.key === 'Enter') addDay(); });
 
 // ============================================================
@@ -3191,6 +3228,9 @@ function sesRender() {
     const sameExercise = sesExIdx === sesLastExIdx;
     sesLastExIdx = sesExIdx;
 
+    // Reset cronometro se cambia esercizio
+    if (!sameExercise) resetStopwatch();
+
     // Progress globale
     let totalSets = 0, doneSets = 0;
     exs.forEach(e => {
@@ -3280,7 +3320,7 @@ function sesRender() {
         doneArea.style.display = 'none';
 
         const s = ex.sd[curSetIdx];
-        document.getElementById('sesSetLabel').textContent = 'SET ' + (curSetIdx + 1);
+        document.getElementById('sesSetLabel').textContent = 'SET ' + (curSetIdx + 1) + '/' + ex.sd.length;
         document.getElementById('sesReps').value = s.r || '';
         document.getElementById('sesKg').value = s.w || '';
         const rpeEl = document.getElementById('sesRpe');
@@ -3453,6 +3493,7 @@ function applySuggestion(reps, kg) {
 let restTimerId = null;
 let restTimeLeft = 0;
 let restTimeTotal = 0;
+let restEndTime = 0;
 let sesTimerEnabled = localStorage.getItem('gym-timer') === '1';
 
 function toggleSesTimer() {
@@ -3482,18 +3523,16 @@ function startRestTimer(seconds) {
     if (!overlay || !circle) return;
 
     restTimeTotal = seconds;
-    restTimeLeft = seconds;
+    restEndTime = Date.now() + seconds * 1000;
 
-    // Reset cerchio a pieno
     circle.style.transition = 'none';
     circle.style.strokeDashoffset = '0';
     circle.style.stroke = 'var(--acc)';
-    void circle.offsetWidth; // force reflow
-    circle.style.transition = 'stroke-dashoffset 1s linear, stroke .3s';
+    void circle.offsetWidth;
+    circle.style.transition = 'stroke-dashoffset .3s linear, stroke .3s';
 
     overlay.style.display = 'flex';
 
-    // Info prossimo set/esercizio
     const nextInfo = document.getElementById('sesTimerNext');
     if (nextInfo) {
         const day = gD();
@@ -3507,17 +3546,18 @@ function startRestTimer(seconds) {
         }
     }
 
+    restTimeLeft = seconds;
     updateTimerDisplay();
     clearInterval(restTimerId);
     restTimerId = setInterval(() => {
-        restTimeLeft--;
+        restTimeLeft = Math.max(0, Math.ceil((restEndTime - Date.now()) / 1000));
         updateTimerDisplay();
         if (restTimeLeft <= 0) {
             clearInterval(restTimerId);
             overlay.style.display = 'none';
             if (navigator.vibrate) navigator.vibrate([100, 50, 100, 50, 200]);
         }
-    }, 1000);
+    }, 250);
 }
 
 function updateTimerDisplay() {
@@ -3542,10 +3582,78 @@ function skipRestTimer() {
 }
 
 function adjRestTimer(delta) {
-    restTimeLeft = Math.max(5, restTimeLeft + delta);
+    restEndTime += delta * 1000;
+    restTimeLeft = Math.max(5, Math.ceil((restEndTime - Date.now()) / 1000));
     if (restTimeLeft > restTimeTotal) restTimeTotal = restTimeLeft;
     updateTimerDisplay();
     if (navigator.vibrate) navigator.vibrate(10);
+}
+// ============================================================
+// ⏱️ EXERCISE STOPWATCH
+// ============================================================
+let swRunning = false;
+let swStartTime = 0;
+let swElapsed = 0;
+let swIntervalId = null;
+
+function toggleStopwatch() {
+    if (swRunning) {
+        stopStopwatch();
+    } else {
+        startStopwatch();
+    }
+}
+
+function startStopwatch() {
+    swRunning = true;
+    swStartTime = Date.now() - swElapsed;
+    const btn = document.getElementById('sesSwBtn');
+    const timeEl = document.getElementById('sesSwTime');
+    const resetBtn = document.getElementById('sesSwReset');
+    btn.textContent = '⏸ Stop';
+    btn.classList.add('active');
+    timeEl.style.display = 'block';
+    timeEl.classList.add('running');
+    resetBtn.style.display = 'none';
+    swIntervalId = setInterval(updateStopwatch, 100);
+    if (navigator.vibrate) navigator.vibrate(15);
+}
+
+function stopStopwatch() {
+    swRunning = false;
+    swElapsed = Date.now() - swStartTime;
+    clearInterval(swIntervalId);
+    const btn = document.getElementById('sesSwBtn');
+    const timeEl = document.getElementById('sesSwTime');
+    const resetBtn = document.getElementById('sesSwReset');
+    btn.textContent = '▶ Riprendi';
+    btn.classList.remove('active');
+    timeEl.classList.remove('running');
+    resetBtn.style.display = 'flex';
+    if (navigator.vibrate) navigator.vibrate(15);
+}
+
+function resetStopwatch() {
+    swRunning = false;
+    swElapsed = 0;
+    clearInterval(swIntervalId);
+    const btn = document.getElementById('sesSwBtn');
+    const timeEl = document.getElementById('sesSwTime');
+    const resetBtn = document.getElementById('sesSwReset');
+    btn.textContent = '⏱️ Cronometro';
+    btn.classList.remove('active');
+    timeEl.textContent = '0:00';
+    timeEl.style.display = 'none';
+    timeEl.classList.remove('running');
+    resetBtn.style.display = 'none';
+}
+
+function updateStopwatch() {
+    const elapsed = Date.now() - swStartTime;
+    const secs = Math.floor(elapsed / 1000);
+    const mins = Math.floor(secs / 60);
+    const s = secs % 60;
+    document.getElementById('sesSwTime').textContent = mins + ':' + String(s).padStart(2, '0');
 }
 function sesGetCurrentSetIdx(ex) {
     if (!ex.sd) return 0;
@@ -3555,6 +3663,7 @@ function sesGetCurrentSetIdx(ex) {
 
 // ===== Check set (con Logica Superserie Alternate) =====
 function sesCheck() {
+    if (swRunning) stopStopwatch();
     const day = gD();
     const ex = day.exs[sesExIdx];
     if (!ex) return;
