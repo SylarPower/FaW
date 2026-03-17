@@ -4,13 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="theme-color" content="#121212">
-	<meta name="mobile-web-app-capable" content="yes">
-	<meta name="apple-mobile-web-app-capable" content="yes">
-	<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-	<link rel="manifest" href="gym-manifest.json">
-	<link rel="apple-touch-icon" href="gym-icon.png">
+    <meta name="mobile-web-app-capable" content="yes">
     <title>GymTracker Pro</title>
     <link rel="icon" href="gym-icon.png">
+    <link rel="manifest" href="gym-manifest.json">
     <script defer src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
@@ -940,6 +937,10 @@ body.in-session .ses-nav { display:flex; }
     </style>
 </head>
 <body>
+<div id="splashScreen" style="position:fixed;inset:0;z-index:999999;
+    background:#121212;transition:opacity .5s ease;">
+    <img src="gym-splash.png" style="width:100%;height:100%;object-fit:cover;">
+</div>
 <canvas id="confetti"></canvas>
 <div id="toast" class="toast"></div>
 
@@ -4076,12 +4077,17 @@ function parseImport(text) {
 
         // Parse carico/peso: "50 kg", "14+14 kg", "50", "Corpo", "Leggero", ""
         let weight = 0;
+        let caricoNote = '';
         const dblMatch = carico.match(/([\d.]+)\s*\+\s*([\d.]+)/);
         if (dblMatch) {
             weight = parseFloat(dblMatch[1]) || 0;
         } else {
             const kgMatch = carico.match(/([\d.]+)/);
             if (kgMatch) weight = parseFloat(kgMatch[1]) || 0;
+        }
+        // Se il carico è testuale (Leggero, Moderato, Corpo, etc.), salvalo nelle note
+        if (weight === 0 && carico && !carico.match(/^\s*$/)) {
+            caricoNote = '💪 ' + carico;
         }
 
         // Parse tempo: "3-1-2", ""
@@ -4114,7 +4120,7 @@ function parseImport(text) {
             seat: '',
             ssG: ssG,
             pF: false,
-            note: note,
+            note: [caricoNote, note].filter(Boolean).join(' — '),
             tempo: tempoClean
         });
     }
@@ -4200,6 +4206,11 @@ function toggleTheme() {
         }, true);
 		console.log('5. Done!');
         toast('👋 Ciao ' + MIO + '!', 'info', 2000);
+        const splash = document.getElementById('splashScreen');
+        if (splash) {
+            splash.style.opacity = '0';
+            setTimeout(() => splash.remove(), 500);
+        }
         // Registra Service Worker per PWA
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('./sw.js')
