@@ -4,10 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="theme-color" content="#121212">
-    <meta name="mobile-web-app-capable" content="yes">
     <title>GymTracker Pro</title>
     <link rel="icon" href="gym-icon.png">
-    <link rel="manifest" href="gym-manifest.json">
     <script defer src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
@@ -937,10 +935,6 @@ body.in-session .ses-nav { display:flex; }
     </style>
 </head>
 <body>
-<div id="splashScreen" style="position:fixed;inset:0;z-index:999999;
-    background:#121212;transition:opacity .5s ease;">
-    <img src="gym-splash.png" style="width:100%;height:100%;object-fit:cover;">
-</div>
 <canvas id="confetti"></canvas>
 <div id="toast" class="toast"></div>
 
@@ -4206,17 +4200,6 @@ function toggleTheme() {
         }, true);
 		console.log('5. Done!');
         toast('👋 Ciao ' + MIO + '!', 'info', 2000);
-        const splash = document.getElementById('splashScreen');
-        if (splash) {
-            splash.style.opacity = '0';
-            setTimeout(() => splash.remove(), 500);
-        }
-        // Registra Service Worker per PWA
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('./sw.js')
-                .then(() => console.log('✅ Service Worker registrato'))
-                .catch(err => console.warn('SW error:', err));
-        }
 		} catch(e) {
         console.error('❌ ERRORE INIT:', e);
 
