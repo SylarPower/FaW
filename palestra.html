@@ -2068,9 +2068,13 @@ function renDay() {
             const mmEl = document.getElementById('exmm-' + ex.uid);
             if (!mmEl || mmEl.hasChildNodes()) return;
             const def = exDef(ex.exerciseId);
-            if (!def || !def.group || def.group === 'Cardio') return;
+            if (!def || !def.groups || def.groups.every(g => g === 'Cardio')) return;
             const exFatigue = {};
-            exFatigue[def.group] = fatigue[def.group] || 0.5;
+            def.groups.forEach(g => {
+                if (g !== 'Cardio') {
+                    exFatigue[g] = g === def.group ? 1.0 : 0.5;
+                }
+            });
             renderMuscleMap(mmEl, exFatigue, 100);
         });
     }
@@ -2537,10 +2541,13 @@ function togEx(uid) {
             const ex = fEx(uid);
             if (ex) {
                 const def = exDef(ex.exerciseId);
-                if (def && def.group && def.group !== 'Cardio') {
-                    const fatigue = getMuscleFatigue();
+                if (def && def.groups && def.groups.some(g => g !== 'Cardio')) {
                     const exFatigue = {};
-                    exFatigue[def.group] = fatigue[def.group] || 0.5;
+                    def.groups.forEach(g => {
+                        if (g !== 'Cardio') {
+                            exFatigue[g] = g === def.group ? 1.0 : 0.5;
+                        }
+                    });
                     renderMuscleMap(mmEl, exFatigue, 100);
                 }
             }
