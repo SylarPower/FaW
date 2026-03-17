@@ -108,29 +108,29 @@
         .sd { font-size:.58rem;color:var(--tx2);margin-top:4px;text-transform:uppercase;letter-spacing:.5px; }
 
         /* ===== DAY CARDS ===== */
-        .dc {
-            display:flex;justify-content:space-between;align-items:center;
-            background:var(--c2);padding:16px;margin:8px 0;border-radius:14px;
-            border:1px solid var(--brd);cursor:pointer;touch-action:manipulation;
-            transition:all .2s;min-height:68px;
-        }
+		.dc {
+		    display:flex;justify-content:space-between;align-items:center;
+		    background:var(--c2);padding:10px 14px;margin:6px 0;border-radius:14px;
+		    border:1px solid var(--brd);cursor:pointer;touch-action:manipulation;
+		    transition:all .2s;min-height:52px;
+		}
+		.dc h4 { color:var(--acc);font-size:.88rem;margin-bottom:2px; }
+		.dc span { font-size:.7rem;color:var(--tx2); }
         .dc:active { border-color:var(--acc);transform:scale(.98); }
-        .dc h4 { color:var(--acc);font-size:.95rem;margin-bottom:4px; }
-        .dc span { font-size:.73rem;color:var(--tx2); }
         .dc .da { display:flex;gap:6px;align-items:center; }
-			.dc.dc-done {
-				 opacity:0.55;border-color:var(--grn);
-				 background:rgba(39,174,96,0.06);
-			}
-			[data-theme="light"] .dc.dc-done {
-				 background:rgba(39,174,96,0.08);
-			}
-			.dc.dc-done h4 { color:var(--grn); }
-			.done-week-badge {
-				 padding:4px 10px;border-radius:12px;font-size:.65rem;
-				 font-weight:700;background:rgba(39,174,96,.15);
-				 color:var(--grn);white-space:nowrap;
-			}
+		.dc.dc-done {
+			 opacity:0.55;border-color:var(--grn);
+			 background:rgba(39,174,96,0.06);
+		}
+		[data-theme="light"] .dc.dc-done {
+			 background:rgba(39,174,96,0.08);
+		}
+		.dc.dc-done h4 { color:var(--grn); }
+		.done-week-badge {
+			 padding:4px 10px;border-radius:12px;font-size:.65rem;
+			 font-weight:700;background:rgba(39,174,96,.15);
+			 color:var(--grn);white-space:nowrap;
+		}
         /* ===== EXERCISE CARDS ===== */
         .ex-card {
             background:var(--c1);border-radius:16px;margin:8px 0;
@@ -937,7 +937,6 @@ body.in-session .ses-nav { display:flex; }
     <div style="display:flex;gap:6px;align-items:center;">
         <button class="tb" onclick="toggleTheme()" id="thBtn" style="padding:8px 10px;">🌙</button>
         <button class="tb" onclick="document.getElementById('mLegend').style.display='flex'" style="padding:8px 10px;">📖</button>
-		<span class="badge" id="ubadge"></span>
     </div>
 </div>
 
@@ -1451,6 +1450,16 @@ let myExChart = null;
 
 const uid = () => Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
 const exDef = id => EX_DB.find(e => e.id === id);
+const GROUP_PRIORITY = {
+    'Petto':1, 'Schiena':2, 'Gambe':3, 'Spalle':4,
+    'Core':5, 'Tricipiti':6, 'Bicipiti':7, 'Avambracci':8, 'Cardio':9
+};
+function getPrimaryGroup(def) {
+    if (!def || !def.groups || !def.groups.length) return def ? def.group : 'Altro';
+    const sorted = [...def.groups].filter(g => g !== 'Cardio')
+        .sort((a, b) => (GROUP_PRIORITY[a] || 99) - (GROUP_PRIORITY[b] || 99));
+    return sorted[0] || def.group || 'Altro';
+}
 const MUSCLE_COLORS = {
     'Spalle':'#ffa502','Petto':'#ff4757','Schiena':'#3742fa',
     'Core':'#eccc68','Bicipiti':'#ff6b81','Tricipiti':'#e17055',
@@ -1738,14 +1747,17 @@ function renderWeeklyOverview() {
     if (legendEl) {
         const sortedGroups = Object.entries(fatigue).sort((a, b) => b[1] - a[1]);
         if (sortedGroups.length > 0) {
-            let legendHTML = `<div style="display:flex;align-items:center;gap:4px;margin-bottom:6px;width:100%;justify-content:center;">
-                <span style="font-size:.55rem;color:var(--tx3);">Basso</span>
-                <div style="height:8px;flex:1;max-width:160px;border-radius:4px;
-                    background:linear-gradient(90deg,hsl(174,25%,15%),hsl(174,55%,33%),hsl(174,82%,48%));"></div>
-                <span style="font-size:.55rem;color:var(--tx3);">Alto</span>
-                <div style="width:3px;"></div>
-                <div style="height:8px;width:20px;border-radius:4px;background:hsl(0,80%,50%);"></div>
-                <span style="font-size:.55rem;color:var(--red);">⚠️</span>
+            let legendHTML = `<div style="display:flex;align-items:center;gap:3px;margin-bottom:6px;width:100%;justify-content:center;">
+                <div style="height:8px;width:18px;border-radius:3px;background:hsl(15,70%,35%);"></div>
+                <span style="font-size:.5rem;color:var(--tx3);">Poco</span>
+                <div style="height:8px;width:18px;border-radius:3px;background:hsl(45,80%,45%);"></div>
+                <span style="font-size:.5rem;color:var(--tx3);">Sotto</span>
+                <div style="height:8px;width:24px;border-radius:3px;background:hsl(130,65%,42%);"></div>
+                <span style="font-size:.5rem;color:var(--tx3);">Ottimo</span>
+                <div style="height:8px;width:18px;border-radius:3px;background:hsl(50,75%,44%);"></div>
+                <span style="font-size:.5rem;color:var(--tx3);">Sopra</span>
+                <div style="height:8px;width:18px;border-radius:3px;background:hsl(5,90%,48%);"></div>
+                <span style="font-size:.5rem;color:var(--tx3);">⚠️</span>
             </div>`;
             legendHTML += sortedGroups.map(([g, ratio]) => {
                 const range = VOLUME_RANGES[g] || { mev:4, mav:10, mrv:16 };
@@ -2065,7 +2077,7 @@ function renDay() {
         if (sorted.length > 0) {
             dayLegendEl.innerHTML = sorted.map(([g, ratio]) => {
                 const c = fatigueColor(ratio) || 'var(--tx3)';
-                const label = ratio >= 0.8 ? 'target' : ratio >= 0.4 ? 'coinvolto' : 'secondario';
+                const label = ratio >= 0.5 ? 'primario' : ratio >= 0.25 ? 'coinvolto' : 'secondario';
                 return `<div class="mm-legend-item">
                     <div class="mm-legend-dot" style="background:${c}"></div>
                     <span>${g} <span style="font-size:.55rem;color:var(--tx3);">${label}</span></span>
@@ -2084,10 +2096,11 @@ function renDay() {
             if (!mmEl || mmEl.hasChildNodes()) return;
             const def = exDef(ex.exerciseId);
             if (!def || !def.groups || def.groups.every(g => g === 'Cardio')) return;
+            const primary = getPrimaryGroup(def);
             const exFatigue = {};
             def.groups.forEach(g => {
                 if (g !== 'Cardio') {
-                    exFatigue[g] = g === def.group ? 1.0 : 0.5;
+                    exFatigue[g] = g === primary ? 0.65 : 0.3;
                 }
             });
             renderMuscleMap(mmEl, exFatigue, 100);
@@ -2334,31 +2347,60 @@ function getDayFatigue(day) {
         }
     });
 
-    // Normalizza rispetto al muscolo più allenato del giorno
+    // Normalizza: il muscolo più allenato → 0.65 (centro zona verde)
     const maxVal = Math.max(...Object.values(sets), 0.001);
     const fatigue = {};
     Object.keys(sets).forEach(g => {
-        fatigue[g] = sets[g] / maxVal; // 0-1 relativo al giorno
+        fatigue[g] = (sets[g] / maxVal) * 0.65;
     });
     return fatigue;
 }
 function fatigueColor(ratio) {
-    // Oltre MRV → rosso warning (solo panoramica settimanale)
-    if (ratio > 1.0) {
-        const t = Math.min((ratio - 1.0) / 0.5, 1);
-        return 'hsl(' + Math.round(10 - 10 * t) + ',80%,' + (48 + Math.round(7 * t)) + '%)';
-    }
-    // Nessun coinvolgimento → null (gestito in renderMuscleMap come grigio)
+    // null → grigio (gestito da renderMuscleMap)
     if (ratio <= 0.03) return null;
-    // Scala teal con 5 step chiari:
-    // 0.03-0.2  → appena visibile  hsl(174, 30%, 18%)
-    // 0.2-0.4   → tenue            hsl(174, 40%, 25%)
-    // 0.4-0.6   → medio            hsl(174, 55%, 33%)
-    // 0.6-0.8   → pieno            hsl(174, 68%, 40%)
-    // 0.8-1.0   → acceso           hsl(174, 82%, 48%)
-    const sat = 25 + Math.round(57 * ratio);
-    const lum = 15 + Math.round(33 * ratio);
-    return 'hsl(174,' + sat + '%,' + lum + '%)';
+
+    // La scala è simmetrica attorno a 0.5-0.7 (zona ottimale):
+    //   0-0.2    → rosso     (troppo basso / quasi assente)
+    //   0.2-0.4  → giallo    (sotto l'ottimale)
+    //   0.4-0.8  → verde     (zona ottimale)
+    //   0.8-1.0  → giallo    (sopra l'ottimale)
+    //   >1.0     → rosso     (troppo alto / eccesso)
+
+    let hue, sat, lum;
+
+    if (ratio <= 0.2) {
+        // Rosso tenue → arancio (troppo basso)
+        const t = ratio / 0.2;
+        hue = Math.round(10 + 15 * t);
+        sat = Math.round(50 + 30 * t);
+        lum = Math.round(25 + 15 * t);
+    } else if (ratio <= 0.4) {
+        // Arancio → giallo (sotto ottimale)
+        const t = (ratio - 0.2) / 0.2;
+        hue = Math.round(25 + 25 * t);
+        sat = Math.round(70 + 15 * t);
+        lum = Math.round(38 + 10 * t);
+    } else if (ratio <= 0.8) {
+        // Verde (zona ottimale)
+        const t = (ratio - 0.4) / 0.4;
+        hue = Math.round(100 + 40 * t);
+        sat = Math.round(50 + 30 * t);
+        lum = Math.round(32 + 16 * t);
+    } else if (ratio <= 1.0) {
+        // Verde → giallo (sopra ottimale)
+        const t = (ratio - 0.8) / 0.2;
+        hue = Math.round(140 - 90 * t);
+        sat = Math.round(80 - 5 * t);
+        lum = Math.round(48 - 4 * t);
+    } else {
+        // Rosso (eccesso, >MRV)
+        const t = Math.min((ratio - 1.0) / 0.5, 1);
+        hue = Math.round(30 - 25 * t);
+        sat = Math.round(75 + 20 * t);
+        lum = Math.round(44 + 6 * t);
+    }
+
+    return 'hsl(' + hue + ',' + sat + '%,' + lum + '%)';
 }
 
 function renderMuscleMap(container, fatigueMap, height) {
@@ -2551,10 +2593,11 @@ function togEx(uid) {
             if (ex) {
                 const def = exDef(ex.exerciseId);
                 if (def && def.groups && def.groups.some(g => g !== 'Cardio')) {
+                    const primary = getPrimaryGroup(def);
                     const exFatigue = {};
                     def.groups.forEach(g => {
                         if (g !== 'Cardio') {
-                            exFatigue[g] = g === def.group ? 1.0 : 0.5;
+                            exFatigue[g] = g === primary ? 0.65 : 0.3;
                         }
                     });
                     renderMuscleMap(mmEl, exFatigue, 100);
