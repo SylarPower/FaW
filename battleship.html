@@ -1282,6 +1282,34 @@ async function risolviTurno(data) {
     processingResolution = false;
 }
 
+// ==========================================
+// 🚀 ANIMAZIONI ATTACCO SULLE GRIGLIE REALI
+// ==========================================
+async function playAttackAnimations(data, roundNumber) {
+    if (animatingRound >= roundNumber) return;
+    animatingRound = roundNumber;
+    isAnimating = true;
+
+    const storico = data.storicoAttacchi || [];
+    const attacks = storico.filter(a => a.round === roundNumber);
+    if (attacks.length === 0) { isAnimating = false; return; }
+
+    // Ordina: mio attacco → attacchi su altri → attacchi su di me
+    const myAttacks = attacks.filter(a => a.by === mioNome);
+    const onOthers = attacks.filter(a => a.by !== mioNome && a.target !== mioNome);
+    const onMe = attacks.filter(a => a.by !== mioNome && a.target === mioNome);
+    const sorted = [...myAttacks, ...onOthers, ...onMe];
+
+    for (const atk of sorted) {
+        await animateSingleAttack(atk, data, storico);
+        await sleep(400);
+    }
+
+    isAnimating = false;
+    // Re-render per stato finale pulito
+    renderBattaglia(data);
+}
+
 async function animateSingleAttack(atk, data, storico) {
     const isMyAttack = atk.by === mioNome;
     const targetsMe = atk.target === mioNome;
