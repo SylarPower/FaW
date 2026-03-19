@@ -1209,7 +1209,7 @@
 				<div style="margin-bottom: 20px;">
 					<label for="modal-timer-select" style="font-weight:bold; display:block; margin-bottom:5px;">Durata:</label>
 					<select id="modal-timer-select" style="width: 100%; padding: 8px; font-size: 1rem;">
-						<option value="45">45s (Fulmine)</option>
+						<option value="30">30s (Fulmine)</option>
 						<option value="60">60s (Blitz)</option>
 						<option value="90">90s</option>
 						<option value="180" selected>180s (Standard)</option>
@@ -1982,7 +1982,7 @@
 			  const manualRotBtn = document.getElementById('manual-rotate-btn');
 			  if (manualRotBtn) manualRotBtn.style.display = 'none';
 			  initialTime = timeRemaining;
-			  if (gridSize === 4 && timeRemaining === 45) showElenaPopup();
+			  if (gridSize === 4 && timeRemaining === 60) showElenaPopup();
 			  timerDisplay.textContent = formatTime(timeRemaining);
 			  timerDisplay.className = "";
 			  displaySeed.textContent = currentSeed;
@@ -4319,7 +4319,7 @@ async function applicaModificaDizionario(parola, tipo) {
 																</div>
 																<div class="banner-right" style="flex-wrap:wrap; gap:8px;">
 																	<select id="rivincita-tempo" style="padding:6px; border-radius:4px; border:none; font-size:0.85rem;">
-																		<option value="45" ${tempoCorrente === '45' ? 'selected' : ''}>45s</option>
+																		<option value="30" ${tempoCorrente === '30' ? 'selected' : ''}>30s</option>
 																		<option value="60" ${tempoCorrente === '60' ? 'selected' : ''}>60s</option>
 																		<option value="90" ${tempoCorrente === '90' ? 'selected' : ''}>90s</option>
 																		<option value="180" ${tempoCorrente === '180' ? 'selected' : ''}>180s</option>
