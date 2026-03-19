@@ -535,12 +535,15 @@
 						<div class="game-card" onclick="window.location.href='palestra.html'" id="game-palestra">
 						    <span style="font-size:2rem;">🏋️</span><br>Palestra
 						</div>
-						<!--<div class="game-card" style="opacity:0.3; cursor:not-allowed; pointer-events:none;">
-						    <span style="font-size:2rem;">❌</span><br>Prossimamente
-						</div>-->
-						<div class="game-card" onclick="window.location.href='test.html'" id="game-test">
-						    <span style="font-size:2rem;">❌</span><br>Test
+						<div class="game-card" onclick="window.location.href='battleships.html'" id="game-battleships">
+						    <span style="font-size:2rem;">🚢</span><br>Battaglia Navale
 						</div>
+						<div class="game-card" style="opacity:0.3; cursor:not-allowed; pointer-events:none;">
+						    <span style="font-size:2rem;">❌</span><br>Prossimamente
+						</div>
+						<!--<div class="game-card" onclick="window.location.href='test.html'" id="game-test">
+						    <span style="font-size:2rem;">❌</span><br>Test
+						</div>-->
 						<!-- Aggiungerai qui i futuri giochi -->
 					</div>
 				</div>
@@ -648,7 +651,8 @@
 			    ruzzle: [],
 			    pictionary: [],
 			    neonwar: [],
-			    gameof15: []
+			    gameof15: [],
+			    battleship: []
 			};
 			// ✅ CONFIGURAZIONE GIOCHI (aggiungi qui nuovi giochi)
 			const GIOCHI_CONFIG = {
@@ -805,6 +809,28 @@ gameof15: {
     minGiocatori: 1,
     maxGiocatori: 8
 },
+battleship: {
+    nome: "Battaglia Navale",
+    icona: "🚢",
+    opzioni: [
+        {
+            id: "gridSize",
+            label: "Griglia",
+            default: "10",
+            valori: [
+                { value: "6", label: "6x6 (Veloce)" },
+                { value: "8", label: "8x8 (Media)" },
+                { value: "10", label: "10x10 (Classica)" },
+                { value: "12", label: "12x12 (Grande)" }
+            ]
+        }
+    ],
+    modalita: [
+        { id: "classic", label: "CLASSICA 🚢", colore: "#1a5276", testo: "white" }
+    ],
+    minGiocatori: 2,
+    maxGiocatori: 8
+},
 			  // Aggiungerai qui altri giochi in futuro
 			};
 			// Debug helper
@@ -958,20 +984,23 @@ function listen() {
     db.collection("partite")
         .where("partecipanti", "array-contains", mioNome)
         .onSnapshot(snap => {
-            partiteCache.ruzzle = [];
-            partiteCache.neonwar = [];
-            partiteCache.gameof15 = [];
+partiteCache.ruzzle = [];
+partiteCache.neonwar = [];
+partiteCache.gameof15 = [];
+partiteCache.battleship = [];
 			
-	        snap.forEach(doc => {
-	            const data = { id: doc.id, ...doc.data() };
-	            if (data.gioco === 'neonwar') {
-	                partiteCache.neonwar.push(data);
-	            } else if (data.gioco === 'gameof15') {
-	                partiteCache.gameof15.push(data);  // ✅ AGGIUNTO
-	            } else {
-	                partiteCache.ruzzle.push(data);
-	            }
-	        });
+			snap.forEach(doc => {
+			    const data = { id: doc.id, ...doc.data() };
+			    if (data.gioco === 'neonwar') {
+			        partiteCache.neonwar.push(data);
+			    } else if (data.gioco === 'gameof15') {
+			        partiteCache.gameof15.push(data);
+			    } else if (data.gioco === 'battleship') {
+			        partiteCache.battleship.push(data);
+			    } else {
+			        partiteCache.ruzzle.push(data);
+			    }
+			});
             
             renderTutteLePartite();
         });
@@ -1055,11 +1084,14 @@ function renderTutteLePartite() {
     // Render NeonWar
     partiteCache.neonwar.forEach(p => renderPartitaRuzzle(p, div));
     
-    // Render Gioco del 15  ← ✅ AGGIUNTO
-    partiteCache.gameof15.forEach(p => renderPartitaRuzzle(p, div));
-    
-    // Render Pictionary
-    partiteCache.pictionary.forEach(p => renderPartitaPictionary(p, div));
+// Render Gioco del 15
+partiteCache.gameof15.forEach(p => renderPartitaRuzzle(p, div));
+
+// Render Battaglia Navale
+partiteCache.battleship.forEach(p => renderPartitaBattleship(p, div));
+
+// Render Pictionary
+partiteCache.pictionary.forEach(p => renderPartitaPictionary(p, div));
 }
 
 // ========================================
@@ -1178,6 +1210,113 @@ function renderPartitaPictionary(p, div) {
             <div>
                 <button onclick="window.location.href='pictionary.html?room=${roomId}'" style="background:#e94560; color:white;">ENTRA</button>
                 <button onclick="event.stopPropagation(); eliminaPictionary('${roomId}')" style="background:#cf6679; margin-left:5px;">🗑️</button>
+            </div>
+        </div>`;
+}
+// ========================================
+// 🚢 RENDER BATTAGLIA NAVALE
+// ========================================
+function renderPartitaBattleship(p, div) {
+    if (!p || !p.id) return;
+    const partitaId = p.id;
+    
+    // Non mostrare partite concluse nella lista attive
+    if (p.stato === "conclusa") return;
+    
+    const rifiutanti = p.rivincitaRifiutataDa || [];
+    const accettanti = p.rivincitaAccettataDa || [];
+    const creatore = p.partecipanti[0];
+    const altri = p.partecipanti.filter(x => x !== mioNome).join(', ');
+    
+    // Rifiuti
+    if (rifiutanti.length > 0) {
+        const ioHoRifiutato = rifiutanti.includes(mioNome);
+        div.innerHTML += `
+            <div class="user-item" style="background:${ioHoRifiutato ? '#7f8c8d' : '#cf6679'}; color:white; ${ioHoRifiutato ? 'opacity:0.7;' : ''}">
+                <span>${ioHoRifiutato ? '👋 Hai rifiutato la sfida' : '😔 Sfida annullata: ' + rifiutanti.join(', ') + ' ha rifiutato'}</span>
+                <button onclick="event.stopPropagation(); if(confirm('Eliminare?')) db.collection('partite').doc('${partitaId}').delete()">🗑️</button>
+            </div>`;
+        return;
+    }
+    
+    // Stati specifici Battleship
+    let statoText = '';
+    let statoColor = '#1a5276';
+    let statoIcon = '🚢';
+    
+    switch(p.stato) {
+        case 'attesa':
+            statoText = 'In attesa';
+            statoColor = '#9b59b6';
+            statoIcon = '⏳';
+            break;
+        case 'piazzamento':
+            statoText = 'Piazzamento navi';
+            statoColor = '#2980b9';
+            statoIcon = '🔧';
+            break;
+        case 'battaglia':
+            const turno = p.turnoCorrente || 1;
+            const eliminati = p.eliminati || [];
+            const sopravvissuti = p.partecipanti.filter(pp => !eliminati.includes(pp)).length;
+            statoText = `Turno ${turno} • ${sopravvissuti} superstiti`;
+            statoColor = '#e74c3c';
+            statoIcon = '⚔️';
+            break;
+    }
+    
+    // Attesa accettazione
+    if (p.stato === "attesa") {
+        if (creatore === mioNome) {
+            const numAccettanti = accettanti.length + 1;
+            const totale = p.partecipanti.length;
+            if (numAccettanti < totale) {
+                div.innerHTML += `
+                    <div class="user-item" style="background:${statoColor}; color:white;">
+                        <span>${statoIcon} Battaglia Navale: attesa (${numAccettanti}/${totale})</span>
+                        <div>
+                            <button onclick="event.stopPropagation(); window.location.href='battleship.html?matchId=${partitaId}'" style="background:#03dac6; color:#000;">ENTRA</button>
+                            <button onclick="event.stopPropagation(); annullaSfida('${partitaId}')" style="background:#cf6679; margin-left:5px;">🚫</button>
+                        </div>
+                    </div>`;
+            } else {
+                div.innerHTML += `
+                    <div class="user-item live-match" style="border-left-color: #1a5276;">
+                        <span>🚢 Battaglia Navale vs ${altri}</span>
+                        <div>
+                            <button onclick="window.location.href='battleship.html?matchId=${partitaId}'" style="background:#03dac6; color:#000;">ENTRA</button>
+                            <button onclick="event.stopPropagation(); if(confirm('Eliminare?')) db.collection('partite').doc('${partitaId}').delete()" style="background:#cf6679; margin-left:5px;">🗑️</button>
+                        </div>
+                    </div>`;
+            }
+        } else {
+            if (accettanti.includes(mioNome)) {
+                div.innerHTML += `
+                    <div class="user-item" style="background:#2ecc71; color:white;">
+                        <span>✅ Battaglia Navale accettata: attesa altri</span>
+                        <button onclick="window.location.href='battleship.html?matchId=${partitaId}'" style="background:#fff; color:#000;">ENTRA</button>
+                    </div>`;
+            } else {
+                div.innerHTML += `
+                    <div class="user-item" style="background:#f1c40f; color:black; border:3px solid #e67e22;">
+                        <span style="font-weight:bold;">🚢 SFIDA NAVALE DA ${creatore}</span>
+                        <div>
+                            <button onclick="event.stopPropagation(); accettaSfida('${partitaId}')" style="background:#2ecc71; color:white;">✅ ACCETTA</button>
+                            <button onclick="event.stopPropagation(); rifiutaSfida('${partitaId}')" style="background:#cf6679; color:white; margin-left:5px;">❌ RIFIUTA</button>
+                        </div>
+                    </div>`;
+            }
+        }
+        return;
+    }
+    
+    // In corso (piazzamento o battaglia)
+    div.innerHTML += `
+        <div class="user-item live-match" style="border-left-color: ${statoColor};">
+            <span>${statoIcon} ${altri} (${statoText})</span>
+            <div>
+                <button onclick="window.location.href='battleship.html?matchId=${partitaId}'" style="background:#03dac6; color:#000;">ENTRA</button>
+                <button onclick="event.stopPropagation(); if(confirm('Eliminare?')) db.collection('partite').doc('${partitaId}').delete()" style="background:#cf6679; margin-left:5px;">🗑️</button>
             </div>
         </div>`;
 }
@@ -1482,9 +1621,49 @@ if (giocoSelezionato === 'pictionary') {
     return;
 }
 			    
-			    // ✅ CONTINUA CON LA LOGICA NORMALE PER GLI ALTRI GIOCHI
-			    let pIniziali = {};
-			    let paroleIniziali = {};
+    // ✅ GESTIONE SPECIFICA PER BATTLESHIP
+    if (giocoSelezionato === 'battleship') {
+        showLoadingBanner('Creazione Battaglia Navale...');
+        
+        try {
+            const doc = await db.collection("partite").add({
+                gioco: 'battleship',
+                partecipanti: partecipanti,
+                opzioni: { gridSize: parseInt(opzioni.gridSize || 10) },
+                pronti: [],
+                prontiPiazzamento: [],
+                navi: {},
+                storicoAttacchi: [],
+                attacchiTurno: {},
+                turnoCorrente: 1,
+                eliminati: [],
+                vincitore: null,
+                stato: 'attesa',
+                rivincitaAccettataDa: [],
+                rivincitaRifiutataDa: [],
+                timestamp: Date.now(),
+                dataOra: new Date().toLocaleString('it-IT', {
+                    day: '2-digit', month: '2-digit',
+                    hour: '2-digit', minute: '2-digit'
+                })
+            });
+            
+            amiciSelezionati.clear();
+            document.querySelectorAll('.user-item.selected').forEach(el => el.classList.remove('selected'));
+            aggiornaBottoneSfida();
+            
+            showSuccessBannerBattleship(doc.id);
+        } catch (e) {
+            console.error("❌ Errore creazione Battleship:", e);
+            removeGameBanner();
+            mostraToast('❌ Errore: ' + e.message);
+        }
+        return;
+    }
+
+    // ✅ CONTINUA CON LA LOGICA NORMALE PER GLI ALTRI GIOCHI
+    let pIniziali = {};
+    let paroleIniziali = {};
 			    partecipanti.forEach(p => {
 			        pIniziali[p] = 0;
 			        paroleIniziali[p] = [];
@@ -1583,7 +1762,31 @@ if (giocoSelezionato === 'pictionary') {
 			    if (b && b.innerHTML.includes('Sfida creata')) removeGameBanner();
 			  }, 5000);
 			}
-			
+function showSuccessBannerBattleship(partitaId) {
+    removeGameBanner();
+    const banner = document.createElement('div');
+    banner.id = 'game-banner';
+    banner.className = 'game-banner';
+    banner.style.background = 'linear-gradient(135deg, #1a5276 0%, #0d2137 100%)';
+    banner.innerHTML = `
+        <div class="banner-left">
+            <span style="font-size:1.5rem;">🚢</span>
+            <div>
+                <div style="font-weight:bold;">Battaglia Navale creata!</div>
+                <div style="font-size:0.8rem; opacity:0.9;">In attesa che gli altri accettino</div>
+            </div>
+        </div>
+        <div class="banner-right">
+            <button class="btn-banner" style="background:white; color:#333;" onclick="window.location.href='battleship.html?matchId=${partitaId}'">ENTRA SUBITO</button>
+            <button class="btn-banner btn-cancel-banner" onclick="removeGameBanner()">OK</button>
+        </div>
+    `;
+    document.body.appendChild(banner);
+    setTimeout(() => {
+        const b = document.getElementById('game-banner');
+        if (b && b.innerHTML.includes('Battaglia Navale creata')) removeGameBanner();
+    }, 5000);
+}			
 			function caricaStorico() {
 			  // Carico le partite e le ordino in JavaScript (evita errore indici Firebase)
 			  db.collection("partite").where("partecipanti", "array-contains", mioNome).where("stato", "==", "conclusa").onSnapshot(snap => {
