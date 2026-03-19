@@ -433,6 +433,15 @@
 			.tile.medium-font {
 			font-size: 2.2rem;
 			}
+			.tile.large-font {
+			    font-size: 2.8rem;
+			    border-radius: 8px;
+			    box-shadow: 0 4px 0 var(--tile-shadow);
+			}
+			.tile.large-font .bonus-badge {
+			    font-size: 0.7rem;
+			    padding: 2px 5px;
+			}
 			.tile.five-font {
 			font-size: 1.8rem;
 			}
@@ -1210,6 +1219,7 @@
 				<div style="margin-bottom: 20px;">
 					<label for="modal-grid-select" style="font-weight:bold; display:block; margin-bottom:5px;">Dimensione Griglia:</label>
 					<select id="modal-grid-select" style="width: 100%; padding: 8px; font-size: 1rem;">
+						<option value="3">3x3 (Mini)</option>
 						<option value="4">4x4 (Easy)</option>
 						<option value="5" selected>5x5 (Classica)</option>
 						<option value="6">6x6 (Intermedia)</option>
@@ -2087,14 +2097,16 @@
 				        tile.classList.add('blurred');
 				    }
 				}
-			    if (gridSize === 4) tile.classList.add('medium-font');
-			    else if (gridSize === 5) tile.classList.add('five-font');
+				if (gridSize === 3) tile.classList.add('large-font');
+				else if (gridSize === 4) tile.classList.add('medium-font');
+				else if (gridSize === 5) tile.classList.add('five-font');
 			    else if (gridSize === 6) tile.classList.add('six-font');
 			    else if (gridSize === 7) tile.classList.add('compact-font');
 			    else if (gridSize >= 10) tile.classList.add('small-font');
 			    tile.textContent = char === 'Q' ? 'Qu' : char;
-			    if (char === 'Q') {
-			      if (gridSize <= 5) tile.style.fontSize = "1.3rem";
+				if (char === 'Q') {
+				  if (gridSize === 3) tile.style.fontSize = "2.0rem";
+				  else if (gridSize <= 5) tile.style.fontSize = "1.3rem";
 			      else if (gridSize === 6) tile.style.fontSize = "1.15rem";
 			      else if (gridSize === 7) tile.style.fontSize = "1.0rem";
 			    }
@@ -2548,7 +2560,7 @@
 			  poly.setAttribute("points", points);
 			  poly.setAttribute("fill", "none");
 			  poly.setAttribute("stroke", "var(--line-color)");
-			  poly.setAttribute("stroke-width", gridSize >= 10 ? "4" : "8");
+			  poly.setAttribute("stroke-width", gridSize >= 10 ? "4" : (gridSize <= 3 ? "10" : "8"));
 			  poly.setAttribute("stroke-linecap", "round");
 			  poly.setAttribute("stroke-linejoin", "round");
 			  lineLayer.appendChild(poly);
@@ -4314,6 +4326,7 @@ async function applicaModificaDizionario(parola, tipo) {
 																		<option value="300" ${tempoCorrente === '300' ? 'selected' : ''}>300s</option>
 																	</select>
 																	<select id="rivincita-griglia" style="padding:6px; border-radius:4px; border:none; font-size:0.85rem;">
+																		<option value="3" ${grigliaCorrente === '3' ? 'selected' : ''}>3x3</option>
 																		<option value="4" ${grigliaCorrente === '4' ? 'selected' : ''}>4x4</option>
 																		<option value="5" ${grigliaCorrente === '5' ? 'selected' : ''}>5x5</option>
 																		<option value="6" ${grigliaCorrente === '6' ? 'selected' : ''}>6x6</option>
