@@ -62,9 +62,13 @@
         .game-container { display: flex; flex-direction: column; gap: 15px; }
         @media (min-width: 800px) {
             .game-container { flex-direction: row; gap: 20px; }
-            .my-section { flex: 0 0 45%; }
+            .my-section { flex: 1; }
             .opponent-section { flex: 1; }
         }
+.battle-grid {
+    max-width: 500px;
+    margin: 0 auto;
+}
         .grid-section { background: var(--panel); border-radius: 10px; padding: 12px; }
         .section-title {
             font-size: 0.85rem; font-weight: 700; text-transform: uppercase;
@@ -157,9 +161,19 @@
             background: linear-gradient(145deg, #c0392b, #e74c3c) !important;
             border-color: #a93226 !important;
         }
-        .cell.ship-hit .hit-fire { font-size: 1.1em; }
-        .cell.ship-hit.anim-new { animation: hitFlash 0.5s ease; }
-        .cell.ship-hit.anim-new .hit-fire { animation: fireFlicker 0.4s ease-in-out 3; }
+        .cell.ship-hit .hit-fire {
+            font-size: 1.1em;
+            animation: fireFlicker 0.6s ease-in-out infinite;
+            display: inline-block;
+        }
+        
+        @keyframes fireFlicker {
+            0%   { transform: scale(1) rotate(-3deg); opacity: 1; }
+            25%  { transform: scale(1.1) rotate(3deg); opacity: 0.9; }
+            50%  { transform: scale(0.95) rotate(-2deg); opacity: 1; }
+            75%  { transform: scale(1.08) rotate(4deg); opacity: 0.85; }
+            100% { transform: scale(1) rotate(-3deg); opacity: 1; }
+        }
 
         /* Nave affondata */
         .cell.sunk-cell {
@@ -187,6 +201,8 @@
             position: relative;
             z-index: 1;
             filter: drop-shadow(0 2px 4px rgba(0,0,0,0.6));
+            display: inline-block;
+            animation: fireFlicker 0.6s ease-in-out infinite;
         }
         .cell.hit-marker::before { display: none; }
 
@@ -1176,7 +1192,7 @@ function renderGrid(containerId, opts) {
             // Click handler
             if (opts.interactive && !attacked && !isRevealedSunk) {
                 cell.addEventListener('click', () => opts.onClick(r, c));
-            } else if (!opts.interactive) {
+            } else {
                 cell.classList.add('no-hover');
             }
 
@@ -1591,7 +1607,10 @@ function renderOpponentGrid(data) {
 
     // Raccogli dati intel per questo avversario
     const myIntel = currentGameData?.intelData?.[mioNome]?.[targetSelezionato] || [];
-    const intelCellsForTarget = myIntel.filter(i => i.hasShip);
+    // ✅ Mostra solo celle con nave e non già colpite
+    const intelCellsForTarget = myIntel.filter(i =>
+        i.hasShip && !allAttacksVsTarget.some(a => a.r === i.r && a.c === i.c)
+    );
 
     renderGrid('opponent-grid-container', {
         size: gridSize,
@@ -1961,28 +1980,6 @@ async function risolviTurno(data) {
                 });
             }
             const storicoFinale = [...storicoAgg, ...ritorsioni];
-
-            // =====================
-            // G. INTEL automatica (ogni 4 turni)
-            // =====================
-            if (hasSpecial && turno % 4 === 0) {
-                surviving.forEach(player => {
-                    if (!intelData[player]) intelData[player] = {};
-                    const opponents = surviving.filter(p => p !== player);
-                    opponents.forEach(opp => {
-                        const naviOpp = fd.navi[opp] || [];
-                        const allCells = naviOpp.flatMap(n => n.cells);
-                        const unrevealedCells = allCells.filter(c =>
-                            !storicoFinale.some(s => s.target === opp && s.r === c.r && s.c === c.c)
-                        );
-                        if (unrevealedCells.length > 0) {
-                            const reveal = unrevealedCells[Math.floor(Math.random() * unrevealedCells.length)];
-                            if (!intelData[player][opp]) intelData[player][opp] = [];
-                            intelData[player][opp].push({ r: reveal.r, c: reveal.c, hasShip: true, turno });
-                        }
-                    });
-                });
-            }
 
             // =====================
             // H. ELIMINAZIONI
