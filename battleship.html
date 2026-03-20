@@ -167,7 +167,14 @@
             border: 1px solid #e74c3c !important;
         }
         .cell.sunk-cell.anim-new { animation: sinkAnim 0.8s ease; }
-        .cell.sunk-cell::after { content: '💀'; font-size: 1.3em; z-index: 1; position: relative; filter: drop-shadow(0 1px 3px rgba(0,0,0,0.6)); }
+        .cell.sunk-cell::after { content: none; }
+        .sunk-skull {
+            font-size: 1.4em;
+            position: relative;
+            z-index: 1;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.7));
+            line-height: 1;
+        }
         .cell.sunk-cell::before { display: none; }
 
         /* Marcatori attacco (griglia avversario) */
@@ -730,7 +737,13 @@
 
             <div id="battle-panel" class="hidden">
                 <div class="section-title"><span>🎯</span><span>SCEGLI BERSAGLIO</span></div>
+                <div id="weapon-help" class="hidden" style="font-size:0.7rem; color:var(--text-dim); padding:4px 8px; margin-bottom:4px;">
+                    ⚔️ Seleziona un'arma, poi clicca la cella bersaglio
+                </div>
                 <div id="weapon-bar" class="weapon-bar hidden"></div>
+                <div id="shield-help" class="hidden" style="font-size:0.7rem; color:var(--text-dim); padding:4px 8px; margin-bottom:4px;">
+                    🛡️ Attiva PRIMA di sparare. Lo scudo protegge da 1 colpo questo turno
+                </div>
                 <div id="shield-bar" class="shield-bar hidden"></div>
                 <div class="opponent-tabs" id="opponent-tabs"></div>
                 <div id="opponent-grid-container"></div>
@@ -1078,24 +1091,28 @@ function renderGrid(containerId, opts) {
                     if (info) {
                         if (info.pos === 'single') cell.classList.add('ship-single');
                         else cell.classList.add(`ship-${info.pos}-${info.dir.toLowerCase()}`);
-                        // Emoji sulla prua
-                        if (info.pos === 'bow' || info.pos === 'single') {
+                    }
+                    if (isSunk) {
+                        cell.classList.add('sunk-cell');
+                        const skull = document.createElement('span');
+                        skull.className = 'sunk-skull';
+                        skull.textContent = '💀';
+                        cell.appendChild(skull);
+                    } else if (attacked) {
+                        cell.classList.add('ship-hit');
+                        // ✅ Fuoco sostituisce l'emoji nave
+                        const fire = document.createElement('span');
+                        fire.className = 'ship-emoji';
+                        fire.textContent = '🔥';
+                        cell.appendChild(fire);
+                    } else {
+                        // ✅ Nave intatta: emoji su OGNI cella
+                        if (info) {
                             const em = document.createElement('span');
                             em.className = 'ship-emoji';
                             em.textContent = info.ship.emoji || '🚢';
                             cell.appendChild(em);
                         }
-                    }
-                    if (isSunk) {
-                        cell.classList.add('sunk-cell');
-                    } else if (attacked) {
-                        cell.classList.add('ship-hit');
-                        const fire = document.createElement('span');
-                        fire.className = 'hit-fire';
-                        fire.textContent = '🔥';
-                        cell.appendChild(fire);
-                    } else {
-                        // Nave intatta: mostra emoji prua
                     }
                 } else if (attacked) {
                     cell.classList.add('miss-marker');
@@ -1110,6 +1127,10 @@ function renderGrid(containerId, opts) {
                         if (info.pos === 'single') cell.classList.add('ship-single');
                         else cell.classList.add(`ship-${info.pos}-${info.dir.toLowerCase()}`);
                     }
+                    const skull = document.createElement('span');
+                    skull.className = 'sunk-skull';
+                    skull.textContent = '💀';
+                    cell.appendChild(skull);
                 } else if (attacked) {
                     const hitShip = opts.enemyShips && opts.enemyShips.some(n => n.cells.some(cc => cc.r === r && cc.c === c));
                     cell.classList.add(hitShip ? 'hit-marker' : 'miss-marker');
@@ -1430,14 +1451,16 @@ function renderBattaglia(data) {
     renderWeaponBar();
     renderShieldBar();
 
-    // Aggiorna testo bottone
-    if (selectedWeapon === 'laser') {
-        btnFire.textContent = '🔭 SCANSIONA!';
-    } else if (selectedWeapon === 'cluster') {
-        btnFire.textContent = '💣 FUOCO GRAPPOLO!';
-    } else {
-        btnFire.textContent = '🔥 FUOCO!';
-    }
+    // Aggiorna testo bottone con info scudo
+    let fireLabel = '';
+    if (selectedWeapon === 'laser') fireLabel = '🔭 SCANSIONA!';
+    else if (selectedWeapon === 'cluster') fireLabel = '💣 FUOCO GRAPPOLO!';
+    else fireLabel = '🔥 FUOCO!';
+
+    if (scudoGlobaleAttivo) fireLabel += ' + 🛡️';
+    if (scudoCellaAttiva) fireLabel += ` + 🎯${COL_LABELS[scudoCellaAttiva.c]}${scudoCellaAttiva.r+1}`;
+
+    btnFire.textContent = fireLabel;
 
     if (hoAttaccato) {
         btnFire.classList.add('hidden');
@@ -1935,8 +1958,10 @@ async function playAttackAnimations(data, roundNumber) {
     }
 
     isAnimating = false;
-    // Re-render per stato finale pulito
-    renderBattaglia(data);
+    // ✅ Re-render dopo tutte le animazioni — ora i teschi appaiono
+    if (currentGameData) {
+        renderBattaglia(currentGameData);
+    }
 }
 
 async function animateSingleAttack(atk, data, storico) {
@@ -2193,8 +2218,10 @@ function showAttackLabel(attacker, target, coord) {
 // ==========================================
 function renderWeaponBar() {
     const bar = document.getElementById('weapon-bar');
-    if (!featureArmiSpeciali) { bar.classList.add('hidden'); return; }
+    const help = document.getElementById('weapon-help');
+    if (!featureArmiSpeciali) { bar.classList.add('hidden'); help.classList.add('hidden'); return; }
     bar.classList.remove('hidden');
+    help.classList.remove('hidden');
     bar.innerHTML = '';
 
     Object.entries(ARMI_CONFIG).forEach(([id, cfg]) => {
@@ -2218,6 +2245,15 @@ function renderWeaponBar() {
         });
         bar.appendChild(btn);
     });
+
+    // ✅ Mostra descrizione arma selezionata
+    const selCfg = ARMI_CONFIG[selectedWeapon];
+    if (selCfg) {
+        const desc = document.createElement('div');
+        desc.style.cssText = 'width:100%; font-size:0.7rem; color:var(--target-color); padding:4px 0 0; text-align:center;';
+        desc.textContent = `${selCfg.emoji} ${selCfg.name}: ${selCfg.desc}`;
+        bar.appendChild(desc);
+    }
 }
 
 // ==========================================
@@ -2225,26 +2261,47 @@ function renderWeaponBar() {
 // ==========================================
 function renderShieldBar() {
     const bar = document.getElementById('shield-bar');
-    if (!featurePowerups) { bar.classList.add('hidden'); return; }
+    const help = document.getElementById('shield-help');
+    if (!featurePowerups) { bar.classList.add('hidden'); help.classList.add('hidden'); return; }
     bar.classList.remove('hidden');
+    help.classList.remove('hidden');
 
     const scudoCount = arsenaleLocale.scudo || 0;
     const strategaCount = arsenaleLocale.scudoStratega || 0;
+    const amIEliminated = (currentGameData?.eliminati || []).includes(mioNome);
 
     bar.innerHTML = `
-        <span class="shield-label">🛡️ DIFESA:</span>
+        <span class="shield-label" style="font-weight:700;">🛡️ DIFESA:</span>
+        
         <button class="shield-btn ${scudoGlobaleAttivo ? 'active' : ''}" 
-                ${scudoCount <= 0 || hoAttaccato ? 'disabled' : ''}
-                onclick="toggleScudoGlobale()">
-            🛡️ Scudo (×${scudoCount})
+                ${scudoCount <= 0 || hoAttaccato || amIEliminated ? 'disabled' : ''}
+                onclick="toggleScudoGlobale()"
+                title="Blocca il prossimo colpo che ti colpisce questo turno">
+            🛡️ Scudo Globale
+            <span style="font-size:0.65rem; display:block;">×${scudoCount} rimasti</span>
         </button>
+        
         <button class="shield-btn ${scudoCellaAttiva ? 'active' : ''}" 
-                ${strategaCount <= 0 || hoAttaccato ? 'disabled' : ''}
-                onclick="toggleScudoStratega()">
-            🎯 Stratega (×${strategaCount})
+                ${strategaCount <= 0 || hoAttaccato || amIEliminated ? 'disabled' : ''}
+                onclick="toggleScudoStratega()"
+                title="Protegge una cella specifica per questo turno">
+            🎯 Scudo Stratega
+            <span style="font-size:0.65rem; display:block;">×${strategaCount} rimasti</span>
         </button>
-        ${scudoCellaAttiva ? `<span class="shield-label">Cella: ${COL_LABELS[scudoCellaAttiva.c]}${scudoCellaAttiva.r+1}</span>` : ''}
-        ${scudoGlobaleAttivo ? `<span class="shield-label" style="color:#2ecc71;">Scudo ATTIVO</span>` : ''}
+        
+        ${scudoGlobaleAttivo ? `
+            <span class="shield-label" style="color:#2ecc71; font-weight:900;">
+                ✅ SCUDO ATTIVO — Il prossimo colpo sarà bloccato
+            </span>
+        ` : ''}
+        
+        ${scudoCellaAttiva ? `
+            <span class="shield-label" style="color:#2ecc71; font-weight:900;">
+                ✅ CELLA PROTETTA: ${COL_LABELS[scudoCellaAttiva.c]}${scudoCellaAttiva.r + 1}
+                <button onclick="scudoCellaAttiva=null; renderShieldBar(); renderMiaGrigliaForShield();" 
+                        style="background:none; border:none; color:#e74c3c; cursor:pointer; font-size:0.8rem; margin-left:5px;">✖️</button>
+            </span>
+        ` : ''}
     `;
 }
 
@@ -2258,14 +2315,36 @@ function toggleScudoGlobale() {
 function toggleScudoStratega() {
     if (scudoCellaAttiva) {
         scudoCellaAttiva = null;
+        shieldSelectionMode = false;
         renderShieldBar();
         renderMiaGrigliaForShield();
         return;
     }
     scudoGlobaleAttivo = false;
-    // Attiva modalità selezione cella sulla mia griglia
-    alert('Clicca una cella sulla TUA griglia per proteggerla questo turno.');
-    activateShieldCellSelection();
+    shieldSelectionMode = true;
+
+    // ✅ Banner guida invece di alert
+    showGameBanner({
+        icon: '🎯',
+        title: 'SELEZIONA CELLA DA PROTEGGERE',
+        subtitle: 'Clicca una cella sulla TUA griglia (a sinistra)',
+        color: '#27ae60',
+        priority: 5,
+        buttons: [
+            { text: '❌ Annulla', onclick: 'cancellaScudoStratega()' }
+        ]
+    });
+
+    renderShieldBar();
+    renderMiaGrigliaForShield();
+}
+
+function cancellaScudoStratega() {
+    shieldSelectionMode = false;
+    scudoCellaAttiva = null;
+    removeGameBanner();
+    renderShieldBar();
+    renderMiaGrigliaForShield();
 }
 
 let shieldSelectionMode = false;
@@ -2293,6 +2372,7 @@ function renderMiaGrigliaForShield() {
             if (shieldSelectionMode) {
                 scudoCellaAttiva = { r, c };
                 shieldSelectionMode = false;
+                removeGameBanner();
                 renderShieldBar();
                 renderMiaGrigliaForShield();
             }
