@@ -182,9 +182,11 @@
             background: linear-gradient(145deg, #c0392b, #e74c3c) !important;
         }
         .cell.hit-marker::after {
-            content: '🔥'; font-size: 1.3em;
-            position: relative; z-index: 1;
-            filter: drop-shadow(0 1px 3px rgba(0,0,0,0.5));
+            content: '🔥';
+            font-size: 1.4em;
+            position: relative;
+            z-index: 1;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.6));
         }
         .cell.hit-marker::before { display: none; }
 
@@ -1094,13 +1096,14 @@ function renderGrid(containerId, opts) {
                     }
                     if (isSunk) {
                         cell.classList.add('sunk-cell');
+                        // ✅ Teschio su ogni cella affondata
                         const skull = document.createElement('span');
                         skull.className = 'sunk-skull';
                         skull.textContent = '💀';
                         cell.appendChild(skull);
                     } else if (attacked) {
                         cell.classList.add('ship-hit');
-                        // ✅ Fuoco sostituisce l'emoji nave
+                        // ✅ Fuoco sostituisce emoji nave
                         const fire = document.createElement('span');
                         fire.className = 'ship-emoji';
                         fire.textContent = '🔥';
@@ -1127,6 +1130,7 @@ function renderGrid(containerId, opts) {
                         if (info.pos === 'single') cell.classList.add('ship-single');
                         else cell.classList.add(`ship-${info.pos}-${info.dir.toLowerCase()}`);
                     }
+                    // ✅ Teschio come elemento DOM
                     const skull = document.createElement('span');
                     skull.className = 'sunk-skull';
                     skull.textContent = '💀';
@@ -1942,50 +1946,68 @@ async function playAttackAnimations(data, roundNumber) {
     animatingRound = roundNumber;
     isAnimating = true;
 
-    const storico = data.storicoAttacchi || [];
-    const attacks = storico.filter(a => a.round === roundNumber);
-    if (attacks.length === 0) { isAnimating = false; return; }
+    const fullStorico = data.storicoAttacchi || [];
+    const roundAttacks = fullStorico.filter(a => a.round === roundNumber);
+    if (roundAttacks.length === 0) { isAnimating = false; return; }
 
-    // Ordina: mio attacco → attacchi su altri → attacchi su di me
-    const myAttacks = attacks.filter(a => a.by === mioNome);
-    const onOthers = attacks.filter(a => a.by !== mioNome && a.target !== mioNome);
-    const onMe = attacks.filter(a => a.by !== mioNome && a.target === mioNome);
+    // ✅ Storico senza questo round (stato "prima dei missili")
+    const preRoundStorico = fullStorico.filter(a => a.round !== roundNumber);
+    let progressiveStorico = [...preRoundStorico];
+
+    // Ordine: miei attacchi → attacchi su altri → attacchi su di me
+    const myAttacks = roundAttacks.filter(a => a.by === mioNome);
+    const onOthers = roundAttacks.filter(a => a.by !== mioNome && a.target !== mioNome);
+    const onMe = roundAttacks.filter(a => a.by !== mioNome && a.target === mioNome);
     const sorted = [...myAttacks, ...onOthers, ...onMe];
 
     for (const atk of sorted) {
-        await animateSingleAttack(atk, data, storico);
+        // ✅ Dati per rendering: senza l'attacco corrente
+        const renderData = { ...data, storicoAttacchi: [...progressiveStorico] };
+        // ✅ Dati per check colpito/affondato: incluso l'attacco corrente
+        const checkStorico = [...progressiveStorico, atk];
+
+        await animateSingleAttack(atk, renderData, checkStorico);
+
+        // ✅ DOPO l'esplosione: aggiungi attacco e aggiorna la cella nel DOM
+        progressiveStorico.push(atk);
+        updateCellAfterHit(atk, data.navi, progressiveStorico);
+
         await sleep(400);
     }
 
     isAnimating = false;
-    // ✅ Re-render dopo tutte le animazioni — ora i teschi appaiono
+
+    // ✅ Re-process stato corrente
     if (currentGameData) {
-        renderBattaglia(currentGameData);
+        if (currentGameData.stato === 'conclusa') {
+            renderBattaglia(currentGameData);
+            mostraFinalePartita(currentGameData, currentGameData.vincitore);
+        } else {
+            renderBattaglia(currentGameData);
+        }
     }
 }
 
-async function animateSingleAttack(atk, data, storico) {
+async function animateSingleAttack(atk, renderData, checkStorico) {
     const isMyAttack = atk.by === mioNome;
     const targetsMe = atk.target === mioNome;
 
     let gridContainerId, startDir;
 
     if (isMyAttack) {
-        // Mio attacco: missile dal basso → griglia avversario
         targetSelezionato = atk.target;
-        renderOpponentTabs(data, data.eliminati || []);
-        renderOpponentGrid(data);
+        renderOpponentTabs(renderData, renderData.eliminati || []);
+        renderOpponentGrid(renderData);  // ✅ Pre-hit data
         gridContainerId = 'opponent-grid-container';
         startDir = 'bottom';
     } else if (targetsMe) {
-        // Nemico attacca me: missile da sinistra → mia griglia
+        // ✅ La mia griglia è già renderizzata con dati pre-round
         gridContainerId = 'my-grid-container';
         startDir = 'left';
     } else {
-        // Nemico attacca un altro: missile da destra → griglia avversario (switch tab)
         targetSelezionato = atk.target;
-        renderOpponentTabs(data, data.eliminati || []);
-        renderOpponentGrid(data);
+        renderOpponentTabs(renderData, renderData.eliminati || []);
+        renderOpponentGrid(renderData);  // ✅ Pre-hit data
         gridContainerId = 'opponent-grid-container';
         startDir = 'right';
     }
@@ -1993,15 +2015,12 @@ async function animateSingleAttack(atk, data, storico) {
     const gridContainer = document.getElementById(gridContainerId);
     if (!gridContainer) return;
 
-    // Scroll alla griglia
     gridContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
     await sleep(300);
 
-    // Evidenzia la griglia
     const gridEl = gridContainer.querySelector('.battle-grid');
     if (gridEl) gridEl.classList.add('grid-highlight');
 
-    // Trova la cella bersaglio nel DOM
     const cellEl = gridContainer.querySelector(`.cell[data-row="${atk.r}"][data-col="${atk.c}"]`);
     if (!cellEl) { if (gridEl) gridEl.classList.remove('grid-highlight'); return; }
 
@@ -2009,10 +2028,10 @@ async function animateSingleAttack(atk, data, storico) {
     const targetX = cellRect.left + cellRect.width / 2;
     const targetY = cellRect.top + cellRect.height / 2;
 
-    // Tipo di impatto
-    const hasShip = cellHasShip(atk.target, atk.r, atk.c, data.navi);
-    const ship = hasShip ? getShipAt(atk.target, atk.r, atk.c, data.navi) : null;
-    const sunk = ship ? isShipSunk(atk.target, ship, storico) : false;
+    // ✅ Usa checkStorico (include QUESTO attacco) per determinare hit/sunk
+    const hasShip = cellHasShip(atk.target, atk.r, atk.c, renderData.navi);
+    const ship = hasShip ? getShipAt(atk.target, atk.r, atk.c, renderData.navi) : null;
+    const sunk = ship ? isShipSunk(atk.target, ship, checkStorico) : false;
 
     // Label floating
     const coord = `${COL_LABELS[atk.c]}${atk.r + 1}`;
@@ -2050,6 +2069,66 @@ async function animateSingleAttack(atk, data, storico) {
     await sleep(300);
 }
 
+// ==========================================
+// ✅ AGGIORNA CELLA DOM DOPO ESPLOSIONE
+// ==========================================
+function updateCellAfterHit(atk, naviData, storico) {
+    const isOnMe = atk.target === mioNome;
+    const gridContainerId = isOnMe ? 'my-grid-container' : 'opponent-grid-container';
+    const gridContainer = document.getElementById(gridContainerId);
+    if (!gridContainer) return;
+
+    const hasShip = cellHasShip(atk.target, atk.r, atk.c, naviData);
+    const ship = hasShip ? getShipAt(atk.target, atk.r, atk.c, naviData) : null;
+    const sunk = ship ? isShipSunk(atk.target, ship, storico) : false;
+
+    if (sunk && ship) {
+        // ✅ TUTTE le celle della nave → teschi
+        ship.cells.forEach(sc => {
+            const shipCell = gridContainer.querySelector(`.cell[data-row="${sc.r}"][data-col="${sc.c}"]`);
+            if (!shipCell) return;
+
+            shipCell.innerHTML = '';
+            // Pulisci classi vecchie
+            shipCell.classList.remove('ship-hit', 'hit-marker', 'preview-valid', 'preview-invalid');
+            shipCell.classList.add('ship-cell', 'sunk-cell', 'no-hover');
+
+            const skull = document.createElement('span');
+            skull.className = 'sunk-skull';
+            skull.textContent = '💀';
+            // ✅ Animazione pop-in per il teschio
+            skull.style.animation = 'sinkAnim 0.6s ease';
+            shipCell.appendChild(skull);
+        });
+    } else if (hasShip) {
+        const cellEl = gridContainer.querySelector(`.cell[data-row="${atk.r}"][data-col="${atk.c}"]`);
+        if (!cellEl) return;
+
+        cellEl.innerHTML = '';
+        if (isOnMe) {
+            // ✅ Sulla mia griglia: fuoco sostituisce emoji nave
+            cellEl.classList.add('ship-hit');
+            const fire = document.createElement('span');
+            fire.className = 'ship-emoji';
+            fire.textContent = '🔥';
+            cellEl.appendChild(fire);
+        } else {
+            // ✅ Su griglia nemica: marcatore colpito
+            cellEl.className = 'cell hit-marker no-hover attacked-cell';
+        }
+    } else {
+        const cellEl = gridContainer.querySelector(`.cell[data-row="${atk.r}"][data-col="${atk.c}"]`);
+        if (!cellEl) return;
+
+        cellEl.innerHTML = '';
+        if (isOnMe) {
+            cellEl.classList.add('miss-marker', 'no-hover');
+        } else {
+            cellEl.className = 'cell miss-marker no-hover attacked-cell';
+        }
+    }
+}
+    
 // ==========================================
 // 📍 CALCOLA POSIZIONE PARTENZA MISSILE
 // ==========================================
@@ -2792,26 +2871,19 @@ function gestisciBattaglia(data) {
     const ultimoRisolto = data.ultimoRoundRisolto || 0;
     removeGameBanner();
 
-    // Non re-renderizzare durante le animazioni
     if (!isAnimating) {
-        iniziaBattaglia(data);
-    }
-
-    if (ultimoRisolto > 0 && animatingRound < ultimoRisolto) {
-        (async () => {
-            // Mostra eventi prima delle animazioni attacco
-            if (data.tempestaAttivaTurno === ultimoRisolto) {
-                await showEventAnimation('tempesta');
-            }
-            if (data.krakenSelvaggioTurno === ultimoRisolto) {
-                await showEventAnimation('kraken_selvaggio');
-            }
-            const eventiCassa = (data.eventiLog || []).filter(e => e.turno === ultimoRisolto && e.tipo === 'cassa');
-            if (eventiCassa.length > 0) {
-                await showEventAnimation('cassa');
-            }
-            await playAttackAnimations(data, ultimoRisolto);
-        })();
+        if (ultimoRisolto > 0 && animatingRound < ultimoRisolto) {
+            // ✅ Render con dati PRE-ROUND (senza i colpi di questo round)
+            const preRoundData = {
+                ...data,
+                storicoAttacchi: (data.storicoAttacchi || []).filter(a => a.round !== ultimoRisolto)
+            };
+            iniziaBattaglia(preRoundData);
+            // ✅ Anima con dati COMPLETI
+            playAttackAnimations(data, ultimoRisolto);
+        } else {
+            iniziaBattaglia(data);
+        }
     }
 
     const tuttiAttaccato = surviving.every(p => !!attacchiTurno[p]);
@@ -2825,13 +2897,26 @@ function gestisciConclusa(data) {
     const vincitore = data.vincitore;
     const ultimoRisolto = data.ultimoRoundRisolto || 0;
 
-    if (ultimoRisolto > 0 && animatingRound < ultimoRisolto) {
-        playAttackAnimations(data, ultimoRisolto);
+    if (!isAnimating) {
+        if (ultimoRisolto > 0 && animatingRound < ultimoRisolto) {
+            // ✅ Render pre-round, poi anima
+            const preRoundData = {
+                ...data,
+                storicoAttacchi: (data.storicoAttacchi || []).filter(a => a.round !== ultimoRisolto)
+            };
+            iniziaBattaglia(preRoundData);
+            playAttackAnimations(data, ultimoRisolto);
+            return; // Banner mostrato dopo animazioni
+        }
+        iniziaBattaglia(data);
+    } else {
+        return; // Animazione in corso
     }
 
-    if (!isAnimating) {
-        iniziaBattaglia(data);
-    }
+    mostraFinalePartita(data, vincitore);
+}
+
+function mostraFinalePartita(data, vincitore) {
     statusFase.textContent = 'FINE';
     const haVinto = vincitore === mioNome;
     const turni = (data.turnoCorrente || 1) - 1;
