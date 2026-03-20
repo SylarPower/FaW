@@ -620,14 +620,19 @@
     0%, 100% { box-shadow: 0 0 5px rgba(241,196,15,0.3); }
     50% { box-shadow: 0 0 15px rgba(241,196,15,0.6); }
 }
+.cell.intel-cell {
+    box-shadow: inset 0 0 0 2px rgba(52,152,219,0.5);
+}
 .cell.intel-cell::after {
     content: '🔭';
-    font-size: 1em;
+    font-size: 1.1em;
     position: absolute;
-    bottom: 1px;
-    right: 1px;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
     z-index: 3;
-    opacity: 0.7;
+    opacity: 0.8;
+    filter: drop-shadow(0 1px 3px rgba(0,0,0,0.5));
 }
 .cell.shielded-cell {
     box-shadow: inset 0 0 0 2px #2ecc71, 0 0 8px rgba(46,204,113,0.4) !important;
@@ -740,7 +745,7 @@
             <div id="battle-panel" class="hidden">
                 <div class="section-title"><span>🎯</span><span>SCEGLI BERSAGLIO</span></div>
                 <div id="weapon-help" class="hidden" style="font-size:0.7rem; color:var(--text-dim); padding:4px 8px; margin-bottom:4px;">
-                    ⚔️ Seleziona un'arma, poi clicca la cella bersaglio
+                    <span id="weapon-help-text">⚔️ Seleziona un'arma, poi clicca la cella bersaglio</span>
                 </div>
                 <div id="weapon-bar" class="weapon-bar hidden"></div>
                 <div id="shield-help" class="hidden" style="font-size:0.7rem; color:var(--text-dim); padding:4px 8px; margin-bottom:4px;">
@@ -819,9 +824,9 @@ const COL_LABELS = 'ABCDEFGHIJKLMNOP';
 // CONFIGURAZIONE ARMI E FEATURE
 // ==========================================
 const ARMI_CONFIG = {
-    missile:  { name: 'Missile',        emoji: '🚀', desc: '1 cella',            unlimited: true },
-    cluster:  { name: 'Grappolo',       emoji: '💣', desc: 'Croce (5 celle)',     unlimited: false },
-    laser:    { name: 'Mirino Laser',   emoji: '🔭', desc: 'Scan 3×3',           unlimited: false }
+    missile:  { name: 'Missile',        emoji: '🚀', desc: 'Colpisce 1 cella',                            unlimited: true },
+    cluster:  { name: 'Grappolo',       emoji: '💣', desc: 'Esplosione a croce: cella + 4 adiacenti',     unlimited: false },
+    laser:    { name: 'Mirino Laser',   emoji: '🔭', desc: 'Scansiona area 3×3: rivela navi SENZA danni', unlimited: false }
 };
 
 const ARSENALE_INIZIALE = {
@@ -895,7 +900,8 @@ let arsenaleLocale = { ...ARSENALE_INIZIALE };
 let scudoGlobaleAttivo = false;
 let scudoCellaAttiva = null;    // {r,c} o null
 let krakenShapeIndex = 0;       // indice forma corrente per Kraken
-    // ==========================================
+let piazzamentoIniziato = false;
+// ==========================================
 // DOM
 // ==========================================
 const lobbyOverlay = document.getElementById('lobby-overlay');
@@ -1269,10 +1275,19 @@ function renderShipList() {
         const placed = naviPiazzate.some(p => p.configIdx === idx);
         const item = document.createElement('div');
         item.className = `ship-item ${naveSelezionataIdx === idx ? 'selected' : ''} ${placed ? 'placed' : ''}`;
+        // ✅ Tooltip con abilità speciale
+        let abilita = '';
+        if (nave.special === 'cannoniera') {
+            abilita = '💥 Se colpita (non affondata), contrattacca 1 cella random sul nemico!';
+        } else if (nave.special === 'kraken') {
+            abilita = '🐙 Forma L o T — usa 🔄 per cambiare forma';
+        }
+
         item.innerHTML = `
             <span class="ship-name">${nave.emoji} ${nave.name}</span>
             <div class="ship-blocks">${'<span class="ship-block"></span>'.repeat(nave.size)}</div>
             <span class="ship-size-label">${nave.size} celle</span>
+            ${abilita ? `<span style="font-size:0.6rem; color:var(--warning); display:block; margin-top:2px;" title="${abilita}">⚡ ${abilita}</span>` : ''}
         `;
         if (!placed) {
             item.addEventListener('click', () => { naveSelezionataIdx = idx; renderShipList(); renderMiaGrigliaPiazzamento(); });
@@ -1577,6 +1592,15 @@ function renderFleetStatus(containerId, navi, storico, player) {
         const span = document.createElement('span');
         span.className = `fleet-ship-indicator ${sunk ? 'sunk' : ''}`;
         span.textContent = `${nave.emoji||''} ${nave.name} (${nave.size})`;
+
+        // ✅ Tooltip abilità
+        if (nave.special === 'cannoniera') {
+            span.title = '💥 Contrattacca se colpita!';
+            if (!sunk) span.textContent += ' ⚡';
+        } else if (nave.special === 'kraken') {
+            span.title = '🐙 Forma L/T';
+        }
+
         el.appendChild(span);
     });
 }
@@ -1737,7 +1761,6 @@ async function risolviTurno(data) {
             Object.entries(attacks).forEach(([player, atk]) => {
                 let cells = calcolaCelleArma(atk.weapon || 'missile', atk.r, atk.c);
 
-                // Tempesta: devia di 1 cella
                 if (tempestaAttiva && atk.weapon !== 'laser') {
                     const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
                     const d = dirs[Math.floor(Math.random() * dirs.length)];
@@ -1747,6 +1770,10 @@ async function risolviTurno(data) {
                     }));
                 }
 
+                // ✅ GroupId per cluster/laser (singola animazione)
+                const isGrouped = (atk.weapon === 'cluster' || atk.weapon === 'laser');
+                const groupId = isGrouped ? `${player}-${turno}-${atk.weapon}` : null;
+
                 cells.forEach(cell => {
                     allAttackCells.push({
                         by: player,
@@ -1755,7 +1782,10 @@ async function risolviTurno(data) {
                         c: cell.c,
                         round: turno,
                         weapon: atk.weapon || 'missile',
-                        isLaser: (atk.weapon === 'laser')
+                        isLaser: (atk.weapon === 'laser'),
+                        groupId: groupId,
+                        centerR: atk.r,
+                        centerC: atk.c
                     });
                 });
             });
@@ -1950,34 +1980,66 @@ async function playAttackAnimations(data, roundNumber) {
     const roundAttacks = fullStorico.filter(a => a.round === roundNumber);
     if (roundAttacks.length === 0) { isAnimating = false; return; }
 
-    // ✅ Storico senza questo round (stato "prima dei missili")
     const preRoundStorico = fullStorico.filter(a => a.round !== roundNumber);
     let progressiveStorico = [...preRoundStorico];
 
-    // Ordine: miei attacchi → attacchi su altri → attacchi su di me
-    const myAttacks = roundAttacks.filter(a => a.by === mioNome);
-    const onOthers = roundAttacks.filter(a => a.by !== mioNome && a.target !== mioNome);
-    const onMe = roundAttacks.filter(a => a.by !== mioNome && a.target === mioNome);
-    const sorted = [...myAttacks, ...onOthers, ...onMe];
+    // ✅ Raggruppa attacchi per groupId
+    const groupedMap = new Map();
+    const ungrouped = [];
 
-    for (const atk of sorted) {
-        // ✅ Dati per rendering: senza l'attacco corrente
-        const renderData = { ...data, storicoAttacchi: [...progressiveStorico] };
-        // ✅ Dati per check colpito/affondato: incluso l'attacco corrente
-        const checkStorico = [...progressiveStorico, atk];
+    roundAttacks.forEach(atk => {
+        if (atk.groupId) {
+            if (!groupedMap.has(atk.groupId)) {
+                groupedMap.set(atk.groupId, {
+                    attacks: [],
+                    by: atk.by,
+                    target: atk.target,
+                    weapon: atk.weapon,
+                    centerR: atk.centerR,
+                    centerC: atk.centerC,
+                    isLaser: atk.isLaser
+                });
+            }
+            groupedMap.get(atk.groupId).attacks.push(atk);
+        } else {
+            ungrouped.push(atk);
+        }
+    });
 
-        await animateSingleAttack(atk, renderData, checkStorico);
+    // Converti gruppi in entry di animazione
+    const animQueue = [];
+    ungrouped.forEach(atk => animQueue.push({ type: 'single', atk }));
+    groupedMap.forEach((group) => animQueue.push({ type: 'group', group }));
 
-        // ✅ DOPO l'esplosione: aggiungi attacco e aggiorna la cella nel DOM
-        progressiveStorico.push(atk);
-        updateCellAfterHit(atk, data.navi, progressiveStorico);
+    // Ordina: miei → su altri → su di me
+    const orderKey = (entry) => {
+        const by = entry.type === 'single' ? entry.atk.by : entry.group.by;
+        const target = entry.type === 'single' ? entry.atk.target : entry.group.target;
+        if (by === mioNome) return 0;
+        if (target !== mioNome) return 1;
+        return 2;
+    };
+    animQueue.sort((a, b) => orderKey(a) - orderKey(b));
 
+    for (const item of animQueue) {
+        if (item.type === 'single') {
+            const renderData = { ...data, storicoAttacchi: [...progressiveStorico] };
+            const checkStorico = [...progressiveStorico, item.atk];
+            await animateSingleAttack(item.atk, renderData, checkStorico);
+            progressiveStorico.push(item.atk);
+            updateCellAfterHit(item.atk, data.navi, progressiveStorico);
+        } else {
+            // ✅ Animazione raggruppata (cluster / laser)
+            const renderData = { ...data, storicoAttacchi: [...progressiveStorico] };
+            const checkStorico = [...progressiveStorico, ...item.group.attacks];
+            await animateGroupAttack(item.group, renderData, checkStorico, data.navi);
+            item.group.attacks.forEach(atk => progressiveStorico.push(atk));
+            item.group.attacks.forEach(atk => updateCellAfterHit(atk, data.navi, progressiveStorico));
+        }
         await sleep(400);
     }
 
     isAnimating = false;
-
-    // ✅ Re-process stato corrente
     if (currentGameData) {
         if (currentGameData.stato === 'conclusa') {
             renderBattaglia(currentGameData);
@@ -1987,7 +2049,179 @@ async function playAttackAnimations(data, roundNumber) {
         }
     }
 }
+async function animateGroupAttack(group, renderData, checkStorico, naviData) {
+    const isMyAttack = group.by === mioNome;
+    const targetsMe = group.target === mioNome;
+    let gridContainerId, startDir;
 
+    if (isMyAttack) {
+        targetSelezionato = group.target;
+        renderOpponentTabs(renderData, renderData.eliminati || []);
+        renderOpponentGrid(renderData);
+        gridContainerId = 'opponent-grid-container';
+        startDir = 'bottom';
+    } else if (targetsMe) {
+        gridContainerId = 'my-grid-container';
+        startDir = 'left';
+    } else {
+        targetSelezionato = group.target;
+        renderOpponentTabs(renderData, renderData.eliminati || []);
+        renderOpponentGrid(renderData);
+        gridContainerId = 'opponent-grid-container';
+        startDir = 'right';
+    }
+
+    const gridContainer = document.getElementById(gridContainerId);
+    if (!gridContainer) return;
+
+    gridContainer.scrollIntoView({ behavior: 'instant', block: 'center' });
+    await sleep(100);
+
+    const gridEl = gridContainer.querySelector('.battle-grid');
+    if (gridEl) gridEl.classList.add('grid-highlight');
+
+    // Trova cella CENTRO
+    const centerCell = gridContainer.querySelector(`.cell[data-row="${group.centerR}"][data-col="${group.centerC}"]`);
+    if (!centerCell) { if (gridEl) gridEl.classList.remove('grid-highlight'); return; }
+
+    await sleep(50);
+    const centerRect = centerCell.getBoundingClientRect();
+    const targetX = centerRect.left + centerRect.width / 2;
+    const targetY = centerRect.top + centerRect.height / 2;
+
+    const coord = `${COL_LABELS[group.centerC]}${group.centerR + 1}`;
+    const attackerName = isMyAttack ? '🎯 TU' : group.by;
+    const targetName = targetsMe ? 'TE' : group.target;
+    const weaponLabel = group.weapon === 'cluster' ? ' 💣' : ' 🔭';
+    const label = showAttackLabel(attackerName + weaponLabel, targetName, coord);
+
+    await sleep(400);
+
+    // Lancio missile al centro
+    const gridRect = gridContainer.getBoundingClientRect();
+    const start = getMissileStart(startDir, gridRect);
+    const fakeAtk = { weapon: group.weapon, isEvent: false };
+    await launchMissileToCell(start.x, start.y, targetX, targetY, startDir, fakeAtk);
+
+    if (group.isLaser) {
+        // ✅ LASER: scan visuale su tutte le celle 3x3
+        await playLaserScanGroup(gridContainer, group.attacks);
+    } else {
+        // ✅ CLUSTER: esplosione simultanea su tutte le celle a croce
+        await playClusterExplosion(gridContainer, group.attacks, naviData, checkStorico);
+    }
+
+    if (gridEl) gridEl.classList.remove('grid-highlight');
+    hideAttackLabel(label);
+    await sleep(300);
+}
+
+// ==========================================
+// 💣 ESPLOSIONE CLUSTER (croce simultanea)
+// ==========================================
+async function playClusterExplosion(gridContainer, attacks, naviData, storico) {
+    // Shake pesante
+    document.body.classList.add('screen-shake-heavy');
+
+    // Per ogni cella della croce: esplosione simultanea
+    const explosionPromises = attacks.map(async (atk, idx) => {
+        const cellEl = gridContainer.querySelector(`.cell[data-row="${atk.r}"][data-col="${atk.c}"]`);
+        if (!cellEl) return;
+
+        const rect = cellEl.getBoundingClientRect();
+        const cx = rect.left + rect.width / 2;
+        const cy = rect.top + rect.height / 2;
+
+        // Delay leggero per effetto "onda"
+        await sleep(idx * 80);
+
+        const hasShip = cellHasShip(atk.target, atk.r, atk.c, naviData);
+        const ship = hasShip ? getShipAt(atk.target, atk.r, atk.c, naviData) : null;
+        const sunk = ship ? isShipSunk(atk.target, ship, storico) : false;
+
+        if (sunk) {
+            spawnFlash(cx, cy, '#f39c12', 100);
+            spawnParticleBurst(cx, cy, ['#e74c3c','#f39c12','#c0392b'], 20, 80, 600);
+            spawnImpactEmoji(cx, cy, '💥', 1.0);
+        } else if (hasShip) {
+            spawnFlash(cx, cy, '#e74c3c', 60);
+            spawnParticleBurst(cx, cy, ['#e74c3c','#f1c40f'], 12, 60, 500);
+            spawnImpactEmoji(cx, cy, '🔥', 0.8);
+        } else {
+            spawnFlash(cx, cy, 'rgba(52,152,219,0.5)', 40);
+            spawnParticleBurst(cx, cy, ['#3498db','#5dade2','#85c1e9'], 8, 50, 400);
+        }
+    });
+
+    await Promise.all(explosionPromises);
+
+    // Flash centrale grosso
+    const centerCell = gridContainer.querySelector(`.cell[data-row="${attacks[0].centerR}"][data-col="${attacks[0].centerC}"]`);
+    if (centerCell) {
+        const r = centerCell.getBoundingClientRect();
+        spawnFlash(r.left + r.width/2, r.top + r.height/2, '#f39c12', 150);
+    }
+
+    setTimeout(() => document.body.classList.remove('screen-shake-heavy'), 700);
+    await sleep(600);
+}
+
+// ==========================================
+// 🔭 LASER SCAN GRUPPO
+// ==========================================
+async function playLaserScanGroup(gridContainer, attacks) {
+    // Trova centro
+    const allCells = attacks.map(atk => {
+        const el = gridContainer.querySelector(`.cell[data-row="${atk.r}"][data-col="${atk.c}"]`);
+        if (!el) return null;
+        const r = el.getBoundingClientRect();
+        return { x: r.left + r.width/2, y: r.top + r.height/2, el };
+    }).filter(Boolean);
+
+    if (allCells.length === 0) return;
+
+    const cx = allCells.reduce((s, c) => s + c.x, 0) / allCells.length;
+    const cy = allCells.reduce((s, c) => s + c.y, 0) / allCells.length;
+
+    // Cerchi concentrici dal centro
+    for (let i = 0; i < 3; i++) {
+        spawnWaterRipples(cx, cy, 1);
+        await sleep(150);
+    }
+
+    // Flash blu su ogni cella
+    for (const cell of allCells) {
+        cell.el.style.transition = 'background 0.3s';
+        cell.el.style.background = 'rgba(52,152,219,0.4)';
+        cell.el.style.boxShadow = '0 0 12px rgba(52,152,219,0.6)';
+        spawnFlash(cell.x, cell.y, 'rgba(52,152,219,0.3)', 30);
+    }
+
+    // Testo
+    const txt = document.createElement('div');
+    txt.className = 'impact-text';
+    txt.style.left = '50%';
+    txt.style.top = (cy - 60) + 'px';
+    txt.style.transform = 'translateX(-50%)';
+    txt.style.color = '#5dade2';
+    txt.style.fontSize = '1.6rem';
+    txt.textContent = '🔭 AREA SCANSIONATA';
+    document.body.appendChild(txt);
+    txt.animate([
+        { opacity: 0, transform: 'translateX(-50%) scale(0.7)' },
+        { opacity: 1, transform: 'translateX(-50%) scale(1)' },
+        { opacity: 0, transform: 'translateX(-50%) translateY(-25px)' }
+    ], { duration: 1500 }).onfinish = () => txt.remove();
+
+    await sleep(1200);
+
+    // Ripulisci stili inline
+    allCells.forEach(cell => {
+        cell.el.style.background = '';
+        cell.el.style.boxShadow = '';
+        cell.el.style.transition = '';
+    });
+}
 async function animateSingleAttack(atk, renderData, checkStorico) {
     const isMyAttack = atk.by === mioNome;
     const targetsMe = atk.target === mioNome;
@@ -2015,8 +2249,9 @@ async function animateSingleAttack(atk, renderData, checkStorico) {
     const gridContainer = document.getElementById(gridContainerId);
     if (!gridContainer) return;
 
-    gridContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    await sleep(300);
+    // ✅ Scroll istantaneo per posizione precisa
+    gridContainer.scrollIntoView({ behavior: 'instant', block: 'center' });
+    await sleep(100);
 
     const gridEl = gridContainer.querySelector('.battle-grid');
     if (gridEl) gridEl.classList.add('grid-highlight');
@@ -2024,6 +2259,8 @@ async function animateSingleAttack(atk, renderData, checkStorico) {
     const cellEl = gridContainer.querySelector(`.cell[data-row="${atk.r}"][data-col="${atk.c}"]`);
     if (!cellEl) { if (gridEl) gridEl.classList.remove('grid-highlight'); return; }
 
+    // ✅ Ricalcola posizione DOPO lo scroll
+    await sleep(50);
     const cellRect = cellEl.getBoundingClientRect();
     const targetX = cellRect.left + cellRect.width / 2;
     const targetY = cellRect.top + cellRect.height / 2;
@@ -2325,13 +2562,28 @@ function renderWeaponBar() {
         bar.appendChild(btn);
     });
 
-    // ✅ Mostra descrizione arma selezionata
     const selCfg = ARMI_CONFIG[selectedWeapon];
     if (selCfg) {
         const desc = document.createElement('div');
         desc.style.cssText = 'width:100%; font-size:0.7rem; color:var(--target-color); padding:4px 0 0; text-align:center;';
         desc.textContent = `${selCfg.emoji} ${selCfg.name}: ${selCfg.desc}`;
         bar.appendChild(desc);
+    }
+
+    // ✅ Help contestuale
+    const helpText = document.getElementById('weapon-help-text');
+    if (helpText) {
+        switch (selectedWeapon) {
+            case 'missile':
+                helpText.textContent = '🚀 Clicca una cella sulla griglia nemica per colpirla';
+                break;
+            case 'cluster':
+                helpText.textContent = '💣 Clicca il CENTRO dell\'esplosione — colpirà anche le 4 celle adiacenti (croce). Passa il mouse per preview';
+                break;
+            case 'laser':
+                helpText.textContent = '🔭 Clicca il CENTRO della scansione — rivelerà un\'area 3×3 mostrando dove ci sono navi. NON fa danni! Le celle con navi saranno marcate 🔭';
+                break;
+        }
     }
 }
 
@@ -2815,6 +3067,7 @@ function gestisciAttesa(data) {
         buttons: [{ text: '🚫 ANNULLA', onclick: 'annullaPartita()' }], spinner: true
     });
     if (pronti.length >= data.partecipanti.length) {
+        piazzamentoIniziato = false;
         db.collection("partite").doc(matchId).update({ stato: 'piazzamento' });
     }
 }
@@ -2836,8 +3089,18 @@ function gestisciPiazzamento(data) {
         btnPronto.disabled = true;
         btnPronto.textContent = '✅ IN ATTESA...';
     } else {
-        removeGameBanner();
-        iniziaPiazzamento();
+        if (!piazzamentoIniziato) {
+            removeGameBanner();
+            iniziaPiazzamento();
+            piazzamentoIniziato = true;
+        }
+        // ✅ Aggiorna solo il conteggio senza resettare
+        showGameBanner({
+            icon: '📋',
+            title: `PIAZZAMENTO (${prontiPiazz.length}/${data.partecipanti.length} pronti)`,
+            subtitle: 'Piazza le tue navi e premi PRONTO',
+            color: '#2c3e50'
+        });
     }
     if (prontiPiazz.length >= data.partecipanti.length) {
         removeGameBanner();
