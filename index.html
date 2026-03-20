@@ -504,7 +504,7 @@
 				<h1>Login dei 🐷</h1>
 				<input type="text" id="username" placeholder="IL TUO NOME">
 				<input type="password" id="password" placeholder="PASSWORD">
-				<button onclick="entra()" class="btn-primary" style="width:100%; height:50px; font-size:1rem;">ENTRA / REGISTRATI</button>
+				<button onclick="entra()" class="btn-primary" style="width:100%; height:50px; font-size:1rem;">ENTRA</button>
 			</div>
 			<!-- DASHBOARD -->
 			<div id="main-app" style="display:none;">
@@ -886,12 +886,8 @@ if (mioNome && passwordHashSalvato) {
 			        return;
 			      }
 			    } else {
-			      if (confirm("👋 Nuovo utente? Registrati con questa password.")) {
-			        await userRef.set({
-			          nome: n,
-			          passwordHash: passwordHash
-			        });
-			      } else return;
+			      if (!isAuto) alert("❌ Utente non trovato. Contatta l'amministratore per la registrazione.");
+			      return;
 			    }
 			    mioNome = n;
 			    localStorage.setItem('mioNome', n);
