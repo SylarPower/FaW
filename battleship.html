@@ -58,17 +58,10 @@
         .status-item { font-size: 0.85rem; display: flex; align-items: center; gap: 5px; }
         .status-val { font-weight: 900; color: var(--accent); }
 
-        /* GAME CONTAINER */
-        .game-container { display: flex; flex-direction: column; gap: 15px; }
-        @media (min-width: 800px) {
-            .game-container { flex-direction: row; gap: 20px; }
-            .my-section { flex: 1; }
-            .opponent-section { flex: 1; }
+        .battle-grid {
+            max-width: 500px;
+            margin: 0 auto;
         }
-.battle-grid {
-    max-width: 500px;
-    margin: 0 auto;
-}
         .grid-section { background: var(--panel); border-radius: 10px; padding: 12px; }
         .section-title {
             font-size: 0.85rem; font-weight: 700; text-transform: uppercase;
@@ -564,17 +557,100 @@
     pointer-events: none;
 }
 /* ==========================================
-   ⚔️ SELETTORE ARMI
+   📐 LAYOUT GRIGLIE AFFIANCATE
    ========================================== */
-.weapon-bar {
+#game-container {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+}
+
+.target-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--panel);
+    padding: 8px 12px;
+    border-radius: 8px;
+    flex-wrap: wrap;
+}
+.target-bar-label {
+    font-size: 0.8rem;
+    font-weight: 900;
+    color: var(--text-dim);
+    white-space: nowrap;
+}
+.target-bar .opponent-tabs {
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+.grids-row {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    width: 100%;
+}
+.grid-col {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.grid-col .battle-grid {
+    max-width: none;
+    width: 100%;
+}
+
+@media (max-width: 700px) {
+    .grids-row {
+        flex-direction: column;
+    }
+    .grid-col {
+        width: 100%;
+    }
+}
+
+/* ==========================================
+   📋 SIDE PANELS (armi e scudi sotto griglia)
+   ========================================== */
+.side-panel {
+    background: var(--panel);
+    border-radius: 8px;
+    padding: 10px;
+    border: 1px solid rgba(255,255,255,0.06);
+}
+.side-panel-title {
+    font-size: 0.75rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+}
+.side-panel-help {
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+}
+
+
+.battle-grid.shield-select-mode .cell:not(.ship-hit):not(.sunk-cell):not(.miss-marker) {
+    cursor: crosshair;
+}
+.battle-grid.shield-select-mode .cell:not(.ship-hit):not(.sunk-cell):not(.miss-marker):hover {
+    box-shadow: inset 0 0 0 2px #2ecc71 !important;
+}
+        
+/* ==========================================
+   ⚔️ ARMI (verticale, sotto griglia destra)
+   ========================================== */
+.weapon-bar-v {
     display: flex;
     gap: 5px;
     flex-wrap: wrap;
-    margin-bottom: 10px;
-    padding: 8px;
-    background: var(--ocean-deep);
-    border-radius: 8px;
-    border: 1px solid rgba(255,255,255,0.1);
 }
 .weapon-btn {
     display: flex;
@@ -587,46 +663,68 @@
     color: var(--text);
     cursor: pointer;
     transition: all 0.2s;
-    min-width: 60px;
+    min-width: 55px;
     font-size: 0.7rem;
 }
 .weapon-btn:hover:not(:disabled) { border-color: var(--accent); }
 .weapon-btn.active { border-color: var(--target-color); background: rgba(241,196,15,0.15); box-shadow: 0 0 10px rgba(241,196,15,0.2); }
 .weapon-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-.weapon-btn .w-emoji { font-size: 1.4rem; }
-.weapon-btn .w-count { font-size: 0.65rem; color: var(--target-color); font-weight: 900; }
-.weapon-btn .w-name { font-size: 0.6rem; margin-top: 2px; }
+.weapon-btn .w-emoji { font-size: 1.3rem; }
+.weapon-btn .w-count { font-size: 0.6rem; color: var(--target-color); font-weight: 900; }
+.weapon-btn .w-name { font-size: 0.55rem; margin-top: 1px; }
+.weapon-desc {
+    font-size: 0.65rem;
+    color: var(--target-color);
+    margin-top: 5px;
+    text-align: center;
+}
 
 /* ==========================================
-   🛡️ PANNELLO SCUDI
+   🛡️ SCUDI (verticale, sotto griglia sinistra)
    ========================================== */
-.shield-bar {
+.shield-bar-v {
     display: flex;
-    gap: 8px;
-    margin-bottom: 10px;
-    padding: 8px;
-    background: rgba(46,204,113,0.08);
-    border-radius: 8px;
-    border: 1px dashed rgba(46,204,113,0.3);
-    align-items: center;
-    flex-wrap: wrap;
+    flex-direction: column;
+    gap: 6px;
 }
-.shield-btn {
-    padding: 5px 12px;
-    border-radius: 20px;
-    border: 2px solid #27ae60;
+.shield-btn-v {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    border: 2px solid rgba(46,204,113,0.3);
     background: transparent;
-    color: #2ecc71;
+    color: var(--text);
     cursor: pointer;
     font-size: 0.75rem;
-    font-weight: 700;
     transition: all 0.2s;
+    text-align: left;
 }
-.shield-btn:hover:not(:disabled) { background: rgba(46,204,113,0.15); }
-.shield-btn.active { background: #27ae60; color: white; }
-.shield-btn:disabled { opacity: 0.3; cursor: not-allowed; border-color: #555; color: #555; }
-.shield-label { font-size: 0.7rem; color: var(--text-dim); }
-
+.shield-btn-v:hover:not(:disabled) { background: rgba(46,204,113,0.1); border-color: #2ecc71; }
+.shield-btn-v.active {
+    background: rgba(46,204,113,0.15);
+    border-color: #2ecc71;
+    box-shadow: 0 0 10px rgba(46,204,113,0.2);
+}
+.shield-btn-v:disabled { opacity: 0.3; cursor: not-allowed; }
+.shield-btn-v .s-emoji { font-size: 1.2rem; }
+.shield-btn-v .s-info {
+    display: flex;
+    flex-direction: column;
+}
+.shield-btn-v .s-name { font-weight: 700; }
+.shield-btn-v .s-desc { font-size: 0.6rem; color: var(--text-dim); }
+.shield-btn-v .s-count { font-size: 0.6rem; color: #2ecc71; font-weight: 900; }
+.shield-status {
+    font-size: 0.7rem;
+    color: #2ecc71;
+    font-weight: 700;
+    padding: 4px 8px;
+    background: rgba(46,204,113,0.1);
+    border-radius: 4px;
+    text-align: center;
+}
 /* ==========================================
    📦 CASSA / 🔭 INTEL / 🛡️ SCUDO su griglia
    ========================================== */
@@ -735,59 +833,75 @@
         <div class="status-item">👥 Superstiti: <span class="status-val" id="status-superstiti">-</span></div>
     </div>
 
-    <div class="game-container" id="game-container">
+    <div id="game-container">
         <div id="start-screen" class="start-screen" style="width:100%;">
             <div style="font-size:4rem;">🚢</div>
             <h2>BATTAGLIA NAVALE</h2>
             <p style="opacity:0.7; margin-bottom:20px;">Crea o entra in una partita multiplayer</p>
         </div>
 
-        <div class="grid-section my-section hidden" id="my-section">
-            <div class="section-title">
-                <span>🛡️</span>
-                <span id="my-section-title">LA TUA FLOTTA</span>
-            </div>
-            <div id="my-grid-container"></div>
-            <div class="fleet-status" id="my-fleet-status"></div>
+        <!-- BARRA AVVERSARI (top) -->
+        <div id="target-bar" class="target-bar hidden">
+            <div class="target-bar-label">🎯 ATTACCA:</div>
+            <div class="opponent-tabs" id="opponent-tabs"></div>
         </div>
 
-        <div class="grid-section opponent-section hidden" id="right-section">
-            <div id="placement-panel">
-                <div class="section-title"><span>📋</span><span>NAVI DA PIAZZARE</span></div>
-                <div class="ship-list" id="ship-list"></div>
-                <div class="placement-controls">
-                    <button class="btn direction-btn" id="btn-rotate" onclick="ruotaDirezione()" title="Ruota">🔄</button>
-                    <span id="direction-label" style="font-size:0.85rem;">Direzione: <b>Orizzontale →</b></span>
-                    <button class="btn btn-danger" onclick="resetPiazzamento()" style="margin-left:auto;">🗑️ RESET</button>
+        <!-- DUE GRIGLIE AFFIANCATE -->
+        <div class="grids-row" id="grids-row">
+            <!-- SINISTRA: mia griglia + scudi -->
+            <div class="grid-col hidden" id="my-section">
+                <div class="grid-section">
+                    <div class="section-title">
+                        <span>🛡️</span>
+                        <span id="my-section-title">LA TUA FLOTTA</span>
+                    </div>
+                    <div id="my-grid-container"></div>
+                    <div class="fleet-status" id="my-fleet-status"></div>
                 </div>
-                <button class="btn btn-success" id="btn-pronto" onclick="confermaPiazzamento()" disabled style="width:100%; margin-top:10px; font-size:1rem;">
-                    ✅ PRONTO!
-                </button>
+                <div id="shield-panel" class="side-panel hidden">
+                    <div class="side-panel-title">🛡️ DIFESA</div>
+                    <div id="shield-bar" class="shield-bar-v"></div>
+                </div>
             </div>
 
-            <div id="battle-panel" class="hidden">
-                <div class="section-title"><span>🎯</span><span>SCEGLI BERSAGLIO</span></div>
-                <div class="opponent-tabs" id="opponent-tabs"></div>
-                <div id="opponent-grid-container"></div>
-                <div class="fleet-status" id="opponent-fleet-status"></div>
+            <!-- DESTRA: griglia avversario + armi -->
+            <div class="grid-col hidden" id="opponent-grid-section">
+                <div class="grid-section">
+                    <div class="section-title">
+                        <span>🎯</span>
+                        <span id="opponent-section-title">AVVERSARIO</span>
+                    </div>
+                    <div id="opponent-grid-container"></div>
+                    <div class="fleet-status" id="opponent-fleet-status"></div>
+                </div>
+                <div id="weapon-panel" class="side-panel hidden">
+                    <div class="side-panel-title">⚔️ ARMI</div>
+                    <div id="weapon-help-text" class="side-panel-help">Seleziona un'arma, poi clicca la cella</div>
+                    <div id="weapon-bar" class="weapon-bar-v"></div>
+                </div>
+            </div>
+        </div>
 
-                <div id="weapon-help" class="hidden" style="font-size:0.7rem; color:var(--text-dim); padding:6px 8px; margin-top:10px; background:var(--ocean-deep); border-radius:6px;">
-                    <span id="weapon-help-text">⚔️ Seleziona un'arma, poi clicca la cella bersaglio</span>
-                </div>
-                <div id="weapon-bar" class="weapon-bar hidden"></div>
+        <!-- PIAZZAMENTO (sotto, centrato) -->
+        <div class="grid-section hidden" id="placement-panel" style="max-width:500px; margin:0 auto;">
+            <div class="section-title"><span>📋</span><span>NAVI DA PIAZZARE</span></div>
+            <div class="ship-list" id="ship-list"></div>
+            <div class="placement-controls">
+                <button class="btn direction-btn" id="btn-rotate" onclick="ruotaDirezione()" title="Ruota (tasto destro / rotellina)">🔄</button>
+                <span id="direction-label" style="font-size:0.85rem;">Direzione: <b>Orizzontale →</b></span>
+                <button class="btn btn-danger" onclick="resetPiazzamento()" style="margin-left:auto;">🗑️ RESET</button>
+            </div>
+            <button class="btn btn-success" id="btn-pronto" onclick="confermaPiazzamento()" disabled style="width:100%; margin-top:10px; font-size:1rem;">
+                ✅ PRONTO!
+            </button>
+        </div>
 
-                <div id="shield-help" class="hidden" style="font-size:0.7rem; color:var(--text-dim); padding:6px 8px; background:rgba(46,204,113,0.05); border-radius:6px;">
-                    🛡️ Attiva PRIMA di sparare. Lo scudo protegge da 1 colpo questo turno
-                </div>
-                <div id="shield-bar" class="shield-bar hidden"></div>
-
-                <div class="btn-group" style="justify-content:center; margin-top:12px;">
-                    <button class="btn btn-fire" id="btn-fire" onclick="confermaAttacco()" disabled>🔥 FUOCO!</button>
-                </div>
-                <div class="waiting-bar hidden" id="waiting-bar">
-                    <span class="spinner"></span>
-                    <span id="waiting-text">In attesa degli altri giocatori...</span>
-                </div>
+        <!-- FUOCO + ATTESA (sotto, centrato) -->
+        <div id="battle-controls" class="hidden" style="text-align:center; margin-top:10px;">
+            <button class="btn btn-fire" id="btn-fire" onclick="confermaAttacco()" disabled>🔥 FUOCO!</button>
+            <div class="waiting-bar hidden" id="waiting-bar">
+                <span class="spinner"></span>
+                <span id="waiting-text">In attesa degli altri giocatori...</span>
             </div>
         </div>
     </div>
@@ -934,7 +1048,11 @@ let piazzamentoIniziato = false;
 const lobbyOverlay = document.getElementById('lobby-overlay');
 const startScreen = document.getElementById('start-screen');
 const mySection = document.getElementById('my-section');
-const rightSection = document.getElementById('right-section');
+const opponentGridSection = document.getElementById('opponent-grid-section');
+const targetBar = document.getElementById('target-bar');
+const shieldPanel = document.getElementById('shield-panel');
+const weaponPanel = document.getElementById('weapon-panel');
+const battleControls = document.getElementById('battle-controls');
 const placementPanel = document.getElementById('placement-panel');
 const battlePanel = document.getElementById('battle-panel');
 const statusFase = document.getElementById('status-fase');
@@ -1297,11 +1415,14 @@ function iniziaPiazzamento() {
     direzione = 'H';
     startScreen.style.display = 'none';
     mySection.classList.remove('hidden');
-    rightSection.classList.remove('hidden');
+    opponentGridSection.classList.add('hidden');
+    targetBar.classList.add('hidden');
     placementPanel.classList.remove('hidden');
-    battlePanel.classList.add('hidden');
-    document.getElementById('my-section-title').textContent = 'PIAZZA LE TUE NAVI';
+    battleControls.classList.add('hidden');
     statusFase.textContent = 'Piazzamento';
+    document.getElementById('my-section-title').textContent = 'PIAZZA LE TUE NAVI';
+    shieldPanel.classList.add('hidden');
+    weaponPanel.classList.add('hidden');
     renderShipList();
     renderMiaGrigliaPiazzamento();
     aggiornaBottonePronto();
@@ -1485,13 +1606,13 @@ async function confermaPiazzamento() {
 function iniziaBattaglia(data) {
     startScreen.style.display = 'none';
     mySection.classList.remove('hidden');
-    rightSection.classList.remove('hidden');
+    opponentGridSection.classList.remove('hidden');
     placementPanel.classList.add('hidden');
-    battlePanel.classList.remove('hidden');
+    battleControls.classList.remove('hidden');
+
     document.getElementById('my-section-title').textContent = 'LA TUA FLOTTA';
     statusFase.textContent = (data.eliminati||[]).includes(mioNome) ? 'Eliminato 💀' : 'Battaglia';
 
-    // ✅ Non resettare se il turno non è cambiato
     const turno = data.turnoCorrente || 1;
     const attacchiTurno = data.attacchiTurno || {};
     const hoGiaAttaccato = !!attacchiTurno[mioNome];
@@ -1545,21 +1666,35 @@ function renderBattaglia(data) {
     }
     renderOpponentGrid(data);
 
-    // Render weapon bar e shield bar
+    // Render armi e scudi
     renderWeaponBar();
     renderShieldBar();
 
-    // Aggiorna testo bottone con info scudo
+    // Tab avversari
+    const opponents = getOpponents(data);
+    if (opponents.length > 1) {
+        targetBar.classList.remove('hidden');
+    } else if (opponents.length === 1) {
+        targetSelezionato = opponents[0];
+        targetBar.classList.add('hidden');
+    }
+
+    // Titolo sezione avversario
+    const titleEl = document.getElementById('opponent-section-title');
+    if (titleEl && targetSelezionato) {
+        titleEl.textContent = `🎯 ${targetSelezionato} ${eliminati.includes(targetSelezionato) ? '(eliminato)' : ''}`;
+    }
+
+    // Testo bottone
     let fireLabel = '';
     if (selectedWeapon === 'laser') fireLabel = '🔭 SCANSIONA!';
     else if (selectedWeapon === 'cluster') fireLabel = '💣 FUOCO GRAPPOLO!';
     else fireLabel = '🔥 FUOCO!';
-
     if (scudoGlobaleAttivo) fireLabel += ' + 🛡️';
     if (scudoCellaAttiva) fireLabel += ` + 🎯${COL_LABELS[scudoCellaAttiva.c]}${scudoCellaAttiva.r+1}`;
-
     btnFire.textContent = fireLabel;
 
+    // Stato bottone
     if (hoAttaccato) {
         btnFire.classList.add('hidden');
         waitingBar.classList.remove('hidden');
@@ -1579,10 +1714,33 @@ function renderBattaglia(data) {
 function renderOpponentTabs(data, eliminati) {
     const tabsEl = document.getElementById('opponent-tabs');
     tabsEl.innerHTML = '';
-    getOpponents(data).forEach(p => {
+
+    const opponents = getOpponents(data);
+
+    if (opponents.length === 1) {
+        targetSelezionato = opponents[0];
+        targetBar.classList.add('hidden');
+        const titleEl = document.getElementById('opponent-section-title');
+        if (titleEl) titleEl.textContent = `🎯 ${targetSelezionato}`;
+        return;
+    }
+
+    targetBar.classList.remove('hidden');
+
+    opponents.forEach(p => {
         const btn = document.createElement('button');
         btn.className = `tab-btn ${p === targetSelezionato ? 'active' : ''} ${eliminati.includes(p) ? 'eliminated' : ''}`;
-        btn.textContent = `${eliminati.includes(p) ? '💀 ' : ''}${p}`;
+
+        const storico = data.storicoAttacchi || [];
+        const hitsOnP = storico.filter(a => a.target === p && cellHasShip(p, a.r, a.c, data.navi)).length;
+        const naviP = data.navi[p] || [];
+        const totalCells = naviP.reduce((sum, n) => sum + n.cells.length, 0);
+
+        let statusEmoji = eliminati.includes(p) ? '💀' : '';
+        if (!eliminati.includes(p) && hitsOnP > 0) statusEmoji = '🔥';
+
+        btn.innerHTML = `${statusEmoji} ${p} <span style="font-size:0.6rem; opacity:0.7;">(${hitsOnP}/${totalCells})</span>`;
+
         btn.addEventListener('click', () => {
             targetSelezionato = p;
             cellaSelezionata = null;
@@ -1590,6 +1748,8 @@ function renderOpponentTabs(data, eliminati) {
             renderOpponentTabs(currentGameData, currentGameData.eliminati || []);
             renderOpponentGrid(currentGameData);
             btnFire.disabled = true;
+            const titleEl = document.getElementById('opponent-section-title');
+            if (titleEl) titleEl.textContent = `🎯 ${p} ${eliminati.includes(p) ? '(eliminato)' : ''}`;
         });
         tabsEl.appendChild(btn);
     });
@@ -2552,11 +2712,10 @@ async function playLaserScan(x, y) {
 // ⚔️ SELETTORE ARMI
 // ==========================================
 function renderWeaponBar() {
+    if (!featureArmiSpeciali) { weaponPanel.classList.add('hidden'); return; }
+    weaponPanel.classList.remove('hidden');
+
     const bar = document.getElementById('weapon-bar');
-    const help = document.getElementById('weapon-help');
-    if (!featureArmiSpeciali) { bar.classList.add('hidden'); help.classList.add('hidden'); return; }
-    bar.classList.remove('hidden');
-    help.classList.remove('hidden');
     bar.innerHTML = '';
 
     Object.entries(ARMI_CONFIG).forEach(([id, cfg]) => {
@@ -2582,27 +2741,22 @@ function renderWeaponBar() {
         bar.appendChild(btn);
     });
 
+    // Descrizione arma
     const selCfg = ARMI_CONFIG[selectedWeapon];
     if (selCfg) {
         const desc = document.createElement('div');
-        desc.style.cssText = 'width:100%; font-size:0.7rem; color:var(--target-color); padding:4px 0 0; text-align:center;';
-        desc.textContent = `${selCfg.emoji} ${selCfg.name}: ${selCfg.desc}`;
+        desc.className = 'weapon-desc';
+        desc.textContent = `${selCfg.emoji} ${selCfg.desc}`;
         bar.appendChild(desc);
     }
 
-    // ✅ Help contestuale
-    const helpText = document.getElementById('weapon-help-text');
-    if (helpText) {
+    // Help contestuale
+    const helpEl = document.getElementById('weapon-help-text');
+    if (helpEl) {
         switch (selectedWeapon) {
-            case 'missile':
-                helpText.textContent = '🚀 Clicca una cella sulla griglia nemica per colpirla';
-                break;
-            case 'cluster':
-                helpText.textContent = '💣 Clicca il CENTRO dell\'esplosione — colpirà anche le 4 celle adiacenti (croce). Passa il mouse per preview';
-                break;
-            case 'laser':
-                helpText.textContent = '🔭 Clicca il CENTRO della scansione — rivelerà un\'area 3×3 mostrando dove ci sono navi. NON fa danni! Le celle con navi saranno marcate 🔭';
-                break;
+            case 'missile': helpEl.textContent = 'Clicca una cella nemica per colpirla'; break;
+            case 'cluster': helpEl.textContent = 'Clicca il centro — colpisce a croce (5 celle)'; break;
+            case 'laser': helpEl.textContent = 'Clicca il centro — scansiona 3×3 senza danni'; break;
         }
     }
 }
@@ -2611,49 +2765,71 @@ function renderWeaponBar() {
 // 🛡️ PANNELLO SCUDI
 // ==========================================
 function renderShieldBar() {
-    const bar = document.getElementById('shield-bar');
-    const help = document.getElementById('shield-help');
-    if (!featurePowerups) { bar.classList.add('hidden'); help.classList.add('hidden'); return; }
-    bar.classList.remove('hidden');
-    help.classList.remove('hidden');
+    if (!featurePowerups) { shieldPanel.classList.add('hidden'); return; }
+    shieldPanel.classList.remove('hidden');
 
+    const bar = document.getElementById('shield-bar');
     const scudoCount = arsenaleLocale.scudo || 0;
     const strategaCount = arsenaleLocale.scudoStratega || 0;
     const amIEliminated = (currentGameData?.eliminati || []).includes(mioNome);
+    const disabled = hoAttaccato || amIEliminated;
 
-    bar.innerHTML = `
-        <span class="shield-label" style="font-weight:700;">🛡️ DIFESA:</span>
-        
-        <button class="shield-btn ${scudoGlobaleAttivo ? 'active' : ''}" 
-                ${scudoCount <= 0 || hoAttaccato || amIEliminated ? 'disabled' : ''}
-                onclick="toggleScudoGlobale()"
-                title="Blocca il prossimo colpo che ti colpisce questo turno">
-            🛡️ Scudo Globale
-            <span style="font-size:0.65rem; display:block;">×${scudoCount} rimasti</span>
-        </button>
-        
-        <button class="shield-btn ${scudoCellaAttiva ? 'active' : ''}" 
-                ${strategaCount <= 0 || hoAttaccato || amIEliminated ? 'disabled' : ''}
-                onclick="toggleScudoStratega()"
-                title="Protegge una cella specifica per questo turno">
-            🎯 Scudo Stratega
-            <span style="font-size:0.65rem; display:block;">×${strategaCount} rimasti</span>
-        </button>
-        
-        ${scudoGlobaleAttivo ? `
-            <span class="shield-label" style="color:#2ecc71; font-weight:900;">
-                ✅ SCUDO ATTIVO — Il prossimo colpo sarà bloccato
-            </span>
-        ` : ''}
-        
-        ${scudoCellaAttiva ? `
-            <span class="shield-label" style="color:#2ecc71; font-weight:900;">
-                ✅ CELLA PROTETTA: ${COL_LABELS[scudoCellaAttiva.c]}${scudoCellaAttiva.r + 1}
-                <button onclick="scudoCellaAttiva=null; renderShieldBar(); renderMiaGrigliaForShield();" 
-                        style="background:none; border:none; color:#e74c3c; cursor:pointer; font-size:0.8rem; margin-left:5px;">✖️</button>
-            </span>
-        ` : ''}
+    bar.innerHTML = '';
+
+    // Scudo Globale
+    const btnGlobal = document.createElement('button');
+    btnGlobal.className = `shield-btn-v ${scudoGlobaleAttivo ? 'active' : ''}`;
+    btnGlobal.disabled = scudoCount <= 0 || disabled;
+    btnGlobal.innerHTML = `
+        <span class="s-emoji">🛡️</span>
+        <div class="s-info">
+            <span class="s-name">Scudo Globale</span>
+            <span class="s-desc">Blocca il prossimo colpo su di te</span>
+            <span class="s-count">×${scudoCount} rimasti</span>
+        </div>
     `;
+    btnGlobal.addEventListener('click', toggleScudoGlobale);
+    bar.appendChild(btnGlobal);
+
+    // Scudo Stratega
+    const btnStrat = document.createElement('button');
+    btnStrat.className = `shield-btn-v ${scudoCellaAttiva ? 'active' : ''} ${shieldSelectionMode ? 'active' : ''}`;
+    btnStrat.disabled = strategaCount <= 0 || disabled;
+    btnStrat.innerHTML = `
+        <span class="s-emoji">🎯</span>
+        <div class="s-info">
+            <span class="s-name">Scudo Stratega</span>
+            <span class="s-desc">Clicca una cella della TUA griglia da proteggere</span>
+            <span class="s-count">×${strategaCount} rimasti</span>
+        </div>
+    `;
+    btnStrat.addEventListener('click', toggleScudoStratega);
+    bar.appendChild(btnStrat);
+
+    // Status attivo
+    if (scudoGlobaleAttivo) {
+        const status = document.createElement('div');
+        status.className = 'shield-status';
+        status.textContent = '✅ Scudo Globale ATTIVO';
+        bar.appendChild(status);
+    }
+    if (scudoCellaAttiva) {
+        const status = document.createElement('div');
+        status.className = 'shield-status';
+        status.innerHTML = `✅ Cella protetta: <b>${COL_LABELS[scudoCellaAttiva.c]}${scudoCellaAttiva.r+1}</b>
+            <span onclick="scudoCellaAttiva=null; renderShieldBar(); renderMiaGrigliaForShield();"
+                  style="cursor:pointer; margin-left:8px; color:#e74c3c;">✖️</span>`;
+        bar.appendChild(status);
+    }
+    if (shieldSelectionMode) {
+        const status = document.createElement('div');
+        status.className = 'shield-status';
+        status.style.color = '#f39c12';
+        status.innerHTML = `⬅️ Clicca una cella sulla TUA griglia
+            <span onclick="cancellaScudoStratega();"
+                  style="cursor:pointer; margin-left:8px; color:#e74c3c;">✖️ Annulla</span>`;
+        bar.appendChild(status);
+    }
 }
 
 function toggleScudoGlobale() {
@@ -2671,21 +2847,15 @@ function toggleScudoStratega() {
         renderMiaGrigliaForShield();
         return;
     }
+    if (shieldSelectionMode) {
+        shieldSelectionMode = false;
+        renderShieldBar();
+        renderMiaGrigliaForShield();
+        return;
+    }
     scudoGlobaleAttivo = false;
     shieldSelectionMode = true;
-
-    // ✅ Banner guida invece di alert
-    showGameBanner({
-        icon: '🎯',
-        title: 'SELEZIONA CELLA DA PROTEGGERE',
-        subtitle: 'Clicca una cella sulla TUA griglia (a sinistra)',
-        color: '#27ae60',
-        priority: 5,
-        buttons: [
-            { text: '❌ Annulla', onclick: 'cancellaScudoStratega()' }
-        ]
-    });
-
+    // ✅ Feedback diretto nel pannello scudi (niente banner)
     renderShieldBar();
     renderMiaGrigliaForShield();
 }
@@ -2693,7 +2863,6 @@ function toggleScudoStratega() {
 function cancellaScudoStratega() {
     shieldSelectionMode = false;
     scudoCellaAttiva = null;
-    removeGameBanner();
     renderShieldBar();
     renderMiaGrigliaForShield();
 }
@@ -2723,13 +2892,24 @@ function renderMiaGrigliaForShield() {
             if (shieldSelectionMode) {
                 scudoCellaAttiva = { r, c };
                 shieldSelectionMode = false;
-                removeGameBanner();
                 renderShieldBar();
                 renderMiaGrigliaForShield();
             }
         },
         shieldedCell: scudoCellaAttiva
     });
+
+    // ✅ Evidenzia bordo griglia quando in modalità selezione scudo
+    const gridEl = document.querySelector('#my-grid-container .battle-grid');
+    if (gridEl) {
+        if (shieldSelectionMode) {
+            gridEl.classList.add('shield-select-mode');
+            gridEl.style.boxShadow = '0 0 20px rgba(46,204,113,0.5), inset 0 0 15px rgba(46,204,113,0.2)';
+        } else {
+            gridEl.classList.remove('shield-select-mode');
+            gridEl.style.boxShadow = '';
+        }
+    }
 }
 function calcolaCelleArma(weapon, r, c) {
     const cells = [{ r, c }];
@@ -3057,9 +3237,12 @@ function gestisciPiazzamento(data) {
         });
         startScreen.style.display = 'none';
         mySection.classList.remove('hidden');
-        rightSection.classList.remove('hidden');
+        opponentGridSection.classList.add('hidden');
+        targetBar.classList.add('hidden');
         placementPanel.classList.remove('hidden');
-        battlePanel.classList.add('hidden');
+        battleControls.classList.add('hidden');
+        shieldPanel.classList.add('hidden');
+        weaponPanel.classList.add('hidden');
         const mieNavi = data.navi[mioNome] || [];
         renderGrid('my-grid-container', { size: gridSize, showShips: mieNavi, attacks: [], isMyGrid: true, interactive: false });
         btnPronto.disabled = true;
