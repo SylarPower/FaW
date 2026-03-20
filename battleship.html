@@ -147,8 +147,8 @@
 
         /* Emoji nave (prua) */
         .ship-emoji {
-            font-size: 1.4em;
-            filter: drop-shadow(0 1px 3px rgba(0,0,0,0.6));
+            font-size: 1.6em;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.7));
             line-height: 1;
         }
 
@@ -156,17 +156,18 @@
         .cell.ship-hit {
             background: linear-gradient(145deg, #c0392b, #e74c3c) !important;
             border-color: #a93226 !important;
-            animation: hitFlash 0.5s ease;
         }
-        .cell.ship-hit .hit-fire { font-size: 0.8em; animation: fireFlicker 0.4s ease-in-out infinite; }
+        .cell.ship-hit .hit-fire { font-size: 1.1em; }
+        .cell.ship-hit.anim-new { animation: hitFlash 0.5s ease; }
+        .cell.ship-hit.anim-new .hit-fire { animation: fireFlicker 0.4s ease-in-out 3; }
 
         /* Nave affondata */
         .cell.sunk-cell {
             background: linear-gradient(145deg, var(--sunk-color), #5b2c20) !important;
             border: 1px solid #e74c3c !important;
-            animation: sinkAnim 0.8s ease;
         }
-        .cell.sunk-cell::after { content: '💀'; font-size: 0.65em; z-index: 1; position: relative; }
+        .cell.sunk-cell.anim-new { animation: sinkAnim 0.8s ease; }
+        .cell.sunk-cell::after { content: '💀'; font-size: 1.3em; z-index: 1; position: relative; filter: drop-shadow(0 1px 3px rgba(0,0,0,0.6)); }
         .cell.sunk-cell::before { display: none; }
 
         /* Marcatori attacco (griglia avversario) */
@@ -174,8 +175,9 @@
             background: linear-gradient(145deg, #c0392b, #e74c3c) !important;
         }
         .cell.hit-marker::after {
-            content: '🔥'; color: white; font-weight: 900; font-size: 1.1em;
+            content: '🔥'; font-size: 1.3em;
             position: relative; z-index: 1;
+            filter: drop-shadow(0 1px 3px rgba(0,0,0,0.5));
         }
         .cell.hit-marker::before { display: none; }
 
@@ -531,6 +533,149 @@
     z-index: 7550;
     pointer-events: none;
 }
+/* ==========================================
+   ⚔️ SELETTORE ARMI
+   ========================================== */
+.weapon-bar {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+    padding: 8px;
+    background: var(--ocean-deep);
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.1);
+}
+.weapon-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: 2px solid transparent;
+    background: var(--panel-light);
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.2s;
+    min-width: 60px;
+    font-size: 0.7rem;
+}
+.weapon-btn:hover:not(:disabled) { border-color: var(--accent); }
+.weapon-btn.active { border-color: var(--target-color); background: rgba(241,196,15,0.15); box-shadow: 0 0 10px rgba(241,196,15,0.2); }
+.weapon-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.weapon-btn .w-emoji { font-size: 1.4rem; }
+.weapon-btn .w-count { font-size: 0.65rem; color: var(--target-color); font-weight: 900; }
+.weapon-btn .w-name { font-size: 0.6rem; margin-top: 2px; }
+
+/* ==========================================
+   🛡️ PANNELLO SCUDI
+   ========================================== */
+.shield-bar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 10px;
+    padding: 8px;
+    background: rgba(46,204,113,0.08);
+    border-radius: 8px;
+    border: 1px dashed rgba(46,204,113,0.3);
+    align-items: center;
+    flex-wrap: wrap;
+}
+.shield-btn {
+    padding: 5px 12px;
+    border-radius: 20px;
+    border: 2px solid #27ae60;
+    background: transparent;
+    color: #2ecc71;
+    cursor: pointer;
+    font-size: 0.75rem;
+    font-weight: 700;
+    transition: all 0.2s;
+}
+.shield-btn:hover:not(:disabled) { background: rgba(46,204,113,0.15); }
+.shield-btn.active { background: #27ae60; color: white; }
+.shield-btn:disabled { opacity: 0.3; cursor: not-allowed; border-color: #555; color: #555; }
+.shield-label { font-size: 0.7rem; color: var(--text-dim); }
+
+/* ==========================================
+   📦 CASSA / 🔭 INTEL / 🛡️ SCUDO su griglia
+   ========================================== */
+.cell.cassa-cell {
+    background: linear-gradient(135deg, #f39c12, #e67e22) !important;
+    border: 2px solid #f1c40f !important;
+    animation: cassaPulse 1.5s infinite;
+}
+.cell.cassa-cell::after { content: '📦'; font-size: 1.2em; z-index: 1; position: relative; }
+.cell.cassa-cell::before { display: none; }
+@keyframes cassaPulse {
+    0%, 100% { box-shadow: 0 0 5px rgba(241,196,15,0.3); }
+    50% { box-shadow: 0 0 15px rgba(241,196,15,0.6); }
+}
+.cell.intel-cell::after {
+    content: '🔭';
+    font-size: 1em;
+    position: absolute;
+    bottom: 1px;
+    right: 1px;
+    z-index: 3;
+    opacity: 0.7;
+}
+.cell.shielded-cell {
+    box-shadow: inset 0 0 0 2px #2ecc71, 0 0 8px rgba(46,204,113,0.4) !important;
+}
+.cell.shielded-cell::after {
+    content: '🛡️';
+    font-size: 0.8em;
+    position: absolute;
+    top: 1px;
+    left: 1px;
+    z-index: 3;
+}
+
+/* ==========================================
+   🌀 BANNER EVENTO
+   ========================================== */
+.event-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    z-index: 6500;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.4s;
+}
+.event-overlay.visible { opacity: 1; }
+.event-box {
+    background: var(--panel);
+    border: 3px solid;
+    border-radius: 20px;
+    padding: 30px 40px;
+    text-align: center;
+    animation: eventBounce 0.5s cubic-bezier(0.175,0.885,0.32,1.275);
+}
+@keyframes eventBounce {
+    0% { transform: scale(0); }
+    60% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+}
+.event-emoji { font-size: 4rem; margin-bottom: 10px; }
+.event-title { font-size: 1.5rem; font-weight: 900; margin-bottom: 5px; }
+.event-desc { font-size: 0.9rem; opacity: 0.8; }
+
+/* Preview cluster bomb (croce) */
+.cell.preview-cluster {
+    background: rgba(231,76,60,0.25) !important;
+    border: 1px dashed rgba(231,76,60,0.6) !important;
+}
+/* Preview laser (3x3) */
+.cell.preview-laser {
+    background: rgba(52,152,219,0.2) !important;
+    border: 1px dashed rgba(52,152,219,0.5) !important;
+}
     </style>
 </head>
 <body>
@@ -585,6 +730,8 @@
 
             <div id="battle-panel" class="hidden">
                 <div class="section-title"><span>🎯</span><span>SCEGLI BERSAGLIO</span></div>
+                <div id="weapon-bar" class="weapon-bar hidden"></div>
+                <div id="shield-bar" class="shield-bar hidden"></div>
                 <div class="opponent-tabs" id="opponent-tabs"></div>
                 <div id="opponent-grid-container"></div>
                 <div class="fleet-status" id="opponent-fleet-status"></div>
@@ -653,7 +800,62 @@ const NAVI_CONFIGS = {
     ]
 };
 const COL_LABELS = 'ABCDEFGHIJKLMNOP';
+// ==========================================
+// CONFIGURAZIONE ARMI E FEATURE
+// ==========================================
+const ARMI_CONFIG = {
+    missile:  { name: 'Missile',        emoji: '🚀', desc: '1 cella',            unlimited: true },
+    cluster:  { name: 'Grappolo',       emoji: '💣', desc: 'Croce (5 celle)',     unlimited: false },
+    laser:    { name: 'Mirino Laser',   emoji: '🔭', desc: 'Scan 3×3',           unlimited: false }
+};
 
+const ARSENALE_INIZIALE = {
+    missile: 999,
+    cluster: 2,
+    laser: 2,
+    scudo: 2,
+    scudoStratega: 1
+};
+
+// Navi speciali: rimpiazzano le normali quando abilitate
+const NAVI_SPECIALI = {
+    kraken: {
+        name: 'Kraken',
+        size: 4,
+        emoji: '🐙',
+        special: 'kraken',
+        shapes: [
+            // L shapes (4 rotazioni)
+            [{r:0,c:0},{r:1,c:0},{r:2,c:0},{r:2,c:1}],
+            [{r:0,c:0},{r:0,c:1},{r:0,c:2},{r:1,c:0}],
+            [{r:0,c:0},{r:0,c:1},{r:1,c:1},{r:2,c:1}],
+            [{r:1,c:0},{r:1,c:1},{r:1,c:2},{r:0,c:2}],
+            // T shapes (4 rotazioni)
+            [{r:0,c:0},{r:0,c:1},{r:0,c:2},{r:1,c:1}],
+            [{r:0,c:0},{r:1,c:0},{r:2,c:0},{r:1,c:1}],
+            [{r:1,c:0},{r:1,c:1},{r:1,c:2},{r:0,c:1}],
+            [{r:0,c:1},{r:1,c:0},{r:1,c:1},{r:2,c:1}]
+        ]
+    },
+    cannoniera: {
+        name: 'Cannoniera',
+        size: 2,
+        emoji: '💥',
+        special: 'cannoniera'
+    }
+};
+
+const EVENTI_CONFIG = {
+    tempesta:         { emoji: '🌀', name: 'TEMPESTA!',         desc: 'Tutti i missili deviano di 1 cella!',         color: '#2980b9' },
+    cassa:            { emoji: '📦', name: 'RIFORNIMENTO!',     desc: 'Una cassa è apparsa sulla mappa!',            color: '#f39c12' },
+    kraken_selvaggio: { emoji: '🐙', name: 'KRAKEN SELVAGGIO!', desc: '3 celle random colpite!',                     color: '#8e44ad' }
+};
+
+// Feature flags (impostate dal listener Firebase)
+let featureArmiSpeciali = false;
+let featureNaviSpeciali = false;
+let featureEventiRandom = false;
+let featurePowerups = false;
 // ==========================================
 // STATO
 // ==========================================
@@ -673,7 +875,12 @@ let processingResolution = false;
 let currentPreviewCells = [];  // DOM elements con preview
 let animatingRound = -1;
 let isAnimating = false;    
-// ==========================================
+let selectedWeapon = 'missile';
+let arsenaleLocale = { ...ARSENALE_INIZIALE };
+let scudoGlobaleAttivo = false;
+let scudoCellaAttiva = null;    // {r,c} o null
+let krakenShapeIndex = 0;       // indice forma corrente per Kraken
+    // ==========================================
 // DOM
 // ==========================================
 const lobbyOverlay = document.getElementById('lobby-overlay');
@@ -691,6 +898,30 @@ const btnFire = document.getElementById('btn-fire');
 const waitingBar = document.getElementById('waiting-bar');
 const waitingText = document.getElementById('waiting-text');
 
+function buildNaviConfig(size) {
+    const base = [...(NAVI_CONFIGS[size] || NAVI_CONFIGS[10])];
+    if (!featureNaviSpeciali) return base;
+
+    const result = [];
+    let krakenAdded = false;
+    let cannonieraAdded = false;
+
+    base.forEach(nave => {
+        if (nave.size === 4 && !krakenAdded) {
+            // Rimpiazza la prima nave da 4 con Kraken
+            result.push({ ...NAVI_SPECIALI.kraken });
+            krakenAdded = true;
+        } else if (nave.size === 2 && !cannonieraAdded) {
+            // Rimpiazza la prima nave da 2 con Cannoniera
+            result.push({ ...NAVI_SPECIALI.cannoniera });
+            cannonieraAdded = true;
+        } else {
+            result.push(nave);
+        }
+    });
+    return result;
+}
+    
 // ==========================================
 // BANNER
 // ==========================================
@@ -863,6 +1094,8 @@ function renderGrid(containerId, opts) {
                         fire.className = 'hit-fire';
                         fire.textContent = '🔥';
                         cell.appendChild(fire);
+                    } else {
+                        // Nave intatta: mostra emoji prua
                     }
                 } else if (attacked) {
                     cell.classList.add('miss-marker');
@@ -888,7 +1121,16 @@ function renderGrid(containerId, opts) {
             if (opts.targetCell && opts.targetCell.r === r && opts.targetCell.c === c) {
                 cell.classList.add('target-cell');
             }
+            // Scudo su cella
+            if (opts.shieldedCell && opts.shieldedCell.r === r && opts.shieldedCell.c === c) {
+                cell.classList.add('shielded-cell');
+            }
 
+            // Intel (celle rivelate)
+            if (opts.intelCells) {
+                const isIntel = opts.intelCells.some(ic => ic.r === r && ic.c === c);
+                if (isIntel && !attacked) cell.classList.add('intel-cell');
+            }
             // Click handler
             if (opts.interactive && !attacked && !isRevealedSunk) {
                 cell.addEventListener('click', () => opts.onClick(r, c));
@@ -921,9 +1163,16 @@ function showPlacementPreview(r, c) {
     const config = naviConfig[naveSelezionataIdx];
     if (naviPiazzate.some(p => p.configIdx === naveSelezionataIdx)) return;
 
-    const cells = calcolaCelleNave(r, c, config.size, direzione);
+    let cells;
+    if (config.special === 'kraken') {
+        cells = calcolaCelleKraken(r, c, krakenShapeIndex);
+    } else {
+        cells = calcolaCelleNave(r, c, config.size, direzione);
+    }
     const valid = cells !== null && !haOverlap(cells);
-    const cellsToShow = cells || calcolaCelleNaveClipped(r, c, config.size, direzione);
+    const cellsToShow = cells || (config.special === 'kraken'
+        ? calcolaCelleKrakenClipped(r, c, krakenShapeIndex)
+        : calcolaCelleNaveClipped(r, c, config.size, direzione));
 
     const gridEl = document.querySelector('#my-grid-container .battle-grid');
     if (!gridEl) return;
@@ -1011,23 +1260,51 @@ function renderShipList() {
 }
 
 function ruotaDirezione() {
-    direzione = direzione === 'H' ? 'V' : 'H';
-    document.getElementById('direction-label').innerHTML = `Direzione: <b>${direzione === 'H' ? 'Orizzontale →' : 'Verticale ↓'}</b>`;
+    if (naveSelezionataIdx >= 0 && naviConfig[naveSelezionataIdx].special === 'kraken') {
+        krakenShapeIndex = (krakenShapeIndex + 1) % NAVI_SPECIALI.kraken.shapes.length;
+        const tipo = krakenShapeIndex < 4 ? 'L' : 'T';
+        const rot = (krakenShapeIndex % 4) + 1;
+        document.getElementById('direction-label').innerHTML = `Forma: <b>${tipo} (rotazione ${rot})</b>`;
+    } else {
+        direzione = direzione === 'H' ? 'V' : 'H';
+        document.getElementById('direction-label').innerHTML = `Direzione: <b>${direzione === 'H' ? 'Orizzontale →' : 'Verticale ↓'}</b>`;
+    }
     renderMiaGrigliaPiazzamento();
 }
 
+function calcolaCelleKraken(startR, startC, shapeIdx) {
+    const shapes = NAVI_SPECIALI.kraken.shapes;
+    const shape = shapes[shapeIdx % shapes.length];
+    const cells = shape.map(offset => ({ r: startR + offset.r, c: startC + offset.c }));
+    if (cells.some(c => c.r >= gridSize || c.c >= gridSize || c.r < 0 || c.c < 0)) return null;
+    return cells;
+}
+
+function calcolaCelleKrakenClipped(startR, startC, shapeIdx) {
+    const shapes = NAVI_SPECIALI.kraken.shapes;
+    const shape = shapes[shapeIdx % shapes.length];
+    return shape.map(o => ({ r: startR + o.r, c: startC + o.c }))
+        .filter(c => c.r >= 0 && c.r < gridSize && c.c >= 0 && c.c < gridSize);
+}
+    
 function piazzaNave(r, c) {
     if (naveSelezionataIdx < 0) return;
     const config = naviConfig[naveSelezionataIdx];
     if (naviPiazzate.some(p => p.configIdx === naveSelezionataIdx)) return;
-    const cells = calcolaCelleNave(r, c, config.size, direzione);
+
+    let cells;
+    if (config.special === 'kraken') {
+        cells = calcolaCelleKraken(r, c, krakenShapeIndex);
+    } else {
+        cells = calcolaCelleNave(r, c, config.size, direzione);
+    }
     if (!cells || haOverlap(cells)) {
         const ct = document.getElementById('my-grid-container');
         ct.classList.add('anim-shake');
         setTimeout(() => ct.classList.remove('anim-shake'), 300);
         return;
     }
-    naviPiazzate.push({ configIdx: naveSelezionataIdx, name: config.name, size: config.size, emoji: config.emoji, cells, dir: direzione });
+    naviPiazzate.push({ configIdx: naveSelezionataIdx, name: config.name, size: config.size, emoji: config.emoji, special: config.special || null, cells, dir: config.special === 'kraken' ? 'K' : direzione });
     // Auto-select next
     naveSelezionataIdx = -1;
     for (let i = 0; i < naviConfig.length; i++) {
@@ -1083,6 +1360,7 @@ async function confermaPiazzamento() {
         name: n.name,
         size: n.size,
         emoji: n.emoji || '🚢',
+        special: n.special || null,
         cells: n.cells.map(c => ({ r: c.r, c: c.c }))
     }));
 
@@ -1148,6 +1426,19 @@ function renderBattaglia(data) {
     }
     renderOpponentGrid(data);
 
+    // Render weapon bar e shield bar
+    renderWeaponBar();
+    renderShieldBar();
+
+    // Aggiorna testo bottone
+    if (selectedWeapon === 'laser') {
+        btnFire.textContent = '🔭 SCANSIONA!';
+    } else if (selectedWeapon === 'cluster') {
+        btnFire.textContent = '💣 FUOCO GRAPPOLO!';
+    } else {
+        btnFire.textContent = '🔥 FUOCO!';
+    }
+
     if (hoAttaccato) {
         btnFire.classList.add('hidden');
         waitingBar.classList.remove('hidden');
@@ -1171,7 +1462,13 @@ function renderOpponentTabs(data, eliminati) {
         const btn = document.createElement('button');
         btn.className = `tab-btn ${p === targetSelezionato ? 'active' : ''} ${eliminati.includes(p) ? 'eliminated' : ''}`;
         btn.textContent = `${eliminati.includes(p) ? '💀 ' : ''}${p}`;
-        btn.addEventListener('click', () => { targetSelezionato = p; cellaSelezionata = null; renderBattaglia(currentGameData); });
+        btn.addEventListener('click', () => {
+        targetSelezionato = p;
+        cellaSelezionata = null;
+        renderOpponentTabs(currentGameData, currentGameData.eliminati || []);
+        renderOpponentGrid(currentGameData);
+        btnFire.disabled = true;
+    });
         tabsEl.appendChild(btn);
     });
 }
@@ -1186,6 +1483,10 @@ function renderOpponentGrid(data) {
     const targetShips = data.navi[targetSelezionato] || [];
     const interactive = !hoAttaccato && !amIEliminated && !targetEliminated;
 
+    // Raccogli dati intel per questo avversario
+    const myIntel = currentGameData?.intelData?.[mioNome]?.[targetSelezionato] || [];
+    const intelCellsForTarget = myIntel.filter(i => i.hasShip);
+
     renderGrid('opponent-grid-container', {
         size: gridSize,
         showShips: targetEliminated ? targetShips : [],
@@ -1194,9 +1495,52 @@ function renderOpponentGrid(data) {
         isMyGrid: false,
         interactive,
         onClick: (r, c) => selezionaCellaAttacco(r, c, data),
-        targetCell: cellaSelezionata
+        targetCell: cellaSelezionata,
+        intelCells: intelCellsForTarget
     });
     renderFleetStatus('opponent-fleet-status', targetShips, storico, targetSelezionato);
+
+    // Preview celle arma quando hover sulla griglia (solo se non laser — laser mostra preview sul click)
+    if (interactive && (selectedWeapon === 'cluster' || selectedWeapon === 'laser')) {
+        const gridEl = document.querySelector('#opponent-grid-container .battle-grid');
+        if (gridEl) {
+            gridEl.querySelectorAll('.cell').forEach(cellEl => {
+                if (cellEl.classList.contains('attacked-cell')) return;
+                cellEl.addEventListener('mouseenter', () => {
+                    const cr = parseInt(cellEl.dataset.row);
+                    const cc = parseInt(cellEl.dataset.col);
+                    const previewCells = calcolaCelleArma(selectedWeapon, cr, cc);
+                    const previewClass = selectedWeapon === 'cluster' ? 'preview-cluster' : 'preview-laser';
+                    previewCells.forEach(pc => {
+                        const target = gridEl.querySelector(`.cell[data-row="${pc.r}"][data-col="${pc.c}"]`);
+                        if (target && !target.classList.contains('attacked-cell')) {
+                            target.classList.add(previewClass);
+                        }
+                    });
+                });
+                cellEl.addEventListener('mouseleave', () => {
+                    gridEl.querySelectorAll('.preview-cluster, .preview-laser').forEach(el => {
+                        el.classList.remove('preview-cluster', 'preview-laser');
+                    });
+                });
+            });
+        }
+    }
+
+    // Mostra casse sulla griglia avversario
+    const casseAttive = currentGameData?.casseAttive || [];
+    if (casseAttive.length > 0) {
+        const gridEl = document.querySelector('#opponent-grid-container .battle-grid');
+        if (gridEl) {
+            casseAttive.forEach(cassa => {
+                const cellEl = gridEl.querySelector(`.cell[data-row="${cassa.r}"][data-col="${cassa.c}"]`);
+                if (cellEl && !cellEl.classList.contains('attacked-cell')) {
+                    cellEl.classList.add('cassa-cell');
+                }
+            });
+        }
+    }
+}
 }
 
 function renderFleetStatus(containerId, navi, storico, player) {
@@ -1215,23 +1559,73 @@ function selezionaCellaAttacco(r, c, data) {
     if (hoAttaccato || isAnimating) return;
     if (wasAttacked(targetSelezionato, r, c, data.storicoAttacchi || [])) return;
     cellaSelezionata = { r, c };
-    renderBattaglia(data);
+    // ✅ Solo la griglia avversaria, NON la mia
+    renderOpponentGrid(data);
+    btnFire.disabled = false;
 }
 
 async function confermaAttacco() {
     if (!cellaSelezionata || !targetSelezionato || hoAttaccato || isAnimating) return;
     if ((currentGameData.eliminati||[]).includes(mioNome)) return;
     if ((currentGameData.eliminati||[]).includes(targetSelezionato)) { alert("Non puoi attaccare un giocatore eliminato!"); return; }
+
+    // Verifica disponibilità arma
+    if (!ARMI_CONFIG[selectedWeapon]?.unlimited) {
+        if ((arsenaleLocale[selectedWeapon] || 0) <= 0) {
+            alert(`${ARMI_CONFIG[selectedWeapon].name} esaurito!`);
+            return;
+        }
+    }
+
+    // Verifica laser non colpisce celle già scansionate
+    if (selectedWeapon === 'laser') {
+        btnFire.textContent = '🔭 SCANSIONE...';
+    }
+
     btnFire.disabled = true;
+
+    const attackData = {
+        target: targetSelezionato,
+        r: cellaSelezionata.r,
+        c: cellaSelezionata.c,
+        weapon: selectedWeapon
+    };
+
+    // Scudi
+    if (scudoGlobaleAttivo) attackData.scudoGlobale = true;
+    if (scudoCellaAttiva) attackData.scudoCella = { r: scudoCellaAttiva.r, c: scudoCellaAttiva.c };
+
     try {
-        await db.collection("partite").doc(matchId).update({
-            [`attacchiTurno.${mioNome}`]: { target: targetSelezionato, r: cellaSelezionata.r, c: cellaSelezionata.c }
-        });
+        const updates = {
+            [`attacchiTurno.${mioNome}`]: attackData
+        };
+
+        // Decrementa arsenale locale
+        if (!ARMI_CONFIG[selectedWeapon]?.unlimited) {
+            arsenaleLocale[selectedWeapon] = (arsenaleLocale[selectedWeapon] || 0) - 1;
+            updates[`arsenale.${mioNome}`] = { ...arsenaleLocale };
+        }
+        if (scudoGlobaleAttivo) {
+            arsenaleLocale.scudo = (arsenaleLocale.scudo || 0) - 1;
+            updates[`arsenale.${mioNome}`] = { ...arsenaleLocale };
+        }
+        if (scudoCellaAttiva) {
+            arsenaleLocale.scudoStratega = (arsenaleLocale.scudoStratega || 0) - 1;
+            updates[`arsenale.${mioNome}`] = { ...arsenaleLocale };
+        }
+
+        await db.collection("partite").doc(matchId).update(updates);
+
         hoAttaccato = true;
         cellaSelezionata = null;
+        scudoGlobaleAttivo = false;
+        scudoCellaAttiva = null;
+        selectedWeapon = 'missile';
+        shieldSelectionMode = false;
     } catch (e) {
         console.error("Errore invio attacco:", e);
         btnFire.disabled = false;
+        btnFire.textContent = '🔥 FUOCO!';
         alert("Errore. Riprova.");
     }
 }
@@ -1242,6 +1636,7 @@ async function confermaAttacco() {
 async function risolviTurno(data) {
     if (processingResolution) return;
     processingResolution = true;
+
     try {
         await db.runTransaction(async (transaction) => {
             const docRef = db.collection("partite").doc(matchId);
@@ -1253,34 +1648,268 @@ async function risolviTurno(data) {
 
             const turno = fd.turnoCorrente || 1;
             const storico = fd.storicoAttacchi || [];
-            const nuoviAttacchi = [];
-            Object.entries(attacks).forEach(([player, atk]) => {
-                nuoviAttacchi.push({ by: player, target: atk.target, r: atk.r, c: atk.c, round: turno });
-            });
-            const storicoAgg = [...storico, ...nuoviAttacchi];
+            const mode = fd.opzioni?.mode || 'classic';
+            const hasEvents = (mode === 'chaos');
+            const hasSpecial = (mode === 'worms' || mode === 'chaos');
+            let casseAttive = [...(fd.casseAttive || [])];
+            let arsenali = JSON.parse(JSON.stringify(fd.arsenale || {}));
+            const eventiLog = [...(fd.eventiLog || [])];
+            let intelData = JSON.parse(JSON.stringify(fd.intelData || {}));
 
+            // =====================
+            // A. EVENTI RANDOM
+            // =====================
+            let tempestaAttiva = false;
+            let krakenSelvaggio = [];
+
+            if (hasEvents && turno >= 3) {
+                // Tempesta: 20% dal turno 3
+                if (Math.random() < 0.20) {
+                    tempestaAttiva = true;
+                    eventiLog.push({ turno, tipo: 'tempesta' });
+                }
+            }
+            if (hasEvents && turno >= 5) {
+                // Kraken selvaggio: 15%
+                if (Math.random() < 0.15) {
+                    const ksHits = [];
+                    for (let i = 0; i < 3; i++) {
+                        const target = surviving[Math.floor(Math.random() * surviving.length)];
+                        const kr = Math.floor(Math.random() * gridSize);
+                        const kc = Math.floor(Math.random() * gridSize);
+                        ksHits.push({ by: '🐙KRAKEN', target, r: kr, c: kc, round: turno, isEvent: true });
+                    }
+                    krakenSelvaggio = ksHits;
+                    eventiLog.push({ turno, tipo: 'kraken_selvaggio', hits: ksHits.map(h => ({target:h.target, r:h.r, c:h.c})) });
+                }
+            }
+            if (hasEvents && turno % 4 === 0) {
+                // Cassa di rifornimento
+                const cr = Math.floor(Math.random() * gridSize);
+                const cc = Math.floor(Math.random() * gridSize);
+                casseAttive.push({ r: cr, c: cc });
+                eventiLog.push({ turno, tipo: 'cassa', r: cr, c: cc });
+            }
+
+            // =====================
+            // B. RACCOGLI SCUDI
+            // =====================
+            const scudi = {};
+            Object.entries(attacks).forEach(([player, atk]) => {
+                scudi[player] = {
+                    globale: atk.scudoGlobale || false,
+                    globaleUsato: false,
+                    cella: atk.scudoCella || null
+                };
+            });
+
+            // =====================
+            // C. ESPANDI ATTACCHI
+            // =====================
+            let allAttackCells = [];
+
+            Object.entries(attacks).forEach(([player, atk]) => {
+                let cells = calcolaCelleArma(atk.weapon || 'missile', atk.r, atk.c);
+
+                // Tempesta: devia di 1 cella
+                if (tempestaAttiva && atk.weapon !== 'laser') {
+                    const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
+                    const d = dirs[Math.floor(Math.random() * dirs.length)];
+                    cells = cells.map(c => ({
+                        r: Math.max(0, Math.min(gridSize - 1, c.r + d[0])),
+                        c: Math.max(0, Math.min(gridSize - 1, c.c + d[1]))
+                    }));
+                }
+
+                cells.forEach(cell => {
+                    allAttackCells.push({
+                        by: player,
+                        target: atk.target,
+                        r: cell.r,
+                        c: cell.c,
+                        round: turno,
+                        weapon: atk.weapon || 'missile',
+                        isLaser: (atk.weapon === 'laser')
+                    });
+                });
+            });
+
+            // Aggiungi Kraken selvaggio
+            allAttackCells.push(...krakenSelvaggio);
+
+            // =====================
+            // D. APPLICA SCUDI
+            // =====================
+            const finalAttacks = [];
+            const laserReveals = [];
+
+            allAttackCells.forEach(atk => {
+                // Laser non fa danno, solo rivela
+                if (atk.isLaser) {
+                    laserReveals.push(atk);
+                    return;
+                }
+
+                const targetPlayer = atk.target;
+                const shield = scudi[targetPlayer];
+
+                // Scudo Stratega: protegge cella specifica
+                if (shield && shield.cella && shield.cella.r === atk.r && shield.cella.c === atk.c) {
+                    // Colpo bloccato!
+                    return;
+                }
+                // Scudo Globale: blocca il primo colpo
+                if (shield && shield.globale && !shield.globaleUsato) {
+                    shield.globaleUsato = true;
+                    return;
+                }
+
+                // Non duplicare attacchi sulla stessa cella già colpita
+                const alreadyHit = storico.some(s => s.target === atk.target && s.r === atk.r && s.c === atk.c);
+                if (!alreadyHit) {
+                    finalAttacks.push(atk);
+                }
+            });
+
+            // Aggiungi laser reveals a intel
+            laserReveals.forEach(lr => {
+                if (!intelData[lr.by]) intelData[lr.by] = {};
+                if (!intelData[lr.by][lr.target]) intelData[lr.by][lr.target] = [];
+                const hasShip = cellHasShip(lr.target, lr.r, lr.c, fd.navi);
+                intelData[lr.by][lr.target].push({ r: lr.r, c: lr.c, hasShip, turno });
+            });
+
+            const storicoAgg = [...storico, ...finalAttacks];
+
+            // =====================
+            // E. CASSA RIFORNIMENTO
+            // =====================
+            const nuoveCasse = [];
+            casseAttive.forEach(cassa => {
+                const hit = finalAttacks.some(a => a.r === cassa.r && a.c === cassa.c);
+                if (hit) {
+                    // Chi ha colpito la cassa?
+                    const hitter = finalAttacks.find(a => a.r === cassa.r && a.c === cassa.c);
+                    if (hitter && arsenali[hitter.by]) {
+                        // Bonus random
+                        const bonusType = ['cluster', 'laser', 'scudo'][Math.floor(Math.random() * 3)];
+                        arsenali[hitter.by][bonusType] = (arsenali[hitter.by][bonusType] || 0) + 1;
+                    }
+                    // Cassa consumata
+                } else {
+                    nuoveCasse.push(cassa);
+                }
+            });
+
+            // =====================
+            // F. CANNONIERA RITORSIONE
+            // =====================
+            const ritorsioni = [];
+            if (hasSpecial) {
+                finalAttacks.forEach(atk => {
+                    const targetNavi = fd.navi[atk.target] || [];
+                    const hitShip = targetNavi.find(nave =>
+                        nave.cells.some(c => c.r === atk.r && c.c === atk.c) && nave.special === 'cannoniera'
+                    );
+                    if (hitShip && !isShipSunk(atk.target, hitShip, storicoAgg)) {
+                        // Ritorsione: spara a cella random dell'attaccante
+                        const rr = Math.floor(Math.random() * gridSize);
+                        const rc = Math.floor(Math.random() * gridSize);
+                        const alreadyHit = storicoAgg.some(s => s.target === atk.by && s.r === rr && s.c === rc);
+                        if (!alreadyHit) {
+                            ritorsioni.push({
+                                by: `${atk.target}💥`,
+                                target: atk.by,
+                                r: rr, c: rc,
+                                round: turno,
+                                isRetaliation: true
+                            });
+                        }
+                    }
+                });
+            }
+            const storicoFinale = [...storicoAgg, ...ritorsioni];
+
+            // =====================
+            // G. INTEL automatica (ogni 4 turni)
+            // =====================
+            if (hasSpecial && turno % 4 === 0) {
+                surviving.forEach(player => {
+                    if (!intelData[player]) intelData[player] = {};
+                    const opponents = surviving.filter(p => p !== player);
+                    opponents.forEach(opp => {
+                        const naviOpp = fd.navi[opp] || [];
+                        const allCells = naviOpp.flatMap(n => n.cells);
+                        const unrevealedCells = allCells.filter(c =>
+                            !storicoFinale.some(s => s.target === opp && s.r === c.r && s.c === c.c)
+                        );
+                        if (unrevealedCells.length > 0) {
+                            const reveal = unrevealedCells[Math.floor(Math.random() * unrevealedCells.length)];
+                            if (!intelData[player][opp]) intelData[player][opp] = [];
+                            intelData[player][opp].push({ r: reveal.r, c: reveal.c, hasShip: true, turno });
+                        }
+                    });
+                });
+            }
+
+            // =====================
+            // H. ELIMINAZIONI
+            // =====================
             const nuoviEliminati = [...(fd.eliminati || [])];
             fd.partecipanti.forEach(player => {
                 if (nuoviEliminati.includes(player)) return;
-                if (isPlayerEliminated(player, fd.navi, storicoAgg)) nuoviEliminati.push(player);
+                if (isPlayerEliminated(player, fd.navi, storicoFinale)) nuoviEliminati.push(player);
             });
 
             const sopravvissuti = fd.partecipanti.filter(p => !nuoviEliminati.includes(p));
             const vincitore = sopravvissuti.length <= 1 ? (sopravvissuti[0] || null) : null;
 
+            // =====================
+            // SAVE
+            // =====================
             transaction.update(docRef, {
-                storicoAttacchi: storicoAgg,
+                storicoAttacchi: storicoFinale,
                 attacchiTurno: {},
                 turnoCorrente: turno + 1,
                 eliminati: nuoviEliminati,
                 vincitore,
                 ultimoRoundRisolto: turno,
-                stato: vincitore ? 'conclusa' : 'battaglia'
+                stato: vincitore ? 'conclusa' : 'battaglia',
+                casseAttive: nuoveCasse,
+                arsenale: arsenali,
+                eventiLog,
+                intelData,
+                tempestaAttivaTurno: tempestaAttiva ? turno : null,
+                krakenSelvaggioTurno: krakenSelvaggio.length > 0 ? turno : null
             });
         });
     } catch (e) { console.error("Errore risoluzione:", e); }
     processingResolution = false;
 }
+
+async function showEventAnimation(tipo) {
+    const cfg = EVENTI_CONFIG[tipo];
+    if (!cfg) return;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'event-overlay';
+    overlay.innerHTML = `
+        <div class="event-box" style="border-color: ${cfg.color};">
+            <div class="event-emoji">${cfg.emoji}</div>
+            <div class="event-title" style="color: ${cfg.color};">${cfg.name}</div>
+            <div class="event-desc">${cfg.desc}</div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => overlay.classList.add('visible'));
+
+    await sleep(2200);
+
+    overlay.classList.remove('visible');
+    await sleep(400);
+    overlay.remove();
+}
+    
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 // ==========================================
@@ -1374,10 +2003,15 @@ async function animateSingleAttack(atk, data, storico) {
     const start = getMissileStart(startDir, gridRect);
 
     // Lancia missile
-    await launchMissileToCell(start.x, start.y, targetX, targetY, startDir);
+    await launchMissileToCell(start.x, start.y, targetX, targetY, startDir, atk);
+
+    // Emoji missile diversa per arma
+    const weaponEmoji = atk.weapon === 'cluster' ? '💣' : atk.weapon === 'laser' ? '🔭' : (atk.isEvent ? '🐙' : '🚀');
 
     // Impatto
-    if (sunk) {
+    if (atk.isLaser || atk.weapon === 'laser') {
+        await playLaserScan(targetX, targetY);
+    } else if (sunk) {
         await playBigExplosion(targetX, targetY, ship);
     } else if (hasShip) {
         await playSmallExplosion(targetX, targetY);
@@ -1414,11 +2048,11 @@ function getMissileStart(direction, gridRect) {
 // ==========================================
 // 🚀 MISSILE VERSO CELLA SPECIFICA
 // ==========================================
-function launchMissileToCell(startX, startY, targetX, targetY, direction) {
+function launchMissileToCell(startX, startY, targetX, targetY, direction, atk) {
     return new Promise(resolve => {
         const missile = document.createElement('div');
         missile.className = 'missile';
-        missile.textContent = '🚀';
+        missile.textContent = atk?.weapon === 'cluster' ? '💣' : atk?.weapon === 'laser' ? '🔭' : (atk?.isEvent ? '🐙' : '🚀');
         missile.style.left = startX + 'px';
         missile.style.top = startY + 'px';
         document.body.appendChild(missile);
@@ -1495,6 +2129,45 @@ function launchMissileToCell(startX, startY, targetX, targetY, direction) {
     });
 }
 
+async function playLaserScan(x, y) {
+    // Flash blu
+    spawnFlash(x, y, 'rgba(52,152,219,0.6)', 120);
+
+    // Griglia laser
+    for (let i = 0; i < 3; i++) {
+        const ring = document.createElement('div');
+        ring.className = 'water-ripple';
+        const size = 20;
+        ring.style.left = (x - size/2) + 'px';
+        ring.style.top = (y - size/2) + 'px';
+        ring.style.width = size + 'px';
+        ring.style.height = size + 'px';
+        ring.style.borderColor = '#3498db';
+        document.body.appendChild(ring);
+
+        ring.animate([
+            { width: size+'px', height: size+'px', left: (x-size/2)+'px', top: (y-size/2)+'px', opacity: 0.9 },
+            { width: (80+i*25)+'px', height: (80+i*25)+'px', left: (x-(80+i*25)/2)+'px', top: (y-(80+i*25)/2)+'px', opacity: 0 }
+        ], { duration: 600+i*150, delay: i*100 }).onfinish = () => ring.remove();
+    }
+
+    // Testo
+    const txt = document.createElement('div');
+    txt.className = 'impact-text';
+    txt.style.left = '50%'; txt.style.top = (y-50)+'px';
+    txt.style.transform = 'translateX(-50%)';
+    txt.style.color = '#5dade2'; txt.style.fontSize = '1.8rem';
+    txt.textContent = '🔭 SCANSIONE';
+    document.body.appendChild(txt);
+    txt.animate([
+        { opacity: 0, transform: 'translateX(-50%) translateY(10px)' },
+        { opacity: 1, transform: 'translateX(-50%) translateY(0)' },
+        { opacity: 0, transform: 'translateX(-50%) translateY(-20px)' }
+    ], { duration: 1200 }).onfinish = () => txt.remove();
+
+    await sleep(800);
+}
+
 // ==========================================
 // 🏷️ LABEL ATTACCO FLOATING
 // ==========================================
@@ -1516,7 +2189,141 @@ function showAttackLabel(attacker, target, coord) {
 
     return label;
 }
+// ==========================================
+// ⚔️ SELETTORE ARMI
+// ==========================================
+function renderWeaponBar() {
+    const bar = document.getElementById('weapon-bar');
+    if (!featureArmiSpeciali) { bar.classList.add('hidden'); return; }
+    bar.classList.remove('hidden');
+    bar.innerHTML = '';
 
+    Object.entries(ARMI_CONFIG).forEach(([id, cfg]) => {
+        const count = arsenaleLocale[id] || 0;
+        const available = cfg.unlimited || count > 0;
+        const btn = document.createElement('button');
+        btn.className = `weapon-btn ${selectedWeapon === id ? 'active' : ''}`;
+        btn.disabled = !available || hoAttaccato;
+        btn.innerHTML = `
+            <span class="w-emoji">${cfg.emoji}</span>
+            <span class="w-name">${cfg.name}</span>
+            ${cfg.unlimited ? '' : `<span class="w-count">×${count}</span>`}
+        `;
+        btn.title = cfg.desc;
+        btn.addEventListener('click', () => {
+            selectedWeapon = id;
+            cellaSelezionata = null;
+            renderWeaponBar();
+            renderOpponentGrid(currentGameData);
+            btnFire.disabled = true;
+        });
+        bar.appendChild(btn);
+    });
+}
+
+// ==========================================
+// 🛡️ PANNELLO SCUDI
+// ==========================================
+function renderShieldBar() {
+    const bar = document.getElementById('shield-bar');
+    if (!featurePowerups) { bar.classList.add('hidden'); return; }
+    bar.classList.remove('hidden');
+
+    const scudoCount = arsenaleLocale.scudo || 0;
+    const strategaCount = arsenaleLocale.scudoStratega || 0;
+
+    bar.innerHTML = `
+        <span class="shield-label">🛡️ DIFESA:</span>
+        <button class="shield-btn ${scudoGlobaleAttivo ? 'active' : ''}" 
+                ${scudoCount <= 0 || hoAttaccato ? 'disabled' : ''}
+                onclick="toggleScudoGlobale()">
+            🛡️ Scudo (×${scudoCount})
+        </button>
+        <button class="shield-btn ${scudoCellaAttiva ? 'active' : ''}" 
+                ${strategaCount <= 0 || hoAttaccato ? 'disabled' : ''}
+                onclick="toggleScudoStratega()">
+            🎯 Stratega (×${strategaCount})
+        </button>
+        ${scudoCellaAttiva ? `<span class="shield-label">Cella: ${COL_LABELS[scudoCellaAttiva.c]}${scudoCellaAttiva.r+1}</span>` : ''}
+        ${scudoGlobaleAttivo ? `<span class="shield-label" style="color:#2ecc71;">Scudo ATTIVO</span>` : ''}
+    `;
+}
+
+function toggleScudoGlobale() {
+    scudoGlobaleAttivo = !scudoGlobaleAttivo;
+    if (scudoGlobaleAttivo) scudoCellaAttiva = null;
+    renderShieldBar();
+    renderMiaGrigliaForShield();
+}
+
+function toggleScudoStratega() {
+    if (scudoCellaAttiva) {
+        scudoCellaAttiva = null;
+        renderShieldBar();
+        renderMiaGrigliaForShield();
+        return;
+    }
+    scudoGlobaleAttivo = false;
+    // Attiva modalità selezione cella sulla mia griglia
+    alert('Clicca una cella sulla TUA griglia per proteggerla questo turno.');
+    activateShieldCellSelection();
+}
+
+let shieldSelectionMode = false;
+
+function activateShieldCellSelection() {
+    shieldSelectionMode = true;
+    // Re-render mia griglia con click abilitato
+    renderMiaGrigliaForShield();
+}
+
+function renderMiaGrigliaForShield() {
+    if (!currentGameData) return;
+    const storico = currentGameData.storicoAttacchi || [];
+    const mieNavi = currentGameData.navi[mioNome] || [];
+    const attacchiControMe = getAttacksAgainst(mioNome, storico);
+
+    renderGrid('my-grid-container', {
+        size: gridSize,
+        showShips: mieNavi,
+        allAttacks: attacchiControMe,
+        attacks: attacchiControMe,
+        isMyGrid: true,
+        interactive: shieldSelectionMode,
+        onClick: (r, c) => {
+            if (shieldSelectionMode) {
+                scudoCellaAttiva = { r, c };
+                shieldSelectionMode = false;
+                renderShieldBar();
+                renderMiaGrigliaForShield();
+            }
+        },
+        shieldedCell: scudoCellaAttiva
+    });
+}
+function calcolaCelleArma(weapon, r, c) {
+    const cells = [{ r, c }];
+    if (weapon === 'cluster') {
+        // Croce: cella + 4 adiacenti
+        [[-1,0],[1,0],[0,-1],[0,1]].forEach(([dr, dc]) => {
+            const nr = r + dr, nc = c + dc;
+            if (nr >= 0 && nr < gridSize && nc >= 0 && nc < gridSize) {
+                cells.push({ r: nr, c: nc });
+            }
+        });
+    } else if (weapon === 'laser') {
+        // 3×3
+        for (let dr = -1; dr <= 1; dr++) {
+            for (let dc = -1; dc <= 1; dc++) {
+                const nr = r + dr, nc = c + dc;
+                if ((dr !== 0 || dc !== 0) && nr >= 0 && nr < gridSize && nc >= 0 && nc < gridSize) {
+                    cells.push({ r: nr, c: nc });
+                }
+            }
+        }
+    }
+    return cells;
+}
 function hideAttackLabel(label) {
     if (!label) return;
     label.classList.remove('visible');
@@ -1808,7 +2615,22 @@ function avviaListener() {
         currentGameData = data;
         lobbyOverlay.style.display = 'none';
         gridSize = parseInt(data.opzioni?.gridSize) || 10;
-        naviConfig = NAVI_CONFIGS[gridSize] || NAVI_CONFIGS[10];
+        const mode = data.opzioni?.mode || 'classic';
+        
+        featureArmiSpeciali = (mode === 'worms' || mode === 'chaos');
+        featureNaviSpeciali = (mode === 'worms' || mode === 'chaos');
+        featureEventiRandom = (mode === 'chaos');
+        featurePowerups = (mode === 'worms' || mode === 'chaos');
+        
+        // Seleziona navi config con/senza speciali
+        naviConfig = buildNaviConfig(gridSize);
+        
+        // Carica arsenale dal Firebase se disponibile
+        if (data.arsenale && data.arsenale[mioNome]) {
+            arsenaleLocale = { ...data.arsenale[mioNome] };
+        } else if (featureArmiSpeciali || featurePowerups) {
+            arsenaleLocale = { ...ARSENALE_INIZIALE };
+        }
         if (data.stato === 'attesa' || data.stato === 'piazzamento') {
             animatingRound = -1;
             roundResultsShown = -1;
@@ -1861,13 +2683,26 @@ function gestisciPiazzamento(data) {
     }
     if (prontiPiazz.length >= data.partecipanti.length) {
         removeGameBanner();
-        // Solo il primo (alfabeticamente) avvia la battaglia
         const starter = data.partecipanti.sort()[0];
         if (mioNome === starter) {
-            db.collection("partite").doc(matchId).update({
+            const mode = data.opzioni?.mode || 'classic';
+            const hasSpecial = (mode === 'worms' || mode === 'chaos');
+
+            const updateData = {
                 stato: 'battaglia', turnoCorrente: 1, attacchiTurno: {},
-                storicoAttacchi: [], eliminati: []
-            });
+                storicoAttacchi: [], eliminati: [],
+                casseAttive: [], eventiLog: [], intelData: {}
+            };
+
+            if (hasSpecial) {
+                const arsenali = {};
+                data.partecipanti.forEach(p => {
+                    arsenali[p] = { ...ARSENALE_INIZIALE };
+                });
+                updateData.arsenale = arsenali;
+            }
+
+            db.collection("partite").doc(matchId).update(updateData);
         }
     }
 }
@@ -1884,7 +2719,20 @@ function gestisciBattaglia(data) {
     }
 
     if (ultimoRisolto > 0 && animatingRound < ultimoRisolto) {
-        playAttackAnimations(data, ultimoRisolto);
+        (async () => {
+            // Mostra eventi prima delle animazioni attacco
+            if (data.tempestaAttivaTurno === ultimoRisolto) {
+                await showEventAnimation('tempesta');
+            }
+            if (data.krakenSelvaggioTurno === ultimoRisolto) {
+                await showEventAnimation('kraken_selvaggio');
+            }
+            const eventiCassa = (data.eventiLog || []).filter(e => e.turno === ultimoRisolto && e.tipo === 'cassa');
+            if (eventiCassa.length > 0) {
+                await showEventAnimation('cassa');
+            }
+            await playAttackAnimations(data, ultimoRisolto);
+        })();
     }
 
     const tuttiAttaccato = surviving.every(p => !!attacchiTurno[p]);
