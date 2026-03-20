@@ -216,10 +216,13 @@
             background: var(--target-color) !important;
             box-shadow: 0 0 12px rgba(241,196,15,0.5);
             animation: pulseTarget 0.8s infinite;
+            cursor: pointer !important;
         }
-        .cell.target-cell::before { display: none; }
+        .cell.target-cell::before { display: none !important; }
+        .cell.target-cell::after { content: none !important; }
         .cell.attacked-cell { cursor: not-allowed; opacity: 0.7; }
-
+        .cell.target-cell .ship-emoji { display: none; }
+        
         @keyframes pulseTarget {
             0%, 100% { box-shadow: 0 0 5px rgba(241,196,15,0.4); }
             50% { box-shadow: 0 0 15px rgba(241,196,15,0.7); }
@@ -614,7 +617,7 @@
     border: 2px solid #f1c40f !important;
     animation: cassaPulse 1.5s infinite;
 }
-.cell.cassa-cell::after { content: '📦'; font-size: 1.2em; z-index: 1; position: relative; }
+.cell.cassa-cell::after { content: '📦'; font-size: 1.2em; z-index: 1; position: relative; pointer-events: none; }
 .cell.cassa-cell::before { display: none; }
 @keyframes cassaPulse {
     0%, 100% { box-shadow: 0 0 5px rgba(241,196,15,0.3); }
@@ -633,6 +636,7 @@
     z-index: 3;
     opacity: 0.8;
     filter: drop-shadow(0 1px 3px rgba(0,0,0,0.5));
+    pointer-events: none;  /* ✅ Non intercetta i click */
 }
 .cell.shielded-cell {
     box-shadow: inset 0 0 0 2px #2ecc71, 0 0 8px rgba(46,204,113,0.4) !important;
@@ -644,6 +648,7 @@
     top: 1px;
     left: 1px;
     z-index: 3;
+    pointer-events: none;
 }
 
 /* ==========================================
@@ -744,17 +749,20 @@
 
             <div id="battle-panel" class="hidden">
                 <div class="section-title"><span>🎯</span><span>SCEGLI BERSAGLIO</span></div>
-                <div id="weapon-help" class="hidden" style="font-size:0.7rem; color:var(--text-dim); padding:4px 8px; margin-bottom:4px;">
-                    <span id="weapon-help-text">⚔️ Seleziona un'arma, poi clicca la cella bersaglio</span>
-                </div>
-                <div id="weapon-bar" class="weapon-bar hidden"></div>
-                <div id="shield-help" class="hidden" style="font-size:0.7rem; color:var(--text-dim); padding:4px 8px; margin-bottom:4px;">
-                    🛡️ Attiva PRIMA di sparare. Lo scudo protegge da 1 colpo questo turno
-                </div>
-                <div id="shield-bar" class="shield-bar hidden"></div>
                 <div class="opponent-tabs" id="opponent-tabs"></div>
                 <div id="opponent-grid-container"></div>
                 <div class="fleet-status" id="opponent-fleet-status"></div>
+
+                <div id="weapon-help" class="hidden" style="font-size:0.7rem; color:var(--text-dim); padding:6px 8px; margin-top:10px; background:var(--ocean-deep); border-radius:6px;">
+                    <span id="weapon-help-text">⚔️ Seleziona un'arma, poi clicca la cella bersaglio</span>
+                </div>
+                <div id="weapon-bar" class="weapon-bar hidden"></div>
+
+                <div id="shield-help" class="hidden" style="font-size:0.7rem; color:var(--text-dim); padding:6px 8px; background:rgba(46,204,113,0.05); border-radius:6px;">
+                    🛡️ Attiva PRIMA di sparare. Lo scudo protegge da 1 colpo questo turno
+                </div>
+                <div id="shield-bar" class="shield-bar hidden"></div>
+
                 <div class="btn-group" style="justify-content:center; margin-top:12px;">
                     <button class="btn btn-fire" id="btn-fire" onclick="confermaAttacco()" disabled>🔥 FUOCO!</button>
                 </div>
@@ -1179,6 +1187,17 @@ function renderGrid(containerId, opts) {
                 }, { passive: false });
             }
 
+            // ✅ Tooltip per celle speciali
+            if (cell.classList.contains('cassa-cell')) {
+                cell.title = '📦 Cassa di rifornimento — Colpiscila per bonus!';
+            }
+            if (cell.classList.contains('intel-cell')) {
+                cell.title = '🔭 Nave rilevata dal laser in quest\'area';
+            }
+            if (cell.classList.contains('shielded-cell')) {
+                cell.title = '🛡️ Cella protetta dallo scudo questo turno';
+            }
+
             grid.appendChild(cell);
         }
     }
@@ -1388,7 +1407,30 @@ function renderMiaGrigliaPiazzamento() {
         onClick: piazzaNave
     });
 }
+// ==========================================
+// 🔄 ROTAZIONE CON TASTO DESTRO E ROTELLINA
+// ==========================================
+document.addEventListener('contextmenu', (e) => {
+    // Solo durante piazzamento
+    if (!piazzamentoIniziato || naveSelezionataIdx < 0) return;
 
+    // Controlla se il click è sulla griglia
+    const gridContainer = document.getElementById('my-grid-container');
+    if (!gridContainer || !gridContainer.contains(e.target)) return;
+
+    e.preventDefault();
+    ruotaDirezione();
+});
+
+document.addEventListener('wheel', (e) => {
+    if (!piazzamentoIniziato || naveSelezionataIdx < 0) return;
+
+    const gridContainer = document.getElementById('my-grid-container');
+    if (!gridContainer || !gridContainer.contains(e.target)) return;
+
+    e.preventDefault();
+    ruotaDirezione();
+}, { passive: false });
 // ✅ FIX: Converte celle in oggetti semplici per Firebase
 async function confermaPiazzamento() {
     if (naviPiazzate.length < naviConfig.length) return;
@@ -1429,8 +1471,25 @@ function iniziaBattaglia(data) {
     battlePanel.classList.remove('hidden');
     document.getElementById('my-section-title').textContent = 'LA TUA FLOTTA';
     statusFase.textContent = (data.eliminati||[]).includes(mioNome) ? 'Eliminato 💀' : 'Battaglia';
-    hoAttaccato = false;
-    cellaSelezionata = null;
+
+    // ✅ Non resettare se il turno non è cambiato
+    const turno = data.turnoCorrente || 1;
+    const attacchiTurno = data.attacchiTurno || {};
+    const hoGiaAttaccato = !!attacchiTurno[mioNome];
+
+    if (hoGiaAttaccato !== hoAttaccato || turno !== (window._lastRenderedTurno || 0)) {
+        hoAttaccato = hoGiaAttaccato;
+        if (turno !== (window._lastRenderedTurno || 0)) {
+            cellaSelezionata = null;
+            selectedWeapon = 'missile';
+            scudoGlobaleAttivo = false;
+            scudoCellaAttiva = null;
+        }
+        window._lastRenderedTurno = turno;
+    } else {
+        hoAttaccato = hoGiaAttaccato;
+    }
+
     renderBattaglia(data);
 }
 
@@ -1578,6 +1637,7 @@ function renderOpponentGrid(data) {
                 const cellEl = gridEl.querySelector(`.cell[data-row="${cassa.r}"][data-col="${cassa.c}"]`);
                 if (cellEl && !cellEl.classList.contains('attacked-cell')) {
                     cellEl.classList.add('cassa-cell');
+                    cellEl.title = '📦 Cassa di rifornimento — Colpiscila per ottenere un\'arma bonus!';
                 }
             });
         }
@@ -1608,8 +1668,14 @@ function renderFleetStatus(containerId, navi, storico, player) {
 function selezionaCellaAttacco(r, c, data) {
     if (hoAttaccato || isAnimating) return;
     if (wasAttacked(targetSelezionato, r, c, data.storicoAttacchi || [])) return;
+
+    // ✅ Doppio click sulla stessa cella → conferma attacco
+    if (cellaSelezionata && cellaSelezionata.r === r && cellaSelezionata.c === c) {
+        confermaAttacco();
+        return;
+    }
+
     cellaSelezionata = { r, c };
-    // ✅ Solo la griglia avversaria, NON la mia
     renderOpponentGrid(data);
     btnFire.disabled = false;
 }
@@ -2074,17 +2140,18 @@ async function animateGroupAttack(group, renderData, checkStorico, naviData) {
     const gridContainer = document.getElementById(gridContainerId);
     if (!gridContainer) return;
 
-    gridContainer.scrollIntoView({ behavior: 'instant', block: 'center' });
-    await sleep(100);
+    await waitForPaint();
+    gridContainer.scrollIntoView({ behavior: 'instant', block: 'nearest' });
+    await waitForPaint();
+    await sleep(50);
 
     const gridEl = gridContainer.querySelector('.battle-grid');
     if (gridEl) gridEl.classList.add('grid-highlight');
 
-    // Trova cella CENTRO
     const centerCell = gridContainer.querySelector(`.cell[data-row="${group.centerR}"][data-col="${group.centerC}"]`);
     if (!centerCell) { if (gridEl) gridEl.classList.remove('grid-highlight'); return; }
 
-    await sleep(50);
+    await waitForPaint();
     const centerRect = centerCell.getBoundingClientRect();
     const targetX = centerRect.left + centerRect.width / 2;
     const targetY = centerRect.top + centerRect.height / 2;
@@ -2249,9 +2316,14 @@ async function animateSingleAttack(atk, renderData, checkStorico) {
     const gridContainer = document.getElementById(gridContainerId);
     if (!gridContainer) return;
 
-    // ✅ Scroll istantaneo per posizione precisa
-    gridContainer.scrollIntoView({ behavior: 'instant', block: 'center' });
-    await sleep(100);
+    // ✅ Aspetta che il DOM sia completamente renderizzato
+    await waitForPaint();
+
+    gridContainer.scrollIntoView({ behavior: 'instant', block: 'nearest' });
+
+    // ✅ Aspetta fine scroll + paint
+    await waitForPaint();
+    await sleep(50);
 
     const gridEl = gridContainer.querySelector('.battle-grid');
     if (gridEl) gridEl.classList.add('grid-highlight');
@@ -2259,8 +2331,8 @@ async function animateSingleAttack(atk, renderData, checkStorico) {
     const cellEl = gridContainer.querySelector(`.cell[data-row="${atk.r}"][data-col="${atk.c}"]`);
     if (!cellEl) { if (gridEl) gridEl.classList.remove('grid-highlight'); return; }
 
-    // ✅ Ricalcola posizione DOPO lo scroll
-    await sleep(50);
+    // ✅ Leggi posizione DOPO paint
+    await waitForPaint();
     const cellRect = cellEl.getBoundingClientRect();
     const targetX = cellRect.left + cellRect.width / 2;
     const targetY = cellRect.top + cellRect.height / 2;
@@ -2384,7 +2456,11 @@ function getMissileStart(direction, gridRect) {
             return { x: cx, y: window.innerHeight + 60 };
     }
 }
-
+function waitForPaint() {
+    return new Promise(resolve => {
+        requestAnimationFrame(() => requestAnimationFrame(resolve));
+    });
+}
 // ==========================================
 // 🚀 MISSILE VERSO CELLA SPECIFICA
 // ==========================================
