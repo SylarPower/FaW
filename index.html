@@ -1624,10 +1624,10 @@ if (giocoSelezionato === 'pictionary') {
         showLoadingBanner('Creazione Battaglia Navale...');
         
         try {
-            const doc = await db.collection("partite").add({
-                gioco: 'battleship',
-                partecipanti: partecipanti,
-                opzioni: { gridSize: parseInt(opzioni.gridSize || 10) },
+	        const doc = await db.collection("partite").add({
+	            gioco: 'battleship',
+	            partecipanti: partecipanti,
+	            opzioni: { gridSize: parseInt(opzioni.gridSize || 10), mode: opzioni.mode || 'classic' },
                 pronti: [],
                 prontiPiazzamento: [],
                 navi: {},
