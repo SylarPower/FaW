@@ -1911,7 +1911,6 @@ function iniziaBattaglia(data) {
     const hoGiaAttaccato = !!attacchiTurno[mioNome];
 
     // ✅ Calcola se ho finito i colpi
-    const attacchiTurno = data.attacchiTurno || {};
     const mioAttacco1 = !!attacchiTurno[mioNome];
     const mioAttacco2 = !!attacchiTurno[`${mioNome}_2`];
     const colpiInviati = (mioAttacco1 ? 1 : 0) + (mioAttacco2 ? 1 : 0);
