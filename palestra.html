@@ -1766,12 +1766,17 @@ function renderWeeklyOverview() {
                 <div style="height:8px;width:28px;background:hsl(35,80%,46%);"></div>
                 <div style="height:8px;width:28px;border-radius:0 3px 3px 0;background:hsl(5,85%,48%);"></div>
             </div>
-            <div style="display:flex;gap:6px;justify-content:center;margin-bottom:8px;width:100%;flex-wrap:wrap;">
+            <div style="display:flex;gap:6px;justify-content:center;margin-bottom:4px;width:100%;flex-wrap:wrap;">
                 <span style="font-size:.5rem;color:hsl(140,35%,40%);">● sotto MEV</span>
                 <span style="font-size:.5rem;color:hsl(120,55%,45%);">● MEV-MAV</span>
                 <span style="font-size:.5rem;color:hsl(60,70%,48%);font-weight:700;">● MAV ✓</span>
                 <span style="font-size:.5rem;color:hsl(35,80%,50%);">● sopra MAV</span>
                 <span style="font-size:.5rem;color:hsl(5,85%,52%);">● MRV ⚠️</span>
+            </div>
+            <div style="width:100%;padding:6px 8px;border-radius:8px;background:var(--c2);border:1px solid var(--brd);margin-bottom:8px;font-size:.55rem;color:var(--tx3);line-height:1.6;">
+                <b>MEV</b> = Volume Minimo Efficace (sotto → il muscolo non cresce)<br>
+                <b>MAV</b> = Volume Massimo Adattivo (zona ottimale per crescita)<br>
+                <b>MRV</b> = Volume Massimo Recuperabile (oltre → sovrallenamento)
             </div>`;
             legendHTML += sortedGroups.map(([g, ratio]) => {
                 const range = VOLUME_RANGES[g] || { mev:4, mav:10, mrv:16 };
@@ -2343,6 +2348,16 @@ function getMuscleFatigue() {
         const range = VOLUME_RANGES[g] || { mev:4, mav:10, mrv:16 };
         fatigue[g] = sets[g] / range.mrv; // >1.0 = oltre MRV → diventerà rosso
     });
+	    // DEBUG: mostra cosa conta ogni esercizio
+    console.log('=== DEBUG VOLUME ===');
+    D.days.forEach(day => {
+        day.exs.forEach(ex => {
+            const def = exDef(ex.exerciseId);
+            if (!def || def.group === 'Cardio') return;
+            console.log(ex.name, '→ primary:', def.group, '| groups:', def.groups, '| sets:', ex.sd?.length);
+        });
+    });
+    console.log('Sets per gruppo:', JSON.parse(JSON.stringify(sets)));
     return fatigue;
 }
 function getDayFatigue(day) {
