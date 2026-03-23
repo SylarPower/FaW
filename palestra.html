@@ -2348,16 +2348,6 @@ function getMuscleFatigue() {
         const range = VOLUME_RANGES[g] || { mev:4, mav:10, mrv:16 };
         fatigue[g] = sets[g] / range.mrv; // >1.0 = oltre MRV → diventerà rosso
     });
-	    // DEBUG: mostra cosa conta ogni esercizio
-    console.log('=== DEBUG VOLUME ===');
-    D.days.forEach(day => {
-        day.exs.forEach(ex => {
-            const def = exDef(ex.exerciseId);
-            if (!def || def.group === 'Cardio') return;
-            console.log(ex.name, '→ primary:', def.group, '| groups:', def.groups, '| sets:', ex.sd?.length);
-        });
-    });
-    console.log('Sets per gruppo:', JSON.parse(JSON.stringify(sets)));
     return fatigue;
 }
 function getDayFatigue(day) {
@@ -2641,6 +2631,33 @@ function togEx(uid) {
                         }
                     });
                     renderMuscleMap(mmEl, exFatigue, 100);
+
+                    // DEBUG esercizio
+                    const sets = ex.sd ? ex.sd.length : 0;
+                    const rpes = (ex.sd || []).map(s => parseInt(s.rpe) || 0).filter(r => r > 0);
+                    let rpeFactor = 1.0;
+                    if (rpes.length > 0) {
+                        const avgRpe = rpes.reduce((a, b) => a + b, 0) / rpes.length;
+                        rpeFactor = 0.5 + (avgRpe / 10) * 0.6;
+                    }
+                    const effectiveSets = sets * rpeFactor;
+                    console.log('=== DEBUG ESERCIZIO ===');
+                    console.log('Nome:', ex.name);
+                    console.log('ID:', ex.exerciseId);
+                    console.log('Override?', PRIMARY_OVERRIDE[ex.exerciseId] || 'no');
+                    console.log('def.group (originale):', def.group);
+                    console.log('def.groups (tutti):', def.groups);
+                    console.log('Muscles (raw):', def.muscles);
+                    console.log('Primary (calcolato):', primary);
+                    console.log('Serie:', sets, '| RPE factor:', rpeFactor.toFixed(2), '| Effective sets:', effectiveSets.toFixed(1));
+                    console.log('Contributi:');
+                    def.groups.forEach(g => {
+                        if (g === 'Cardio') return;
+                        const isPrim = g === primary;
+                        const credit = isPrim ? effectiveSets : effectiveSets * SECONDARY_CREDIT;
+                        console.log('  ' + g + ': ' + credit.toFixed(1) + ' serie (' + (isPrim ? 'PRIMARIO ×1.0' : 'secondario ×' + SECONDARY_CREDIT) + ')');
+                    });
+                    console.log('Fatigue map (per mappa):', exFatigue);
                 }
             }
         }
