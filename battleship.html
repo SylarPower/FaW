@@ -605,10 +605,24 @@
     gap: 8px;
 }
 .grid-col .battle-grid {
-    max-width: none;
     width: 100%;
 }
-
+.grid-col .grid-section {
+    max-width: 100%;
+}
+/* ✅ Limita dimensione griglia in base alla size */
+.battle-grid.grid-small {
+    max-width: 300px;
+    margin: 0 auto;
+}
+.battle-grid.grid-medium {
+    max-width: 400px;
+    margin: 0 auto;
+}
+.battle-grid.grid-large {
+    max-width: 500px;
+    margin: 0 auto;
+}
 @media (max-width: 700px) {
     .grids-row {
         flex-direction: column;
@@ -1306,6 +1320,8 @@ let scudoGlobaleAttivo = false;
 let scudoCellaAttiva = null;    // {r,c} o null
 let selectedWeaponCells = [];  // tutte le celle coinvolte dall'arma selezionata
 let piercingDirection = 'H';   // H o V per colpo perforante
+let colpiRimastiTurno = 1;  // Normalmente 1, diventa 2 con doppio colpo
+let colpiSparatiTurno = 0;
 let torpedoMode = 'row';       // 'row' o 'col' per torpedine
 let krakenShapeIndex = 0;       // indice forma corrente per Kraken
 let piazzamentoIniziato = false;
@@ -1436,6 +1452,10 @@ function renderGrid(containerId, opts) {
     container.innerHTML = '';
     const grid = document.createElement('div');
     grid.className = 'battle-grid';
+    // ✅ Classe dimensione
+    if (opts.size <= 6) grid.classList.add('grid-small');
+    else if (opts.size <= 8) grid.classList.add('grid-medium');
+    else grid.classList.add('grid-large');
     grid.style.gridTemplateColumns = `25px repeat(${opts.size}, 1fr)`;
     grid.style.gridTemplateRows = `25px repeat(${opts.size}, 1fr)`;
 
@@ -1813,6 +1833,12 @@ function renderMiaGrigliaPiazzamento() {
         placementMode: true,
         onClick: piazzaNave
     });
+    // ✅ Centra griglia piazzamento
+    const gridEl = document.querySelector('#my-grid-container .battle-grid');
+    if (gridEl && gridSize <= 6) {
+        gridEl.style.maxWidth = '350px';
+        gridEl.style.margin = '0 auto';
+    }
 }
 // ==========================================
 // 🔄 ROTAZIONE CON TASTO DESTRO E ROTELLINA
@@ -1884,15 +1910,35 @@ function iniziaBattaglia(data) {
     const attacchiTurno = data.attacchiTurno || {};
     const hoGiaAttaccato = !!attacchiTurno[mioNome];
 
-    if (hoGiaAttaccato !== hoAttaccato || turno !== (window._lastRenderedTurno || 0)) {
-        hoAttaccato = hoGiaAttaccato;
+    // ✅ Calcola se ho finito i colpi
+    const attacchiTurno = data.attacchiTurno || {};
+    const mioAttacco1 = !!attacchiTurno[mioNome];
+    const mioAttacco2 = !!attacchiTurno[`${mioNome}_2`];
+    const colpiInviati = (mioAttacco1 ? 1 : 0) + (mioAttacco2 ? 1 : 0);
+
+    const hasDC = (data.powerups?.[mioNome]?.doppioColpo || 0) > 0;
+    const hasUR = data.powerups?.[mioNome]?.ultimoRespiro === true;
+    const colpiTotali = (hasDC || hasUR) ? 2 : 1;
+
+    colpiSparatiTurno = colpiInviati;
+    colpiRimastiTurno = colpiTotali;
+    hoAttaccato = colpiInviati >= colpiTotali;
+
+    if (turno !== (window._lastRenderedTurno || 0)) {
         if (turno !== (window._lastRenderedTurno || 0)) {
             cellaSelezionata = null;
             selectedWeapon = 'missile';
             selectedWeaponCells = [];
-            window._secondShotUsed = false;
             scudoGlobaleAttivo = false;
             scudoCellaAttiva = null;
+            piercingDirection = 'H';
+            torpedoMode = 'row';
+            colpiSparatiTurno = 0;
+
+            // ✅ Calcola colpi disponibili
+            const hasDC = (data.powerups?.[mioNome]?.doppioColpo || 0) > 0;
+            const hasUR = data.powerups?.[mioNome]?.ultimoRespiro === true;
+            colpiRimastiTurno = (hasDC || hasUR) ? 2 : 1;
         }
         window._lastRenderedTurno = turno;
     } else {
@@ -1961,15 +2007,14 @@ function renderBattaglia(data) {
     if (scudoGlobaleAttivo) fireLabel += ' + 🛡️';
     if (scudoCellaAttiva) fireLabel += ` + 🎯${COL_LABELS[scudoCellaAttiva.c]}${scudoCellaAttiva.r+1}`;
     btnFire.textContent = fireLabel;
-    // Indicatore doppio colpo
-    const hasDC = (data.powerups?.[mioNome]?.doppioColpo || 0) > 0;
-    const hasUR = data.powerups?.[mioNome]?.ultimoRespiro === true;
-    if ((hasDC || hasUR) && !hoAttaccato) {
-        if (window._secondShotUsed) {
-            btnFire.textContent = '🔥 SECONDO COLPO!';
+    if (colpiRimastiTurno > 1 && !hoAttaccato) {
+        const remaining = colpiRimastiTurno - colpiSparatiTurno;
+        if (colpiSparatiTurno > 0) {
+            btnFire.textContent = `🔥 COLPO ${colpiSparatiTurno + 1}/${colpiRimastiTurno}!`;
             btnFire.style.boxShadow = '0 0 20px rgba(241,196,15,0.5)';
         } else {
-            btnFire.textContent += ' ⚡×2';
+            btnFire.textContent += ` ⚡×${colpiRimastiTurno}`;
+            btnFire.style.boxShadow = '';
         }
     } else {
         btnFire.style.boxShadow = '';
@@ -2168,21 +2213,16 @@ function selezionaCellaAttacco(r, c, data) {
 }
 
 async function confermaAttacco() {
-    if (!cellaSelezionata || !targetSelezionato || hoAttaccato || isAnimating) return;
+    if (!cellaSelezionata || !targetSelezionato || isAnimating) return;
     if ((currentGameData.eliminati||[]).includes(mioNome)) return;
     if ((currentGameData.eliminati||[]).includes(targetSelezionato)) { alert("Non puoi attaccare un giocatore eliminato!"); return; }
+    if (colpiSparatiTurno >= colpiRimastiTurno) return;
 
-    // Verifica disponibilità arma
     if (!ARMI_CONFIG[selectedWeapon]?.unlimited) {
         if ((arsenaleLocale[selectedWeapon] || 0) <= 0) {
             alert(`${ARMI_CONFIG[selectedWeapon].name} esaurito!`);
             return;
         }
-    }
-
-    // Verifica laser non colpisce celle già scansionate
-    if (selectedWeapon === 'laser') {
-        btnFire.textContent = '🔭 SCANSIONE...';
     }
 
     btnFire.disabled = true;
@@ -2195,77 +2235,57 @@ async function confermaAttacco() {
         weaponDir: selectedWeapon === 'piercing' ? piercingDirection : (selectedWeapon === 'torpedo' ? torpedoMode : null)
     };
 
-    // Scudi
     if (scudoGlobaleAttivo) attackData.scudoGlobale = true;
     if (scudoCellaAttiva) attackData.scudoCella = { r: scudoCellaAttiva.r, c: scudoCellaAttiva.c };
 
     try {
-        const updates = {
-            [`attacchiTurno.${mioNome}`]: attackData
-        };
+        const updates = {};
 
-        // Decrementa arsenale locale
+        // ✅ Primo o secondo colpo
+        const attackKey = colpiSparatiTurno === 0
+            ? `attacchiTurno.${mioNome}`
+            : `attacchiTurno.${mioNome}_2`;
+
+        updates[attackKey] = attackData;
+
+        // Decrementa arsenale
         if (!ARMI_CONFIG[selectedWeapon]?.unlimited) {
             arsenaleLocale[selectedWeapon] = (arsenaleLocale[selectedWeapon] || 0) - 1;
-            updates[`arsenale.${mioNome}`] = { ...arsenaleLocale };
         }
         if (scudoGlobaleAttivo) {
             arsenaleLocale.scudo = (arsenaleLocale.scudo || 0) - 1;
-            updates[`arsenale.${mioNome}`] = { ...arsenaleLocale };
         }
         if (scudoCellaAttiva) {
             arsenaleLocale.scudoStratega = (arsenaleLocale.scudoStratega || 0) - 1;
-            updates[`arsenale.${mioNome}`] = { ...arsenaleLocale };
         }
-
-        // ✅ Se è il secondo colpo, aggiungi come secondo attacco
-        if (window._secondShotUsed) {
-            updates[`attacchiTurno.${mioNome}_2`] = attackData;
-            delete updates[`attacchiTurno.${mioNome}`];
-        }
+        updates[`arsenale.${mioNome}`] = { ...arsenaleLocale };
 
         await db.collection("partite").doc(matchId).update(updates);
 
-        // ✅ Doppio colpo: primo colpo non chiude il turno
-        const hasDoppioColpo = (currentGameData?.powerups?.[mioNome]?.doppioColpo || 0) > 0;
-        const hasUltimoRespiro = currentGameData?.powerups?.[mioNome]?.ultimoRespiro === true;
-        const extraShot = hasDoppioColpo || hasUltimoRespiro;
-
-        if (extraShot && !window._secondShotUsed) {
-            window._secondShotUsed = true;
-            cellaSelezionata = null;
-            selectedWeaponCells = [];
-            // Decrementa powerup su Firebase
-            if (hasDoppioColpo) {
-                const newCount = (currentGameData.powerups[mioNome].doppioColpo || 1) - 1;
-                db.collection("partite").doc(matchId).update({
-                    [`powerups.${mioNome}.doppioColpo`]: newCount
-                });
-            }
-            if (hasUltimoRespiro) {
-                db.collection("partite").doc(matchId).update({
-                    [`powerups.${mioNome}.ultimoRespiro`]: false
-                });
-            }
-            // Non segnare hoAttaccato — secondo colpo
-            renderBattaglia(currentGameData);
-            return;
-        }
-
-        hoAttaccato = true;
-        window._secondShotUsed = false;
+        colpiSparatiTurno++;
         cellaSelezionata = null;
+        selectedWeaponCells = [];
         scudoGlobaleAttivo = false;
         scudoCellaAttiva = null;
+        shieldSelectionMode = false;
         selectedWeapon = 'missile';
-        selectedWeaponCells = [];
         piercingDirection = 'H';
         torpedoMode = 'row';
-        shieldSelectionMode = false;
+
+        if (colpiSparatiTurno >= colpiRimastiTurno) {
+            // ✅ Tutti i colpi sparati — turno finito
+            hoAttaccato = true;
+        } else {
+            // ✅ Secondo colpo disponibile — resta attivo
+            hoAttaccato = false;
+            btnFire.disabled = false;
+        }
+
+        if (currentGameData) renderBattaglia(currentGameData);
+
     } catch (e) {
         console.error("Errore invio attacco:", e);
         btnFire.disabled = false;
-        btnFire.textContent = '🔥 FUOCO!';
         alert("Errore. Riprova.");
     }
 }
@@ -2583,6 +2603,12 @@ async function risolviTurno(data) {
                 } else {
                     powerups[player].ultimoRespiro = false;
                 }
+                // --- CONSUMARE DOPPIO COLPO USATO ---
+                const hadDoppioColpo = (fd.powerups?.[player]?.doppioColpo || 0) > 0;
+                const usedSecondShot = !!attacks[`${player}_2`];
+                if (hadDoppioColpo && usedSecondShot) {
+                    powerups[player].doppioColpo = Math.max(0, (powerups[player].doppioColpo || 1) - 1);
+                }
             });
 
             // =====================
@@ -2757,7 +2783,7 @@ async function animateGroupAttack(group, renderData, checkStorico, naviData) {
     if (!gridContainer) return;
 
     await waitForPaint();
-    gridContainer.scrollIntoView({ behavior: 'instant', block: 'nearest' });
+    await waitForPaint();
     await waitForPaint();
 
     const gridEl = gridContainer.querySelector('.battle-grid');
@@ -2766,22 +2792,18 @@ async function animateGroupAttack(group, renderData, checkStorico, naviData) {
     const centerCell = gridContainer.querySelector(`.cell[data-row="${group.centerR}"][data-col="${group.centerC}"]`);
     if (!centerCell) { if (gridEl) gridEl.classList.remove('grid-highlight'); return; }
 
-    await waitForPaint();
-    let centerRect = centerCell.getBoundingClientRect();
-    let targetX = centerRect.left + centerRect.width / 2;
-    let targetY = centerRect.top + centerRect.height / 2;
+    centerCell.offsetHeight; // forza reflow
 
-    await sleep(300);
+    await sleep(200);
+
+    const centerRect = centerCell.getBoundingClientRect();
+    const targetX = centerRect.left + centerRect.width / 2;
+    const targetY = centerRect.top + centerRect.height / 2;
 
     const gridRect = gridContainer.getBoundingClientRect();
     const start = getMissileStart(startDir, gridRect);
     const fakeAtk = { weapon: group.weapon, isEvent: false };
     await launchMissileToCell(start.x, start.y, targetX, targetY, startDir, fakeAtk);
-
-    // ✅ Ri-leggi posizione dopo missile
-    centerRect = centerCell.getBoundingClientRect();
-    targetX = centerRect.left + centerRect.width / 2;
-    targetY = centerRect.top + centerRect.height / 2;
 
     if (group.isLaser) {
         await playLaserScanGroup(gridContainer, group.attacks);
@@ -2908,8 +2930,9 @@ async function animateSingleAttack(atk, renderData, checkStorico) {
     const gridContainer = document.getElementById(gridContainerId);
     if (!gridContainer) return;
 
+    // ✅ TRIPLO waitForPaint per garantire layout completo
     await waitForPaint();
-    gridContainer.scrollIntoView({ behavior: 'instant', block: 'nearest' });
+    await waitForPaint();
     await waitForPaint();
 
     const gridEl = gridContainer.querySelector('.battle-grid');
@@ -2918,26 +2941,28 @@ async function animateSingleAttack(atk, renderData, checkStorico) {
     const cellEl = gridContainer.querySelector(`.cell[data-row="${atk.r}"][data-col="${atk.c}"]`);
     if (!cellEl) { if (gridEl) gridEl.classList.remove('grid-highlight'); return; }
 
-    // ✅ Posizione per LANCIO missile
-    await waitForPaint();
-    let cellRect = cellEl.getBoundingClientRect();
-    let targetX = cellRect.left + cellRect.width / 2;
-    let targetY = cellRect.top + cellRect.height / 2;
+    // ✅ Forza reflow prima di leggere posizione
+    cellEl.offsetHeight;
 
     const hasShip = cellHasShip(atk.target, atk.r, atk.c, renderData.navi);
     const ship = hasShip ? getShipAt(atk.target, atk.r, atk.c, renderData.navi) : null;
     const sunk = ship ? isShipSunk(atk.target, ship, checkStorico) : false;
 
-    await sleep(300);
+    await sleep(200);
+
+    // ✅ Leggi posizione ADESSO (dopo sleep, tutto stabile)
+    const cellRect = cellEl.getBoundingClientRect();
+    const targetX = cellRect.left + cellRect.width / 2;
+    const targetY = cellRect.top + cellRect.height / 2;
 
     const gridRect = gridContainer.getBoundingClientRect();
     const start = getMissileStart(startDir, gridRect);
     await launchMissileToCell(start.x, start.y, targetX, targetY, startDir, atk);
 
-    // ✅ Ri-leggi posizione ESATTA della cella dopo missile
-    const freshRect = cellEl.getBoundingClientRect();
-    const impactX = freshRect.left + freshRect.width / 2;
-    const impactY = freshRect.top + freshRect.height / 2;
+    // ✅ Ri-leggi posizione per esplosione (missile potrebbe aver causato scroll)
+    const impactRect = cellEl.getBoundingClientRect();
+    const impactX = impactRect.left + impactRect.width / 2;
+    const impactY = impactRect.top + impactRect.height / 2;
 
     if (sunk) {
         await playBigExplosion(impactX, impactY, ship);
@@ -3864,7 +3889,15 @@ function gestisciBattaglia(data) {
         }
     }
 
-    const tuttiAttaccato = surviving.every(p => !!attacchiTurno[p]);
+    const tuttiAttaccato = surviving.every(p => {
+        const hasDC = (data.powerups?.[p]?.doppioColpo || 0) > 0;
+        const hasUR = data.powerups?.[p]?.ultimoRespiro === true;
+        const colpiNecessari = (hasDC || hasUR) ? 2 : 1;
+        const colpo1 = !!attacchiTurno[p];
+        const colpo2 = !!attacchiTurno[`${p}_2`];
+        const colpiInviati = (colpo1 ? 1 : 0) + (colpo2 ? 1 : 0);
+        return colpiInviati >= colpiNecessari;
+    });
     if (tuttiAttaccato && surviving.length > 0) {
         const resolver = surviving.sort()[0];
         if (mioNome === resolver) risolviTurno(data);
