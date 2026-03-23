@@ -2279,14 +2279,14 @@ function renEC(ex, showDrag, dragIdx) {
 // MEV = Minimum Effective Volume, MAV = Maximum Adaptive Volume, MRV = Maximum Recoverable Volume
 // Fonte: Renaissance Periodization / Dr. Mike Israetel
 const VOLUME_RANGES = {
-    'Petto':    { mev:8,  mav:14, mrv:20 },
-    'Schiena':  { mev:10, mav:16, mrv:22 },
-    'Spalle':   { mev:6,  mav:12, mrv:18 },
-    'Gambe':    { mev:8,  mav:14, mrv:20 },
-    'Bicipiti': { mev:4,  mav:10, mrv:16 },
-    'Tricipiti':{ mev:4,  mav:10, mrv:14 },
-    'Core':     { mev:0,  mav:8,  mrv:16 },
-    'Avambracci':{ mev:0, mav:6,  mrv:12 },
+    'Petto':    { mev:10, mav:20, mrv:28 },
+    'Schiena':  { mev:10, mav:20, mrv:28 },
+    'Spalle':   { mev:14, mav:32, mrv:44 },
+    'Gambe':    { mev:10, mav:22, mrv:30 },
+    'Bicipiti': { mev:12, mav:28, mrv:38 },
+    'Tricipiti':{ mev:6,  mav:16, mrv:24 },
+    'Core':     { mev:10, mav:30, mrv:44 },
+    'Avambracci':{ mev:0, mav:6,  mrv:14 },
 };
 
 // Quanto un esercizio compound contribuisce ai muscoli secondari
