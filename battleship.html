@@ -1320,8 +1320,10 @@ let scudoGlobaleAttivo = false;
 let scudoCellaAttiva = null;    // {r,c} o null
 let selectedWeaponCells = [];  // tutte le celle coinvolte dall'arma selezionata
 let piercingDirection = 'H';   // H o V per colpo perforante
-let colpiRimastiTurno = 1;  // Normalmente 1, diventa 2 con doppio colpo
+let colpiRimastiTurno = 1;
 let colpiSparatiTurno = 0;
+let turnoCorrenteLocale = 0;
+let doppioColpoAttivo = false;
 let torpedoMode = 'row';       // 'row' o 'col' per torpedine
 let krakenShapeIndex = 0;       // indice forma corrente per Kraken
 let piazzamentoIniziato = false;
@@ -1895,44 +1897,42 @@ function iniziaBattaglia(data) {
     battleControls.classList.remove('hidden');
 
     document.getElementById('my-section-title').textContent = 'LA TUA FLOTTA';
-    statusFase.textContent = (data.eliminati||[]).includes(mioNome) ? 'Eliminato 💀' : 'Battaglia';
+    const amIEliminated = (data.eliminati || []).includes(mioNome);
+    statusFase.textContent = amIEliminated ? 'Eliminato 💀' : 'Battaglia';
 
     const turno = data.turnoCorrente || 1;
     const attacchiTurno = data.attacchiTurno || {};
-    const hoGiaAttaccato = !!attacchiTurno[mioNome];
 
-    // ✅ Calcola se ho finito i colpi
-    const mioAttacco1 = !!attacchiTurno[mioNome];
-    const mioAttacco2 = !!attacchiTurno[`${mioNome}_2`];
-    const colpiInviati = (mioAttacco1 ? 1 : 0) + (mioAttacco2 ? 1 : 0);
-
+    // ✅ Calcola doppio colpo PRIMA di determinare hoAttaccato
     const hasDC = (data.powerups?.[mioNome]?.doppioColpo || 0) > 0;
     const hasUR = data.powerups?.[mioNome]?.ultimoRespiro === true;
-    const colpiTotali = (hasDC || hasUR) ? 2 : 1;
+    doppioColpoAttivo = hasDC || hasUR;
 
-    colpiSparatiTurno = colpiInviati;
-    colpiRimastiTurno = colpiTotali;
-    hoAttaccato = colpiInviati >= colpiTotali;
+    const colpo1Inviato = !!attacchiTurno[mioNome];
+    const colpo2Inviato = !!attacchiTurno[`${mioNome}_2`];
+    const colpiInviati = (colpo1Inviato ? 1 : 0) + (colpo2Inviato ? 1 : 0);
+    const colpiNecessari = doppioColpoAttivo ? 2 : 1;
 
-    if (turno !== (window._lastRenderedTurno || 0)) {
-        if (turno !== (window._lastRenderedTurno || 0)) {
-            cellaSelezionata = null;
-            selectedWeapon = 'missile';
-            selectedWeaponCells = [];
-            scudoGlobaleAttivo = false;
-            scudoCellaAttiva = null;
-            piercingDirection = 'H';
-            torpedoMode = 'row';
-            colpiSparatiTurno = 0;
-
-            // ✅ Calcola colpi disponibili
-            const hasDC = (data.powerups?.[mioNome]?.doppioColpo || 0) > 0;
-            const hasUR = data.powerups?.[mioNome]?.ultimoRespiro === true;
-            colpiRimastiTurno = (hasDC || hasUR) ? 2 : 1;
-        }
-        window._lastRenderedTurno = turno;
+    // ✅ Nuovo turno: reset completo
+    if (turno !== turnoCorrenteLocale) {
+        turnoCorrenteLocale = turno;
+        cellaSelezionata = null;
+        selectedWeapon = 'missile';
+        selectedWeaponCells = [];
+        scudoGlobaleAttivo = false;
+        scudoCellaAttiva = null;
+        shieldSelectionMode = false;
+        piercingDirection = 'H';
+        torpedoMode = 'row';
+        colpiSparatiTurno = colpiInviati;
+        colpiRimastiTurno = colpiNecessari;
+        hoAttaccato = colpiInviati >= colpiNecessari || amIEliminated;
     } else {
-        hoAttaccato = hoGiaAttaccato;
+        // ✅ Stesso turno: aggiorna solo lo stato dei colpi dal server
+        // MA NON resettare la selezione locale
+        colpiSparatiTurno = colpiInviati;
+        colpiRimastiTurno = colpiNecessari;
+        hoAttaccato = colpiInviati >= colpiNecessari || amIEliminated;
     }
 
     renderBattaglia(data);
@@ -1974,7 +1974,6 @@ function renderBattaglia(data) {
     renderWeaponBar();
     renderShieldBar();
 
-    // Tab avversari
     const opponents = getOpponents(data);
     if (opponents.length > 1) {
         targetBar.classList.remove('hidden');
@@ -1983,37 +1982,42 @@ function renderBattaglia(data) {
         targetBar.classList.add('hidden');
     }
 
-    // Titolo sezione avversario
     const titleEl = document.getElementById('opponent-section-title');
     if (titleEl && targetSelezionato) {
         titleEl.textContent = `🎯 ${targetSelezionato} ${eliminati.includes(targetSelezionato) ? '(eliminato)' : ''}`;
     }
 
-    // Testo bottone
+    // ✅ Testo bottone
     let fireLabel = '';
     if (selectedWeapon === 'laser') fireLabel = '🔭 SCANSIONA!';
     else if (selectedWeapon === 'cluster') fireLabel = '💣 FUOCO GRAPPOLO!';
+    else if (selectedWeapon === 'piercing') fireLabel = '🔩 PERFORANTE!';
+    else if (selectedWeapon === 'torpedo') fireLabel = '🐟 TORPEDINE!';
     else fireLabel = '🔥 FUOCO!';
+
     if (scudoGlobaleAttivo) fireLabel += ' + 🛡️';
-    if (scudoCellaAttiva) fireLabel += ` + 🎯${COL_LABELS[scudoCellaAttiva.c]}${scudoCellaAttiva.r+1}`;
-    btnFire.textContent = fireLabel;
+    if (scudoCellaAttiva) fireLabel += ` + 🎯${COL_LABELS[scudoCellaAttiva.c]}${scudoCellaAttiva.r + 1}`;
+
+    // ✅ Indicatore doppio colpo
     if (colpiRimastiTurno > 1 && !hoAttaccato) {
-        const remaining = colpiRimastiTurno - colpiSparatiTurno;
         if (colpiSparatiTurno > 0) {
-            btnFire.textContent = `🔥 COLPO ${colpiSparatiTurno + 1}/${colpiRimastiTurno}!`;
+            fireLabel = `🔥 COLPO ${colpiSparatiTurno + 1}/${colpiRimastiTurno}!`;
             btnFire.style.boxShadow = '0 0 20px rgba(241,196,15,0.5)';
         } else {
-            btnFire.textContent += ` ⚡×${colpiRimastiTurno}`;
+            fireLabel += ` ⚡×${colpiRimastiTurno}`;
             btnFire.style.boxShadow = '';
         }
     } else {
         btnFire.style.boxShadow = '';
     }
-    // Stato bottone
+
+    btnFire.textContent = fireLabel;
+
+    // ✅ Stato bottone/attesa
     if (hoAttaccato) {
         btnFire.classList.add('hidden');
         waitingBar.classList.remove('hidden');
-        const submitted = Object.keys(attacchiTurno).length;
+        const submitted = Object.keys(attacchiTurno).filter(k => !k.includes('_2')).length;
         waitingText.textContent = `Attacchi: ${submitted}/${surviving.length} — attendo gli altri...`;
     } else if (amIEliminated) {
         btnFire.classList.add('hidden');
@@ -2024,7 +2028,7 @@ function renderBattaglia(data) {
         btnFire.disabled = !cellaSelezionata;
         waitingBar.classList.add('hidden');
     }
-    // Stats e powerups
+
     renderStatsBar(data);
 }
 
@@ -2204,10 +2208,14 @@ function selezionaCellaAttacco(r, c, data) {
 
 async function confermaAttacco() {
     if (!cellaSelezionata || !targetSelezionato || isAnimating) return;
-    if ((currentGameData.eliminati||[]).includes(mioNome)) return;
-    if ((currentGameData.eliminati||[]).includes(targetSelezionato)) { alert("Non puoi attaccare un giocatore eliminato!"); return; }
-    if (colpiSparatiTurno >= colpiRimastiTurno) return;
+    if ((currentGameData.eliminati || []).includes(mioNome)) return;
+    if ((currentGameData.eliminati || []).includes(targetSelezionato)) {
+        alert("Non puoi attaccare un giocatore eliminato!");
+        return;
+    }
+    if (hoAttaccato) return;
 
+    // Verifica arma
     if (!ARMI_CONFIG[selectedWeapon]?.unlimited) {
         if ((arsenaleLocale[selectedWeapon] || 0) <= 0) {
             alert(`${ARMI_CONFIG[selectedWeapon].name} esaurito!`);
@@ -2222,54 +2230,54 @@ async function confermaAttacco() {
         r: cellaSelezionata.r,
         c: cellaSelezionata.c,
         weapon: selectedWeapon,
-        weaponDir: selectedWeapon === 'piercing' ? piercingDirection : (selectedWeapon === 'torpedo' ? torpedoMode : null)
+        weaponDir: selectedWeapon === 'piercing' ? piercingDirection :
+                   (selectedWeapon === 'torpedo' ? torpedoMode : null)
     };
 
-    if (scudoGlobaleAttivo) attackData.scudoGlobale = true;
-    if (scudoCellaAttiva) attackData.scudoCella = { r: scudoCellaAttiva.r, c: scudoCellaAttiva.c };
+    // Scudi solo sul primo colpo
+    if (colpiSparatiTurno === 0) {
+        if (scudoGlobaleAttivo) attackData.scudoGlobale = true;
+        if (scudoCellaAttiva) attackData.scudoCella = { r: scudoCellaAttiva.r, c: scudoCellaAttiva.c };
+    }
+
+    // ✅ Chiave Firebase: primo o secondo colpo
+    const attackKey = colpiSparatiTurno === 0
+        ? `attacchiTurno.${mioNome}`
+        : `attacchiTurno.${mioNome}_2`;
 
     try {
         const updates = {};
-
-        // ✅ Primo o secondo colpo
-        const attackKey = colpiSparatiTurno === 0
-            ? `attacchiTurno.${mioNome}`
-            : `attacchiTurno.${mioNome}_2`;
-
         updates[attackKey] = attackData;
 
         // Decrementa arsenale
         if (!ARMI_CONFIG[selectedWeapon]?.unlimited) {
             arsenaleLocale[selectedWeapon] = (arsenaleLocale[selectedWeapon] || 0) - 1;
         }
-        if (scudoGlobaleAttivo) {
+        if (colpiSparatiTurno === 0 && scudoGlobaleAttivo) {
             arsenaleLocale.scudo = (arsenaleLocale.scudo || 0) - 1;
         }
-        if (scudoCellaAttiva) {
+        if (colpiSparatiTurno === 0 && scudoCellaAttiva) {
             arsenaleLocale.scudoStratega = (arsenaleLocale.scudoStratega || 0) - 1;
         }
         updates[`arsenale.${mioNome}`] = { ...arsenaleLocale };
 
         await db.collection("partite").doc(matchId).update(updates);
 
+        // ✅ Aggiorna stato locale
         colpiSparatiTurno++;
         cellaSelezionata = null;
         selectedWeaponCells = [];
-        scudoGlobaleAttivo = false;
-        scudoCellaAttiva = null;
-        shieldSelectionMode = false;
         selectedWeapon = 'missile';
         piercingDirection = 'H';
         torpedoMode = 'row';
 
         if (colpiSparatiTurno >= colpiRimastiTurno) {
-            // ✅ Tutti i colpi sparati — turno finito
             hoAttaccato = true;
-        } else {
-            // ✅ Secondo colpo disponibile — resta attivo
-            hoAttaccato = false;
-            btnFire.disabled = false;
+            scudoGlobaleAttivo = false;
+            scudoCellaAttiva = null;
+            shieldSelectionMode = false;
         }
+        // Se doppio colpo e primo colpo appena sparato → resta attivo
 
         if (currentGameData) renderBattaglia(currentGameData);
 
@@ -2772,28 +2780,38 @@ async function animateGroupAttack(group, renderData, checkStorico, naviData) {
     const gridContainer = document.getElementById(gridContainerId);
     if (!gridContainer) return;
 
-    await waitForPaint();
-    await waitForPaint();
-    await waitForPaint();
-
     const gridEl = gridContainer.querySelector('.battle-grid');
     if (gridEl) gridEl.classList.add('grid-highlight');
 
     const centerCell = gridContainer.querySelector(`.cell[data-row="${group.centerR}"][data-col="${group.centerC}"]`);
     if (!centerCell) { if (gridEl) gridEl.classList.remove('grid-highlight'); return; }
 
-    centerCell.offsetHeight; // forza reflow
+    const getStablePosition = (el) => {
+        return new Promise(resolve => {
+            let lastX = -1, lastY = -1, checks = 0;
+            const poll = () => {
+                const rect = el.getBoundingClientRect();
+                const x = rect.left + rect.width / 2;
+                const y = rect.top + rect.height / 2;
+                if (x === lastX && y === lastY && checks > 2) {
+                    resolve({ x, y });
+                } else {
+                    lastX = x; lastY = y; checks++;
+                    requestAnimationFrame(poll);
+                }
+            };
+            poll();
+        });
+    };
 
-    await sleep(200);
+    const centerPos = await getStablePosition(centerCell);
+    await sleep(150);
 
-    const centerRect = centerCell.getBoundingClientRect();
-    const targetX = centerRect.left + centerRect.width / 2;
-    const targetY = centerRect.top + centerRect.height / 2;
-
+    const launchPos = await getStablePosition(centerCell);
     const gridRect = gridContainer.getBoundingClientRect();
     const start = getMissileStart(startDir, gridRect);
     const fakeAtk = { weapon: group.weapon, isEvent: false };
-    await launchMissileToCell(start.x, start.y, targetX, targetY, startDir, fakeAtk);
+    await launchMissileToCell(start.x, start.y, launchPos.x, launchPos.y, startDir, fakeAtk);
 
     if (group.isLaser) {
         await playLaserScanGroup(gridContainer, group.attacks);
@@ -2809,48 +2827,49 @@ async function animateGroupAttack(group, renderData, checkStorico, naviData) {
 // 💣 ESPLOSIONE CLUSTER (croce simultanea)
 // ==========================================
 async function playClusterExplosion(gridContainer, attacks, naviData, storico) {
-    // Shake pesante
     document.body.classList.add('screen-shake-heavy');
 
-    // Per ogni cella della croce: esplosione simultanea
+    const getStablePos = (el) => {
+        return new Promise(resolve => {
+            let lastX = -1, lastY = -1, checks = 0;
+            const poll = () => {
+                const rect = el.getBoundingClientRect();
+                const x = rect.left + rect.width / 2;
+                const y = rect.top + rect.height / 2;
+                if (x === lastX && y === lastY && checks > 1) resolve({ x, y });
+                else { lastX = x; lastY = y; checks++; requestAnimationFrame(poll); }
+            };
+            poll();
+        });
+    };
+
     const explosionPromises = attacks.map(async (atk, idx) => {
         const cellEl = gridContainer.querySelector(`.cell[data-row="${atk.r}"][data-col="${atk.c}"]`);
         if (!cellEl) return;
 
-        const rect = cellEl.getBoundingClientRect();
-        const cx = rect.left + rect.width / 2;
-        const cy = rect.top + rect.height / 2;
-
-        // Delay leggero per effetto "onda"
         await sleep(idx * 80);
+
+        const pos = await getStablePos(cellEl);
 
         const hasShip = cellHasShip(atk.target, atk.r, atk.c, naviData);
         const ship = hasShip ? getShipAt(atk.target, atk.r, atk.c, naviData) : null;
         const sunk = ship ? isShipSunk(atk.target, ship, storico) : false;
 
         if (sunk) {
-            spawnFlash(cx, cy, '#f39c12', 100);
-            spawnParticleBurst(cx, cy, ['#e74c3c','#f39c12','#c0392b'], 20, 80, 600);
-            spawnImpactEmoji(cx, cy, '💥', 1.0);
+            spawnFlash(pos.x, pos.y, '#f39c12', 100);
+            spawnParticleBurst(pos.x, pos.y, ['#e74c3c', '#f39c12', '#c0392b'], 20, 80, 600);
+            spawnImpactEmoji(pos.x, pos.y, '💥', 1.0);
         } else if (hasShip) {
-            spawnFlash(cx, cy, '#e74c3c', 60);
-            spawnParticleBurst(cx, cy, ['#e74c3c','#f1c40f'], 12, 60, 500);
-            spawnImpactEmoji(cx, cy, '🔥', 0.8);
+            spawnFlash(pos.x, pos.y, '#e74c3c', 60);
+            spawnParticleBurst(pos.x, pos.y, ['#e74c3c', '#f1c40f'], 12, 60, 500);
+            spawnImpactEmoji(pos.x, pos.y, '🔥', 0.8);
         } else {
-            spawnFlash(cx, cy, 'rgba(52,152,219,0.5)', 40);
-            spawnParticleBurst(cx, cy, ['#3498db','#5dade2','#85c1e9'], 8, 50, 400);
+            spawnFlash(pos.x, pos.y, 'rgba(52,152,219,0.5)', 40);
+            spawnParticleBurst(pos.x, pos.y, ['#3498db', '#5dade2', '#85c1e9'], 8, 50, 400);
         }
     });
 
     await Promise.all(explosionPromises);
-
-    // Flash centrale grosso
-    const centerCell = gridContainer.querySelector(`.cell[data-row="${attacks[0].centerR}"][data-col="${attacks[0].centerC}"]`);
-    if (centerCell) {
-        const r = centerCell.getBoundingClientRect();
-        spawnFlash(r.left + r.width/2, r.top + r.height/2, '#f39c12', 150);
-    }
-
     setTimeout(() => document.body.classList.remove('screen-shake-heavy'), 700);
     await sleep(600);
 }
@@ -2920,46 +2939,58 @@ async function animateSingleAttack(atk, renderData, checkStorico) {
     const gridContainer = document.getElementById(gridContainerId);
     if (!gridContainer) return;
 
-    // ✅ TRIPLO waitForPaint per garantire layout completo
-    await waitForPaint();
-    await waitForPaint();
-    await waitForPaint();
-
     const gridEl = gridContainer.querySelector('.battle-grid');
     if (gridEl) gridEl.classList.add('grid-highlight');
 
     const cellEl = gridContainer.querySelector(`.cell[data-row="${atk.r}"][data-col="${atk.c}"]`);
     if (!cellEl) { if (gridEl) gridEl.classList.remove('grid-highlight'); return; }
 
-    // ✅ Forza reflow prima di leggere posizione
-    cellEl.offsetHeight;
+    // ✅ FIX DEFINITIVO: aspetta layout stabile con polling
+    const getStablePosition = () => {
+        return new Promise(resolve => {
+            let lastX = -1, lastY = -1;
+            let checks = 0;
+            const poll = () => {
+                const rect = cellEl.getBoundingClientRect();
+                const x = rect.left + rect.width / 2;
+                const y = rect.top + rect.height / 2;
+                if (x === lastX && y === lastY && checks > 2) {
+                    resolve({ x, y, rect });
+                } else {
+                    lastX = x;
+                    lastY = y;
+                    checks++;
+                    requestAnimationFrame(poll);
+                }
+            };
+            poll();
+        });
+    };
+
+    const pos = await getStablePosition();
 
     const hasShip = cellHasShip(atk.target, atk.r, atk.c, renderData.navi);
     const ship = hasShip ? getShipAt(atk.target, atk.r, atk.c, renderData.navi) : null;
     const sunk = ship ? isShipSunk(atk.target, ship, checkStorico) : false;
 
-    await sleep(200);
+    await sleep(150);
 
-    // ✅ Leggi posizione ADESSO (dopo sleep, tutto stabile)
-    const cellRect = cellEl.getBoundingClientRect();
-    const targetX = cellRect.left + cellRect.width / 2;
-    const targetY = cellRect.top + cellRect.height / 2;
+    // ✅ Ri-leggi per sicurezza (nessun scroll nel frattempo)
+    const launchPos = await getStablePosition();
 
     const gridRect = gridContainer.getBoundingClientRect();
     const start = getMissileStart(startDir, gridRect);
-    await launchMissileToCell(start.x, start.y, targetX, targetY, startDir, atk);
+    await launchMissileToCell(start.x, start.y, launchPos.x, launchPos.y, startDir, atk);
 
-    // ✅ Ri-leggi posizione per esplosione (missile potrebbe aver causato scroll)
-    const impactRect = cellEl.getBoundingClientRect();
-    const impactX = impactRect.left + impactRect.width / 2;
-    const impactY = impactRect.top + impactRect.height / 2;
+    // ✅ Posizione impatto: leggi un'ultima volta
+    const impactPos = await getStablePosition();
 
     if (sunk) {
-        await playBigExplosion(impactX, impactY, ship);
+        await playBigExplosion(impactPos.x, impactPos.y, ship);
     } else if (hasShip) {
-        await playSmallExplosion(impactX, impactY);
+        await playSmallExplosion(impactPos.x, impactPos.y);
     } else {
-        await playSplash(impactX, impactY);
+        await playSplash(impactPos.x, impactPos.y);
     }
 
     if (gridEl) gridEl.classList.remove('grid-highlight');
@@ -3866,19 +3897,18 @@ function gestisciBattaglia(data) {
 
     if (!isAnimating) {
         if (ultimoRisolto > 0 && animatingRound < ultimoRisolto) {
-            // ✅ Render con dati PRE-ROUND (senza i colpi di questo round)
             const preRoundData = {
                 ...data,
                 storicoAttacchi: (data.storicoAttacchi || []).filter(a => a.round !== ultimoRisolto)
             };
             iniziaBattaglia(preRoundData);
-            // ✅ Anima con dati COMPLETI
             playAttackAnimations(data, ultimoRisolto);
         } else {
             iniziaBattaglia(data);
         }
     }
 
+    // ✅ Check tutti hanno finito (considerando doppio colpo)
     const tuttiAttaccato = surviving.every(p => {
         const hasDC = (data.powerups?.[p]?.doppioColpo || 0) > 0;
         const hasUR = data.powerups?.[p]?.ultimoRespiro === true;
@@ -3888,6 +3918,7 @@ function gestisciBattaglia(data) {
         const colpiInviati = (colpo1 ? 1 : 0) + (colpo2 ? 1 : 0);
         return colpiInviati >= colpiNecessari;
     });
+
     if (tuttiAttaccato && surviving.length > 0) {
         const resolver = surviving.sort()[0];
         if (mioNome === resolver) risolviTurno(data);
