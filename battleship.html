@@ -1910,10 +1910,9 @@ function iniziaBattaglia(data) {
 
     const colpo1Inviato = !!attacchiTurno[mioNome];
     const colpo2Inviato = !!attacchiTurno[`${mioNome}_2`];
-    const colpiInviati = (colpo1Inviato ? 1 : 0) + (colpo2Inviato ? 1 : 0);
+    const colpiInviatiServer = (colpo1Inviato ? 1 : 0) + (colpo2Inviato ? 1 : 0);
     const colpiNecessari = doppioColpoAttivo ? 2 : 1;
 
-    // ✅ Nuovo turno: reset completo
     if (turno !== turnoCorrenteLocale) {
         turnoCorrenteLocale = turno;
         cellaSelezionata = null;
@@ -1924,15 +1923,15 @@ function iniziaBattaglia(data) {
         shieldSelectionMode = false;
         piercingDirection = 'H';
         torpedoMode = 'row';
-        colpiSparatiTurno = colpiInviati;
+
+        colpiSparatiTurno = colpiInviatiServer;
         colpiRimastiTurno = colpiNecessari;
-        hoAttaccato = colpiInviati >= colpiNecessari || amIEliminated;
+        hoAttaccato = colpiSparatiTurno >= colpiRimastiTurno || amIEliminated;
     } else {
-        // ✅ Stesso turno: aggiorna solo lo stato dei colpi dal server
-        // MA NON resettare la selezione locale
-        colpiSparatiTurno = colpiInviati;
+        // ✅ stesso turno: non peggiorare mai lo stato locale
+        colpiSparatiTurno = Math.max(colpiSparatiTurno, colpiInviatiServer);
         colpiRimastiTurno = colpiNecessari;
-        hoAttaccato = colpiInviati >= colpiNecessari || amIEliminated;
+        hoAttaccato = colpiSparatiTurno >= colpiRimastiTurno || amIEliminated;
     }
 
     renderBattaglia(data);
@@ -2000,12 +1999,12 @@ function renderBattaglia(data) {
 
     // ✅ Indicatore doppio colpo
     if (colpiRimastiTurno > 1 && !hoAttaccato) {
-        if (colpiSparatiTurno > 0) {
-            fireLabel = `🔥 COLPO ${colpiSparatiTurno + 1}/${colpiRimastiTurno}!`;
-            btnFire.style.boxShadow = '0 0 20px rgba(241,196,15,0.5)';
-        } else {
-            fireLabel += ` ⚡×${colpiRimastiTurno}`;
+        if (colpiSparatiTurno === 0) {
+            fireLabel += ` ⚡ 1/${colpiRimastiTurno}`;
             btnFire.style.boxShadow = '';
+        } else {
+            fireLabel = `🔥 SECONDO COLPO! (${colpiSparatiTurno + 1}/${colpiRimastiTurno})`;
+            btnFire.style.boxShadow = '0 0 20px rgba(241,196,15,0.5)';
         }
     } else {
         btnFire.style.boxShadow = '';
@@ -2014,15 +2013,29 @@ function renderBattaglia(data) {
     btnFire.textContent = fireLabel;
 
     // ✅ Stato bottone/attesa
-    if (hoAttaccato) {
-        btnFire.classList.add('hidden');
-        waitingBar.classList.remove('hidden');
-        const submitted = Object.keys(attacchiTurno).filter(k => !k.includes('_2')).length;
-        waitingText.textContent = `Attacchi: ${submitted}/${surviving.length} — attendo gli altri...`;
-    } else if (amIEliminated) {
+    const hoFinitoDavvero = colpiSparatiTurno >= colpiRimastiTurno;
+
+    if (amIEliminated) {
         btnFire.classList.add('hidden');
         waitingBar.classList.remove('hidden');
         waitingText.textContent = '💀 Sei stato eliminato. Osserva la battaglia!';
+    } else if (hoFinitoDavvero) {
+        btnFire.classList.add('hidden');
+        waitingBar.classList.remove('hidden');
+
+        const submitted = surviving.filter(p => {
+            const hasDC = (data.powerups?.[p]?.doppioColpo || 0) > 0;
+            const hasUR = data.powerups?.[p]?.ultimoRespiro === true;
+            const colpiNecessari = (hasDC || hasUR) ? 2 : 1;
+
+            const colpo1 = !!attacchiTurno[p];
+            const colpo2 = !!attacchiTurno[`${p}_2`];
+            const colpiInviati = (colpo1 ? 1 : 0) + (colpo2 ? 1 : 0);
+
+            return colpiInviati >= colpiNecessari;
+        }).length;
+
+        waitingText.textContent = `Attacchi completati: ${submitted}/${surviving.length} — attendo gli altri...`;
     } else {
         btnFire.classList.remove('hidden');
         btnFire.disabled = !cellaSelezionata;
@@ -2271,15 +2284,28 @@ async function confermaAttacco() {
         piercingDirection = 'H';
         torpedoMode = 'row';
 
-        if (colpiSparatiTurno >= colpiRimastiTurno) {
-            hoAttaccato = true;
-            scudoGlobaleAttivo = false;
-            scudoCellaAttiva = null;
-            shieldSelectionMode = false;
-        }
-        // Se doppio colpo e primo colpo appena sparato → resta attivo
+        // Gli scudi si consumano comunque dopo il primo invio turno
+        scudoGlobaleAttivo = false;
+        scudoCellaAttiva = null;
+        shieldSelectionMode = false;
 
-        if (currentGameData) renderBattaglia(currentGameData);
+        // ✅ Solo se ho finito TUTTI i colpi vado in attesa
+        hoAttaccato = colpiSparatiTurno >= colpiRimastiTurno;
+
+        if (currentGameData) {
+            // Aggiorna subito il dato locale per evitare attesa sbagliata
+            const localAttacchiTurno = { ...(currentGameData.attacchiTurno || {}) };
+            if (colpiSparatiTurno === 1) {
+                localAttacchiTurno[mioNome] = attackData;
+            } else {
+                localAttacchiTurno[`${mioNome}_2`] = attackData;
+            }
+
+            renderBattaglia({
+                ...currentGameData,
+                attacchiTurno: localAttacchiTurno
+            });
+        }
 
     } catch (e) {
         console.error("Errore invio attacco:", e);
@@ -3913,10 +3939,12 @@ function gestisciBattaglia(data) {
         const hasDC = (data.powerups?.[p]?.doppioColpo || 0) > 0;
         const hasUR = data.powerups?.[p]?.ultimoRespiro === true;
         const colpiNecessari = (hasDC || hasUR) ? 2 : 1;
+
         const colpo1 = !!attacchiTurno[p];
         const colpo2 = !!attacchiTurno[`${p}_2`];
         const colpiInviati = (colpo1 ? 1 : 0) + (colpo2 ? 1 : 0);
-        return colpiInviati >= colpiNecessari;
+
+        return colpiInviati === colpiNecessari;
     });
 
     if (tuttiAttaccato && surviving.length > 0) {
