@@ -1750,7 +1750,7 @@
 			  console.log("🔄 Inizio caricamento dizionario...");
 			  loadingMsg.style.display = 'flex';
 			  try {
-			    const urls = ['https://raw.githubusercontent.com/napolux/paroleitaliane/refs/heads/main/paroleitaliane/280000_parole_italiane.txt', 'https://raw.githubusercontent.com/napolux/paroleitaliane/refs/heads/main/paroleitaliane/9000_nomi_propri.txt'];
+			    const urls = ['./dizionario.txt'];
 			    console.log("📡 Download file dizionari...");
 			    const fetchWithTimeout = (url, timeout = 15000) => {
 			      return Promise.race([
