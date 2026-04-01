@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pig Racing 🐷🏎️</title>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{overflow:hidden;background:#000;font-family:'Segoe UI',sans-serif;color:#eee;user-select:none}
+        canvas#rc{position:fixed;top:0;left:0;z-index:0}
+        .overlay{position:fixed;inset:0;display:flex;justify-content:center;align-items:center;z-index:100;background:rgba(0,0,0,0.92)}
+        .menu-box{background:#1e1e1e;padding:40px;border-radius:20px;border:2px solid #333;max-width:520px;width:92%;text-align:center}
+        .menu-box h1{color:#03dac6;font-size:2.2rem;margin-bottom:5px}
+        .menu-box h2{color:#03dac6;margin-bottom:15px}
+        .menu-box p{opacity:0.6;margin-bottom:20px;font-size:0.9rem}
+        .opt-row{display:flex;justify-content:space-between;align-items:center;margin:10px 0;gap:10px}
+        .opt-row label{font-weight:bold;font-size:0.9rem;white-space:nowrap}
+        .opt-row select{flex:1;padding:10px;background:#2c2c2c;color:#eee;border:1px solid #444;border-radius:6px;font-size:0.95rem}
+        .btn{padding:12px 24px;border-radius:8px;border:1px solid #555;background:#1e1e1e;color:#eee;cursor:pointer;font-weight:bold;font-size:1rem;transition:all .15s}
+        .btn:hover{background:#2d2d2d;transform:scale(1.03)}
+        .btn:active{transform:scale(0.97)}
+        .btn-go{background:#e74c3c!important;color:#fff!important;border:none!important;font-size:1.3rem;padding:15px 50px;margin:10px 5px;animation:pulse 1.5s infinite}
+        .btn-home{background:#444!important;margin:10px 5px}
+        @keyframes pulse{0%,100%{box-shadow:0 0 10px rgba(231,76,60,0.4)}50%{box-shadow:0 0 25px rgba(231,76,60,0.8)}}
+        #hud{position:fixed;top:0;left:0;right:0;bottom:0;z-index:10;pointer-events:none;display:none}
+        .hud-tl{position:absolute;top:15px;left:20px}
+        .hud-tc{position:absolute;top:15px;left:50%;transform:translateX(-50%)}
+        .hud-tr{position:absolute;top:15px;right:20px}
+        .hud-br{position:absolute;bottom:20px;right:20px}
+        .hud-bl{position:absolute;bottom:20px;left:20px}
+        .hud-box{background:rgba(0,0,0,0.7);padding:8px 14px;border-radius:8px;backdrop-filter:blur(4px)}
+        #pos-display{font-size:2.8rem;font-weight:900;color:#f1c40f;text-shadow:2px 2px 4px #000}
+        #pos-suffix{font-size:1.2rem;vertical-align:super}
+        #lap-display{font-size:1.1rem;font-weight:bold}
+        #speed-display{font-size:1.3rem;font-weight:bold}
+        #item-slot{width:60px;height:60px;background:rgba(0,0,0,0.8);border:3px solid #555;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:2.2rem;transition:border-color .2s}
+        #item-slot.has-item{border-color:#f1c40f;animation:itemPulse .5s}
+        @keyframes itemPulse{0%{transform:scale(1)}50%{transform:scale(1.2)}100%{transform:scale(1)}}
+        #minimap-canvas{border:2px solid rgba(255,255,255,0.3);border-radius:8px;background:rgba(0,0,0,0.6)}
+        #countdown-screen{z-index:200;background:rgba(0,0,0,0.6)}
+        #countdown-text{font-size:12rem;font-weight:900;color:#f1c40f;text-shadow:0 0 40px rgba(241,196,15,0.6)}
+        .results-box{background:linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%);padding:40px;border-radius:20px;border:3px solid #f1c40f;max-width:500px;width:92%;text-align:center}
+        .results-box h2{color:#f1c40f;font-size:2rem;margin-bottom:20px}
+        .result-row{display:flex;justify-content:space-between;align-items:center;padding:10px 15px;margin:5px 0;border-radius:8px;font-size:1.05rem}
+        .result-row.gold{background:rgba(241,196,15,0.15);border:1px solid #f1c40f}
+        .result-row.silver{background:rgba(192,192,192,0.1);border:1px solid #999}
+        .result-row.bronze{background:rgba(205,127,50,0.1);border:1px solid #cd7f32}
+        .medal{font-size:1.5rem;margin-right:10px}
+        .result-name{font-weight:bold;flex:1;text-align:left}
+        .result-time{opacity:0.8;font-family:monospace}
+        .lobby-box{background:#1e1e1e;padding:30px;border-radius:15px;border:2px solid #333;max-width:450px;width:90%;text-align:center}
+        .lobby-player{padding:10px;margin:5px 0;background:#252525;border-radius:6px;display:flex;justify-content:space-between;align-items:center}
+        .lobby-ready{color:#2ecc71;font-weight:bold}
+        .lobby-waiting{color:#f39c12}
+        .wrong-way{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);font-size:3rem;font-weight:900;color:#e74c3c;text-shadow:0 0 20px rgba(231,76,60,0.8);z-index:50;display:none;pointer-events:none}
+        #stun-overlay{position:fixed;inset:0;z-index:15;pointer-events:none;display:none}
+        .stun-stars{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:4rem;animation:spinStars 0.5s linear infinite}
+        @keyframes spinStars{from{transform:translate(-50%,-50%) rotate(0deg)}to{transform:translate(-50%,-50%) rotate(360deg)}}
+        .boost-lines{position:fixed;inset:0;z-index:12;pointer-events:none;display:none;background:linear-gradient(90deg,transparent 0%,rgba(241,196,15,0.05) 40%,rgba(241,196,15,0.1) 50%,rgba(241,196,15,0.05) 60%,transparent 100%)}
+        #race-info{position:fixed;top:60px;left:50%;transform:translateX(-50%);z-index:20;pointer-events:none;display:none}
+        .race-msg{background:rgba(0,0,0,0.8);color:#f1c40f;padding:8px 20px;border-radius:20px;font-weight:bold;font-size:0.9rem}
+    </style>
+</head>
+<body>
+    <canvas id="rc"></canvas>
+
+    <!-- HUD -->
+    <div id="hud">
+        <div class="hud-tl">
+            <div class="hud-box"><span id="pos-display">1</span><span id="pos-suffix">°</span></div>
+        </div>
+        <div class="hud-tc">
+            <div class="hud-box"><span id="lap-display">Giro 1/3</span></div>
+        </div>
+        <div class="hud-tr">
+            <div class="hud-box"><span id="speed-display">0 km/h</span></div>
+        </div>
+        <div class="hud-br" style="display:flex;flex-direction:column;align-items:flex-end;gap:10px;">
+            <div id="item-slot">-</div>
+            <canvas id="minimap-canvas" width="170" height="170"></canvas>
+        </div>
+        <div class="hud-bl">
+            <div class="hud-box" id="race-standings" style="font-size:0.8rem;min-width:140px;"></div>
+        </div>
+    </div>
+
+    <!-- Wrong Way Warning -->
+    <div id="wrong-way" class="wrong-way">⚠️ CONTROMANO!</div>
+
+    <!-- Stun Overlay -->
+    <div id="stun-overlay"><div class="stun-stars">⭐🌟💫</div></div>
+
+    <!-- Boost Lines -->
+    <div id="boost-lines" class="boost-lines"></div>
+
+    <!-- Race Info -->
+    <div id="race-info"><div class="race-msg" id="race-msg-text"></div></div>
+
+    <!-- Main Menu -->
+    <div id="menu-screen" class="overlay">
+        <div class="menu-box">
+            <h1>🐷 PIG RACING 🏎️</h1>
+            <p>Corri con i maialini!</p>
+            <div class="opt-row"><label>🏁 Pista:</label><select id="sel-track">
+                <option value="porcile">Circuito Porcile (Facile)</option>
+                <option value="prosciutto">Monte Prosciutto (Medio)</option>
+                <option value="pancetta">Vulcano Pancetta (Difficile)</option>
+            </select></div>
+            <div class="opt-row"><label>🔄 Giri:</label><select id="sel-laps">
+                <option value="1">1 Giro</option>
+                <option value="3" selected>3 Giri</option>
+                <option value="5">5 Giri</option>
+            </select></div>
+            <div class="opt-row"><label>🤖 Bot:</label><select id="sel-bots">
+                <option value="0">Nessuno</option>
+                <option value="1">1 Bot</option>
+                <option value="2">2 Bot</option>
+                <option value="3" selected>3 Bot</option>
+                <option value="4">4 Bot</option>
+            </select></div>
+            <div class="opt-row"><label>📊 Difficoltà:</label><select id="sel-diff">
+                <option value="easy">Facile</option>
+                <option value="medium" selected>Medio</option>
+                <option value="hard">Difficile</option>
+            </select></div>
+            <div style="margin-top:20px;">
+                <button class="btn btn-go" onclick="Game.startSolo()">🏁 VIA!</button>
+            </div>
+            <button class="btn btn-home" onclick="window.location.href='index.html'">🏠 HOME</button>
+        </div>
+    </div>
+
+    <!-- Lobby -->
+    <div id="lobby-screen" class="overlay" style="display:none;">
+        <div class="lobby-box">
+            <h2 style="color:#03dac6;">🏎️ SALA D'ATTESA</h2>
+            <div id="lobby-players"></div>
+            <p id="lobby-status" style="margin-top:15px;color:#f39c12;"></p>
+            <div style="margin-top:15px;">
+                <button class="btn" id="btn-lobby-ready" onclick="Game.setReady()" style="background:#2ecc71!important;color:#000!important;">✅ PRONTO</button>
+                <button class="btn btn-home" onclick="window.location.href='index.html'">🏠 HOME</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Countdown -->
+    <div id="countdown-screen" class="overlay" style="display:none;">
+        <div id="countdown-text"></div>
+    </div>
+
+    <!-- Results -->
+    <div id="results-screen" class="overlay" style="display:none;">
+        <div class="results-box">
+            <div style="font-size:4rem;margin-bottom:10px;">🏁</div>
+            <h2>RISULTATI</h2>
+            <div id="results-list"></div>
+            <div style="margin-top:25px;">
+                <button class="btn btn-go" onclick="Game.restart()" style="font-size:1rem;padding:12px 30px;">🔄 RIVINCITA</button>
+                <button class="btn btn-home" onclick="window.location.href='index.html'">🏠 HOME</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const firebaseConfig={apiKey:"AIzaSyCNo7o2Ft22JDEyJ97BspE3Kur5DNAPKQc",authDomain:"funatwork-cd237.firebaseapp.com",projectId:"funatwork-cd237",storageBucket:"funatwork-cd237.firebasestorage.app",messagingSenderId:"798226885203",appId:"1:798226885203:web:ce83f4d9e96b82266274a6"};
+        firebase.initializeApp(firebaseConfig);
+        const db=firebase.firestore();
+        const urlParams=new URLSearchParams(window.location.search);
+        const matchId=urlParams.get('matchId');
+        let mioNome=localStorage.getItem('mioNome')||'PLAYER';
+        if(!mioNome&&matchId){alert("Effettua il login.");window.location.href="index.html";}
+        if(!mioNome)mioNome='PLAYER';
+    </script>
+    <script src="racing.js"></script>
+</body>
+</html>
