@@ -529,9 +529,9 @@
 						<div class="game-card" onclick="selezionaGioco('pictionary', this)" id="game-pictionary">
 						    <span style="font-size:2rem;">🎨</span><br>Pictionary
 						</div>
-						<div class="game-card" onclick="selezionaGioco('gameof15', this)" id="game-gameof15">
+						<!--<div class="game-card" onclick="selezionaGioco('gameof15', this)" id="game-gameof15">
 						    <span style="font-size:2rem;">🧩</span><br>Gioco del 15
-						</div>
+						</div>-->
 						<div class="game-card" onclick="window.location.href='palestra.html'" id="game-palestra">
 						    <span style="font-size:2rem;">🏋️</span><br>Palestra
 						</div>
@@ -540,6 +540,9 @@
 						</div>
 						<div class="game-card" style="opacity:0.3; cursor:not-allowed; pointer-events:none;">
 						    <span style="font-size:2rem;">❌</span><br>Prossimamente
+						</div>
+						<div class="game-card" onclick="selezionaGioco('racing', this)" id="game-racing">
+						    <span style="font-size:2rem;">🐷</span><br>Pig Racing
 						</div>
 						<!--<div class="game-card" onclick="window.location.href='test.html'" id="game-test">
 						    <span style="font-size:2rem;">❌</span><br>Test
@@ -652,7 +655,8 @@
 			    pictionary: [],
 			    neonwar: [],
 			    gameof15: [],
-			    battleship: []
+			    battleship: [],
+			    racing: []
 			};
 			// ✅ CONFIGURAZIONE GIOCHI (aggiungi qui nuovi giochi)
 			const GIOCHI_CONFIG = {
@@ -833,6 +837,37 @@ battleship: {
     minGiocatori: 2,
     maxGiocatori: 8
 },
+racing: {
+    nome: "Pig Racing",
+    icona: "🐷",
+    opzioni: [
+        {
+            id: "laps",
+            label: "Giri",
+            default: "3",
+            valori: [
+                { value: "1", label: "1 Giro" },
+                { value: "3", label: "3 Giri" },
+                { value: "5", label: "5 Giri" }
+            ]
+        },
+        {
+            id: "track",
+            label: "Pista",
+            default: "porcile",
+            valori: [
+                { value: "porcile", label: "Circuito Porcile" },
+                { value: "prosciutto", label: "Monte Prosciutto" },
+                { value: "pancetta", label: "Vulcano Pancetta" }
+            ]
+        }
+    ],
+    modalita: [
+        { id: "classic", label: "CLASSICA 🏁", colore: "#e74c3c", testo: "white" }
+    ],
+    minGiocatori: 1,
+    maxGiocatori: 4
+},
 			  // Aggiungerai qui altri giochi in futuro
 			};
 			// Debug helper
@@ -986,19 +1021,23 @@ partiteCache.ruzzle = [];
 partiteCache.neonwar = [];
 partiteCache.gameof15 = [];
 partiteCache.battleship = [];
+partiteCache.racing = [];
 			
-			snap.forEach(doc => {
-			    const data = { id: doc.id, ...doc.data() };
-			    if (data.gioco === 'neonwar') {
-			        partiteCache.neonwar.push(data);
-			    } else if (data.gioco === 'gameof15') {
-			        partiteCache.gameof15.push(data);
-			    } else if (data.gioco === 'battleship') {
-			        partiteCache.battleship.push(data);
-			    } else {
-			        partiteCache.ruzzle.push(data);
-			    }
-			});
+	snap.forEach(doc => {
+	    const data = { id: doc.id, ...doc.data() };
+	
+	    if (data.gioco === 'neonwar') {
+	        partiteCache.neonwar.push(data);
+	    } else if (data.gioco === 'gameof15') {
+	        partiteCache.gameof15.push(data);
+	    } else if (data.gioco === 'battleship') {
+	        partiteCache.battleship.push(data);
+	    } else if (data.gioco === 'racing') {
+	        partiteCache.racing.push(data);
+	    } else {
+	        partiteCache.ruzzle.push(data);
+	    }
+	});
             
             renderTutteLePartite();
         });
@@ -1088,6 +1127,8 @@ partiteCache.gameof15.forEach(p => renderPartitaRuzzle(p, div));
 // Render Battaglia Navale
 partiteCache.battleship.forEach(p => renderPartitaBattleship(p, div));
 
+partiteCache.racing.forEach(p => renderPartitaRuzzle(p, div));
+	
 // Render Pictionary
 partiteCache.pictionary.forEach(p => renderPartitaPictionary(p, div));
 }
@@ -1560,7 +1601,68 @@ function renderPartitaBattleship(p, div) {
 			        mostraToast(`❌ Massimo ${config.maxGiocatori} giocatori`);
 			        return;
 			    }
-			    
+if (giocoSelezionato === 'racing') {
+    showLoadingBanner('Creazione gara Pig Racing...');
+
+    try {
+        const partecipanti = [mioNome, ...Array.from(amiciSelezionati)];
+
+        const pts = {};
+        const words = {};
+        partecipanti.forEach(p => {
+            pts[p] = 0;
+            words[p] = [];
+        });
+
+        const doc = await db.collection("partite").add({
+            gioco: 'racing',
+            partecipanti,
+            punteggi: pts,
+            parole: words,
+            pronti: [],
+            finito: [],
+            confermaVerifica: [],
+            stato: "attesa",
+            rivincitaAccettataDa: [],
+            rivincitaRifiutataDa: [],
+            timestamp: Date.now(),
+            dataOra: new Date().toLocaleString('it-IT', {
+                day: '2-digit',
+                month: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            }),
+            opzioni: {
+                mode: modalitaId || 'classic',
+                laps: parseInt(opzioni.laps || 3),
+                track: opzioni.track || 'porcile',
+                seed: Math.random().toString(36).substring(2).toUpperCase()
+            },
+            racingState: {
+                started: false,
+                finished: false,
+                trackId: opzioni.track || 'porcile',
+                totalLaps: parseInt(opzioni.laps || 3),
+                players: {},
+                events: {},
+                worldItems: {},
+                itemBoxes: {},
+                results: []
+            }
+        });
+
+        amiciSelezionati.clear();
+        document.querySelectorAll('.user-item.selected').forEach(el => el.classList.remove('selected'));
+        aggiornaBottoneSfida();
+
+        showSuccessBanner(doc.id);
+    } catch (e) {
+        console.error("❌ Errore creazione Racing:", e);
+        removeGameBanner();
+        mostraToast('❌ Errore creazione gara');
+    }
+    return;
+}			    
 // ✅ GESTIONE SPECIFICA PER PICTIONARY (CORRETTA)
 if (giocoSelezionato === 'pictionary') {
     showLoadingBanner('Creazione sfida Pictionary...');
