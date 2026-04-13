@@ -3728,18 +3728,37 @@ function toggleStopwatch() {
 }
 
 function startStopwatch() {
-    swRunning = true;
-    swStartTime = Date.now() - swElapsed;
-    const btn = document.getElementById('sesSwBtn');
     const timeEl = document.getElementById('sesSwTime');
-    const resetBtn = document.getElementById('sesSwReset');
-    btn.textContent = '⏸ Stop';
-    btn.classList.add('active');
+    const btn = document.getElementById('sesSwBtn');
+    
+    // Countdown 3-2-1
+    let countdown = 3;
+    timeEl.textContent = countdown;
     timeEl.style.display = 'block';
-    timeEl.classList.add('running');
-    resetBtn.style.display = 'none';
-    swIntervalId = setInterval(updateStopwatch, 100);
-    if (navigator.vibrate) navigator.vibrate(15);
+    timeEl.style.color = 'var(--yel)';
+    timeEl.style.fontSize = '2rem';
+    
+    const countInterval = setInterval(() => {
+        countdown--;
+        if (countdown > 0) {
+            timeEl.textContent = countdown;
+            if (navigator.vibrate) navigator.vibrate(50);
+        } else {
+            clearInterval(countInterval);
+            timeEl.style.color = 'var(--acc)';
+            timeEl.style.fontSize = '1.8rem';
+            
+            // Ora parte il cronometro vero
+            swRunning = true;
+            swStartTime = Date.now();
+            swElapsed = 0;
+            btn.textContent = '⏸ Stop';
+            btn.classList.add('active');
+            timeEl.classList.add('running');
+            swIntervalId = setInterval(updateStopwatch, 100);
+            if (navigator.vibrate) navigator.vibrate([30, 50, 30]);
+        }
+    }, 1000);
 }
 
 function stopStopwatch() {
