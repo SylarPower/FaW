@@ -1,5 +1,4 @@
 import { ARENAS, arenaById } from "./arenas.js";
-import { audio } from "./audio.js";
 import { POWER_DEFS } from "./powerups.js";
 import { net, isFirebaseConfigured, codeFromSeed } from "./net.js";
 import { PNAME, TRI_SIDES, DUEL_SIDES } from "./players.js";
@@ -250,7 +249,6 @@ export class UI {
     this.hook();
     this.root.querySelectorAll("[data-arena]").forEach((btn) => {
       btn.addEventListener("click", () => {
-        audio.confirm();
         this.showBrief(btn.dataset.arena, vsCPU);
       });
     });
@@ -284,7 +282,7 @@ export class UI {
       return `
         <button class="pw-pick ${on ? "on" : ""}" data-power="${id}">
           <span class="pw-dot" style="background:${hex};box-shadow:0 0 10px ${hex}"></span>
-          <span class="pw-pick-name">${p.name}</span>
+          <span class="pw-pick-name"><span class="pw-glyph" style="color:${hex}">${p.glyph || ""}</span> ${p.name}</span>
           <span class="pw-pick-desc">${p.desc}</span>
         </button>`;
     }).join("");
@@ -337,7 +335,6 @@ export class UI {
 
     this.root.querySelectorAll("[data-cst]").forEach((b) => {
       b.addEventListener("click", () => {
-        audio.ui();
         const k = b.dataset.cst;
         let v = b.dataset.val;
         if (k === "target") v = Number.parseInt(v, 10);
@@ -347,7 +344,6 @@ export class UI {
     });
     this.root.querySelectorAll("[data-power]").forEach((b) => {
       b.addEventListener("click", () => {
-        audio.ui();
         const id = b.dataset.power;
         const i = this._custom.powers.indexOf(id);
         if (i >= 0) this._custom.powers.splice(i, 1);
@@ -355,10 +351,9 @@ export class UI {
         this.showCustom();
       });
     });
-    this.root.querySelector("#cstNone").onclick = () => { audio.ui(); this._custom.powers = []; this.showCustom(); };
-    this.root.querySelector("#cstAll").onclick = () => { audio.ui(); this._custom.powers = Object.keys(POWER_DEFS); this.showCustom(); };
+    this.root.querySelector("#cstNone").onclick = () => { this._custom.powers = []; this.showCustom(); };
+    this.root.querySelector("#cstAll").onclick = () => { this._custom.powers = Object.keys(POWER_DEFS); this.showCustom(); };
     this.root.querySelector("#cstGo").onclick = async () => {
-      audio.confirm();
       const cfg = this._custom;
       await this.createRoom({
         mode: "duel",
@@ -397,7 +392,6 @@ export class UI {
       </div>`));
     this.hook();
     this.root.querySelector("[data-start]").addEventListener("click", async () => {
-      audio.confirm();
       if (vsCPU) this.game.beginMatch(id, { vsCPU: true });
       else await this.createRoom({ mode: "duel", arenaId: id, seats: 2 });
     });
@@ -466,7 +460,6 @@ export class UI {
     const go = async () => {
       const code = this.root.querySelector("#code").value;
       try {
-        audio.confirm();
         await net.join(code, this.game.save.nick || "Ospite");
         this.game.online = true;
         this.showLobby();
@@ -544,7 +537,6 @@ export class UI {
       </div>`));
 
     this.root.querySelector("#leaveLobby").onclick = async () => {
-      audio.ui();
       await net.leave();
       this.game.online = false;
       this.showMain();
@@ -560,7 +552,6 @@ export class UI {
       }
     });
     this.root.querySelector("#goPlay")?.addEventListener("click", async () => {
-      audio.confirm();
       const id = meta.arenaId || this._pendingArena || (seats === 3 ? "triangle" : "classic");
       const settings = meta.settings || {};
       for (let i = 0; i < seats; i++) {
@@ -643,7 +634,7 @@ export class UI {
     el.innerHTML = list.map((pid, i) => {
       const d = POWER_DEFS[pid];
       const sel = i === mgr.selected[side];
-      return `<div class="slot ${sel ? "ready" : ""}">${d?.name || pid}</div>`;
+      return `<div class="slot ${sel ? "ready" : ""}">${d?.glyph ? d.glyph + " " : ""}${d?.name || pid}</div>`;
     }).join("");
   }
 
@@ -665,9 +656,9 @@ export class UI {
         </div>
       </div>`);
     this.root.appendChild(overlay);
-    overlay.querySelector("[data-act=resume]").onclick = () => { audio.ui(); game.resume(); };
-    overlay.querySelector("[data-act=rematch]")?.addEventListener("click", () => { audio.ui(); game.rematch(); });
-    overlay.querySelector("[data-act=leave]").onclick = () => { audio.ui(); game.forfeit(); this.showTitle(); };
+    overlay.querySelector("[data-act=resume]").onclick = () => { game.resume(); };
+    overlay.querySelector("[data-act=rematch]")?.addEventListener("click", () => { game.rematch(); });
+    overlay.querySelector("[data-act=leave]").onclick = () => { game.forfeit(); this.showTitle(); };
   }
 
   hidePause() { document.getElementById("pauseScr")?.remove(); }
@@ -693,9 +684,9 @@ export class UI {
           </div>
         </div>
       </div>`));
-    this.root.querySelector("[data-act=again]")?.addEventListener("click", () => { audio.confirm(); game.rematch(); });
-    this.root.querySelector("[data-act=play]").onclick = () => { audio.ui(); game.forfeit(); this.showMain(); };
-    this.root.querySelector("[data-act=title]").onclick = () => { audio.ui(); game.forfeit(); this.showTitle(); };
+    this.root.querySelector("[data-act=again]")?.addEventListener("click", () => { game.rematch(); });
+    this.root.querySelector("[data-act=play]").onclick = () => { game.forfeit(); this.showMain(); };
+    this.root.querySelector("[data-act=title]").onclick = () => { game.forfeit(); this.showTitle(); };
   }
 
   showOptions() {
@@ -753,7 +744,6 @@ export class UI {
     this.hook();
     this.root.querySelectorAll("[data-opt]").forEach((b) => {
       b.addEventListener("click", () => {
-        audio.ui();
         const key = b.dataset.opt;
         let val = b.dataset.val;
         if (val === "true") val = true;
@@ -770,7 +760,6 @@ export class UI {
       });
     });
     this.root.querySelector("[data-act=unlock]").onclick = () => {
-      audio.confirm();
       this.game.save.unlocked = ARENAS.map((a) => a.id);
       this.game.persist();
       this.toast("Tutte le arene sono aperte.");
@@ -831,7 +820,7 @@ export class UI {
         <div class="pw-card${unused ? " pw-unused" : ""}">
           <div class="pw-head">
             <span class="pw-dot" style="background:${hex};box-shadow:0 0 12px ${hex}"></span>
-            <h4>${p.name}</h4>
+            <h4><span class="pw-glyph" style="color:${hex}">${p.glyph || ""}</span> ${p.name}</h4>
             ${p.hold ? `<span class="pw-flag">TIENI PREMUTO</span>` : ""}
           </div>
           <p class="pw-desc">${p.desc}</p>
@@ -884,7 +873,6 @@ export class UI {
   }
 
   async onAct(act) {
-    audio.ui();
     if (act === "play") this.showMain();
     if (act === "title") this.showTitle();
     if (act === "opt") this.showOptions();

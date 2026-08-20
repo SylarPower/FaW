@@ -12,8 +12,7 @@ games/<nome>/
 └── js/
     ├── ai.js
     ├── arenas.js
-    ├── audio.js
-    ├── engine.js
+        ├── engine.js
     ├── game.js
     ├── input.js
     ├── main.js

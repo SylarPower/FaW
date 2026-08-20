@@ -1,7 +1,6 @@
 import { Engine } from "./engine.js";
 import { World, Ball, rand } from "./physics.js";
 import { Particles, BallTrail } from "./particles.js";
-import { audio } from "./audio.js";
 import { input } from "./input.js";
 import { updateAI, SKILL } from "./ai.js";
 import { PowerUpManager, applyPower, POWER_DEFS } from "./powerups.js";
@@ -195,7 +194,6 @@ export class Game {
     this.cd = 3.2;
     this.serveDir = Math.random() < 0.5 ? 1 : -1;
     this.showMsg("3", 1.2);
-    audio.countdown();
     this.ui.showHUD(this);
   }
 
@@ -265,7 +263,6 @@ export class Game {
 
   spawnExtraBall(from) {
     const b = this.spawnBall({ from, color: 0xfff4c8, colorId: from.colorId });
-    audio.pop();
     this.particles.burst(from.x, 0.3, from.z, 0xffffff, 14, 4);
     this.showMsg("MULTI", 0.45);
     return b;
@@ -282,7 +279,6 @@ export class Game {
 
   update(dt) {
     input.update();
-    audio.update(dt, this.rally / 12);
 
     if (this.msgT > 0) {
       this.msgT -= dt;
@@ -319,11 +315,10 @@ export class Game {
       // La durata (1.2s) e' > della fase (1s) perche' il messaggio non svanisca
       // prima del numero successivo.
       const n = this.cd > 2.2 ? "3" : this.cd > 1.2 ? "2" : this.cd > 0.2 ? "1" : null;
-      if (n && this.msg !== n) { this.showMsg(n, 1.2); audio.countdown(); }
+      if (n && this.msg !== n) { this.showMsg(n, 1.2); }
       if (this.cd <= 0) {
         this.state = "play";
         this.showMsg("VIA!", 0.5);
-        audio.go();
         this.serve(this.serveDir);
       }
       this.drivePaddles(dt);
@@ -384,13 +379,12 @@ export class Game {
       if (ev.type === "hit") {
         this.rally++;
         const spd = ev.ball.speed();
-        audio.hit(Math.min(1, spd / 18));
         this.engine.kick(0.08 + spd * 0.006);
         this.particles.spark(ev.ball.x, 0.3, ev.ball.z, 1, this.sideColor(ev.paddle.side));
         if (ev.paddle.mesh) ev.paddle.mesh.scale.z = 1.12;
         fx.push("hit");
       }
-      if (ev.type === "wall") { audio.wall(); fx.push("wall"); }
+      if (ev.type === "wall") { fx.push("wall"); }
       if (ev.type === "score") {
         if (this.triangle) {
           const scorer = ev.ball.lastHit;
@@ -403,7 +397,6 @@ export class Game {
         fx.push("score");
       }
       if (ev.type === "powerup") {
-        audio.powerup();
         this.ui.updateHUD(this);
       }
       if (ev.type === "powerhit") {
@@ -490,7 +483,6 @@ export class Game {
     const id = this.powers.consume(side);
     if (!id) return;
     applyPower(id, side, { world: this.world, features: this.ctrl.features, engine: this.engine });
-    audio.powerup();
     const def = POWER_DEFS[id];
     this.showMsg(def?.name || id, 0.6);
     this.ui.updateHUD(this);
@@ -526,7 +518,6 @@ export class Game {
           b.held = true;
           b.holder = p;
           p.heldBall = b;
-          audio.whoosh();
           break;
         }
       }
@@ -544,7 +535,6 @@ export class Game {
     b.vz = s * spd + rand(-1.2, 1.2);
     b.ghost = 0.08;
     p.heldBall = null;
-    audio.hit(0.8);
   }
 
   scorePoint(scorer, opts = {}) {
@@ -555,7 +545,6 @@ export class Game {
     this.scores[scorer]++;
     this.rally = 0;
     this.serveDir = scorer === "left" || scorer === "bottom" || scorer === "west" ? 1 : -1;
-    audio.score(scorer);
     this.engine.kick(0.32);
     const hex = "#" + this.sideColor(scorer).toString(16).padStart(6, "0");
     this.engine.flash(this.flashEl, hex, 90);
@@ -610,11 +599,10 @@ export class Game {
     const win = this.winnerSide();
     const iWon = win === this.localSide;
     if (iWon) {
-      audio.win();
       this.unlockNext();
       if (!this.save.cleared.includes(this.arenaId)) this.save.cleared.push(this.arenaId);
       this.persist();
-    } else audio.lose();
+    }
     this.publishSnap();
     this.ui.showResult(this, iWon, win);
   }
@@ -704,7 +692,6 @@ export class Game {
     }
     this.scores = snap.sc || this.scores;
     if (snap.st && snap.st !== this.state && snap.st !== "pause") {
-      if (snap.st === "play" && this.state === "countdown") audio.go();
       this.state = snap.st;
     }
     if (snap.msg && snap.msg !== this.msg) this.showMsg(snap.msg, 0.6);
@@ -727,10 +714,8 @@ export class Game {
         b.x = sb.x; b.z = sb.z; b.vx = sb.vx; b.vz = sb.vz; b.alive = true; b.held = !!sb.h;
       });
     }
-    if (snap.fx?.includes("hit")) audio.hit(0.6);
-    if (snap.fx?.includes("wall")) audio.wall();
+    // Un punto segnato dall'host: aggiorna il tabellone anche per l'ospite.
     if (snap.fx?.includes("score")) {
-      audio.score("left");
       this.ui.updateHUD(this);
     }
   }

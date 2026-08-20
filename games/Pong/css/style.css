@@ -344,3 +344,6 @@ h2.section {
   .center-msg { font-size: 44px; }
   .back { top: 14px; left: 14px; }
 }
+
+/* Simbolo del potere, uguale a quello sul gettone in campo */
+.pw-glyph { display: inline-block; font-weight: 700; }

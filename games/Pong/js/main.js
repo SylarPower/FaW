@@ -1,6 +1,5 @@
 import { Game } from "./game.js";
 import { UI } from "./ui.js";
-import { audio } from "./audio.js";
 import { input } from "./input.js";
 import { net } from "./net.js";
 import { applyThemeToUI } from "./themes.js";
@@ -32,7 +31,6 @@ function boot() {
   ui.bind(game);
   // Il tema salvato deve colorare menu e HUD gia' dalla prima schermata.
   applyThemeToUI(game.save.options.theme);
-  audio.init();
 
   const params = new URLSearchParams(window.location.search);
   const matchId = params.get("matchId");
@@ -40,7 +38,6 @@ function boot() {
   else ui.showTitle();
 
   const unlock = async () => {
-    await audio.resume();
     window.removeEventListener("pointerdown", unlock);
     window.removeEventListener("keydown", unlock);
   };

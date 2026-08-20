@@ -316,18 +316,115 @@ export function makeGoalFrame(width, height, color) {
   return g;
 }
 
-export function makePowerToken(color, glyph = "●") {
+/**
+ * Disegna il simbolo di un power-up su una texture, cosi' il gettone in campo
+ * dice subito QUALE potere e', non solo che c'e' un potere.
+ */
+function powerGlyphTexture(glyph, color) {
+  const S = 128;
+  const cvs = document.createElement("canvas");
+  cvs.width = cvs.height = S;
+  const c = cvs.getContext("2d");
+  const hex = "#" + color.toString(16).padStart(6, "0");
+
+  // pastiglia scura: fa risaltare il simbolo sul colore acceso del disco
+  c.beginPath();
+  c.arc(S / 2, S / 2, S * 0.46, 0, Math.PI * 2);
+  c.fillStyle = "rgba(6, 8, 14, 0.92)";
+  c.fill();
+  c.lineWidth = S * 0.06;
+  c.strokeStyle = hex;
+  c.stroke();
+
+  c.font = `700 ${S * 0.5}px "Outfit", system-ui, sans-serif`;
+  c.textAlign = "center";
+  c.textBaseline = "middle";
+  c.fillStyle = "#ffffff";
+  c.shadowColor = hex;
+  c.shadowBlur = S * 0.18;
+  c.fillText(glyph, S / 2, S * 0.54);
+
+  const tex = new THREE.CanvasTexture(cvs);
+  tex.anisotropy = 4;
+  return tex;
+}
+
+/** Etichetta col nome del potere, da mostrare sotto il gettone. */
+function powerLabelSprite(text, color) {
+  const W = 256, H = 64;
+  const cvs = document.createElement("canvas");
+  cvs.width = W; cvs.height = H;
+  const c = cvs.getContext("2d");
+  const hex = "#" + color.toString(16).padStart(6, "0");
+
+  const label = String(text).toUpperCase();
+  c.font = `700 ${H * 0.46}px "Outfit", system-ui, sans-serif`;
+  const tw = c.measureText(label).width;
+  const pad = H * 0.28;
+  const bw = Math.min(W, tw + pad * 2), bx = (W - bw) / 2;
+
+  c.beginPath();
+  if (c.roundRect) c.roundRect(bx, H * 0.18, bw, H * 0.64, H * 0.32);
+  else c.rect(bx, H * 0.18, bw, H * 0.64);
+  c.fillStyle = "rgba(6, 8, 14, 0.85)";
+  c.fill();
+  c.lineWidth = 2;
+  c.strokeStyle = hex;
+  c.stroke();
+
+  c.font = `700 ${H * 0.46}px "Outfit", system-ui, sans-serif`;
+  c.textAlign = "center";
+  c.textBaseline = "middle";
+  c.fillStyle = hex;
+  c.fillText(label, W / 2, H * 0.52);
+
+  const tex = new THREE.CanvasTexture(cvs);
+  tex.anisotropy = 4;
+  return tex;
+}
+
+export function makePowerToken(color, glyph = "?", label = "") {
   const g = new THREE.Group();
   const disc = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.32, 0.32, 0.08, 20),
+    new THREE.CylinderGeometry(0.34, 0.34, 0.08, 24),
     new THREE.MeshStandardMaterial({
       color, emissive: color, emissiveIntensity: 0.85, metalness: 0.3, roughness: 0.25
     })
   );
   disc.rotation.x = Math.PI / 2;
+
+  // Il simbolo e' un billboard: game.js lo tiene rivolto alla telecamera.
+  const badge = new THREE.Sprite(
+    new THREE.SpriteMaterial({
+      map: powerGlyphTexture(glyph, color),
+      transparent: true,
+      depthTest: false
+    })
+  );
+  badge.scale.set(0.62, 0.62, 1);
+  badge.position.y = 0.34;
+  badge.renderOrder = 5;
+
   const glow = new THREE.PointLight(color, 1.2, 4);
-  g.add(disc, glow);
+  g.add(disc, badge, glow);
+
+  if (label) {
+    const tag = new THREE.Sprite(
+      new THREE.SpriteMaterial({
+        map: powerLabelSprite(label, color),
+        transparent: true,
+        depthTest: false
+      })
+    );
+    tag.scale.set(1.15, 0.29, 1);
+    tag.position.y = -0.16;
+    tag.renderOrder = 5;
+    g.add(tag);
+    g.userData.tag = tag;
+  }
+
   g.userData.disc = disc;
+  g.userData.badge = badge;
   return g;
 }
 

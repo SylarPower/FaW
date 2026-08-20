@@ -399,6 +399,17 @@ export class World {
 
   collideBallPaddle(b, p) {
     if (b.ghost > 0) return false;
+
+    // La palla ha gia' superato il piano di gioco della racchetta? Allora e'
+    // un punto in arrivo: non deve piu' essere colpita, altrimenti il rimbalzo
+    // forzato qui sotto la rispedisce in campo e il punto non viene assegnato.
+    // (Solo per le racchette "dritte": quelle su un lato del triangolo hanno
+    // una normale propria e usano il controllo generico.)
+    if (!p.edge) {
+      if (p.side === "left" && b.x < p.x - p.hw) return false;
+      if (p.side === "right" && b.x > p.x + p.hw) return false;
+    }
+
     const closestX = clamp(b.x, p.x - p.hw, p.x + p.hw);
     const closestZ = clamp(b.z, p.z - p.hd, p.z + p.hd);
     const dx = b.x - closestX;
@@ -418,8 +429,13 @@ export class World {
     }
     const rel = clamp((b.z - p.z) / p.hd, -1, 1);
     b.vz += rel * 6.5 + p.vz * 0.35;
-    if (p.side === "left" && b.vx < 1.5) b.vx = Math.abs(b.vx) + 1.2;
-    if (p.side === "right" && b.vx > -1.5) b.vx = -Math.abs(b.vx) - 1.2;
+    // Spinta minima verso il campo avversario, così la palla non resta
+    // "incollata" alla racchetta. Applicata solo se la palla è davanti alla
+    // racchetta (per le racchette dritte il controllo sopra lo garantisce già).
+    if (!p.edge) {
+      if (p.side === "left" && b.vx < 1.5) b.vx = Math.abs(b.vx) + 1.2;
+      if (p.side === "right" && b.vx > -1.5) b.vx = -Math.abs(b.vx) - 1.2;
+    }
 
     let spd = b.speed();
     let boost = 1.035;
