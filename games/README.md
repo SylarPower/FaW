@@ -25,4 +25,6 @@ games/<nome>/
     └── ui.js
 ```
 
+Esempio già collegato: `games/Pong/`.
+
 Collega il gioco dall'hub (`../../index.html` → `GAME_PATHS` + card + `GIOCHI_CONFIG`).

@@ -16,7 +16,8 @@ FaW/
     ├── pictionary/index.html
     ├── gameof15/index.html
     ├── neonwar/index.html
-    └── palestra/index.html
+    ├── palestra/index.html
+    └── Pong/                 # index.html + css/ + js/
 ```
 
 Ogni gioco vive nella propria cartella. L'hub punta a `games/<nome>/index.html`.

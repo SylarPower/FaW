@@ -532,6 +532,9 @@
 						<div class="game-card" onclick="selezionaGioco('gameof15', this)" id="game-gameof15">
 						    <span style="font-size:2rem;">🧩</span><br>Gioco del 15
 						</div>
+						<div class="game-card" onclick="selezionaGioco('pong', this)" id="game-pong">
+						    <span style="font-size:2rem;">🏓</span><br>Pong
+						</div>
 						<div class="game-card" onclick="window.location.href='games/palestra/index.html'" id="game-palestra">
 						    <span style="font-size:2rem;">🏋️</span><br>Palestra
 						</div>
@@ -643,7 +646,8 @@
 			    pictionary: 'games/pictionary/index.html',
 			    gameof15: 'games/gameof15/index.html',
 			    neonwar: 'games/neonwar/index.html',
-			    palestra: 'games/palestra/index.html'
+			    palestra: 'games/palestra/index.html',
+			    pong: 'games/Pong/index.html'
 			};
 			function gameHref(gioco, query) {
 			    const base = GAME_PATHS[gioco] || ('games/' + gioco + '/index.html');
@@ -653,7 +657,8 @@
 			    ruzzle: [],
 			    pictionary: [],
 			    neonwar: [],
-			    gameof15: []
+			    gameof15: [],
+			    pong: []
 			};
 			// ✅ CONFIGURAZIONE GIOCHI (aggiungi qui nuovi giochi)
 			const GIOCHI_CONFIG = {
@@ -810,6 +815,40 @@ gameof15: {
     minGiocatori: 1,
     maxGiocatori: 8
 },
+pong: {
+    nome: "Pong",
+    icona: "🏓",
+    opzioni: [
+        {
+            id: "target",
+            label: "Punti",
+            default: "7",
+            valori: [
+                { value: "5", label: "5 punti" },
+                { value: "7", label: "7 punti" },
+                { value: "11", label: "11 punti" }
+            ]
+        },
+        {
+            id: "arena",
+            label: "Arena",
+            default: "neon",
+            valori: [
+                { value: "neon", label: "Neon Club" },
+                { value: "dusk", label: "Sunset" },
+                { value: "ice", label: "Ice Rink" },
+                { value: "arcade", label: "Arcade" }
+            ]
+        }
+    ],
+    modalita: [
+        { id: "classic", label: "CLASSICA 🏓", colore: "#00ffc8", testo: "#000" },
+        { id: "power", label: "POWER-UP ⚡", colore: "#ffd166", testo: "#000" },
+        { id: "hardcore", label: "HARDCORE", colore: "#ff2bd6", testo: "white" }
+    ],
+    minGiocatori: 2,
+    maxGiocatori: 2
+},
 			  // Aggiungerai qui altri giochi in futuro
 			};
 			// Debug helper
@@ -962,11 +1001,13 @@ function listen() {
 partiteCache.ruzzle = [];
 partiteCache.neonwar = [];
 partiteCache.gameof15 = [];
+partiteCache.pong = [];
 			
 	snap.forEach(doc => {
 	    const data = { id: doc.id, ...doc.data() };
 	    if (data.gioco === 'neonwar') partiteCache.neonwar.push(data);
 	    else if (data.gioco === 'gameof15') partiteCache.gameof15.push(data);
+	    else if (data.gioco === 'pong') partiteCache.pong.push(data);
 	    else if (data.gioco !== 'pictionary') partiteCache.ruzzle.push(data);
 	});
             
@@ -1024,6 +1065,7 @@ function renderTutteLePartite() {
     
 // Render Gioco del 15
 partiteCache.gameof15.forEach(p => renderPartitaRuzzle(p, div));
+partiteCache.pong.forEach(p => renderPartitaRuzzle(p, div));
 
 // Render Pictionary
 partiteCache.pictionary.forEach(p => renderPartitaPictionary(p, div));
