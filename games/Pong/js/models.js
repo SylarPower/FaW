@@ -40,12 +40,12 @@ export function makePaddle(color, hw, hd, hh, theme = {}) {
     buildSushi(art, mat);
   } else if (style === "viking") {
     buildVikingShip(art, mat);
-  } else if (style === "western") {
-    buildWesternBarrel(art, mat);
   } else if (style === "airhockey") {
     buildAirHockey(art, mat, color, hw, hd);
   } else if (style === "baseball") {
     buildBaseball(art, mat);
+  } else if (style === "spiaggia") {
+    buildDefault(art, mat, color, theme, style);
   } else {
     buildDefault(art, mat, color, theme, style);
   }
@@ -203,15 +203,16 @@ function buildDefault(body, mat, color, theme, style) {
 }
 
 function buildBoot(body, leather, hw, hd) {
-  // SCARPA DA CALCIO "in piedi", vista di profilo: silhouette classica con
-  // tallone, collo della caviglia, tomaia che scivola verso la punta
-  // arrotondata, suola con tacchetti, lacci e triple strisce.
-  // La scarpa è larga quanto una scarpa vera: il bordo verso il centro campo
-  // resta allineato alla hitbox, il resto sporge un po' FUORI dal campo.
+  // CALCIO: blocco d'oro delle dimensioni corrette della racchetta,
+  // con sopra appoggiata una scarpa da calcio ben disegnata e distinguibile.
+  const goldMat = new THREE.MeshStandardMaterial({
+    color: 0xffd700, metalness: 0.85, roughness: 0.15,
+    emissive: 0xffa500, emissiveIntensity: 0.45
+  });
   const dark = new THREE.MeshStandardMaterial({ color: 0x171b20, roughness: 0.82 });
-  const soleMat = new THREE.MeshStandardMaterial({ color: 0x0c0e11, roughness: 0.95 });
+  const soletMat = new THREE.MeshStandardMaterial({ color: 0x0c0e11, roughness: 0.9 });
   const white = new THREE.MeshStandardMaterial({ color: 0xf2efe6, roughness: 0.55 });
-  const laceMat = new THREE.MeshStandardMaterial({ color: 0xf7f4ea, roughness: 0.6 });
+  const laceMat = new THREE.MeshStandardMaterial({ color: 0xf7f4ea, roughness:0.6 });
   const studMat = new THREE.MeshStandardMaterial({ color: 0xd8dce2, metalness: 0.6, roughness: 0.35 });
 
   // --- profilo della scarpa (x = lunghezza, y = altezza) ---
@@ -426,67 +427,7 @@ function buildVikingShip(body, _mat) {
   body.add(hull, deck, keel, mast, sailCloth, redStripe, dragonGrp, tail);
 }
 
-function buildWesternBarrel(body, _mat) {
-  // BOTTE da saloon: doghe di legno disposte attorno alla linea di porta,
-  // cerchi di ferro, fondi in legno e stella da sceriffo dorata sopra. Le
-  // doghe formano un cilindro (rotondo in coordinate mondo, non nella targa
-  // art): il bordo che tocca il centro campo resta sulla hitbox e la pancia
-  // della botte esce leggermente verso l'esterno.
-  const woodA = new THREE.MeshStandardMaterial({ color: 0x9a5a26, roughness: 0.92 });
-  const woodB = new THREE.MeshStandardMaterial({ color: 0x7f471c, roughness: 0.95 });
-  const capMat = new THREE.MeshStandardMaterial({ color: 0x5e3413, roughness: 0.95 });
-  const iron = new THREE.MeshStandardMaterial({ color: 0x3d434c, metalness: 0.75, roughness: 0.5 });
-  const brass = new THREE.MeshStandardMaterial({ color: 0xd4a84a, metalness: 0.85, roughness: 0.28, emissive: 0x5c3a08, emissiveIntensity: 0.22 });
 
-  // Ellisse in art che diventa un cerchio in mondo (X e Y scalano diverso).
-  const RX = 0.85, RY = 0.66, T = 0.11;
-  const CX = 0.5 - RX - T; // punto più interno della botte sulla hitbox
-  // La botte ROTOLA sul tavolo: alziamo tutto finché il fondo tocca il piano.
-  const barrel = new THREE.Group();
-  barrel.position.y = RY + T - 0.46;
-  body.add(barrel);
-  const N = 8;
-  for (let i = 0; i < N; i++) {
-    const a = (i / N) * Math.PI * 2;
-    // Spessore (T*2) lungo il raggio, larghezza (0.84) lungo la tangente.
-    const stave = new THREE.Mesh(new THREE.BoxGeometry(T * 2, 0.84, 0.98), i % 2 ? woodA : woodB);
-    stave.position.set(CX + Math.cos(a) * RX, Math.sin(a) * RY, 0);
-    stave.rotation.z = a;
-    barrel.add(stave);
-  }
-
-  // Cerchi di ferro che stringono le doghe (il segno distintivo della botte).
-  for (const z of [-0.30, 0.0, 0.30]) {
-    const hoop = new THREE.Mesh(new THREE.TorusGeometry(RX + T, 0.06, 8, 22), iron);
-    hoop.scale.y = (RY + T) / (RX + T);
-    hoop.position.set(CX, 0, z);
-    barrel.add(hoop);
-  }
-
-  // Fondi in legno più scuro alle due estremità.
-  for (const z of [-0.47, 0.47]) {
-    const cap = new THREE.Mesh(new THREE.CylinderGeometry(RX, RX, 0.05, 18), capMat);
-    cap.rotation.x = Math.PI / 2;
-    cap.scale.y = 1;
-    cap.scale.x = 1;
-    cap.scale.z = RY / RX;
-    cap.position.set(CX, 0, z);
-    barrel.add(cap);
-  }
-
-  // Stella da sceriffo a cinque punte, inchiodata sul fianco alto della botte.
-  // (In coordinate art Z "pesa" 5× più di X: la schiacciamo per avere una
-  // stella rotonda vista dall'alto.)
-  const star = new THREE.Mesh(starGeometry(0.26, 0.11, 0.05), brass);
-  star.rotation.x = -Math.PI / 2;
-  star.scale.y = 0.19;
-  star.position.set(CX, RY + T + 0.04, 0.12);
-  barrel.add(star);
-  const nail = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.05, 8), iron);
-  nail.scale.z = 0.19;
-  nail.position.set(CX, RY + T + 0.06, 0.12);
-  barrel.add(nail);
-}
 
 /** Stella a cinque punte come geometria estrusa (per lo sceriffo). */
 function starGeometry(outer, inner, depth) {
@@ -669,30 +610,60 @@ export function makeBall(color = 0xffffff, r = 0.22, theme = {}) {
     wrap.rotation.y = Math.PI / 2;
     wrap.position.x = 0.05;
     deco.add(handle, blade, wrap);
-  } else if (style === "sushi") {
-    // NIGIRI: blocco di riso ovale, fetta di salmone sopra, fascia di nori.
-    const rice = new THREE.MeshStandardMaterial({ color: 0xf5efdc, roughness: 0.7 });
-    const nori = new THREE.MeshStandardMaterial({ color: 0x10181a, roughness: 0.9 });
-    const fish = new THREE.MeshStandardMaterial({ color: 0xff7a6a, roughness: 0.5, emissive: 0x601a10, emissiveIntensity: 0.15 });
-    const avo  = new THREE.MeshStandardMaterial({ color: 0x7dc268, roughness: 0.6 });
-    const riceBlob = new THREE.Mesh(new THREE.SphereGeometry(0.78, 18, 14), rice);
-    riceBlob.scale.set(1.05, 0.72, 0.9);
-    const fishTop = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.16, 0.78), fish);
-    fishTop.position.y = 0.4;
-    // Venature bianche sul salmone (sottili striscioline).
-    for (let i = 0; i < 4; i++) {
-      const vein = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.02, 0.72), rice);
-      vein.position.set(-0.3 + i * 0.2, 0.49, 0);
-      deco.add(vein);
+  } else if (style === "sushi" || style === "shrimp") {
+    // GAMBERO ARROTOLATO: corpo arcuato a forma di "e" con coda a ventaglio, antenne e occhi.
+    const shrimpBody = new THREE.MeshStandardMaterial({ color: 0xff6a4a, roughness: 0.55, emissive: 0xff3a1a, emissiveIntensity: 0.15 });
+    const shrimpTail = new THREE.MeshStandardMaterial({ color: 0xff8866, roughness: 0.5 });
+    const shrimpEye  = new THREE.MeshBasicMaterial({ color: 0x000000 });
+    const shrimpAnt  = new THREE.MeshStandardMaterial({ color: 0xcc5544, roughness: 0.7 });
+    // Corpo: segmenti arrotondati che formano un arco (gambero arrotolato)
+    const bodyGroup = new THREE.Group();
+    const segs = 5;
+    for (let i = 0; i < segs; i++) {
+      const t = i / (segs - 1);
+      const ang = t * Math.PI * 0.7 - 0.1;
+      const seg = new THREE.Mesh(new THREE.SphereGeometry(0.2 - t*0.05, 8, 6), shrimpBody);
+      seg.position.set(Math.sin(ang) * 0.45, Math.cos(ang) * 0.4 - 0.15, (t - 0.5) * 0.3);
+      seg.scale.set(1 - t*0.15, 0.65 + t*0.1, 0.7);
+      bodyGroup.add(seg);
     }
-    const band = new THREE.Mesh(new THREE.TorusGeometry(0.72, 0.07, 6, 22), nori);
-    band.rotation.x = Math.PI / 2;
-    band.position.y = -0.1;
-    // Un puntino di wasabi verde per rendere il tema subito riconoscibile.
-    const wasabi = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 6), avo);
-    wasabi.scale.set(0.8, 0.6, 0.8);
-    wasabi.position.set(-0.3, 0.5, -0.2);
-    deco.add(riceBlob, fishTop, band, wasabi);
+    // Coda a ventaglio
+    for (let j = 0; j < 4; j++) {
+      const tailFan = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.18, 4), shrimpTail);
+      tailFan.rotation.z = (j / 4) * Math.PI * 2;
+      tailFan.position.set(-0.45, -0.05, (j - 1.5) * 0.06);
+      tailFan.rotation.x = -0.3;
+      bodyGroup.add(tailFan);
+    }
+    // Testa
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 6), shrimpBody);
+    head.position.set(0.42, 0.25, 0);
+    head.scale.set(1, 0.75, 0.8);
+    // Occhi
+    for (const s of [-1, 1]) {
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.04, 6, 5), shrimpEye);
+      eye.position.set(0.5, 0.32, s * 0.08);
+      bodyGroup.add(eye);
+    }
+    // Antenne
+    for (const s of [-1, 1]) {
+      const ant = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.015, 0.25, 4), shrimpAnt);
+      ant.rotation.z = -0.5 * s;
+      ant.rotation.x = 0.4 * s;      ant.position.set(0.55, 0.38, s * 0.1);
+      bodyGroup.add(ant);
+    }
+    bodyGroup.add(head);
+    // Strisce orizontai della cottura
+    const stripeMat = new THREE.MeshBasicMaterial({ color:  0xcc4422, transparent: true, opacity: 0.3 });
+    for (let i = 0; i < 4; i++) {
+      const t = i / 4;
+      const ang = t * Math.PI * 0.7 - 0.1;
+      const stripe = new THREE.Mesh(new THREE.TorusGeometry(0.18 - t*0.03, 0.015, 4, 8), stripeMat);
+      stripe.rotation.y = Math.PI / 2;
+      stripe.position.set(Math.sin(ang) * 0.45, Math.cos(ang) * 0.4 - 0.15, 0);
+      bodyGroup.add(stripe);
+    }
+    deco.add(bodyGroup);
   } else if (style === "jungle") {
     // Noce di cocco con tre "solchi" scuri.
     const shell = new THREE.MeshStandardMaterial({ color: 0x5a3818, roughness: 0.95 });
@@ -732,6 +703,17 @@ export function makeBall(color = 0xffffff, r = 0.22, theme = {}) {
     const ink = new THREE.Mesh(geo("ball-mono", () => new THREE.SphereGeometry(0.9, 18, 12)),
       new THREE.MeshStandardMaterial({ color: 0xf5f1e8, roughness: 0.4 }));
     deco.add(ink);
+  } else if (style === "spiaggia") {
+    // Pallone da spiaggia colorato
+    const beachBall = new THREE.Mesh(new THREE.SphereGeometry(0.92, 18, 14),
+      new THREE.MeshStandardMaterial({ color: 0xff6a3d, roughness: 0.6 }));
+    const stripeMat = new THREE.MeshBasicMaterial({ color: 0x4dc9f0 });
+    for (let i = 0; i < 3; i++) {
+      const stripe = new THREE.Mesh(new THREE.TorusGeometry(0.7, 0.06, 6, 24), stripeMat);
+      stripe.rotation.x = (i / 3) * Math.PI;
+      deco.add(stripe);
+    }
+    deco.add(beachBall);
   } else {
     const plain = new THREE.Mesh(geo("ball-plain", () => new THREE.SphereGeometry(0.9, 20, 14)), mat);
     deco.add(plain);
@@ -795,7 +777,7 @@ export function tickBallMesh(mesh, vx, vz, dt) {
 // ============================================================
 const surfaceTextures = new Map();
 function surfaceTexture(style) {
-  const styles = ["jungle", "boot", "airhockey", "baseball", "western", "sushi", "viking"];
+  const styles = ["jungle", "boot", "airhockey", "baseball", "western", "sushi", "viking", "spiaggia"];
   if (!styles.includes(style)) return null;
   if (surfaceTextures.has(style)) return surfaceTextures.get(style);
   const S = 256;
@@ -841,6 +823,12 @@ function surfaceTexture(style) {
       c.fillStyle = `rgba(255,255,255,${Math.random() * 0.04})`;
       c.fillRect(Math.random() * S, Math.random() * S, 1, 1);
     }
+  } else if (style === "spiaggia") {
+    c.fillStyle = "#d4a76b"; c.fillRect(0, 0, S, S);
+    for (let y = 0; y < S; y += 4) {
+      c.fillStyle = `rgba(200,160,100,${0.02 + Math.random() * 0.06})`;
+      c.fillRect(0, y, S, 2);
+    }
   } else {
     c.fillStyle = style === "boot" ? "#a8c59d" : "#a3b68b";
     c.fillRect(0, 0, S, S);
@@ -883,7 +871,7 @@ function themedStandardMaterial(color, theme = {}, extra = {}) {
 
 function rimMaterial(lineColor, theme) {
   const style = theme.style || "neon";
-  const woodStyles = ["jungle", "viking", "western", "sushi"];
+  const woodStyles = ["jungle", "viking", "western", "sushi", "spiaggia"];
   return new THREE.MeshStandardMaterial({
     color: woodStyles.includes(style) ? 0x2a180a : (style === "boot" ? 0xe7e1d4 : (style === "ice" ? 0xffffff : 0x0a0c12)),
     metalness: (style === "neon" || style === "ice") ? 0.7 : 0,
@@ -1242,13 +1230,14 @@ export function makeGoalCelebration(scene, x, color) {
 }
 
 // Particelle d'urto a tema (chiamate quando la palla colpisce una racchetta).
-export function impactParticles(scene, x, z, theme, color) {
+export function impactParticles(scene, x, z, theme, color, paddle) {
   const style = theme.style || "neon";
   let particles = null;
   if (style === "colori") {
     // Tema COLORI: ogni tocco sulla racchetta è uno splash di un colore
     // casuale fatto di una forma casuale, più una macchia piatta sul tavolo.
-    particles = makeColorSplash(scene, x, z);
+    // Inoltre lascia una macchia sulla racchetta.
+    particles = makeColorSplash(scene, x, z, paddle);
   } else if (style === "jungle") {
     particles = makeBurst(scene, x, z, [0x6fae3a, 0x3c6824, 0x9bd25d], { leaf: true });
   } else if (style === "sushi") {
@@ -1316,7 +1305,7 @@ const SPLASH_SHAPES = [
   (r) => new THREE.OctahedronGeometry(r * 1.3)        // rombo
 ];
 
-function makeColorSplash(scene, x, z) {
+function makeColorSplash(scene, x, z, paddle) {
   const items = [];
   const color = SPLASH_COLORS[(Math.random() * SPLASH_COLORS.length) | 0];
   const shape = SPLASH_SHAPES[(Math.random() * SPLASH_SHAPES.length) | 0];
@@ -1366,6 +1355,27 @@ function makeColorSplash(scene, x, z) {
     const d = 0.5 + Math.random() * 0.45;
     splat(x + Math.cos(a) * d, z + Math.sin(a) * d, 0.07 + Math.random() * 0.1);
   }
+
+  // Macchia sulla racchetta: un cerchietto colorato sulla faccia anteriore.
+  if (paddle && paddle.mesh) {
+    const body = paddle.mesh.userData?.body;
+    if (body) {
+      const stainR = 0.08 + Math.random() * 0.06;
+      const stainGeo = new THREE.CircleGeometry(stainR, 12);
+      const stainMat = new THREE.MeshBasicMaterial({
+        color, transparent: true, opacity: 0.85, depthWrite: false
+      });
+      const stain = new THREE.Mesh(stainGeo, stainMat);
+      stain.rotation.y = Math.PI / 2;
+      stain.position.set(0.52, (Math.random() - 0.5) * 0.4, (Math.random() - 0.5) * 0.5);
+      body.add(stain);
+      items.push({
+        mesh: stain, static: true, spread: false, onPaddle: true,
+        life: 3.0 + Math.random() * 1.0, age: 0
+      });
+    }
+  }
+
   return items;
 }
 
@@ -1380,7 +1390,11 @@ export function updateBurst(items, dt, scene) {
       p.mesh.material.opacity = Math.max(0, t * t * 0.92);
       p.mesh.scale.setScalar(p.spread ? 0.7 + 0.3 * (1 - t) : 1);
       if (p.age >= p.life) {
-        scene.remove(p.mesh);
+        if (p.onPaddle) {
+          if (p.mesh.parent) p.mesh.parent.remove(p.mesh);
+        } else {
+          scene.remove(p.mesh);
+        }
         p.mesh.geometry.dispose();
         p.mesh.material.dispose();
         items.splice(i, 1);
