@@ -1,7 +1,7 @@
 import { ARENAS, arenaById } from "./arenas.js";
 import { audio } from "./audio.js";
 import { POWER_DEFS } from "./powerups.js";
-import { net, isFirebaseConfigured } from "./net.js";
+import { net, isFirebaseConfigured, codeFromSeed } from "./net.js";
 import { PNAME, TRI_SIDES, DUEL_SIDES } from "./players.js";
 
 export class UI {
@@ -47,6 +47,109 @@ export class UI {
     const b = document.getElementById("loadbar");
     if (b) b.style.width = `${Math.floor(p * 100)}%`;
   }
+
+
+
+  async fetchPortalSettings(matchId) {
+    try {
+      await net.init();
+      const { getFirestore, doc, getDoc } = await import("firebase/firestore");
+      const db = getFirestore(net.app);
+      const snap = await getDoc(doc(db, "partite", matchId));
+      if (!snap.exists()) return {};
+      const opzioni = snap.data()?.opzioni || {};
+      return this.normalizePortalSettings(opzioni);
+    } catch (e) {
+      console.warn("Impossibile leggere opzioni Pong dal portale", e);
+      return {};
+    }
+  }
+
+  normalizePortalSettings(opzioni = {}) {
+    const arenaMap = {
+      neon: "classic",
+      dusk: "beach",
+      ice: "penguin",
+      arcade: "walled"
+    };
+    const arenaId = arenaById(opzioni.arena) ? opzioni.arena : (arenaMap[opzioni.arena] || "classic");
+    const target = Number.parseInt(opzioni.target, 10) || null;
+    const mode = opzioni.mode || "classic";
+    return {
+      arenaId,
+      target,
+      mode,
+      options: {
+        extraPowers: mode === "power",
+        ballSpeed: mode === "hardcore" ? "fast" : "default",
+        paddleSize: mode === "hardcore" ? "small" : "default"
+      }
+    };
+  }
+
+  applyPortalSettings(settings = {}) {
+    if (!settings.options) return;
+    Object.assign(this.game.save.options, settings.options);
+    this.game.persist();
+  }
+
+  async openPortalMatch(matchId) {
+    const code = codeFromSeed(matchId);
+    const nick = (localStorage.getItem("mioNome") || this.game.save.nick || "Ospite").slice(0, 16);
+    this.game.save.nick = nick;
+    this.game.persist();
+    this.screen = "portal";
+    this.show(this.el(`
+      <div class="screen">
+        <div class="panel brief">
+          <h2 class="section">Sfida Pong</h2>
+          <p class="sub">Connessione alla stanza online condivisa con i colleghi…</p>
+          <div class="room-code">${code}</div>
+          <p class="sub" id="portalErr"></p>
+        </div>
+      </div>`));
+
+    if (!isFirebaseConfigured()) {
+      this.root.querySelector("#portalErr").textContent = "Firebase non configurato per Pong.";
+      return;
+    }
+
+    try {
+      const portalSettings = await this.fetchPortalSettings(matchId);
+      const snap = await net.fb.get(net.roomRef(code));
+      if (snap.exists()) {
+        await net.join(code, nick);
+      } else {
+        await net.create({
+          mode: "duel",
+          arenaId: portalSettings.arenaId || "classic",
+          seats: 2,
+          nick,
+          codeHint: code,
+          settings: portalSettings
+        });
+      }
+      const settings = net.room?.meta?.settings || portalSettings;
+      this.applyPortalSettings(settings);
+      this.game.online = true;
+      this.triangle = false;
+      this._pendingArena = settings.arenaId || "classic";
+      this.showLobby();
+    } catch (e) {
+      try {
+        await net.join(code, nick);
+        const settings = net.room?.meta?.settings || {};
+        this.applyPortalSettings(settings);
+        this.game.online = true;
+        this.triangle = false;
+        this._pendingArena = settings.arenaId || "classic";
+        this.showLobby();
+      } catch (joinErr) {
+        this.root.querySelector("#portalErr").textContent = joinErr.message || e.message || "Errore nella sfida online";
+      }
+    }
+  }
+
 
   showTitle() {
     this.screen = "title";
@@ -243,12 +346,13 @@ export class UI {
     this.root.querySelector("#code").focus();
   }
 
-  async createRoom({ mode, arenaId, seats }) {
+  async createRoom({ mode, arenaId, seats, settings = {} }) {
     try {
       const code = await net.create({
         mode,
         arenaId,
         seats,
+        settings,
         nick: this.game.save.nick || (mode === "tri" ? "Blu" : "Blu")
       });
       this.game.online = true;
@@ -323,15 +427,18 @@ export class UI {
     this.root.querySelector("#goPlay")?.addEventListener("click", async () => {
       audio.confirm();
       const id = meta.arenaId || this._pendingArena || (seats === 3 ? "triangle" : "classic");
+      const settings = meta.settings || {};
       for (let i = 0; i < seats; i++) {
         const pl = net.playersList().find((p) => p.slot === i && p.in);
         if (!pl) await net.fillCpu(i, "CPU " + (i + 1));
       }
       await net.start(id);
+      this.applyPortalSettings(settings);
       this.game.beginMatch(id, {
         online: true,
         triangle: seats === 3,
-        vsCPU: false
+        vsCPU: false,
+        target: settings.target
       });
     });
   }
@@ -358,7 +465,7 @@ export class UI {
               <div class="sep"></div>
               <div class="hud-meta">
                 <div class="arena">${a.name.toUpperCase()}</div>
-                <div class="need">a ${a.scoreToWin}${game.vsCPU && !tri ? " · scarto 2" : ""}</div>
+                <div class="need">a ${game.customTarget || a.scoreToWin}${game.vsCPU && !tri ? " · scarto 2" : ""}</div>
               </div>
             </div>
             <div class="side-info right">

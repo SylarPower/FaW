@@ -30,7 +30,11 @@ function boot() {
   const game = new Game(canvas, ui);
   ui.bind(game);
   audio.init();
-  ui.showTitle();
+
+  const params = new URLSearchParams(window.location.search);
+  const matchId = params.get("matchId");
+  if (matchId) ui.openPortalMatch(matchId);
+  else ui.showTitle();
 
   const unlock = async () => {
     await audio.resume();

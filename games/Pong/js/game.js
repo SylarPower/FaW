@@ -89,6 +89,7 @@ export class Game {
     this.vsCPU = true;
     this.online = false;
     this.triangle = false;
+    this.customTarget = null;
     this.loadArena(pickDemo(), { demo: true });
     this.state = "play";
     this.serve(1);
@@ -141,6 +142,7 @@ export class Game {
     this.stopDemo();
     this.vsCPU = !!opts.vsCPU;
     this.online = !!opts.online;
+    this.customTarget = Number.parseInt(opts.target, 10) || null;
     this.triangle = !!opts.triangle || id === "triangle";
     if (this.triangle) id = "triangle";
     if (this.online) this.localSide = slotSide(this.triangle, net.slot);
@@ -537,7 +539,7 @@ export class Game {
   }
 
   checkWin() {
-    const need = this.ctrl.def.scoreToWin;
+    const need = this.customTarget || this.ctrl.def.scoreToWin;
     const vals = Object.values(this.scores);
     const max = Math.max(...vals);
     if (max < need) return false;
@@ -627,10 +629,13 @@ export class Game {
     if (!this.online) return;
     if (room?.meta?.status === "play" && (this.demo || this.state === "title")) {
       const id = room.meta.arenaId || "classic";
+      const settings = room.meta.settings || {};
+      this.ui.applyPortalSettings?.(settings);
       this.beginMatch(id, {
         online: true,
         triangle: room.meta.mode === "tri",
-        vsCPU: false
+        vsCPU: false,
+        target: settings.target
       });
     }
     if (room?.meta?.status === "dead") {
