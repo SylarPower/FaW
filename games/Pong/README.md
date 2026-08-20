@@ -7,6 +7,10 @@ Replica migliorativa 3D di *Pong: The Next Level* (1999). Un giocatore per compu
 - **1 vs Computer** — campagna, sblocco arene (vittoria con 2 di scarto)
 - **1 vs Giocatore** — due PC, stanza con codice (Firebase)
 - **Triangolo 1v1v1** — campo a triangolo, vs 2 CPU oppure 3 PC online
+- **Arena su misura** — partita libera configurabile: tavolo di base, punti,
+  velocità, racchette, **tema grafica**, **difficoltà CPU** (vs CPU) e quali
+  power-up entrano in campo. Il tema scelto vale per la partita e le rivincite;
+  uscendo si torna al tema salvato nelle Opzioni.
 
 ## Comandi (ogni PC)
 
@@ -34,7 +38,12 @@ con una fiondata laterale fortissima).
 
 Le racchette hanno tutte la **stessa lunghezza** (riferimento: Giungla); cambiano
 larghezza e altezza a seconda del tema, ma il bordo più avanzato verso il centro
-del campo è identico per tutte.
+del campo è identico per tutte. Le forme tonde o larghe (mazza Air Hockey,
+scarpa da Calcio, botte Western) possono sporgere un po' **fuori dal campo
+esterno** restando agganciate al bordo interno della hitbox: forma corretta,
+zero spazio interno rubato. Nel tema **Colori** ogni tocco sulla racchetta fa
+uno splash di un colore casuale con una forma casuale, più la macchia che resta
+sul tavolo ad asciugarsi.
 
 La palla non ha un tetto di velocità: ogni rimbalzo la accelera un po' meno del
 precedente, ma per sempre. La velocità si vede: scia più accesa e rossa, luce

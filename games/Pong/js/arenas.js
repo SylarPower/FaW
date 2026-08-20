@@ -1057,13 +1057,24 @@ export function handleArenaEvent(ctrl, ev, game, world, engine) {
       game.particles.burst(ev.ball.x, 0.2, ev.ball.z, 0x1a3a1a, 10, 2);
       if (world.balls.filter((b) => b.alive).length === 0) game.serveSoon();
     } else if (ctrl.holes) {
+      // Colline delle talpe: la palla sparisce nella buca e viene sputata
+      // fuori da un'altra, con una spinta visibile e un piccolo botto di
+      // terra. (La ricarica e' in physics.js: senza, la palla finiva al
+      // centro della buca di destinazione e veniva risucchiata a catena.)
       const others = ctrl.holes.filter((x) => x !== h);
       const dest = pick(others);
+      game.particles.burst(h.x, 0.25, h.z, 0x6b4a2e, 10, 3);
+      pulseHole(h.mesh);
       ev.ball.x = dest.x;
       ev.ball.z = dest.z;
-      ev.ball.vx *= -0.4;
-      ev.ball.vz = rand(-6, 6);
+      const outAng = rand(0, Math.PI * 2);
+      const outSpd = Math.max(7, Math.hypot(ev.ball.vx, ev.ball.vz) * 0.75);
+      ev.ball.vx = Math.cos(outAng) * outSpd;
+      ev.ball.vz = Math.sin(outAng) * outSpd;
       ev.ball.ghost = 0.2;
+      ev.ball.holeCd = 0.7;
+      game.particles.burst(dest.x, 0.25, dest.z, 0x6b4a2e, 12, 4);
+      pulseHole(dest.mesh);
     }
   }
   if (ev.type === "score" && ctrl.id === "clown") {
@@ -1090,6 +1101,19 @@ export function handleArenaEvent(ctrl, ev, game, world, engine) {
 
 function resetPuck(p) {
   p.x = 0; p.z = 0; p.vx = 0; p.vz = 0;
+}
+
+/** Piccola pulsazione della buca quando la palla entra o ne esce. */
+function pulseHole(mesh) {
+  if (!mesh) return;
+  mesh.scale.setScalar(1.7);
+  const t0 = performance.now();
+  const tick = () => {
+    const t = Math.min(1, (performance.now() - t0) / 260);
+    mesh.scale.setScalar(1.7 - 0.7 * t);
+    if (t < 1) requestAnimationFrame(tick);
+  };
+  tick();
 }
 
 function lerp(a, b, t) { return a + (b - a) * t; }

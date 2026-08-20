@@ -89,6 +89,8 @@ export class UI {
     this.nav = new MenuNav(this);
     this._previewArena = null;
     this._previewSize = null;
+    this._previewBall = null;
+    this._previewTheme = null;
   }
 
   bind(game) {
@@ -371,10 +373,16 @@ export class UI {
         target: 10,
         ballSpeed: opts.ballSpeed || "default",
         paddleSize: opts.paddleSize || "default",
+        theme: opts.theme || "neon",
+        difficulty: opts.difficulty || "medio",
         powers: ["whack", "stretch", "turbo", "grab", "magnet"]
       };
     }
     const c = this._custom;
+
+    // Il pannello segue il tema scelto per la partita (si torna al tema
+    // globale quando si esce dalla schermata).
+    applyThemeToUI(c.theme);
 
     // Appena entriamo, aggiorniamo la demo del background con il tavolo e la
     // dimensione scelti. Poi riagganciamo quando cambiano.
@@ -414,9 +422,6 @@ export class UI {
           <div class="custom-base-desc">
             <strong>${arenaById(c.base)?.name || ""} —</strong>
             ${arenaById(c.base)?.desc || ""}
-            Il tavolo scelto porta con sé forma del campo, ostacoli e regole
-            (porte, buche, multiball…); i settaggi qui sotto (punti, velocità,
-            dimensione racchetta e power-up) si applicano sopra di esso.
           </div>
           <div class="opt">
             <div><label>Punti per vincere</label></div>
@@ -437,6 +442,23 @@ export class UI {
               { id: "medium", label: "Grande" }, { id: "large", label: "Maxi" }
             ])}</div>
           </div>
+          <div class="opt">
+            <div><label>Tema grafica</label></div>
+            <div class="seg th-seg">${THEME_IDS.map((id) => {
+              const t = themeById(id);
+              const dots = t.swatch.map((col) =>
+                `<i style="background:#${col.toString(16).padStart(6, "0")}"></i>`).join("");
+              return `<button data-cst="theme" data-val="${id}" class="${c.theme === id ? "on" : ""}"><span class="th-dots">${dots}</span>${t.name}</button>`;
+            }).join("")}</div>
+          </div>
+          ${vsCPU ? `
+          <div class="opt">
+            <div><label>Difficoltà CPU</label></div>
+            <div class="seg">${seg("difficulty", [
+              { id: "facile", label: "Facile" }, { id: "medio", label: "Media" },
+              { id: "difficile", label: "Difficile" }, { id: "leggenda", label: "Leggenda" }
+            ])}</div>
+          </div>` : ""}
 
           <div style="margin-top:18px">
             <label style="font-weight:600">Power-up in campo</label>
@@ -460,7 +482,11 @@ export class UI {
         let v = b.dataset.val;
         if (k === "target") v = Number.parseInt(v, 10);
         this._custom[k] = v;
-        if (k === "base" || k === "paddleSize") this._applyCustomPreview();
+        if (k === "theme") {
+          // Il tema si vede subito: pannello e demo sullo sfondo cambiano.
+          applyThemeToUI(v);
+          this._applyCustomPreview();
+        } else if (k === "base" || k === "paddleSize") this._applyCustomPreview();
         this.showCustom();
       });
     });
@@ -477,6 +503,10 @@ export class UI {
     this.root.querySelector("#cstAll").onclick = () => { this._custom.powers = Object.keys(POWER_DEFS); this.showCustom(); };
     // Anteprima: finché il pulsante resta premuto la modale diventa
     // quasi trasparente e si vede il tavolo che scorre sullo sfondo.
+    // Con la pointer capture il rilascio arriva sempre al pulsante, anche
+    // se il dito scivola di qualche pixel o il browser prova a scrollare
+    // (prima un pointercancel/pointerleave prematuro spegneva l'anteprima
+    // mentre il tasto era ancora premuto).
     const peek = this.root.querySelector("#cstPeek");
     const scr = this.root.querySelector(".screen");
     const setPeek = (on) => { if (scr) scr.classList.toggle("peeking", on); };
@@ -484,15 +514,29 @@ export class UI {
     if (this._peekUp) {
       window.removeEventListener("pointerup", this._peekUp);
       window.removeEventListener("pointercancel", this._peekUp);
+      window.removeEventListener("blur", this._peekUp);
     }
     this._peekUp = release;
-    peek.addEventListener("pointerdown", (e) => { e.preventDefault(); setPeek(true); });
-    peek.addEventListener("pointerleave", release);
+    peek.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      try { peek.setPointerCapture(e.pointerId); } catch { /* pointer già andato */ }
+      setPeek(true);
+    });
+    peek.addEventListener("pointerup", release);
+    peek.addEventListener("pointercancel", release);
+    peek.addEventListener("lostpointercapture", release);
+    peek.addEventListener("contextmenu", (e) => e.preventDefault());
     window.addEventListener("pointerup", release);
     window.addEventListener("pointercancel", release);
+    window.addEventListener("blur", release);
     this.root.querySelector("#cstGo").onclick = async () => {
       const cfg = this._custom;
-      const options = { ballSpeed: cfg.ballSpeed, paddleSize: cfg.paddleSize };
+      const options = {
+        ballSpeed: cfg.ballSpeed,
+        paddleSize: cfg.paddleSize,
+        theme: cfg.theme,
+        difficulty: cfg.difficulty
+      };
       // Ripristina la demo standard quando usciamo.
       this._clearCustomPreview();
       if (vsCPU) {
@@ -524,13 +568,15 @@ export class UI {
     const changed =
       this._previewArena !== c.base ||
       this._previewSize !== c.paddleSize ||
-      this._previewBall !== c.ballSpeed;
+      this._previewBall !== c.ballSpeed ||
+      this._previewTheme !== c.theme;
     if (!changed) return;
     this._previewArena = c.base;
     this._previewSize = c.paddleSize;
     this._previewBall = c.ballSpeed;
+    this._previewTheme = c.theme;
     // Sostituiamo la demo con una preview del tavolo/palla/racchetta scelti.
-    this.game.matchOptions = { paddleSize: c.paddleSize, ballSpeed: c.ballSpeed };
+    this.game.matchOptions = { paddleSize: c.paddleSize, ballSpeed: c.ballSpeed, theme: c.theme };
     this.game.customPowers = [];
     this.game.customTarget = null;
     this.game.demo = true;
@@ -542,8 +588,11 @@ export class UI {
     this._previewArena = null;
     this._previewSize = null;
     this._previewBall = null;
+    this._previewTheme = null;
     this.game.matchOptions = null;
     this.game.customPowers = null;
+    // Il tema "su misura" resta nella partita: qui si torna a quello salvato.
+    applyThemeToUI(this.game.save.options.theme);
     // Torna a una demo casuale invece di lasciare in scena l'ultimo tavolo
     // della preview.
     if (this.game.demo) {
@@ -903,7 +952,7 @@ export class UI {
     const just = iWon && nxt && game.save.unlocked.includes(nxt);
     const scoreLine = (game.triangle ? TRI_SIDES : DUEL_SIDES)
       .map((s) => `${PNAME[s]} ${game.scores[s] ?? 0}`).join("  ·  ");
-    const theme = themeById(game.save.options.theme);
+    const theme = themeById(game.currentThemeId ? game.currentThemeId() : game.save.options.theme);
     const titleColor = iWon ? (theme.ui?.["--mint"] || "var(--mint)") : (theme.ui?.["--pink"] || "var(--pink)");
     this.show(this.el(`
       <div class="screen">

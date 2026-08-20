@@ -53,6 +53,7 @@ export class Ball {
     this.lastHit = null;
     this.age = 0;
     this.ghost = 0;
+    this.holeCd = 0;     // Ricarica dopo una buca: evita di essere risucchiata di nuovo.
     this.hits = 0;        // Rimbalzi sulle racchette da questo servizio.
     this.whackMul = 1;    // Moltiplicatore Schianto cumulato (da annullare).
     this.whackSide = null;// Lato a cui appartiene la catena Schianto attiva.
@@ -280,6 +281,7 @@ export class World {
   stepBall(b, dt) {
     b.age += dt;
     if (b.ghost > 0) b.ghost -= dt;
+    if (b.holeCd > 0) b.holeCd -= dt;
     if (b.held) return;
 
     b.vx += (this.gravityX + this.windX) * dt;
@@ -338,6 +340,11 @@ export class World {
     for (const h of this.holes) {
       const dx = b.x - h.x, dz = b.z - h.z;
       if (dx * dx + dz * dz < (h.r - b.r * 0.2) ** 2) {
+        // Una sola volta per ingresso: il gestore teletrasporta la palla al
+        // centro di UN'ALTRA buca, quindi senza ricarica verrebbe risucchiata
+        // all'infinito rimbalzando da una buca all'altra.
+        if (b.holeCd > 0) continue;
+        b.holeCd = 0.7;
         this.emit("hole", { ball: b, hole: h });
       }
     }
