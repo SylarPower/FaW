@@ -234,6 +234,78 @@ export class Game {
     return Math.random() < 0.5 ? 1 : -1;
   }
 
+  /**
+   * A ogni punto fatto tutti i power-up si azzerano: cariche, timer ed
+   * effetti temporanei sul campo tornano puliti per il servizio successivo.
+   * Le cariche della curva Q/E non sono un power-up e restano.
+   */
+  resetPowerups() {
+    for (const p of this.world.paddles) {
+      p.powerHit = 0;
+      p.whackStep = 0;
+      p.stretchTimers = [];
+      p.stretchStacks = 0;
+      p.stretchT = 0;
+      p.hd = p.baseHd;
+      p.grabT = 0;
+      p.turboT = 0;
+      p.invert = 0;
+      p.burn = 0;
+      p.barrierT = 0;
+      p.magnetT = 0;
+      p.spinHit = 0;
+    }
+    const c = this.ctrl;
+    if (!c) return;
+    // Barriere temporanee.
+    if (c.barrier) {
+      for (const side of Object.keys(c.barrier)) {
+        const b = c.barrier[side];
+        this.world.obstacles = this.world.obstacles.filter((o) => o !== b.obs);
+        if (b.mesh) this.engine.arenaRoot.remove(b.mesh);
+      }
+      c.barrier = {};
+    }
+    // Foca.
+    if (c.seal) {
+      this.world.obstacles = this.world.obstacles.filter((o) => o !== c.seal);
+      this.engine.arenaRoot.remove(c.seal.mesh);
+      c.seal = null;
+    }
+    // Orso polare.
+    if (c.bear) {
+      this.world.obstacles = this.world.obstacles.filter((o) => o !== c.bearWall);
+      this.engine.arenaRoot.remove(c.bear.mesh);
+      c.bear = null;
+      c.bearWall = null;
+    }
+    // Ventilatore.
+    if (c.fanT > 0) {
+      c.fanT = 0;
+      this.world.windX = 0;
+    }
+    // Tavolo folle: inclinazione, collina e conca da power-up.
+    if (c.tiltWant) c.tiltWant = 0;
+    this.world.gravityX = 0;
+    this.world.gravityZ = 0;
+    if (c.centerHill) {
+      this.world.obstacles = this.world.obstacles.filter((o) => o !== c.centerHill);
+      this.engine.arenaRoot.remove(c.centerHill.mesh);
+      c.centerHill = null;
+      c.hillStacks = 0;
+    }
+    if (c.dip) {
+      c.dip = false;
+      c.dipStacks = 0;
+    }
+    // Nebbia.
+    if (c.fog) {
+      this.engine.arenaRoot.remove(c.fog.mesh);
+      c.fog = null;
+    }
+    this.ui.updateHUD(this);
+  }
+
   resetPaddlesForServe() {
     for (const p of this.world.paddles) {
       p.vz = 0;
@@ -516,6 +588,14 @@ export class Game {
         if (!isDemo) this.stats.curve++;
         this.ui.updateHUD(this);
       }
+      if (ev.type === "spinhit") {
+        // Effetto: la fiondata laterale è partita.
+        this.engine.kick(0.32);
+        this.engine.flash(this.flashEl, "#7cffd2", 70);
+        this.particles.burst(ev.ball.x, 0.4, ev.ball.z, 0x66e3b0, 22, 8);
+        this.showMsg("EFFETTO!", 0.55);
+        this.ui.updateHUD(this);
+      }
     }
     this._fx = fx;
 
@@ -542,6 +622,21 @@ export class Game {
       if (this._hudT > 0.2) {
         this._hudT = 0;
         this.ui.updateHUD(this);
+      }
+      // Aura della Calamita: scintille che volano dalla palla verso la
+      // racchetta del possessore.
+      this._magnetT = (this._magnetT || 0) - dt;
+      if (this._magnetT <= 0) {
+        this._magnetT = 0.14;
+        for (const p of this.world.paddles) {
+          if (p.magnetT <= 0) continue;
+          const inHalf = (b) => (p.side === "left" ? b.x < 0 : b.x > 0);
+          for (const b of this.world.balls) {
+            if (b.alive && !b.held && inHalf(b)) {
+              this.particles.spark(b.x, 0.3, b.z, 1, 0xb48cff);
+            }
+          }
+        }
       }
     }
   }
@@ -664,6 +759,8 @@ export class Game {
       else this.stats.puntiSubiti++;
     }
     this.rally = 0;
+    // Punto fatto: tutti i power-up si azzerano.
+    this.resetPowerups();
     // Il punto non decide più il lato del servizio: ogni ripresa è casuale.
     this.serveDir = this.randomServeDir();
     this.resetPaddlesForServe();
@@ -875,8 +972,15 @@ export class Game {
         // Curva Q/E: piega morbida dell'estremo (i vertici si incurvano
         // all'indietro mantenendo il corpo dritto, stile Pong: Next Level).
         if (p.mesh.userData.setBend) p.mesh.userData.setBend(p.curveL, p.curveR);
-        if (p.barrierT > 0) p.mesh.userData.mat.emissiveIntensity = Math.max(0.8, p.mesh.userData.baseEmissive || 0);
-        else p.mesh.userData.mat.emissiveIntensity = p.mesh.userData.baseEmissive ?? 0.22;
+        if (p.barrierT > 0) {
+          p.mesh.userData.mat.emissiveIntensity = Math.max(0.8, p.mesh.userData.baseEmissive || 0);
+        } else if (p.magnetT > 0) {
+          // Calamita: la racchetta pulsa.
+          p.mesh.userData.mat.emissiveIntensity = Math.max(0.8, p.mesh.userData.baseEmissive || 0) *
+            (0.75 + 0.25 * Math.sin(performance.now() * 0.02));
+        } else {
+          p.mesh.userData.mat.emissiveIntensity = p.mesh.userData.baseEmissive ?? 0.22;
+        }
       }
     }
     for (const b of this.world.balls) {

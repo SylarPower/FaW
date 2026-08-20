@@ -4,7 +4,7 @@ import { applyTheme } from "./themes.js";
 import {
   makeTable, makeCircleTable, makeTriangleTable, makePenguin, makeLog, makeHill,
   makeBalloon, makePuck, makeBumper, makeGoalFrame, makeSpike,
-  makeSeal, makePolarBear, makeSpectators
+  makeSeal, makePolarBear, makeSpectators, makeFogBank
 } from "./models.js";
 
 export const ARENAS = [
@@ -12,19 +12,19 @@ export const ARENAS = [
     id: "classic", zone: "Arcade", zoneId: 1, name: "Pong Classico",
     tag: "Origine",
     desc: "Uno contro uno. Niente scuse, solo geometria pura. Si gioca a 10.",
-    scoreToWin: 10, paddles: 1, powerUps: ["whack", "stretch", "turbo"]
+    scoreToWin: 10, paddles: 1, powerUps: ["whack", "stretch", "turbo", "magnet"]
   },
   {
     id: "walled", zone: "Arcade", zoneId: 1, name: "Muro Spezzato",
     tag: "Doppio",
     desc: "Due racchette a testa. La porta è lo squarcio nel muro centrale.",
-    scoreToWin: 10, paddles: 2, powerUps: ["whack", "stretch", "grab"]
+    scoreToWin: 10, paddles: 2, powerUps: ["whack", "stretch", "grab", "spin"]
   },
   {
     id: "soccer", zone: "Arcade", zoneId: 1, name: "Calcio Stelle",
     tag: "Stadio",
     desc: "Attaccante e portiere. Segna nella porta, non sulla linea di fondo.",
-    scoreToWin: 10, paddles: 2, powerUps: ["whack", "stretch", "turbo"]
+    scoreToWin: 10, paddles: 2, powerUps: ["whack", "stretch", "turbo", "fog"]
   },
   {
     id: "penguin", zone: "Artide", zoneId: 2, name: "Pinguini sul Ghiaccio",
@@ -36,7 +36,7 @@ export const ARENAS = [
     id: "snowstorm", zone: "Artide", zoneId: 2, name: "Bufera",
     tag: "Vento",
     desc: "Una raffica cambia direzione senza preavviso. Tieni la palla, non il meteo.",
-    scoreToWin: 10, paddles: 1, powerUps: ["grab", "whack"]
+    scoreToWin: 10, paddles: 1, powerUps: ["grab", "whack", "fog"]
   },
   {
     id: "logs", zone: "Ostacoli", zoneId: 3, name: "Tronchi Rotanti",
@@ -48,7 +48,7 @@ export const ARENAS = [
     id: "moles", zone: "Ostacoli", zoneId: 3, name: "Colline delle Talpe",
     tag: "Deflessione",
     desc: "I dossi deviano la palla. Le buche la risputano dall'altra parte.",
-    scoreToWin: 10, paddles: 2, powerUps: ["whack", "stretch"]
+    scoreToWin: 10, paddles: 2, powerUps: ["whack", "stretch", "spin"]
   },
   {
     id: "clown", zone: "Show", zoneId: 4, name: "Circo dei Colori",
@@ -60,13 +60,13 @@ export const ARENAS = [
     id: "beach", zone: "Show", zoneId: 4, name: "Festa in Spiaggia",
     tag: "Presa infinita",
     desc: "Acqua lenta. Tieni premuto per afferrare e rilasciare la palla. Si gioca a 7.",
-    scoreToWin: 7, paddles: 2, powerUps: ["grab"]
+    scoreToWin: 7, paddles: 2, powerUps: ["grab", "magnet"]
   },
   {
     id: "tilt", zone: "Show", zoneId: 4, name: "Tavolo Folle",
     tag: "Inclinazione",
     desc: "Inclina il tavolo, alza dossi, scava conche. La gravità è un'arma.",
-    scoreToWin: 10, paddles: 1, powerUps: ["tilt", "hill", "dip", "whack"]
+    scoreToWin: 10, paddles: 1, powerUps: ["tilt", "hill", "dip", "whack", "fog"]
   },
   {
     id: "puck", zone: "Leggenda", zoneId: 5, name: "Hockey Puck",
@@ -133,11 +133,15 @@ export function buildArena(id, engine, world, sizeMul = 1, themeId = "neon") {
   const ctrl = { id, def, theme, extras: [], snow: null, features: {}, table: null, goldHits: 0 };
 
   const padScale = sizeMul;
-  // Forma racchetta dettata dal tema: larghezza e lunghezza cambiano ma
-  // l'area (hw × hd) resta la stessa per tutti i temi.
-  const aspect = theme.paddle || { wMul: 1, lMul: 1 };
-  const hwBase = 0.22 * padScale * (aspect.wMul ?? 1);
-  const hdBase = 1.15 * padScale * (aspect.lMul ?? 1);
+  // Forma racchetta dettata dal tema: la LUNGHEZZA (asse Z, lungo la linea
+  // di porta) è uniforme per tutti i temi; la larghezza (X) e l'altezza
+  // visiva variano. Il punto più avanzato verso il centro del campo è comune:
+  // si compensa la posizione con la larghezza.
+  const aspect = theme.paddle || { wMul: 1 };
+  const hwStd = 0.22 * padScale;
+  const hwBase = hwStd * (aspect.wMul ?? 1);
+  const hdBase = 1.15 * padScale;
+  const dx = hwBase - hwStd; // sporgenza extra verso il centro campo
   const w = 20, d = 12;
 
   if (id === "triangle") {
@@ -150,10 +154,10 @@ export function buildArena(id, engine, world, sizeMul = 1, themeId = "neon") {
       [theme.p1 ?? 0x3dffd1, theme.p2 ?? 0xff3d7f, theme.line ?? 0xffc857],
       theme
     ));
-    const hd = 1.2 * padScale * (aspect.lMul ?? 1);
+    const hd = 1.2 * padScale;
     const sides = ["bottom", "east", "west"];
     tri.edges.forEach((e, i) => {
-      const hw = 0.22 * padScale * (aspect.wMul ?? 1);
+      const hw = hwStd * (aspect.wMul ?? 1);
       const p = makePState(sides[i], "main", {
         hw,
         hd,
@@ -188,12 +192,12 @@ export function buildArena(id, engine, world, sizeMul = 1, themeId = "neon") {
     for (const side of sides) {
       if (count === 1) {
         world.paddles.push(makePState(side, "main", {
-          x: side === "left" ? -world.w / 2 + 0.7 : world.w / 2 - 0.7,
+          x: side === "left" ? -world.w / 2 + 0.7 - dx : world.w / 2 - 0.7 + dx,
           hw: hwBase, hd, ...opts
         }));
       } else {
-        const gx = side === "left" ? -world.w / 2 + 0.55 : world.w / 2 - 0.55;
-        const sx = side === "left" ? -world.w / 2 + 2.6 : world.w / 2 - 2.6;
+        const gx = side === "left" ? -world.w / 2 + 0.55 - dx : world.w / 2 - 0.55 + dx;
+        const sx = side === "left" ? -world.w / 2 + 2.6 - dx : world.w / 2 - 2.6 + dx;
         world.paddles.push(makePState(side, "goalie", {
           x: gx, hw: hwBase, hd: hd * 0.85, zMin: -2.2, zMax: 2.2, ...opts
         }));
@@ -205,8 +209,8 @@ export function buildArena(id, engine, world, sizeMul = 1, themeId = "neon") {
   };
 
   if (id === "balloons") {
-    world.paddles.push(makePState("left", "main", { x: -5.8, hw: hwBase, hd, canMoveX: true, xMin: -6.6, xMax: -2.2 }));
-    world.paddles.push(makePState("right", "main", { x: 5.8, hw: hwBase, hd, canMoveX: true, xMin: 2.2, xMax: 6.6 }));
+    world.paddles.push(makePState("left", "main", { x: -5.8 - dx, hw: hwBase, hd, canMoveX: true, xMin: -6.6 - dx, xMax: -2.2 - dx }));
+    world.paddles.push(makePState("right", "main", { x: 5.8 + dx, hw: hwBase, hd, canMoveX: true, xMin: 2.2 + dx, xMax: 6.6 + dx }));
   } else if (id === "classic" || id === "penguin" || id === "snowstorm" || id === "tilt" || id === "pinball") {
     makePads(1);
   } else if (id === "logs" || id === "clown" || id === "jungle" || id === "puck") {
@@ -799,6 +803,18 @@ function setupSpecial(id, world, engine, theme, ctrl) {
       ctrl.seal = { side, mesh, x, z: 0, t: 10, r: 0.4, type: "circle", restitution: 1.1 };
       world.obstacles.push(ctrl.seal);
     },
+    fog(side) {
+      // Nebbia leggera sulla metà campo dell'avversario: copre un po',
+      // senza nascondere del tutto palla e racchette.
+      if (ctrl.fog) {
+        ctrl.fog.t += 7;
+        return;
+      }
+      const mesh = makeFogBank(world.w, world.d);
+      mesh.scale.x = side === "left" ? 1 : -1;
+      engine.add(mesh);
+      ctrl.fog = { mesh, t: 7 };
+    },
     skull(side) {
       const other = side === "left" ? "right" : "left";
       raiseSpikesVisual(ctrl, other, world, true);
@@ -880,6 +896,21 @@ export function updateArena(ctrl, world, dt, engine, game) {
     ctrl.fanT -= dt;
     world.windX = (ctrl.fanDir || 1) * 7;
     if (ctrl.fanT <= 0) world.windX = 0;
+  }
+
+  // Nebbia: deriva lenta delle nuvole e dissolvenza in entrata/uscita.
+  if (ctrl.fog) {
+    ctrl.fog.t -= dt;
+    const fade = ctrl.fog.t < 1.5 ? Math.max(0, ctrl.fog.t / 1.5) : 1;
+    const now = performance.now() * 0.001;
+    for (const p of ctrl.fog.mesh.children) {
+      p.position.z += Math.sin(now * 0.4 + p.userData.phase) * p.userData.drift * dt;
+      p.material.opacity = p.userData.baseOp * fade;
+    }
+    if (ctrl.fog.t <= 0) {
+      engine.arenaRoot.remove(ctrl.fog.mesh);
+      ctrl.fog = null;
+    }
   }
 
   if (ctrl.puck) {

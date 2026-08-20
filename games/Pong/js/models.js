@@ -203,84 +203,79 @@ function buildDefault(body, mat, color, theme, style) {
 }
 
 function buildBoot(body, leather) {
-  // Scarpa da calcio vista dall'alto: suola scura con tacchetti, tomaia
-  // slanciata, lacci centrali, tripla striscia laterale e controtallone.
-  // Tutto resta dentro la lunghezza reale della zona di contatto (asse Z).
-  const soleMat = new THREE.MeshStandardMaterial({ color: 0x141210, roughness: 0.9 });
-  const dark = new THREE.MeshStandardMaterial({ color: 0x23201c, roughness: 0.85 });
+  // Scarpa da calcio vista dall'alto con proporzioni reali (lunga e stretta):
+  // occupa TUTTA la lunghezza della racchetta. Punta arrotondata, tomaia
+  // slanciata colorata, toe-cap bianca, lacci centrali, tripla striscia
+  // laterale, controtallone scuro con collarino e tacchetti sotto la suola.
+  const dark = new THREE.MeshStandardMaterial({ color: 0x171b20, roughness: 0.82 });
+  const soleMat = new THREE.MeshStandardMaterial({ color: 0x0c0e11, roughness: 0.95 });
+  const white = new THREE.MeshStandardMaterial({ color: 0xf2efe6, roughness: 0.55 });
   const laceMat = new THREE.MeshStandardMaterial({ color: 0xf7f4ea, roughness: 0.6 });
-  const white = new THREE.MeshStandardMaterial({ color: 0xf0ede4, roughness: 0.55 });
-  const logoMat = new THREE.MeshStandardMaterial({ color: 0x2a86f0, roughness: 0.45, emissive: 0x0a2544, emissiveIntensity: 0.3 });
+  const logoMat = new THREE.MeshStandardMaterial({ color: 0xffd23d, roughness: 0.4, emissive: 0x553800, emissiveIntensity: 0.25 });
 
-  // Suola: piastra scura leggermente più larga della tomaia.
-  const sole = new THREE.Mesh(new THREE.BoxGeometry(0.88, 0.1, 1.04), soleMat);
-  sole.position.y = -0.22;
+  // Suola: piastra scura più larga della tomaia, lunga quanto la scarpa.
+  const sole = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.05, 0.98), soleMat);
+  sole.position.y = -0.42;
 
-  // Tomaia: capsula appiattita che corre dal tallone alla punta.
-  const upper = new THREE.Mesh(new THREE.CapsuleGeometry(0.3, 0.34, 6, 14), leather);
+  // Tomaia: capsula lungo Z appiattita, dal tallone alla punta.
+  const upper = new THREE.Mesh(new THREE.CapsuleGeometry(0.125, 0.66, 6, 16), leather);
   upper.rotation.x = Math.PI / 2;
-  upper.scale.set(1.14, 0.8, 0.98);
-  upper.position.set(0, 0.08, 0.03);
+  upper.scale.set(0.92, 0.6, 1);
+  upper.position.set(0, 0.02, 0);
 
   // Punta arrotondata.
-  const toe = new THREE.Mesh(new THREE.SphereGeometry(0.31, 16, 12), leather);
-  toe.scale.set(1.14, 0.72, 0.66);
-  toe.position.set(0, 0.04, 0.44);
+  const toe = new THREE.Mesh(new THREE.SphereGeometry(0.13, 14, 10), leather);
+  toe.scale.set(0.92, 0.5, 0.5);
+  toe.position.set(0, 0.02, 0.43);
 
-  // Toe-cap bianca sul davanti.
-  const toeCap = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.16, 0.14), white);
-  toeCap.position.set(0, 0.1, 0.5);
+  // Toe-cap bianca sul primo terzo davanti.
+  const toeCap = new THREE.Mesh(new THREE.BoxGeometry(0.27, 0.1, 0.3), white);
+  toeCap.position.set(0, 0.1, 0.3);
 
-  // Controtallone scuro (heel counter) + collarino con bordo chiaro.
-  const heel = new THREE.Mesh(new THREE.BoxGeometry(0.74, 0.3, 0.3), dark);
-  heel.position.set(0, 0.1, -0.35);
-  const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.33, 0.4, 14), leather);
-  collar.position.set(0, 0.3, -0.36);
-  const cuff = new THREE.Mesh(new THREE.TorusGeometry(0.29, 0.04, 7, 14), white);
-  cuff.position.set(0, 0.5, -0.36);
-  const pullTab = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.12, 0.06), dark);
-  pullTab.position.set(0, 0.12, -0.52);
+  // Controtallone scuro con collarino chiaro attorno alla caviglia.
+  const heel = new THREE.Mesh(new THREE.BoxGeometry(0.27, 0.16, 0.24), dark);
+  heel.position.set(0, 0.07, -0.39);
+  const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.14, 0.2, 12), leather);
+  collar.position.set(0, 0.12, -0.45);
+  const cuff = new THREE.Mesh(new THREE.TorusGeometry(0.11, 0.022, 6, 12), white);
+  cuff.rotation.x = Math.PI / 2;
+  cuff.position.set(0, 0.23, -0.45);
 
-  // Linguetta centrale.
-  const tongue = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.2, 0.5), leather);
-  tongue.position.set(0, 0.14, 0.08);
+  // Linguetta sotto i lacci.
+  const tongue = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.05, 0.34), leather);
+  tongue.position.set(0, 0.15, 0.03);
 
-  // Lacci trasversali sopra la linguetta, dal collo verso la punta.
-  for (let i = 0; i < 5; i++) {
-    const lace = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.035, 0.05), laceMat);
-    lace.position.set(0, 0.25 - i * 0.008, -0.14 + i * 0.1);
+  // Lacci trasversali, dal collo verso la punta.
+  for (let i = 0; i < 6; i++) {
+    const lace = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.02, 0.028), laceMat);
+    lace.position.set(0, 0.18, 0.08 + i * 0.05);
     body.add(lace);
   }
-  // Tripla striscia laterale su entrambi i lati, inclinata come una vera scarpa.
+
+  // Tripla striscia laterale su entrambi i lati, che segue la tomaia.
   for (const side of [-1, 1]) {
     for (let i = 0; i < 3; i++) {
-      const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.16, 0.13), white);
-      stripe.position.set(side * 0.37, 0.13, -0.08 + i * 0.12);
-      stripe.rotation.y = side * 0.22;
+      const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.035, 0.4), white);
+      stripe.position.set(side * (0.085 + i * 0.03), 0.09, 0.05);
+      stripe.rotation.y = side * 0.14;
       body.add(stripe);
     }
-    // Logo tondo sul controtallone.
-    const logo = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.02, 12), logoMat);
+    // Logo dorato sul controtallone.
+    const logo = new THREE.Mesh(new THREE.CylinderGeometry(0.034, 0.034, 0.02, 10), logoMat);
     logo.rotation.x = Math.PI / 2;
-    logo.position.set(side * 0.37, 0.13, -0.37);
+    logo.position.set(side * 0.1, 0.12, -0.43);
     body.add(logo);
   }
-  // Tacchetti: quattro sotto l'avampiede, tre sotto il tallone.
-  for (let zi = 0; zi < 4; zi++) {
+
+  // Tacchetti: due file da cinque sotto la suola, a contatto col tavolo.
+  for (let zi = 0; zi < 5; zi++) {
     for (let xi = 0; xi < 2; xi++) {
-      const stud = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.13, 8), soleMat);
-      stud.position.set(-0.2 + xi * 0.4, -0.31, 0.1 + zi * 0.11);
+      const stud = new THREE.Mesh(new THREE.ConeGeometry(0.034, 0.1, 7), soleMat);
+      stud.position.set(-0.09 + xi * 0.18, -0.5, -0.36 + zi * 0.18);
       body.add(stud);
     }
   }
-  for (let zi = 0; zi < 3; zi++) {
-    for (let xi = 0; xi < 2; xi++) {
-      const stud = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.12, 8), soleMat);
-      stud.position.set(-0.2 + xi * 0.4, -0.31, -0.28 - zi * 0.11);
-      body.add(stud);
-    }
-  }
-  body.add(sole, upper, toe, toeCap, heel, collar, cuff, pullTab, tongue);
+  body.add(sole, upper, toe, toeCap, heel, collar, cuff, tongue);
 }
 
 function buildJungle(body, barkMat) {
@@ -872,6 +867,46 @@ export function makeCircleTable(radius, color, lineColor, theme = {}) {
   const inner = new THREE.Mesh(new THREE.RingGeometry(radius*0.22, radius*0.24, 48),
     new THREE.MeshBasicMaterial({ color: lineColor, transparent: true, opacity: 0.55, side: THREE.DoubleSide }));
   inner.rotation.x = -Math.PI/2; inner.position.y = 0.01; g.add(inner);
+  return g;
+}
+
+/**
+ * Coltre di nebbia leggera (power-up Nebbia): nuvole piatte e soffici sulla
+ * metà campo X>0. Il gruppo viene specchiato per coprire l'altra metà.
+ * Copre "un po'": la palla e il tavolo restano visibili, solo velati.
+ */
+export function makeFogBank(w, d, color = 0xffffff) {
+  const g = new THREE.Group();
+  // Texture radiale morbida, riusata da tutte le nuvole.
+  const S = 128;
+  const cvs = document.createElement("canvas");
+  cvs.width = cvs.height = S;
+  const c = cvs.getContext("2d");
+  const grad = c.createRadialGradient(S / 2, S / 2, S * 0.04, S / 2, S / 2, S * 0.5);
+  grad.addColorStop(0, "rgba(255,255,255,0.9)");
+  grad.addColorStop(0.55, "rgba(255,255,255,0.38)");
+  grad.addColorStop(1, "rgba(255,255,255,0)");
+  c.fillStyle = grad;
+  c.fillRect(0, 0, S, S);
+  const tex = new THREE.CanvasTexture(cvs);
+  let seed = 7;
+  const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
+  for (let i = 0; i < 9; i++) {
+    const s = 2.6 + rnd() * 2.2;
+    const m = new THREE.Mesh(
+      new THREE.PlaneGeometry(s, s),
+      new THREE.MeshBasicMaterial({
+        map: tex, color, transparent: true, depthWrite: false,
+        opacity: 0.13 + rnd() * 0.13
+      })
+    );
+    m.rotation.x = -Math.PI / 2;
+    m.position.set(1.0 + rnd() * (w / 2 - 1.5), 1.0 + rnd() * 1.1, -d / 2 + 0.9 + rnd() * (d - 1.8));
+    m.userData.baseOp = m.material.opacity;
+    m.userData.drift = 0.4 + rnd() * 0.7;
+    m.userData.phase = rnd() * Math.PI * 2;
+    g.add(m);
+  }
   return g;
 }
 

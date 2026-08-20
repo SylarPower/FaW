@@ -123,6 +123,8 @@ export class Paddle {
     this.curveLockR = false;
     this.curveCharges = 2;// La curva Q/E ha 2 cariche che si ricaricano nel tempo.
     this.curveCd = 0;
+    this.magnetT = 0;     // Calamita: attira la palla verso questa racchetta.
+    this.spinHit = 0;     // Effetto: colpi con fiondata laterale rimasti.
     this.mesh = null;
     this.inputAxis = 0;
     this.inputAxis2 = 0;
@@ -226,6 +228,7 @@ export class World {
     if (p.turboT > 0) p.turboT -= dt;
     if (p.grabT > 0) p.grabT -= dt;
     if (p.barrierT > 0) p.barrierT -= dt;
+    if (p.magnetT > 0) p.magnetT -= dt;
     if (p.powerHit > 0) { /* charges, not time */ }
 
     if (p.locked || p.stun > 0) {
@@ -285,6 +288,22 @@ export class World {
       const d = Math.pow(1 - this.drag, dt * 60);
       b.vx *= d;
       b.vz *= d;
+    }
+
+    // Calamita: mentre la palla è nella metà campo del possessore, viene
+    // attratta con dolcezza verso la sua racchetta (aiuto in difesa, non
+    // un buco nero).
+    for (const p of this.paddles) {
+      if (p.magnetT <= 0) continue;
+      const inHalf = (p.side === "left" || p.side === "west" || p.side === "bottom")
+        ? b.x < 0 : b.x > 0;
+      if (!inHalf) continue;
+      const dx = p.x - b.x, dz = p.z - b.z;
+      const d = Math.hypot(dx, dz);
+      if (d < 0.5) continue;
+      const pull = 6 * Math.min(1.5, d / 5);
+      b.vx += (dx / d) * pull * dt;
+      b.vz += (dz / d) * pull * dt;
     }
 
     const spd = b.speed();
@@ -539,6 +558,15 @@ export class World {
     if (curveHit) target *= 1.6;
     target = Math.max(target * whackMul, b.minSpeed);
     b.setSpeed(target);
+    // Effetto: fiondata laterale fortissima, una carica per colpo.
+    if (p.spinHit > 0) {
+      const charges = p.spinHit - 1;
+      for (const mate of this.paddles) {
+        if (mate.side === p.side) mate.spinHit = charges;
+      }
+      b.vz += (20 + rand(0, 6)) * (Math.random() < 0.5 ? 1 : -1);
+      this.emit("spinhit", { ball: b, paddle: p, charges });
+    }
     b.lastHit = p.side;
     b.hits++;
     b.ghost = 0.04;

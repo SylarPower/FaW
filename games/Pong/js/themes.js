@@ -137,8 +137,9 @@ export const THEME_DEFS = {
     name: "Scarpone",
     swatch: [0x2f8a43, 0xf4efe1, 0xe04848],
     spectators: "stadium",
-    // Scarpa da calcio: più corta e larga di una barra standard, stessa area.
-    paddle: { wMul: 1.5, lMul: 0.667 },
+    // Scarpa da calcio: più larga di una barra standard (la lunghezza è
+    // uniforme per tutti i temi, il bordo verso il centro è comune).
+    paddle: { wMul: 1.5 },
     ball: { color: 0xf5f5f5, emissive: 0x0, metalness: 0.05, roughness: 0.7, emissiveIntensity: 0, light: 0.3, pattern: "soccer" },
     apply: (b) => ({
       ...b,
@@ -172,8 +173,8 @@ export const THEME_DEFS = {
     name: "Air Hockey",
     swatch: [0x4dc6ff, 0xff5368, 0xf5fbff],
     spectators: "stadium",
-    // Mazza tonda: larghezza e lunghezza quasi uguali, area invariata.
-    paddle: { wMul: 2.05, lMul: 0.49 },
+    // Mazza larga e tonda dell'air hockey (la lunghezza resta uniforme).
+    paddle: { wMul: 2.05 },
     ball: { color: 0xf5fbff, emissive: 0x74d5ff, metalness: 0.55, roughness: 0.16, emissiveIntensity: 0.35, light: 1.4 },
     apply: (b) => ({
       ...b,
@@ -219,8 +220,8 @@ export const THEME_DEFS = {
     name: "Baseball",
     swatch: [0x3f9652, 0xd9e4ea, 0xd84747],
     spectators: "stadium",
-    // Mazza: lunga e sottile, stessa area di una barra standard.
-    paddle: { wMul: 0.55, lMul: 1.82 },
+    // Mazza da baseball: stretta (la lunghezza resta uniforme).
+    paddle: { wMul: 0.55 },
     ball: { color: 0xf7f4e8, emissive: 0xffffff, metalness: 0.02, roughness: 0.62, emissiveIntensity: 0.08, light: 0.6 },
     apply: (b) => ({
       ...b,
@@ -344,8 +345,8 @@ export const THEME_DEFS = {
     name: "Sushi",
     swatch: [0xff7a7a, 0x2c2c2c, 0xf5f0dd],
     spectators: "sushi",
-    // Maki: rotolo più corto e largo, stessa area.
-    paddle: { wMul: 1.35, lMul: 0.74 },
+    // Maki: rotolo largo (la lunghezza resta uniforme).
+    paddle: { wMul: 1.35 },
     ball: { color: 0xff9a9a, emissive: 0xff5050, metalness: 0.05, roughness: 0.45, emissiveIntensity: 0.25, light: 0.7 },
     apply: (b) => ({
       ...b,

@@ -8,6 +8,9 @@ export const POWER_DEFS = {
   spike: { id: "spike", glyph: "▲", name: "Spine", desc: "Alza le spine difensive", color: 0xff5a5a },
   invert: { id: "invert", glyph: "⇄", name: "Caos", desc: "Inverte temporaneamente i comandi avversari", color: 0xc77dff },
   barrier: { id: "barrier", glyph: "▤", name: "Barriera", desc: "Crea un muro temporaneo in porta", color: 0x9be7ff },
+  magnet: { id: "magnet", glyph: "◉", name: "Calamita", desc: "Per 6s la palla viene attratta verso la tua racchetta", color: 0xb48cff },
+  fog: { id: "fog", glyph: "☁", name: "Nebbia", desc: "Per 7s una coltre leggera copre il campo avversario", color: 0xcfd8e3 },
+  spin: { id: "spin", glyph: "〰", name: "Effetto", desc: "Il prossimo colpo parte con una fiondata laterale fortissima", color: 0x66e3b0, charges: 1 },
   fan: { id: "fan", glyph: "✺", name: "Ventilatore", desc: "Soffia il disco via da te", color: 0x7ad7ff },
   tilt: { id: "tilt", glyph: "◣", name: "Inclinazione", desc: "Inclina il tavolo", color: 0xffb347 },
   hill: { id: "hill", glyph: "⌒", name: "Collina", desc: "Crea o rafforza il dosso al centro", color: 0x86c06c },
@@ -134,6 +137,17 @@ export function applyPower(id, side, ctx) {
     case "barrier":
       for (const p of pads) addTime(p, "barrierT", 6);
       ctx.features?.raiseBarrier?.(side, 6);
+      break;
+    case "magnet":
+      for (const p of pads) addTime(p, "magnetT", 6);
+      break;
+    case "fog":
+      // La coltre leggera copre la metà campo dell'avversario.
+      ctx.features?.fog?.(side);
+      break;
+    case "spin":
+      // Una carica per colpo: la prossima racchettata parte con la fiondata.
+      for (const p of pads) p.spinHit = (p.spinHit || 0) + 1;
       break;
     case "spike":
       ctx.features?.raiseSpikes?.(side);

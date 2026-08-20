@@ -25,7 +25,16 @@ molto più forte: flash, scossa e messaggio «CURVA!». La curva ha **2 cariche*
 che si ricaricano da sole (~6s l'una); dopo un colpo in curva bisogna
 rilasciare e ripiegare. L'HUD mostra cariche e ricarica.
 
-I power-up si attivano automaticamente appena la palla colpisce il gettone. Gli effetti sono cumulabili; non esiste più una borsa con selezione e uso manuale. I power-up a tempo mostrano i secondi rimanenti nell'HUD.
+I power-up si attivano automaticamente appena la palla colpisce il gettone. Gli effetti sono cumulabili; non esiste più una borsa con selezione e uso manuale. I power-up a tempo mostrano i secondi rimanenti nell'HUD. **A ogni punto fatto tutti i power-up si azzerano** (cariche, timer ed effetti sul campo).
+
+Tra i poteri ci sono anche **Calamita** (la palla viene attratta verso la tua
+racchetta per 6s), **Nebbia** (una coltre leggera copre per 7s la metà campo
+avversaria, senza nasconderla del tutto) ed **Effetto** (il prossimo colpo parte
+con una fiondata laterale fortissima).
+
+Le racchette hanno tutte la **stessa lunghezza** (riferimento: Giungla); cambiano
+larghezza e altezza a seconda del tema, ma il bordo più avanzato verso il centro
+del campo è identico per tutte.
 
 La palla non ha un tetto di velocità: ogni rimbalzo la accelera un po' meno del
 precedente, ma per sempre. La velocità si vede: scia più accesa e rossa, luce

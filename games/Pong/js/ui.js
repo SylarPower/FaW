@@ -371,7 +371,7 @@ export class UI {
         target: 10,
         ballSpeed: opts.ballSpeed || "default",
         paddleSize: opts.paddleSize || "default",
-        powers: ["whack", "stretch", "turbo", "grab"]
+        powers: ["whack", "stretch", "turbo", "grab", "magnet"]
       };
     }
     const c = this._custom;
@@ -408,8 +408,15 @@ export class UI {
             : "Configura la partita, poi crea la stanza e manda il codice al collega."}</p>
 
           <div class="opt">
-            <div><label>Tavolo di base</label><span class="hint">Ostacoli e forma del campo (anteprima sullo sfondo)</span></div>
+            <div><label>Tavolo di base</label></div>
             <div class="seg th-seg">${baseOpts}</div>
+          </div>
+          <div class="custom-base-desc">
+            <strong>${arenaById(c.base)?.name || ""} —</strong>
+            ${arenaById(c.base)?.desc || ""}
+            Il tavolo scelto porta con sé forma del campo, ostacoli e regole
+            (porte, buche, multiball…); i settaggi qui sotto (punti, velocità,
+            dimensione racchetta e power-up) si applicano sopra di esso.
           </div>
           <div class="opt">
             <div><label>Punti per vincere</label></div>
@@ -424,7 +431,7 @@ export class UI {
             ])}</div>
           </div>
           <div class="opt">
-            <div><label>Dimensione racchetta</label><span class="hint">Anteprima sullo sfondo</span></div>
+            <div><label>Dimensione racchetta</label></div>
             <div class="seg">${seg("paddleSize", [
               { id: "small", label: "Piccola" }, { id: "default", label: "Media" },
               { id: "medium", label: "Grande" }, { id: "large", label: "Maxi" }
@@ -439,6 +446,7 @@ export class UI {
 
           <div class="row" style="margin-top:20px">
             <button class="btn" id="cstGo">${vsCPU ? "Gioca contro CPU" : "Crea stanza"}</button>
+            <button class="btn ghost" id="cstPeek">👁 Vedi anteprima — tieni premuto</button>
             <button class="btn small ghost" id="cstNone">Nessun potere</button>
             <button class="btn small ghost" id="cstAll">Tutti</button>
           </div>
@@ -467,6 +475,21 @@ export class UI {
     });
     this.root.querySelector("#cstNone").onclick = () => { this._custom.powers = []; this.showCustom(); };
     this.root.querySelector("#cstAll").onclick = () => { this._custom.powers = Object.keys(POWER_DEFS); this.showCustom(); };
+    // Anteprima: finché il pulsante resta premuto la modale diventa
+    // quasi trasparente e si vede il tavolo che scorre sullo sfondo.
+    const peek = this.root.querySelector("#cstPeek");
+    const scr = this.root.querySelector(".screen");
+    const setPeek = (on) => { if (scr) scr.classList.toggle("peeking", on); };
+    const release = () => setPeek(false);
+    if (this._peekUp) {
+      window.removeEventListener("pointerup", this._peekUp);
+      window.removeEventListener("pointercancel", this._peekUp);
+    }
+    this._peekUp = release;
+    peek.addEventListener("pointerdown", (e) => { e.preventDefault(); setPeek(true); });
+    peek.addEventListener("pointerleave", release);
+    window.addEventListener("pointerup", release);
+    window.addEventListener("pointercancel", release);
     this.root.querySelector("#cstGo").onclick = async () => {
       const cfg = this._custom;
       const options = { ballSpeed: cfg.ballSpeed, paddleSize: cfg.paddleSize };
@@ -823,6 +846,9 @@ export class UI {
       const stepTxt = whackStep > 0 ? ` · ${whackStep}° colpo ${(1.8 + 0.55 * (whackStep - 1)).toFixed(2)}×` : "";
       tags.push(`<div class="slot active" title="I prossimi 3 colpi accelerano la palla: ognuno più veloce del precedente">✸ Schianto ×${whack}${stepTxt}</div>`);
     }
+    if (timers("magnetT")) tags.push(`<div class="slot active" title="La palla viene attratta verso la tua racchetta">◉ Calamita ${timers("magnetT")}s</div>`);
+    const spin = Math.max(0, ...pads.map((p) => p.spinHit || 0));
+    if (spin) tags.push(`<div class="slot active" title="Il prossimo colpo parte con una fiondata laterale fortissima">〰 Effetto ×${spin}</div>`);
     if (stretch) tags.push(`<div class="slot active" title="Allunga la racchetta; gli effetti si sommano">↔ Allunga ×${stretch} · ${stretchLeft()}s</div>`);
     if (timers("grabT")) tags.push(`<div class="slot active">✋ Presa ${timers("grabT")}s</div>`);
     if (timers("turboT")) tags.push(`<div class="slot active">≫ Turbo ${timers("turboT")}s</div>`);
