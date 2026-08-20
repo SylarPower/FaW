@@ -16,21 +16,21 @@ export const ARENAS = [
   },
   {
     id: "walled", zone: "Arcade", zoneId: 1, name: "Muro Spezzato",
-    tag: "Doppio",
-    desc: "Due racchette a testa. La porta è lo squarcio nel muro centrale.",
-    scoreToWin: 10, paddles: 2, powerUps: ["whack", "stretch", "grab", "spin"]
+    tag: "Singolo",
+    desc: "Una racchetta a testa. La porta è lo squarcio nel muro centrale.",
+    scoreToWin: 10, paddles: 1, powerUps: ["whack", "stretch", "grab", "spin"]
   },
   {
     id: "soccer", zone: "Arcade", zoneId: 1, name: "Calcio Stelle",
     tag: "Stadio",
     desc: "Attaccante e portiere. Segna nella porta, non sulla linea di fondo.",
-    scoreToWin: 10, paddles: 2, powerUps: ["whack", "stretch", "turbo", "fog"]
+    scoreToWin: 10, paddles: 1, powerUps: ["whack", "stretch", "turbo", "fog"]
   },
   {
     id: "penguin", zone: "Artide", zoneId: 2, name: "Pinguini sul Ghiaccio",
     tag: "Multiball",
     desc: "Colpisci un pinguino e nasce un'altra palla. Massimo quattro. Ghiaccio viscido.",
-    scoreToWin: 10, paddles: 1, powerUps: ["seal", "stretch", "grab"]
+    scoreToWin: 10, paddles: 1, powerUps: ["seal", "stretch", "grab"], theme: "aurora"
   },
   {
     id: "snowstorm", zone: "Artide", zoneId: 2, name: "Bufera",
@@ -41,14 +41,14 @@ export const ARENAS = [
   {
     id: "logs", zone: "Ostacoli", zoneId: 3, name: "Tronchi Rotanti",
     tag: "Cantiere",
-    desc: "Quattro tronchi al centro. Falli girare verso l'avversario. Due porte a testa.",
+    desc: "Quattro tronchi fermi al centro. Il potere Rotazione li fa girare verso l'avversario. Due porte a testa.",
     scoreToWin: 10, paddles: 1, powerUps: ["spinlog", "whack", "stretch"]
   },
   {
     id: "moles", zone: "Ostacoli", zoneId: 3, name: "Colline delle Talpe",
     tag: "Deflessione",
     desc: "I dossi deviano la palla. Le buche la risputano dall'altra parte.",
-    scoreToWin: 10, paddles: 2, powerUps: ["whack", "stretch", "spin"]
+    scoreToWin: 10, paddles: 1, powerUps: ["whack", "stretch", "spin"]
   },
   {
     id: "clown", zone: "Show", zoneId: 4, name: "Circo dei Colori",
@@ -60,7 +60,7 @@ export const ARENAS = [
     id: "beach", zone: "Show", zoneId: 4, name: "Festa in Spiaggia",
     tag: "Presa infinita",
     desc: "Acqua lenta. Tieni premuto per afferrare e rilasciare la palla. Si gioca a 7.",
-    scoreToWin: 7, paddles: 2, powerUps: ["grab", "magnet"]
+    scoreToWin: 7, paddles: 1, powerUps: ["grab", "magnet"]
   },
   {
     id: "tilt", zone: "Show", zoneId: 4, name: "Tavolo Folle",
@@ -73,12 +73,6 @@ export const ARENAS = [
     tag: "Disco",
     desc: "Afferra una palla e lanciala sul disco. Fai oltrepassare la linea avversaria.",
     scoreToWin: 5, paddles: 1, powerUps: ["grab", "fan"]
-  },
-  {
-    id: "balloons", zone: "Leggenda", zoneId: 5, name: "Palloncini",
-    tag: "Circo",
-    desc: "Arena tonda. Scoppia i palloncini: l'ultimo tocco si prende il punto. Si gioca a 5.",
-    scoreToWin: 5, paddles: 1, powerUps: []
   },
   {
     id: "pinball", zone: "Leggenda", zoneId: 5, name: "Pongball Wizard",
@@ -108,7 +102,7 @@ export const THEMES = {
   classic: { bg: 0x07080e, fog: 0x07080e, table: 0x10141c, line: 0x3dffd1, p1: 0x3dffd1, p2: 0xff3d7f, bloom: 0.42 },
   walled: { bg: 0x0a0b10, fog: 0x0a0b10, table: 0x141821, line: 0xffc857, p1: 0x3dffd1, p2: 0xff3d7f, bloom: 0.4 },
   soccer: { bg: 0x071409, fog: 0x071409, table: 0x1d6b32, line: 0xf5f5f5, p1: 0x3dffd1, p2: 0xff3d7f, hemi: 0xc8ffd4, bloom: 0.32 },
-  penguin: { bg: 0x0a1520, fog: 0x0a1520, table: 0xc8e7f5, line: 0x3d7dff, p1: 0x3dffd1, p2: 0xff6aa8, hemi: 0xd4f0ff, bloom: 0.45, exposure: 1.12 },
+  aurora: { bg: 0x0a1520, fog: 0x0a1520, table: 0xc8e7f5, line: 0x3d7dff, p1: 0x3dffd1, p2: 0xff6aa8, hemi: 0xd4f0ff, bloom: 0.45, exposure: 1.12 },
   snowstorm: { bg: 0x0b1420, fog: 0x8aa, table: 0xd9eef8, line: 0x8ee7ff, p1: 0x8ee7ff, p2: 0xff3d7f, bloom: 0.5 },
   logs: { bg: 0x120c08, fog: 0x120c08, table: 0x3a2718, line: 0xd27d2c, p1: 0xffc857, p2: 0xff6a3d, hemi: 0xffe0c0, bloom: 0.34 },
   moles: { bg: 0x0c140c, fog: 0x0c140c, table: 0x2e7d3a, line: 0xf5f5f5, p1: 0x3dffd1, p2: 0xff3d7f, bloom: 0.3 },
@@ -116,7 +110,6 @@ export const THEMES = {
   beach: { bg: 0x081820, fog: 0x081820, table: 0x1a8f9a, line: 0xffe08a, p1: 0xffe08a, p2: 0xff6aa8, hemi: 0xfff0c8, bloom: 0.4, exposure: 1.15 },
   tilt: { bg: 0x0c0c14, fog: 0x0c0c14, table: 0x1a2030, line: 0x7ad7ff, p1: 0x3dffd1, p2: 0xff3d7f, bloom: 0.44 },
   puck: { bg: 0x0a1018, fog: 0x0a1018, table: 0xcfdbe6, line: 0xff3d7f, p1: 0x3d7dff, p2: 0xff3d7f, bloom: 0.4 },
-  balloons: { bg: 0x14080c, fog: 0x14080c, table: 0x3a1020, line: 0xffc857, p1: 0xff4d8d, p2: 0x4dffd1, bloom: 0.55 },
   pinball: { bg: 0x080610, fog: 0x080610, table: 0x12081c, line: 0xff4dff, p1: 0x3dffd1, p2: 0xffc857, bloom: 0.62 },
   jungle: { bg: 0x071208, fog: 0x071208, table: 0x1c4a24, line: 0xffc857, p1: 0x9be36a, p2: 0xff7a3d, bloom: 0.36 },
   triangle: { bg: 0x08070f, fog: 0x08070f, table: 0x14101c, line: 0xffc857, p1: 0x3dffd1, p2: 0xff3d7f, bloom: 0.5 }
@@ -128,7 +121,9 @@ const P2 = 0xff3d7f;
 export function buildArena(id, engine, world, sizeMul = 1, themeId = "neon") {
   const def = arenaById(id);
   // La palette dell'arena viene filtrata dal tema globale scelto in Opzioni.
-  const theme = applyTheme(themeId, THEMES[id] || THEMES.classic);
+  // Se l'arena ha un tema esplicito (es. penguin -> aurora), lo usa come chiave.
+  const themeKey = def?.theme || id;
+  const theme = applyTheme(themeId, THEMES[themeKey] || THEMES.classic);
   engine.setTheme(theme);
   const ctrl = { id, def, theme, extras: [], snow: null, features: {}, table: null, goldHits: 0 };
 
@@ -176,9 +171,8 @@ export function buildArena(id, engine, world, sizeMul = 1, themeId = "neon") {
     return ctrl;
   }
 
-  if (id === "balloons") {
-    world.w = 16; world.d = 16; world.circle = true; world.radius = 7.6; world.openEnds = false;
-    ctrl.table = engine.add(makeCircleTable(7.6, theme.table, theme.line, theme));
+  if (false) {
+    // balloons removed
   } else {
     world.circle = false;
     world.w = w; world.d = id === "soccer" || id === "moles" ? 13 : 12;
@@ -208,10 +202,7 @@ export function buildArena(id, engine, world, sizeMul = 1, themeId = "neon") {
     }
   };
 
-  if (id === "balloons") {
-    world.paddles.push(makePState("left", "main", { x: -5.8 - dx, hw: hwBase, hd, canMoveX: true, xMin: -6.6 - dx, xMax: -2.2 - dx }));
-    world.paddles.push(makePState("right", "main", { x: 5.8 + dx, hw: hwBase, hd, canMoveX: true, xMin: 2.2 + dx, xMax: 6.6 + dx }));
-  } else if (id === "classic" || id === "penguin" || id === "snowstorm" || id === "tilt" || id === "pinball") {
+  if (id === "classic" || id === "penguin" || id === "snowstorm" || id === "tilt" || id === "pinball") {
     makePads(1);
   } else if (id === "logs" || id === "clown" || id === "jungle" || id === "puck") {
     makePads(1);
@@ -220,7 +211,7 @@ export function buildArena(id, engine, world, sizeMul = 1, themeId = "neon") {
   }
 
   world.icePaddles = (id === "penguin" || id === "snowstorm" || id === "puck") ? 1.2 : 0;
-  world.drag = id === "beach" ? 0.035 : 0;
+  world.drag = id === "beach" ? 0.008 : 0;
 
   setupGoals(id, world, engine, theme, ctrl);
   setupSpecial(id, world, engine, theme, ctrl);
@@ -470,9 +461,9 @@ function setupGoals(id, world, engine, theme, ctrl) {
   }
   if (id === "clown") {
     const colors = [
-      { id: "red", color: 0xff3d5a },
-      { id: "blue", color: 0x3d8fff },
-      { id: "gold", color: 0xffc857 }
+      { id: "red", color: 0xff1a4a },
+      { id: "blue", color: 0x1a7aff },
+      { id: "gold", color: 0xffea2a }
     ];
     ctrl.colors = colors;
     world.openEnds = false;
@@ -486,10 +477,10 @@ function setupGoals(id, world, engine, theme, ctrl) {
           accept: (b) => !b.colorId || b.colorId === c.id, open: true
         });
         const m = new THREE.Mesh(
-          new THREE.BoxGeometry(0.2, 0.55, slot - 0.25),
-          new THREE.MeshStandardMaterial({ color: c.color, emissive: c.color, emissiveIntensity: 0.55 })
+          new THREE.BoxGeometry(0.3, 0.7, slot - 0.2),
+          new THREE.MeshStandardMaterial({ color: c.color, emissive: c.color, emissiveIntensity: 2.5 })
         );
-        m.position.set(side === "left" ? -world.w / 2 - 0.05 : world.w / 2 + 0.05, 0.28, (z0 + z1) / 2);
+        m.position.set(side === "left" ? -world.w / 2 - 0.05 : world.w / 2 + 0.05, 0.35, (z0 + z1) / 2);
         engine.add(m);
       }
     });
@@ -528,11 +519,43 @@ function setupGoals(id, world, engine, theme, ctrl) {
         engine.add(f);
       }
     });
-    addEndWalls(world, engine, theme, null, true, 1.2);
+    // Pareti tra le porte: blocchi solidi tra uno slot e l'altro
+    const mat = new THREE.MeshStandardMaterial({ color: 0x10141c, metalness: 0.4, roughness: 0.35, emissive: theme.line, emissiveIntensity: 0.12 });
+    const h = 0.55;
+    for (const side of [-1, 1]) {
+      const x = side * (world.w / 2 + 0.1);
+      // Muro sopra la porta più alta (z > 4.3)
+      let topH = world.d / 2 - (slots[slots.length - 1] + 0.7) - 0.1;
+      if (topH > 0.2) {
+        const topWall = new THREE.Mesh(new THREE.BoxGeometry(0.22, h, topH * 2), mat);
+        topWall.position.set(x, h / 2, (slots[slots.length - 1] + 0.7 + world.d / 2) / 2);
+        engine.add(topWall);
+        world.obstacles.push({ type: "wall", x, z: topWall.position.z, hw: 0.12, hd: topH, mesh: topWall });
+      }
+      // Muro sotto la porta più bassa (z < -4.3)
+      let botH = (slots[0] - 0.7) - (-world.d / 2) - 0.1;
+      if (botH > 0.2) {
+        const botWall = new THREE.Mesh(new THREE.BoxGeometry(0.22, h, botH * 2), mat);
+        botWall.position.set(x, h / 2, (-world.d / 2 + slots[0] - 0.7) / 2);
+        engine.add(botWall);
+        world.obstacles.push({ type: "wall", x, z: botWall.position.z, hw: 0.12, hd: botH, mesh: botWall });
+      }
+      // Muri tra le porte
+      for (let i = 0; i < slots.length - 1; i++) {
+        const gap = (slots[i+1] - 0.7) - (slots[i] + 0.7);
+        if (gap > 0.2) {
+          const midZ = (slots[i] + 0.7 + slots[i+1] - 0.7) / 2;
+          const mid = new THREE.Mesh(new THREE.BoxGeometry(0.22, h, gap), mat);
+          mid.position.set(x, h / 2, midZ);
+          engine.add(mid);
+          world.obstacles.push({ type: "wall", x, z: midZ, hw: 0.12, hd: gap / 2, mesh: mid });
+        }
+      }
+    }
     return;
   }
-  if (id === "balloons") {
-    world.goals = [];
+  if (false) {
+    // balloons removed
   }
 }
 
@@ -636,20 +659,8 @@ function setupSpecial(id, world, engine, theme, ctrl) {
       ctrl.holes.push(hole);
     }
   }
-  if (id === "balloons") {
-    ctrl.balloons = [];
-    const cols = [0xff3d5a, 0xffc857, 0x3dffd1, 0x4d9fff, 0xff7ad9, 0xb47cff];
-    for (let i = 0; i < 12; i++) {
-      const a = (i / 12) * Math.PI * 2;
-      const r = 2.1 + (i % 3) * 0.55;
-      const mesh = makeBalloon(cols[i % cols.length]);
-      const x = Math.cos(a) * r, z = Math.sin(a) * r;
-      mesh.position.set(x, 0, z);
-      engine.add(mesh);
-      const b = { type: "balloon", x, z, r: 0.4, mesh, hp: 1, color: cols[i % cols.length], restitution: 0.4 };
-      world.obstacles.push(b);
-      ctrl.balloons.push(b);
-    }
+  if (false) {
+    // balloons removed
   }
   if (id === "puck") {
     const mesh = makePuck();
@@ -706,6 +717,24 @@ function setupSpecial(id, world, engine, theme, ctrl) {
   if (id === "tilt") {
     ctrl.tilt = { x: 0, z: 0 };
     ctrl.hillMesh = null;
+    // Livella a bolla: un cerchio trasparente sul tavolo con una bolla
+    // che si sposta in base all'inclinazione.
+    const levelRing = new THREE.Mesh(
+      new THREE.RingGeometry(0.7, 0.85, 32),
+      new THREE.MeshBasicMaterial({ color: 0x7ad7ff, transparent: true, opacity: 0.2, depthWrite: false, side: THREE.DoubleSide })
+    );
+    levelRing.rotation.x = -Math.PI / 2;
+    levelRing.position.set(0, 0.02, 0);
+    engine.add(levelRing);
+    ctrl._levelRing = levelRing;
+    const bubble = new THREE.Mesh(
+      new THREE.CircleGeometry(0.15, 16),
+      new THREE.MeshBasicMaterial({ color: 0x7ad7ff, transparent: true, opacity: 0.7, depthWrite: false })
+    );
+    bubble.rotation.x = -Math.PI / 2;
+    bubble.position.set(0, 0.025, 0);
+    engine.add(bubble);
+    ctrl._levelBubble = bubble;
   }
 
   ctrl.features = {
@@ -826,7 +855,10 @@ function setPillarGlow(ctrl) {
   ctrl.pillars.forEach((p, i) => {
     p.glow = i === ctrl.activePillar && p.hp > 0;
     if (p.mesh?.userData.mat) {
-      p.mesh.userData.mat.emissiveIntensity = p.glow ? 1.2 : 0.15;
+      p.mesh.userData.mat.emissiveIntensity = p.glow ? 2.5 : 0.15;
+      if (p.glow) {
+        p.mesh.scale.setScalar(1.15 + Math.sin(performance.now() * 0.005) * 0.05);
+      }
     }
   });
 }
@@ -887,8 +919,9 @@ export function updateArena(ctrl, world, dt, engine, game) {
 
   if (ctrl.logs) {
     for (const l of ctrl.logs) {
-      l.omega *= Math.pow(0.25, dt);
+      // Tronchi fermi: non ruotano automaticamente, solo il potere Rotazione li muove
       l.mesh.rotation.x += l.omega * dt;
+      l.omega *= Math.pow(0.08, dt);
     }
   }
 
@@ -915,15 +948,15 @@ export function updateArena(ctrl, world, dt, engine, game) {
 
   if (ctrl.puck) {
     const p = ctrl.puck;
-    p.vx *= Math.pow(0.55, dt);
-    p.vz *= Math.pow(0.55, dt);
+    p.vx *= Math.pow(0.92, dt);
+    p.vz *= Math.pow(0.92, dt);
     p.x += p.vx * dt;
     p.z += p.vz * dt;
     const hx = world.w / 2 - p.r - 0.2, hz = world.d / 2 - p.r;
-    if (p.z > hz) { p.z = hz; p.vz *= -0.8; }
-    if (p.z < -hz) { p.z = -hz; p.vz *= -0.8; }
-    if (p.x > hx) { p.x = hx; p.vx *= -0.6; }
-    if (p.x < -hx) { p.x = -hx; p.vx *= -0.6; }
+    if (p.z > hz) { p.z = hz; p.vz *= -0.85; }
+    if (p.z < -hz) { p.z = -hz; p.vz *= -0.85; }
+    if (p.x > hx) { p.x = hx; p.vx *= -0.7; }
+    if (p.x < -hx) { p.x = -hx; p.vx *= -0.7; }
     p.mesh.position.set(p.x, 0.1, p.z);
     p.mesh.rotation.z -= p.vx * dt * 0.4;
     if (p.x > world.w / 2 - ctrl.puckLine - 0.4) {
@@ -940,6 +973,37 @@ export function updateArena(ctrl, world, dt, engine, game) {
     ctrl.tilt.x = lerp(ctrl.tilt.x, want, 1 - Math.pow(0.1, dt));
     ctrl.table.rotation.z = -ctrl.tilt.x;
     world.gravityX = ctrl.tilt.x * 28;
+    // Indicatore visivo dell'inclinazione: linee luminose sul tavolo che
+    // si inclinano e cambiano colore/opacità in base alla pendenza.
+    if (!ctrl._tiltMarkers) {
+      ctrl._tiltMarkers = [];
+      const markerMat = new THREE.MeshBasicMaterial({ color: 0x7ad7ff, transparent: true, opacity: 0.6, depthWrite: false });
+      for (let i = 0; i < 5; i++) {
+        const z = -world.d / 2 + 1.2 + i * (world.d / 5);
+        const m = new THREE.Mesh(new THREE.BoxGeometry(6.0, 0.02, 0.06), markerMat.clone());
+        m.position.set(0, 0.015, z);
+        engine.add(m);
+        ctrl._tiltMarkers.push(m);
+      }
+    }
+    const absTilt = Math.abs(ctrl.tilt.x);
+    ctrl._tiltMarkers.forEach((m, i) => {
+      m.material.opacity = Math.min(0.8, 0.15 + absTilt * 2.5);
+      const phase = i / ctrl._tiltMarkers.length * Math.PI * 2;
+      m.rotation.z = ctrl.tilt.x * 0.5;
+      m.position.y = 0.015 + absTilt * 0.06 * Math.sin(phase + performance.now() * 0.003);
+    });
+    // Bolla della livella: si sposta nella direzione della gravità
+    if (ctrl._levelBubble) {
+      const bx = ctrl.tilt.x * 2;
+      const bz = (ctrl.tilt.z || 0) * 2;
+      ctrl._levelBubble.position.x = lerp(ctrl._levelBubble.position.x, bx, 1 - Math.pow(0.08, dt));
+      ctrl._levelBubble.position.z = lerp(ctrl._levelBubble.position.z, bz, 1 - Math.pow(0.08, dt));
+      ctrl._levelBubble.material.opacity = 0.15 + absTilt * 1.5;
+      if (ctrl._levelRing) {
+        ctrl._levelRing.material.opacity = 0.1 + absTilt * 0.5;
+      }
+    }
     if (ctrl.dip) {
       for (const b of world.balls) {
         const dipForce = 1.8 * Math.max(1, ctrl.dipStacks || 1);
@@ -1010,23 +1074,12 @@ export function handleArenaEvent(ctrl, ev, game, world, engine) {
       game.spawnExtraBall(ev.ball);
     }
   }
-  if (ev.type === "obstacle" && ev.obs?.type === "balloon") {
-    ev.obs.hp--;
-    if (ev.obs.hp <= 0 && ev.obs.alive !== false) {
-      ev.obs.alive = false;
-      ev.obs.mesh.visible = false;
-      world.obstacles = world.obstacles.filter((o) => o !== ev.obs);
-      const scorer = ev.ball.lastHit || (ev.ball.vx > 0 ? "left" : "right");
-      game.scorePoint(scorer, { keepBall: true });
-      game.particles.burst(ev.obs.x, 0.5, ev.obs.z, ev.obs.color, 22, 5);
-      if (ctrl.balloons && ctrl.balloons.every((x) => x.alive === false) && game.checkWin?.() === false) {
-        if (game.scores.left !== game.scores.right) game.endMatch();
-      }
-    }
-  }
   if (ev.type === "obstacle" && ev.obs?.type === "puck") {
-    ev.obs.vx += ev.ball.vx * 0.18;
-    ev.obs.vz += ev.ball.vz * 0.18;
+    ev.obs.vx += ev.ball.vx * 0.45;
+    ev.obs.vz += ev.ball.vz * 0.45;
+    // Un piccolo effetto: la palla perde un po' della sua energia
+    ev.ball.vx *= 0.6;
+    ev.ball.vz *= 0.6;
   }
   if (ev.type === "obstacle" && ev.obs?.type === "bumper") {
     const p = ev.obs;
@@ -1093,9 +1146,14 @@ export function handleArenaEvent(ctrl, ev, game, world, engine) {
       raiseSpikesVisual(ctrl, ev.side, world, true);
     }
   }
-  if (ev.type === "score" && (ctrl.id === "puck" || ctrl.id === "balloons" || ctrl.id === "pinball")) {
-    if (ctrl.id === "puck") return true;
-    if (ctrl.id === "balloons") return true;
+  if (ev.type === "score" && ctrl.id === "penguin") {
+    const aliveCount = world.balls.filter((b) => b.alive).length;
+    if (aliveCount > 0) {
+      return true;
+    }
+  }
+  if (ev.type === "score" && (ctrl.id === "puck" || ctrl.id === "pinball")) {
+    return true;
   }
 }
 

@@ -120,7 +120,13 @@ export class Game {
     this._bindPowerPickups();
     const options = { ...this.save.options, ...(this.matchOptions || {}) };
     const sizeMul = SIZE_MUL[options.paddleSize] || 1;
-    this.ctrl = buildArena(id, this.engine, this.world, sizeMul, options.theme);
+    // Forza il tema per arene specifiche
+    let themeId = options.theme;
+    if (id === "penguin") themeId = "aurora";
+    if (id === "beach") themeId = "spiaggia";
+    if (id === "soccer") themeId = "boot";
+    if (id === "puck") themeId = "airhockey";
+    this.ctrl = buildArena(id, this.engine, this.world, sizeMul, themeId);
     this.triangle = !!this.world.triangle;
     const def = arenaById(id);
     // Pool di poteri: arena personalizzata detta il suo, altrimenti quello
@@ -471,7 +477,7 @@ export class Game {
     if (this.state === "countdown") {
       this.cd -= dt;
       const n = this.cd > 0.75 ? "READY" : "GO";
-      if (this.msg !== n || this.msgT <= 0) this.showMsg(n, n === "READY" ? 0.8 : 0.45);
+      if (this.msg !== n) this.showMsg(n, n === "READY" ? 0.8 : 0.45);
       if (this.cd <= 0) {
         this.state = "play";
         this.serve(this.serveDir);
@@ -486,7 +492,7 @@ export class Game {
     if (this.state === "point") {
       this.cd -= dt;
       const n = this.cd > 0.75 ? "READY" : "GO";
-      if (this.msg !== n || this.msgT <= 0) this.showMsg(n, n === "READY" ? 0.8 : 0.45);
+      if (this.msg !== n) this.showMsg(n, n === "READY" ? 0.8 : 0.45);
       this.resetPaddlesForServe();
       this.syncVisuals(dt);
       this.publishSnap();
@@ -541,7 +547,7 @@ export class Game {
         this.engine.kick(0.05 + spd * 0.004);
         this.particles.spark(ev.ball.x, 0.3, ev.ball.z, 1, this.sideColor(ev.paddle.side));
         // Particelle a tema (foglie, salsa di soia, scintille, schegge di ghiaccio).
-        const burst = impactParticles(this.engine.arenaRoot, ev.ball.x, ev.ball.z, this.ctrl.theme, this.sideColor(ev.paddle.side));
+        const burst = impactParticles(this.engine.arenaRoot, ev.ball.x, ev.ball.z, this.ctrl.theme, this.sideColor(ev.paddle.side), ev.paddle);
         if (burst) this._bursts.push(burst);
         // L'impatto si anima in altezza, non lungo la zona di contatto.
         if (ev.paddle.mesh) ev.paddle.mesh.scale.y = 1.06;
@@ -784,7 +790,6 @@ export class Game {
     this.engine.flash(this.flashEl, hex, 90);
     if (!this.demo) {
       this.ui.updateHUD(this);
-      this.showMsg("READY", 1.0);
     }
     if (opts.keepBall) {
       if (this.checkWin() && !this.demo) this.endMatch();
