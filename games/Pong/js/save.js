@@ -1,4 +1,4 @@
-const KEY = "pong-nl-save-v1";
+const KEY = "pong-nl-save-v2";
 
 const DEFAULT = {
   unlocked: ["classic"],
@@ -7,7 +7,6 @@ const DEFAULT = {
   options: {
     paddleSize: "default",
     ballSpeed: "default",
-    extraPowers: false,
     difficulty: "medio",
     theme: "neon"
   }

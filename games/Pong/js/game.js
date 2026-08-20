@@ -1,11 +1,12 @@
 import { Engine } from "./engine.js";
+import * as THREE from "three";
 import { World, Ball, rand } from "./physics.js";
 import { Particles, BallTrail } from "./particles.js";
 import { input } from "./input.js";
 import { updateAI, SKILL } from "./ai.js";
 import { PowerUpManager, applyPower, POWER_DEFS } from "./powerups.js";
 import { ARENAS, buildArena, updateArena, handleArenaEvent, nextBallColor, arenaById } from "./arenas.js";
-import { makePaddle, makeBall } from "./models.js";
+import { makePaddle, makeBall, impactParticles, updateBurst, makeGoalCelebration, cheerSpectators } from "./models.js";
 import { loadSave, writeSave, SIZE_MUL, SPEED_MUL } from "./save.js";
 import { net } from "./net.js";
 import { PCOL, PNAME, DUEL_SIDES, TRI_SIDES } from "./players.js";
@@ -111,18 +112,13 @@ export class Game {
     this.ctrl = buildArena(id, this.engine, this.world, sizeMul, options.theme);
     this.triangle = !!this.world.triangle;
     const def = arenaById(id);
-    // L'arena personalizzata detta il proprio pool (anche vuoto): in quel caso
-    // ignoriamo sia i power-up dell'arena base sia l'opzione "extra".
+    // Pool di poteri: arena personalizzata detta il suo, altrimenti quello
+    // predefinito dell'arena.
     let pool;
     if (this.customPowers) {
       pool = this.customPowers.slice();
     } else {
       pool = (def.powerUps || []).slice();
-      if (options.extraPowers) {
-        for (const extra of ["grab", "whack", "stretch", "turbo"]) {
-          if (!pool.includes(extra)) pool.push(extra);
-        }
-      }
     }
     this.powers.setPool(pool);
     this.powers.spawnEvery = 6.5;
@@ -138,6 +134,8 @@ export class Game {
     else this.scores = { left: 0, right: 0 };
     this.rally = 0;
     this.speedMul = SPEED_MUL[options.ballSpeed] || 1;
+    this._bursts = [];
+    this._cheerT = 0;
   }
 
   /**
@@ -147,7 +145,11 @@ export class Game {
    */
   refreshTheme() {
     if (!this.ctrl) return;
-    const id = this.ctrl.id;
+    let id = this.ctrl.id;
+    // Se siamo in demo ma l'arena che stavano guardando in preview non e'
+    // quella del titolo, ricarica un'arena demo a caso cosi' non restiamo
+    // bloccati sulla preview "su misura".
+    if (this.demo && this.state === "title") id = pickDemo();
     this.loadArena(id, { demo: this.demo });
     if (this.demo) this.serve(this.serveDir);
   }
@@ -269,11 +271,18 @@ export class Game {
     return b;
   }
 
-  syncBall(b) {
+  syncBall(b, dt = 0) {
     if (!b.mesh) return;
     b.mesh.position.set(b.x, b.y, b.z);
-    b.mesh.rotation.x += b.vz * 0.02;
-    b.mesh.rotation.z -= b.vx * 0.02;
+    // La decorazione tematica (pallottola, ascia) ruota in base alla velocità.
+    const deco = b.mesh.userData.deco;
+    if (deco) {
+      const sp = Math.hypot(b.vx, b.vz);
+      if (sp > 0.1) {
+        const axis = new THREE.Vector3(-b.vz / sp, 0, b.vx / sp);
+        deco.rotateOnWorldAxis(axis, sp * dt * 0.9);
+      }
+    }
     if (b.mesh.userData.light) {
       const base = b.mesh.userData.lightBase ?? 1.6;
       b.mesh.userData.light.intensity = b.held ? base * 0.25 : base;
@@ -289,6 +298,14 @@ export class Game {
       if (this.msgT <= 0) this.ui.setCenter("");
     }
 
+    // Navigazione tastiera nei menu: W/S muovono, Spazio conferma, Esc torna indietro.
+    // Funziona ogni volta che c'e' una UI di menu sullo schermo (non in partita HUD).
+    const nonMenuScreens = new Set(["hud", "load"]);
+    const inMenu = this.demo || !nonMenuScreens.has(this.ui.screen);
+    if (inMenu && this.ui.updateMenuNav) {
+      this.ui.updateMenuNav(input);
+    }
+
     if (this.online && (this.state === "play" || this.state === "countdown" || this.state === "point")) {
       net.writeInput(input.snapshot());
     }
@@ -300,6 +317,9 @@ export class Game {
     }
 
     if (this.state === "pause") {
+      // Pausa è un "menu" sovrapposto all'HUD: la tastiera (W/S, Spazio, Esc)
+      // deve funzionare anche qui. Esc riprende la partita.
+      if (this.ui.updateMenuNav) this.ui.updateMenuNav(input);
       if (input.pause && this.isHost()) this.resume();
       input.endFrame();
       return;
@@ -385,19 +405,33 @@ export class Game {
         const spd = ev.ball.speed();
         this.engine.kick(0.08 + spd * 0.006);
         this.particles.spark(ev.ball.x, 0.3, ev.ball.z, 1, this.sideColor(ev.paddle.side));
+        // Particelle a tema (foglie, salsa di soia, scintille, schegge di ghiaccio).
+        const burst = impactParticles(this.engine.arenaRoot, ev.ball.x, ev.ball.z, this.ctrl.theme, this.sideColor(ev.paddle.side));
+        if (burst) this._bursts.push(burst);
         if (ev.paddle.mesh) ev.paddle.mesh.scale.z = 1.12;
+        // Dopo molti scambi la palla accelera leggermente (fino a un tetto).
+        if (this.rally > 6) {
+          const factor = Math.min(1.25, 1 + (this.rally - 6) * 0.012);
+          ev.ball.minSpeed = 8 * this.speedMul * factor;
+        }
         fx.push("hit");
       }
       if (ev.type === "wall") { fx.push("wall"); }
       if (ev.type === "score") {
+        let scorer;
         if (this.triangle) {
-          const scorer = ev.ball.lastHit;
-          if (scorer && scorer !== ev.side) this.scorePoint(scorer);
-          else this.serveSoon();
+          scorer = ev.ball.lastHit;
+          if (!scorer || scorer === ev.side) { this.serveSoon(); continue; }
         } else {
-          const scorer = ev.side === "left" ? "right" : "left";
-          this.scorePoint(scorer);
+          scorer = ev.side === "left" ? "right" : "left";
         }
+        // Festeggiamento in stile Rocket League: cono di luce, onda d'urto e
+        // tribune che saltano.
+        const scorerX = scorer === "left" || scorer === "west" ? -8 : 8;
+        makeGoalCelebration(this.engine.scene, scorerX, this.sideColor(scorer));
+        this._cheerT = 2.2;
+        this.engine.kick(0.6);
+        this.scorePoint(scorer);
         fx.push("score");
       }
       if (ev.type === "powerup") {
@@ -743,8 +777,19 @@ export class Game {
       }
     }
     for (const b of this.world.balls) {
-      this.syncBall(b);
+      this.syncBall(b, dt);
       b._trail?.update(dt, b);
+    }
+    // Aggiorna i fuochi di festa e le tribune.
+    if (this._bursts) {
+      for (let i = this._bursts.length-1; i >= 0; i--) {
+        updateBurst(this._bursts[i], dt, this.engine.arenaRoot);
+        if (!this._bursts[i].length) this._bursts.splice(i, 1);
+      }
+    }
+    if (this.ctrl?.spectators) {
+      this._cheerT = Math.max(0, (this._cheerT || 0) - dt);
+      cheerSpectators(this.ctrl.spectators, dt, performance.now()/1000, this._cheerT > 0 ? 1 : 0);
     }
   }
 }

@@ -50,7 +50,6 @@ const hex = (c) => "#" + c.toString(16).padStart(6, "0");
 
 /** Parametri comuni al solo tema che deve davvero sembrare al neon. */
 const neonMaterials = {
-  style: "neon",
   tableMetalness: 0.35,
   tableRoughness: 0.38,
   tableEmissive: 0.04,
@@ -94,17 +93,18 @@ export const THEME_DEFS = {
   neon: {
     id: "neon",
     name: "Neon",
-    desc: "Il look originale: metallo scuro, riflessi e accenti al neon.",
     swatch: [0x3dffd1, 0xff3d7f, 0xffc857],
+    ball: { color: 0xffffff, emissive: 0xffffff, metalness: 0.65, roughness: 0.18, emissiveIntensity: 0.25, light: 1.8 },
     apply: (b) => ({ ...b, ...neonMaterials }),
-    ui: null // usa i valori di default del CSS
+    ui: null
   },
 
   jungle: {
     id: "jungle",
     name: "Giungla",
-    desc: "Erba vera sul tavolo, ciuffi ai bordi e racchette di legno avvolte dalle liane.",
     swatch: [0x75a843, 0x274e2b, 0xc49a5a],
+    spectators: "jungle",
+    ball: { color: 0xd7b07a, emissive: 0x0, metalness: 0.02, roughness: 0.85, emissiveIntensity: 0, light: 0.25 },
     apply: (b) => ({
       ...b,
       ...matteMaterials,
@@ -135,8 +135,9 @@ export const THEME_DEFS = {
   boot: {
     id: "boot",
     name: "Scarpone",
-    desc: "Un campo da calcio opaco: le barre diventano veri scarponi con lacci e tacchetti.",
     swatch: [0x2f8a43, 0xf4efe1, 0xe04848],
+    spectators: "stadium",
+    ball: { color: 0xf5f5f5, emissive: 0x0, metalness: 0.05, roughness: 0.7, emissiveIntensity: 0, light: 0.3, pattern: "soccer" },
     apply: (b) => ({
       ...b,
       ...matteMaterials,
@@ -167,8 +168,9 @@ export const THEME_DEFS = {
   retro: {
     id: "retro",
     name: "Retro CRT",
-    desc: "Cabinet anni '70: fosfori verdi, griglia a pixel e materiali opachi, senza cromature.",
     swatch: [0x36df68, 0x10351b, 0xb4ff4a],
+    spectators: "pixel",
+    ball: { color: 0xb4ff4a, emissive: 0x36df68, metalness: 0.1, roughness: 0.5, emissiveIntensity: 0.55, light: 0.6 },
     apply: (b) => ({
       ...b,
       ...matteMaterials,
@@ -183,8 +185,8 @@ export const THEME_DEFS = {
       tableRoughness: 0.72,
       paddleEmissive: 0.08,
       edgeGlow: 0.18,
-      ballEmissive: 0.06,
-      ballLight: 0.25,
+      ballEmissive: 0.3,
+      ballLight: 0.5,
       bloom: 0.1,
       exposure: 0.95,
       accentIntensity: 0.16,
@@ -204,8 +206,10 @@ export const THEME_DEFS = {
   aurora: {
     id: "aurora",
     name: "Ghiaccio",
-    desc: "Superfici fredde e levigate, cristalli ai bordi e luce artica soffusa.",
     swatch: [0x76b7ff, 0xb59bff, 0xd9f5ff],
+    spectators: "ice",
+    // La barra sul ghiaccio si vedeva poco: piu' scura, bordo piu' marcato.
+    ball: { color: 0xeaf6ff, emissive: 0x76b7ff, metalness: 0.2, roughness: 0.1, emissiveIntensity: 0.35, light: 0.9 },
     apply: (b) => ({
       ...b,
       style: "ice",
@@ -213,34 +217,35 @@ export const THEME_DEFS = {
       fog: 0x111d32,
       table: tint(sat(b.table, 0.35), 0xaad9eb, 0.68),
       line: 0xd9f5ff,
-      p1: 0x76b7ff,
-      p2: 0xb59bff,
+      p1: 0x3b82f6,
+      p2: 0xa855f7,
       hemi: 0xdceeff,
       bloom: 0.12,
       exposure: 1.08,
       tableMetalness: 0.05,
       tableRoughness: 0.18,
       tableEmissive: 0.01,
-      rimGlow: 0.12,
-      paddleMetalness: 0.08,
-      paddleRoughness: 0.2,
-      paddleEmissive: 0.03,
-      edgeGlow: 0.18,
+      rimGlow: 0.18,
+      // Racchetta piu' scura e con bordo marcato, cosi' non si confonde col tavolo.
+      paddleMetalness: 0.15,
+      paddleRoughness: 0.28,
+      paddleEmissive: 0.12,
+      edgeGlow: 0.55,
       ballMetalness: 0.12,
       ballRoughness: 0.12,
-      ballEmissive: 0.02,
-      ballLight: 0.25,
+      ballEmissive: 0.06,
+      ballLight: 0.55,
       showStars: true,
       showRings: false,
-      accentIntensity: 0.24,
+      accentIntensity: 0.35,
       sunIntensity: 1.75,
       hemiIntensity: 1.2
     }),
     ui: {
       "--bg": "#09101e", "--panel": "rgba(12, 23, 42, 0.84)",
       "--panel-2": "rgba(20, 34, 58, 0.95)", "--line": "rgba(217, 245, 255, 0.17)",
-      "--mint": "#76b7ff", "--mint-dim": "rgba(118, 183, 255, 0.16)",
-      "--pink": "#b59bff", "--pink-dim": "rgba(181, 155, 255, 0.16)",
+      "--mint": "#4a9eff", "--mint-dim": "rgba(74, 158, 255, 0.18)",
+      "--pink": "#b480ff", "--pink-dim": "rgba(180, 128, 255, 0.18)",
       "--gold": "#d9f5ff", "--ice": "#e9fbff",
       "--text": "#f1f8ff", "--muted": "#879bb5"
     }
@@ -249,8 +254,9 @@ export const THEME_DEFS = {
   sunset: {
     id: "sunset",
     name: "Terracotta",
-    desc: "Argilla, sabbia e colori caldi: tutto opaco, come un campo al tramonto.",
     swatch: [0xe58a4b, 0x913f4b, 0xf1cb85],
+    spectators: "canyon",
+    ball: { color: 0xf1cb85, emissive: 0xd06030, metalness: 0.02, roughness: 0.7, emissiveIntensity: 0.12, light: 0.4 },
     apply: (b) => ({
       ...b,
       ...matteMaterials,
@@ -281,8 +287,9 @@ export const THEME_DEFS = {
   mono: {
     id: "mono",
     name: "Inchiostro",
-    desc: "Bianco e nero da tavolo tecnico: carta ruvida, ombre nette, zero bagliori.",
     swatch: [0xf5f1e8, 0x8d8b86, 0x242424],
+    spectators: "silhouette",
+    ball: { color: 0xf5f1e8, emissive: 0xffffff, metalness: 0.02, roughness: 0.5, emissiveIntensity: 0.1, light: 0.5 },
     apply: (b) => ({
       ...b,
       ...matteMaterials,
@@ -308,6 +315,133 @@ export const THEME_DEFS = {
       "--gold": "#ded9cd", "--ice": "#ffffff",
       "--text": "#f5f1e8", "--muted": "#999792"
     }
+  },
+
+  sushi: {
+    id: "sushi",
+    name: "Sushi",
+    swatch: [0xff7a7a, 0x2c2c2c, 0xf5f0dd],
+    spectators: "sushi",
+    ball: { color: 0xff9a9a, emissive: 0xff5050, metalness: 0.05, roughness: 0.45, emissiveIntensity: 0.25, light: 0.7 },
+    apply: (b) => ({
+      ...b,
+      ...matteMaterials,
+      style: "sushi",
+      bg: 0x1a0e10,
+      fog: 0x2b1618,
+      table: 0x1f2728,
+      line: 0xffb07a,
+      p1: 0xff6b6b,
+      p2: 0x7fd1b9,
+      hemi: 0xffe2d1,
+      bloom: 0.18,
+      exposure: 1.1,
+      tableMetalness: 0.08,
+      tableRoughness: 0.45,
+      tableEmissive: 0.0,
+      rimGlow: 0.18,
+      paddleMetalness: 0.1,
+      paddleRoughness: 0.55,
+      paddleEmissive: 0.15,
+      edgeGlow: 0.35,
+      ballEmissive: 0.2,
+      ballLight: 0.7,
+      accentIntensity: 0.45,
+      sunIntensity: 1.7,
+      hemiIntensity: 1.0
+    }),
+    ui: {
+      "--bg": "#1a0e10", "--panel": "rgba(35, 18, 20, 0.88)",
+      "--panel-2": "rgba(50, 25, 28, 0.96)", "--line": "rgba(255, 176, 122, 0.2)",
+      "--mint": "#7fd1b9", "--mint-dim": "rgba(127, 209, 185, 0.17)",
+      "--pink": "#ff6b6b", "--pink-dim": "rgba(255, 107, 107, 0.17)",
+      "--gold": "#ffb07a", "--ice": "#f5f0dd",
+      "--text": "#fff4ea", "--muted": "#b59a92"
+    }
+  },
+
+  viking: {
+    id: "viking",
+    name: "Vichingo",
+    swatch: [0xd9b26b, 0x5b3a1e, 0x9ec4d2],
+    spectators: "viking",
+    ball: { color: 0xf3d27a, emissive: 0xd88f2b, metalness: 0.45, roughness: 0.35, emissiveIntensity: 0.2, light: 0.7 },
+    apply: (b) => ({
+      ...b,
+      ...matteMaterials,
+      style: "viking",
+      bg: 0x15100c,
+      fog: 0x2a1e14,
+      table: 0x4a3220,
+      line: 0xe8c069,
+      p1: 0xd9b26b,
+      p2: 0x9ec4d2,
+      hemi: 0xf6e3b5,
+      bloom: 0.1,
+      exposure: 1.08,
+      tableRoughness: 0.82,
+      paddleMetalness: 0.25,
+      paddleRoughness: 0.5,
+      paddleEmissive: 0.05,
+      edgeGlow: 0.25,
+      ballMetalness: 0.45,
+      ballRoughness: 0.35,
+      ballEmissive: 0.2,
+      ballLight: 0.65,
+      accentIntensity: 0.3,
+      sunIntensity: 1.8,
+      hemiIntensity: 0.95
+    }),
+    ui: {
+      "--bg": "#15100c", "--panel": "rgba(28, 20, 14, 0.9)",
+      "--panel-2": "rgba(44, 30, 20, 0.96)", "--line": "rgba(232, 192, 105, 0.2)",
+      "--mint": "#d9b26b", "--mint-dim": "rgba(217, 178, 107, 0.17)",
+      "--pink": "#9ec4d2", "--pink-dim": "rgba(158, 196, 210, 0.17)",
+      "--gold": "#f0cf7e", "--ice": "#e8d9b8",
+      "--text": "#fff2d6", "--muted": "#b59c7c"
+    }
+  },
+
+  western: {
+    id: "western",
+    name: "Western",
+    swatch: [0xc9813a, 0x5c3218, 0xf0ddb0],
+    spectators: "western",
+    ball: { color: 0xd9a05b, emissive: 0xa04b1a, metalness: 0.08, roughness: 0.8, emissiveIntensity: 0.05, light: 0.35 },
+    apply: (b) => ({
+      ...b,
+      ...matteMaterials,
+      style: "western",
+      bg: 0x1e1408,
+      fog: 0x3a2614,
+      table: 0x7a4a22,
+      line: 0xf0ddb0,
+      p1: 0xc9813a,
+      p2: 0xb5392a,
+      hemi: 0xffe8bf,
+      bloom: 0.04,
+      exposure: 1.1,
+      tableRoughness: 0.9,
+      paddleMetalness: 0.05,
+      paddleRoughness: 0.78,
+      paddleEmissive: 0.02,
+      edgeGlow: 0.12,
+      ballMetalness: 0.08,
+      ballRoughness: 0.8,
+      ballEmissive: 0.05,
+      ballLight: 0.3,
+      accentIntensity: 0.1,
+      sunIntensity: 2.1,
+      hemiIntensity: 1.05
+    }),
+    ui: {
+      "--bg": "#1e1408", "--panel": "rgba(38, 24, 12, 0.9)",
+      "--panel-2": "rgba(58, 36, 20, 0.96)", "--line": "rgba(240, 221, 176, 0.2)",
+      "--mint": "#e6a14a", "--mint-dim": "rgba(230, 161, 74, 0.17)",
+      "--pink": "#c84535", "--pink-dim": "rgba(200, 69, 53, 0.17)",
+      "--gold": "#f0ddb0", "--ice": "#e9d0a0",
+      "--text": "#fff1d6", "--muted": "#b89671"
+    }
   }
 };
 
@@ -319,7 +453,14 @@ export function themeById(id) {
 
 /** Applica il tema alla palette di un'arena. */
 export function applyTheme(themeId, base) {
-  return themeById(themeId).apply(base);
+  const def = themeById(themeId);
+  const res = def.apply(base);
+  // Porta in risultato anche le proprietà specifiche del tema (palla,
+  // spettatori, stile) che la funzione apply() non setta da sola.
+  if (def.ball) res.ball = def.ball;
+  if (def.spectators) res.spectators = def.spectators;
+  if (!res.style && def.id === "neon") res.style = "neon";
+  return res;
 }
 
 /**
@@ -343,4 +484,9 @@ export function applyThemeToUI(themeId, root = document.documentElement) {
 /** Colori di anteprima per la schermata Opzioni. */
 export function themeSwatch(themeId) {
   return themeById(themeId).swatch.map(hex);
+}
+
+/** Restituisce i parametri della palla per un tema. */
+export function ballStyleFor(themeId) {
+  return themeById(themeId).ball || null;
 }
