@@ -3,6 +3,7 @@ import { audio } from "./audio.js";
 import { POWER_DEFS } from "./powerups.js";
 import { net, isFirebaseConfigured, codeFromSeed } from "./net.js";
 import { PNAME, TRI_SIDES, DUEL_SIDES } from "./players.js";
+import { THEME_IDS, themeById, applyThemeToUI } from "./themes.js";
 
 export class UI {
   constructor(root) {
@@ -182,8 +183,10 @@ export class UI {
         <div class="menu">
           <button class="btn" data-act="cpu">1 vs Computer</button>
           <button class="btn pink" data-act="pvp">${fb ? "1 vs Giocatore · online" : "1 vs Giocatore · configura Firebase"}</button>
-          <button class="btn gold" data-act="tri-cpu">Triangolo 1v1v1 · vs 2 CPU</button>
-          <button class="btn gold" data-act="tri-on">${fb ? "Triangolo 1v1v1 · online" : "Triangolo online · configura Firebase"}</button>
+          <!-- Triangolo 1v1v1 temporaneamente nascosto: la resa a schermo non e'
+               all'altezza del 1v1 e va riprogettata. Il codice resta al suo posto
+               (arena "triangle", collideTriangle, TRI_SIDES) e per riattivarlo
+               basta rimettere qui i due bottoni tri-cpu / tri-on. -->
         </div>
       </div>`));
     this.hook();
@@ -222,13 +225,26 @@ export class UI {
         </div>
       </div>`).join("");
 
+    // Nell'online si puo' costruire un'arena su misura (regole + power-up).
+    const customBlock = vsCPU ? "" : `
+      <div class="zone-block">
+        <h3>Su misura</h3>
+        <div class="cards">
+          <button class="card card-custom" data-act="custom">
+            <div class="tag">Personalizzata</div>
+            <h4>Arena su misura</h4>
+            <p>Scegli tavolo, punteggio, velocità, racchette e quali power-up entrano in campo.</p>
+          </button>
+        </div>
+      </div>`;
+
     this.show(this.el(`
       <div class="screen">
         <button class="btn small ghost back" data-act="play">← Indietro</button>
         <div class="panel">
           <h2 class="section">${vsCPU ? "Campagna" : "Scontro online"}</h2>
           <p class="sub">${vsCPU ? "Vinci con 2 punti di scarto per sbloccare la successiva." : "Scegli l'arena. Poi crei una stanza e mandi il codice al collega."}</p>
-          <div class="zones">${cards}</div>
+          <div class="zones">${customBlock}${cards}</div>
         </div>
       </div>`));
     this.hook();
@@ -238,6 +254,124 @@ export class UI {
         this.showBrief(btn.dataset.arena, vsCPU);
       });
     });
+  }
+
+  /**
+   * Arena personalizzata (solo online): l'host sceglie tavolo di base, regole e
+   * quali power-up entrano in campo. Le scelte finiscono in `settings.custom`
+   * dentro la stanza Firebase, quindi valgono anche per chi si unisce.
+   */
+  showCustom() {
+    this.screen = "custom";
+    const c = this._custom || (this._custom = {
+      base: "classic",
+      target: 10,
+      ballSpeed: "default",
+      paddleSize: "default",
+      powers: ["whack", "stretch", "turbo", "grab"]
+    });
+
+    const bases = this.campaignArenas().filter((a) => !a.triangle);
+    const baseOpts = bases.map((a) =>
+      `<button data-cst="base" data-val="${a.id}" class="${c.base === a.id ? "on" : ""}">${a.name}</button>`).join("");
+    const seg = (key, vals) => vals.map((v) =>
+      `<button data-cst="${key}" data-val="${v.id}" class="${String(c[key]) === String(v.id) ? "on" : ""}">${v.label}</button>`).join("");
+
+    const powerCards = Object.keys(POWER_DEFS).map((id) => {
+      const p = POWER_DEFS[id];
+      const on = c.powers.includes(id);
+      const hex = "#" + p.color.toString(16).padStart(6, "0");
+      return `
+        <button class="pw-pick ${on ? "on" : ""}" data-power="${id}">
+          <span class="pw-dot" style="background:${hex};box-shadow:0 0 10px ${hex}"></span>
+          <span class="pw-pick-name">${p.name}</span>
+          <span class="pw-pick-desc">${p.desc}</span>
+        </button>`;
+    }).join("");
+
+    this.show(this.el(`
+      <div class="screen">
+        <button class="btn small ghost back" data-act="zones">← Arene</button>
+        <div class="panel">
+          <h2 class="section">Arena su misura</h2>
+          <p class="sub">Configura la partita, poi crea la stanza e manda il codice al collega.</p>
+
+          <div class="opt">
+            <div><label>Tavolo di base</label><span class="hint">Ostacoli e forma del campo</span></div>
+            <div class="seg th-seg">${baseOpts}</div>
+          </div>
+          <div class="opt">
+            <div><label>Punti per vincere</label></div>
+            <div class="seg">${seg("target", [
+              { id: 5, label: "5" }, { id: 7, label: "7" }, { id: 10, label: "10" }, { id: 15, label: "15" }
+            ])}</div>
+          </div>
+          <div class="opt">
+            <div><label>Velocità palla</label></div>
+            <div class="seg">${seg("ballSpeed", [
+              { id: "slow", label: "Lenta" }, { id: "default", label: "Media" }, { id: "fast", label: "Veloce" }
+            ])}</div>
+          </div>
+          <div class="opt">
+            <div><label>Dimensione racchetta</label></div>
+            <div class="seg">${seg("paddleSize", [
+              { id: "small", label: "Piccola" }, { id: "default", label: "Media" },
+              { id: "medium", label: "Grande" }, { id: "large", label: "Maxi" }
+            ])}</div>
+          </div>
+
+          <div style="margin-top:18px">
+            <label style="font-weight:600">Power-up in campo</label>
+            <span class="hint" style="display:block;margin:3px 0 10px">Tocca per attivarli o spegnerli. Nessuno selezionato = partita pulita.</span>
+            <div class="pw-picks">${powerCards}</div>
+          </div>
+
+          <div class="row" style="margin-top:20px">
+            <button class="btn" id="cstGo">Crea stanza</button>
+            <button class="btn small ghost" id="cstNone">Nessun potere</button>
+            <button class="btn small ghost" id="cstAll">Tutti</button>
+          </div>
+        </div>
+      </div>`));
+    this.hook();
+
+    this.root.querySelectorAll("[data-cst]").forEach((b) => {
+      b.addEventListener("click", () => {
+        audio.ui();
+        const k = b.dataset.cst;
+        let v = b.dataset.val;
+        if (k === "target") v = Number.parseInt(v, 10);
+        this._custom[k] = v;
+        this.showCustom();
+      });
+    });
+    this.root.querySelectorAll("[data-power]").forEach((b) => {
+      b.addEventListener("click", () => {
+        audio.ui();
+        const id = b.dataset.power;
+        const i = this._custom.powers.indexOf(id);
+        if (i >= 0) this._custom.powers.splice(i, 1);
+        else this._custom.powers.push(id);
+        this.showCustom();
+      });
+    });
+    this.root.querySelector("#cstNone").onclick = () => { audio.ui(); this._custom.powers = []; this.showCustom(); };
+    this.root.querySelector("#cstAll").onclick = () => { audio.ui(); this._custom.powers = Object.keys(POWER_DEFS); this.showCustom(); };
+    this.root.querySelector("#cstGo").onclick = async () => {
+      audio.confirm();
+      const cfg = this._custom;
+      await this.createRoom({
+        mode: "duel",
+        arenaId: cfg.base,
+        seats: 2,
+        settings: {
+          arenaId: cfg.base,
+          target: cfg.target,
+          custom: { powers: cfg.powers.slice() },
+          options: { ballSpeed: cfg.ballSpeed, paddleSize: cfg.paddleSize }
+        }
+      });
+    };
   }
 
   showBrief(id, vsCPU) {
@@ -439,7 +573,8 @@ export class UI {
         online: true,
         triangle: seats === 3,
         vsCPU: false,
-        target: settings.target
+        target: settings.target,
+        powers: settings.custom?.powers
       });
     });
   }
@@ -575,6 +710,15 @@ export class UI {
           <h2 class="section">Opzioni</h2>
           <p class="sub">Restano salvate su questo browser.</p>
           <div class="opt">
+            <div><label>Tema grafica</label><span class="hint">${themeById(o.theme).desc}</span></div>
+            <div class="seg th-seg">${THEME_IDS.map((id) => {
+              const t = themeById(id);
+              const dots = t.swatch.map((c) =>
+                `<i style="background:#${c.toString(16).padStart(6, "0")}"></i>`).join("");
+              return `<button data-opt="theme" data-val="${id}" class="${o.theme === id ? "on" : ""}" title="${t.desc}"><span class="th-dots">${dots}</span>${t.name}</button>`;
+            }).join("")}</div>
+          </div>
+          <div class="opt">
             <div><label>Dimensione racchetta</label><span class="hint">Default, piccola, media, grande</span></div>
             <div class="seg">${seg("paddleSize", [
               { id: "small", label: "Piccola" }, { id: "default", label: "Default" },
@@ -616,6 +760,12 @@ export class UI {
         else if (val === "false") val = false;
         this.game.save.options[key] = val;
         this.game.persist();
+        if (key === "theme") {
+          // Effetto immediato: variabili CSS di menu/HUD + ricolorazione della
+          // scena 3D che sta girando dietro (demo o partita in corso).
+          applyThemeToUI(val);
+          this.game.refreshTheme();
+        }
         this.showOptions();
       });
     });
@@ -748,6 +898,7 @@ export class UI {
       this.showOnlineHub(false);
     }
     if (act === "pvp-create") this.showZones(false);
+    if (act === "custom") this.showCustom();
     if (act === "tri-cpu") {
       this.game.beginMatch("triangle", { vsCPU: true, triangle: true });
     }

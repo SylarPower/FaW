@@ -5,7 +5,8 @@ import { audio } from "./audio.js";
 import { input } from "./input.js";
 import { updateAI, SKILL } from "./ai.js";
 import { PowerUpManager, applyPower, POWER_DEFS } from "./powerups.js";
-import { ARENAS, buildArena, updateArena, handleArenaEvent, nextBallColor, arenaById } from "./arenas.js";
+import { ARENAS, THEMES, buildArena, updateArena, handleArenaEvent, nextBallColor, arenaById } from "./arenas.js";
+import { applyTheme } from "./themes.js";
 import { makePaddle, makeBall } from "./models.js";
 import { loadSave, writeSave, SIZE_MUL, SPEED_MUL } from "./save.js";
 import { net } from "./net.js";
@@ -106,20 +107,27 @@ export class Game {
     this.world = new World();
     this.powers = new PowerUpManager(this.engine, this.world);
     const sizeMul = SIZE_MUL[this.save.options.paddleSize] || 1;
-    this.ctrl = buildArena(id, this.engine, this.world, sizeMul);
+    this.ctrl = buildArena(id, this.engine, this.world, sizeMul, this.save.options.theme);
     this.triangle = !!this.world.triangle;
     const def = arenaById(id);
-    let pool = (def.powerUps || []).slice();
-    if (this.save.options.extraPowers) {
-      for (const extra of ["grab", "whack", "stretch", "turbo"]) {
-        if (!pool.includes(extra)) pool.push(extra);
+    // L'arena personalizzata detta il proprio pool (anche vuoto): in quel caso
+    // ignoriamo sia i power-up dell'arena base sia l'opzione "extra".
+    let pool;
+    if (this.customPowers) {
+      pool = this.customPowers.slice();
+    } else {
+      pool = (def.powerUps || []).slice();
+      if (this.save.options.extraPowers) {
+        for (const extra of ["grab", "whack", "stretch", "turbo"]) {
+          if (!pool.includes(extra)) pool.push(extra);
+        }
       }
     }
     this.powers.setPool(pool);
     this.powers.spawnEvery = 6.5;
 
     for (const p of this.world.paddles) {
-      const col = PCOL[p.side] || 0xffffff;
+      const col = this.sideColor(p.side);
       p.mesh = makePaddle(col, p.hw, p.hd, p.hh);
       this.engine.add(p.mesh);
       this.syncPaddleMesh(p);
@@ -129,6 +137,38 @@ export class Game {
     else this.scores = { left: 0, right: 0 };
     this.rally = 0;
     this.speedMul = SPEED_MUL[this.save.options.ballSpeed] || 1;
+  }
+
+  /**
+   * Riapplica il tema all'arena attualmente in scena, senza ricostruirla.
+   * Usato quando si cambia tema dalle Opzioni mentre gira la demo di sfondo.
+   */
+  refreshTheme() {
+    if (!this.ctrl) return;
+    const base = THEMES[this.ctrl.id] || THEMES.classic;
+    const theme = applyTheme(this.save.options.theme, base);
+    this.ctrl.theme = theme;
+    this.engine.setTheme(theme);
+    // Le racchette hanno materiali propri: vanno ritinte a mano.
+    for (const p of this.world.paddles) {
+      const col = this.sideColor(p.side);
+      const mat = p.mesh?.userData?.mat;
+      if (mat) mat.color.setHex(col), mat.emissive.setHex(col);
+    }
+  }
+
+  /**
+   * Colore di un lato tenendo conto del tema attivo: p1/p2 arrivano dalla
+   * palette gia' filtrata dal tema, cosi' racchette, scintille e flash dei
+   * punti restano coerenti con l'arena. Fallback su PCOL (es. terzo lato).
+   */
+  sideColor(side) {
+    const t = this.ctrl?.theme;
+    if (t) {
+      if (side === "left" || side === "bottom") return t.p1 ?? PCOL[side];
+      if (side === "right" || side === "east") return t.p2 ?? PCOL[side];
+    }
+    return PCOL[side] || 0xffffff;
   }
 
   syncPaddleMesh(p) {
@@ -143,6 +183,8 @@ export class Game {
     this.vsCPU = !!opts.vsCPU;
     this.online = !!opts.online;
     this.customTarget = Number.parseInt(opts.target, 10) || null;
+    // Pool di power-up scelto nell'arena su misura (array, anche vuoto).
+    this.customPowers = Array.isArray(opts.powers) ? opts.powers.slice() : null;
     this.triangle = !!opts.triangle || id === "triangle";
     if (this.triangle) id = "triangle";
     if (this.online) this.localSide = slotSide(this.triangle, net.slot);
@@ -152,7 +194,7 @@ export class Game {
     this.state = "countdown";
     this.cd = 3.2;
     this.serveDir = Math.random() < 0.5 ? 1 : -1;
-    this.showMsg("3");
+    this.showMsg("3", 1.2);
     audio.countdown();
     this.ui.showHUD(this);
   }
@@ -272,10 +314,13 @@ export class Game {
 
     if (this.state === "countdown") {
       this.cd -= dt;
-      if (this.cd > 2 && this.msg !== "3") { this.showMsg("3"); audio.countdown(); }
-      else if (this.cd <= 2 && this.cd > 1 && this.msg !== "2") { this.showMsg("2"); audio.countdown(); }
-      else if (this.cd <= 1 && this.cd > 0.15 && this.msg !== "1") { this.showMsg("1"); audio.countdown(); }
-      else if (this.cd <= 0) {
+      // Il numero mostrato dipende solo da `cd`, cosi' non ci sono buchi:
+      // 3.2..2.2 -> "3", 2.2..1.2 -> "2", 1.2..0.2 -> "1", poi VIA!.
+      // La durata (1.2s) e' > della fase (1s) perche' il messaggio non svanisca
+      // prima del numero successivo.
+      const n = this.cd > 2.2 ? "3" : this.cd > 1.2 ? "2" : this.cd > 0.2 ? "1" : null;
+      if (n && this.msg !== n) { this.showMsg(n, 1.2); audio.countdown(); }
+      if (this.cd <= 0) {
         this.state = "play";
         this.showMsg("VIA!", 0.5);
         audio.go();
@@ -320,6 +365,9 @@ export class Game {
     this.drivePaddles(dt);
     this.handleGrabThrows();
 
+    // Un solo reset per frame: gli eventi di TUTTI i sotto-step si accumulano e
+    // vengono letti insieme qui sotto (altrimenti si perdevano i punti).
+    this.world.resetEvents();
     this.acc += dt;
     const STEP = 1 / 120;
     while (this.acc >= STEP) {
@@ -338,7 +386,7 @@ export class Game {
         const spd = ev.ball.speed();
         audio.hit(Math.min(1, spd / 18));
         this.engine.kick(0.08 + spd * 0.006);
-        this.particles.spark(ev.ball.x, 0.3, ev.ball.z, 1, PCOL[ev.paddle.side] || 0xffffff);
+        this.particles.spark(ev.ball.x, 0.3, ev.ball.z, 1, this.sideColor(ev.paddle.side));
         if (ev.paddle.mesh) ev.paddle.mesh.scale.z = 1.12;
         fx.push("hit");
       }
@@ -509,7 +557,7 @@ export class Game {
     this.serveDir = scorer === "left" || scorer === "bottom" || scorer === "west" ? 1 : -1;
     audio.score(scorer);
     this.engine.kick(0.32);
-    const hex = "#" + (PCOL[scorer] || 0xffffff).toString(16).padStart(6, "0");
+    const hex = "#" + this.sideColor(scorer).toString(16).padStart(6, "0");
     this.engine.flash(this.flashEl, hex, 90);
     if (!this.demo) {
       this.ui.updateHUD(this);

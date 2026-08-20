@@ -8,7 +8,8 @@ const DEFAULT = {
     paddleSize: "default",
     ballSpeed: "default",
     extraPowers: false,
-    difficulty: "medio"
+    difficulty: "medio",
+    theme: "neon"
   }
 };
 

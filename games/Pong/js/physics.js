@@ -156,8 +156,16 @@ export class World {
     return ball;
   }
 
+  /**
+   * Avanza la simulazione di `dt`.
+   *
+   * NB: gli eventi NON vengono azzerati qui. Il game loop esegue piu' sotto-step
+   * per frame (acc/STEP in game.js) e legge world.events una volta sola a fine
+   * frame: azzerando a ogni step si perdevano punti, rimbalzi e power-up
+   * avvenuti nei sotto-step precedenti. Ora e' il chiamante a fare resetEvents()
+   * una volta per frame, prima della serie di step.
+   */
   step(dt) {
-    this.resetEvents();
     for (const p of this.paddles) this.stepPaddle(p, dt);
     for (const b of this.balls) {
       if (!b.alive) continue;

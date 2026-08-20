@@ -460,22 +460,20 @@
                 <div class="mode-name">IMMAGINE</div>
                 <div class="mode-desc">PUZZLE CON<br>FOTO</div>
             </div>
-            <div class="mode-card" data-type="emoji" onclick="selectType('emoji', this)">
-                <div class="mode-icon">😀</div>
-                <div class="mode-name">EMOJI</div>
-                <div class="mode-desc">ICONE<br>DIVERTENTI</div>
-            </div>
         </div>
 
         <!-- Selezione immagine (nascosta inizialmente) -->
         <div id="image-select-section" style="display:none; margin-top:15px;">
-            <p style="font-size:0.6rem; color:#aaa; margin-bottom:10px;">📷 SCEGLI IMMAGINE</p>
+            <p style="font-size:0.6rem; color:#aaa; margin-bottom:10px;">📷 LA TUA IMMAGINE</p>
             <div class="image-grid" id="image-grid"></div>
             <div style="margin-top:10px;">
                 <label class="btn btn-small" style="display:inline-block;">
-                    📤 CARICA TUA
+                    📤 CARICA IMMAGINE
                     <input type="file" accept="image/*" id="custom-image-input" style="display:none;" onchange="loadCustomImage(event)">
                 </label>
+                <p id="image-hint" style="font-size:0.55rem; color:#888; margin-top:8px;">
+                    Carica una tua foto per usarla come puzzle.
+                </p>
             </div>
         </div>
 
@@ -735,159 +733,10 @@ function getTheme() {
 // ============================================
 // 🖼️ IMMAGINI PUZZLE
 // ============================================
-const PUZZLE_IMAGES = [
-    { id:'landscape', name:'Paesaggio', url:null, generate:'landscape' },
-    { id:'space', name:'Spazio', url:null, generate:'space' },
-    { id:'city', name:'Città', url:null, generate:'city' },
-    { id:'abstract', name:'Astratto', url:null, generate:'abstract' },
-    { id:'ocean', name:'Oceano', url:null, generate:'ocean' },
-    { id:'fire', name:'Fuoco', url:null, generate:'fire' },
-    { id:'neon', name:'Neon', url:null, generate:'neon' },
-    { id:'sunset2', name:'Tramonto', url:null, generate:'sunset' },
-];
-
-const EMOJI_SETS = [
-    '🚀','⭐','🌙','💎','🔥','❄️','🌈','⚡','🎯','🎮',
-    '🦊','🐉','🦋','🐙','🦁','🐺','🦅','🐬','🦈','🐅',
-    '🍎','🍕','🎸','🎭','🏆','💰','👑','🗡️','🛡️','💣',
-    '🌸','🌺','🌻','🍀','🌊','🌋','❤️','💜','💙','💚'
-];
-
+// Il puzzle immagine usa esclusivamente una foto caricata dall'utente:
+// niente immagini predefinite, niente modalita' emoji.
 let currentPuzzleImage = null;
 
-function generateImage(type, width, height) {
-    const cvs = document.createElement('canvas');
-    cvs.width = width; cvs.height = height;
-    const c = cvs.getContext('2d');
-
-    switch(type) {
-        case 'landscape':
-            // Sky gradient
-            let sky = c.createLinearGradient(0,0,0,height);
-            sky.addColorStop(0,'#001133'); sky.addColorStop(0.5,'#003366'); sky.addColorStop(1,'#006699');
-            c.fillStyle = sky; c.fillRect(0,0,width,height);
-            // Stars
-            for(let i=0;i<80;i++){c.fillStyle=`rgba(255,255,255,${Math.random()*0.8+0.2})`;c.beginPath();c.arc(Math.random()*width,Math.random()*height*0.6,Math.random()*2,0,Math.PI*2);c.fill();}
-            // Mountains
-            c.fillStyle='#002244';c.beginPath();c.moveTo(0,height*0.7);
-            for(let x=0;x<=width;x+=30){c.lineTo(x,height*0.4+Math.sin(x*0.01)*height*0.15+Math.sin(x*0.03)*height*0.08);}
-            c.lineTo(width,height);c.lineTo(0,height);c.fill();
-            c.fillStyle='#001122';c.beginPath();c.moveTo(0,height*0.8);
-            for(let x=0;x<=width;x+=20){c.lineTo(x,height*0.55+Math.sin(x*0.02+1)*height*0.12+Math.sin(x*0.04)*height*0.06);}
-            c.lineTo(width,height);c.lineTo(0,height);c.fill();
-            // Water
-            let wg = c.createLinearGradient(0,height*0.75,0,height);
-            wg.addColorStop(0,'#004466');wg.addColorStop(1,'#002233');
-            c.fillStyle=wg;c.fillRect(0,height*0.75,width,height*0.25);
-            // Moon
-            c.fillStyle='#ffeedd';c.shadowBlur=30;c.shadowColor='#ffcc88';
-            c.beginPath();c.arc(width*0.75,height*0.2,35,0,Math.PI*2);c.fill();c.shadowBlur=0;
-            break;
-
-        case 'space':
-            c.fillStyle='#050510';c.fillRect(0,0,width,height);
-            for(let i=0;i<200;i++){c.fillStyle=`hsl(${Math.random()*360},80%,${Math.random()*60+40}%)`;c.beginPath();c.arc(Math.random()*width,Math.random()*height,Math.random()*2.5,0,Math.PI*2);c.fill();}
-            // Nebula
-            for(let i=0;i<5;i++){let grd=c.createRadialGradient(Math.random()*width,Math.random()*height,0,Math.random()*width,Math.random()*height,200);
-            grd.addColorStop(0,`hsla(${Math.random()*360},100%,50%,0.1)`);grd.addColorStop(1,'transparent');c.fillStyle=grd;c.fillRect(0,0,width,height);}
-            // Planet
-            let pg=c.createRadialGradient(width*0.3,height*0.4,10,width*0.3,height*0.4,80);
-            pg.addColorStop(0,'#ff6633');pg.addColorStop(0.5,'#cc3300');pg.addColorStop(1,'#660000');
-            c.fillStyle=pg;c.beginPath();c.arc(width*0.3,height*0.4,60,0,Math.PI*2);c.fill();
-            // Ring
-            c.strokeStyle='rgba(255,200,100,0.4)';c.lineWidth=8;c.beginPath();c.ellipse(width*0.3,height*0.4,100,25,0.3,0,Math.PI*2);c.stroke();
-            break;
-
-        case 'city':
-            let csky=c.createLinearGradient(0,0,0,height);
-            csky.addColorStop(0,'#0a0015');csky.addColorStop(0.6,'#1a0030');csky.addColorStop(1,'#2a0050');
-            c.fillStyle=csky;c.fillRect(0,0,width,height);
-            for(let i=0;i<50;i++){c.fillStyle=`rgba(255,255,255,${Math.random()*0.5})`;c.beginPath();c.arc(Math.random()*width,Math.random()*height*0.5,1,0,Math.PI*2);c.fill();}
-            // Buildings
-            for(let i=0;i<20;i++){let bw=20+Math.random()*40;let bh=60+Math.random()*200;let bx=Math.random()*width;
-            c.fillStyle=`hsl(${Math.random()*60+240},30%,${8+Math.random()*12}%)`;c.fillRect(bx,height-bh,bw,bh);
-            // Windows
-            for(let wy=height-bh+5;wy<height-5;wy+=12){for(let wx=bx+4;wx<bx+bw-4;wx+=8){
-            if(Math.random()>0.3){c.fillStyle=Math.random()>0.5?'#ffcc00':'#00ccff';c.fillRect(wx,wy,4,6);}}}}
-            // Ground
-            c.fillStyle='#0a0a15';c.fillRect(0,height-10,width,10);
-            // Neon signs
-            for(let i=0;i<5;i++){c.fillStyle=`hsla(${Math.random()*360},100%,60%,0.6)`;c.shadowBlur=20;c.shadowColor=c.fillStyle;
-            c.fillRect(Math.random()*width,height*0.3+Math.random()*height*0.4,30+Math.random()*20,8);c.shadowBlur=0;}
-            break;
-
-        case 'abstract':
-            c.fillStyle='#0a0a1a';c.fillRect(0,0,width,height);
-            for(let i=0;i<15;i++){c.beginPath();let hue=Math.random()*360;c.strokeStyle=`hsla(${hue},100%,60%,0.6)`;c.lineWidth=2+Math.random()*4;
-            c.shadowBlur=15;c.shadowColor=`hsla(${hue},100%,60%,0.5)`;
-            let px=Math.random()*width,py=Math.random()*height;c.moveTo(px,py);
-            for(let j=0;j<8;j++){c.quadraticCurveTo(Math.random()*width,Math.random()*height,Math.random()*width,Math.random()*height);}c.stroke();c.shadowBlur=0;}
-            for(let i=0;i<10;i++){let grd=c.createRadialGradient(Math.random()*width,Math.random()*height,0,Math.random()*width,Math.random()*height,50+Math.random()*100);
-            grd.addColorStop(0,`hsla(${Math.random()*360},100%,50%,0.15)`);grd.addColorStop(1,'transparent');c.fillStyle=grd;c.fillRect(0,0,width,height);}
-            break;
-
-        case 'ocean':
-            let og=c.createLinearGradient(0,0,0,height);
-            og.addColorStop(0,'#001133');og.addColorStop(0.3,'#003366');og.addColorStop(0.7,'#006688');og.addColorStop(1,'#002244');
-            c.fillStyle=og;c.fillRect(0,0,width,height);
-            // Light rays
-            for(let i=0;i<6;i++){c.save();c.globalAlpha=0.05;c.fillStyle='#00ccff';c.beginPath();let rx=Math.random()*width;
-            c.moveTo(rx,0);c.lineTo(rx-60,height);c.lineTo(rx+60,height);c.fill();c.restore();}
-            // Bubbles
-            for(let i=0;i<40;i++){let bub=5+Math.random()*20;c.strokeStyle=`rgba(100,200,255,${Math.random()*0.4})`;c.lineWidth=1;
-            c.beginPath();c.arc(Math.random()*width,Math.random()*height,bub,0,Math.PI*2);c.stroke();}
-            // Fish
-            for(let i=0;i<8;i++){c.fillStyle=`hsl(${Math.random()*60+160},80%,50%)`;let fx=Math.random()*width,fy=height*0.3+Math.random()*height*0.5;
-            c.beginPath();c.ellipse(fx,fy,12,6,0,0,Math.PI*2);c.fill();c.beginPath();c.moveTo(fx-12,fy);c.lineTo(fx-22,fy-8);c.lineTo(fx-22,fy+8);c.fill();}
-            break;
-
-        case 'fire':
-            c.fillStyle='#0a0000';c.fillRect(0,0,width,height);
-            for(let i=0;i<30;i++){let grd=c.createRadialGradient(width*0.5+(Math.random()-0.5)*width*0.5,height*0.8-Math.random()*height*0.6,0,
-            width*0.5+(Math.random()-0.5)*width*0.3,height*0.8,100+Math.random()*150);
-            grd.addColorStop(0,`hsla(${Math.random()*40},100%,60%,0.15)`);grd.addColorStop(0.5,`hsla(${Math.random()*30+10},100%,40%,0.08)`);grd.addColorStop(1,'transparent');
-            c.fillStyle=grd;c.fillRect(0,0,width,height);}
-            // Embers
-            for(let i=0;i<60;i++){c.fillStyle=`hsla(${Math.random()*40+10},100%,${50+Math.random()*30}%,${Math.random()*0.7+0.3})`;
-            c.beginPath();c.arc(Math.random()*width,Math.random()*height,Math.random()*3+1,0,Math.PI*2);c.fill();}
-            break;
-
-        case 'neon':
-            c.fillStyle='#050008';c.fillRect(0,0,width,height);
-            // Neon grid
-            c.strokeStyle='rgba(0,204,255,0.1)';c.lineWidth=1;
-            for(let x=0;x<width;x+=40){c.beginPath();c.moveTo(x,0);c.lineTo(x,height);c.stroke();}
-            for(let y=0;y<height;y+=40){c.beginPath();c.moveTo(0,y);c.lineTo(width,y);c.stroke();}
-            // Neon shapes
-            const neonColors=['#ff0088','#00ffcc','#ffff00','#ff4400','#8800ff','#00ff44'];
-            for(let i=0;i<8;i++){let nc=neonColors[i%neonColors.length];c.strokeStyle=nc;c.lineWidth=3;c.shadowBlur=20;c.shadowColor=nc;
-            c.beginPath();if(Math.random()>0.5){c.arc(Math.random()*width,Math.random()*height,20+Math.random()*40,0,Math.PI*2);}
-            else{let rx=Math.random()*width,ry=Math.random()*height,rs=30+Math.random()*50;c.rect(rx,ry,rs,rs);}c.stroke();}
-            c.shadowBlur=0;
-            // Neon text lines
-            for(let i=0;i<3;i++){c.fillStyle=neonColors[Math.floor(Math.random()*neonColors.length)];c.shadowBlur=15;c.shadowColor=c.fillStyle;
-            c.fillRect(Math.random()*width*0.3,Math.random()*height,width*0.3+Math.random()*width*0.3,4);c.shadowBlur=0;}
-            break;
-
-        case 'sunset':
-            let sg=c.createLinearGradient(0,0,0,height);
-            sg.addColorStop(0,'#1a0033');sg.addColorStop(0.3,'#660044');sg.addColorStop(0.5,'#cc3300');
-            sg.addColorStop(0.65,'#ff6600');sg.addColorStop(0.8,'#ffaa00');sg.addColorStop(1,'#003344');
-            c.fillStyle=sg;c.fillRect(0,0,width,height);
-            // Sun
-            c.fillStyle='#ffcc00';c.shadowBlur=40;c.shadowColor='#ff8800';
-            c.beginPath();c.arc(width*0.5,height*0.55,50,0,Math.PI*2);c.fill();c.shadowBlur=0;
-            // Clouds
-            for(let i=0;i<5;i++){c.fillStyle=`rgba(${180+Math.random()*75},${80+Math.random()*40},${Math.random()*60},0.3)`;
-            let cx=Math.random()*width,cy=height*0.2+Math.random()*height*0.3;
-            for(let j=0;j<5;j++){c.beginPath();c.arc(cx+j*20,cy+Math.random()*10,15+Math.random()*15,0,Math.PI*2);c.fill();}}
-            // Water reflection
-            for(let y=height*0.7;y<height;y+=3){c.fillStyle=`rgba(${200+Math.random()*55},${100+Math.random()*80},0,${0.05+Math.random()*0.05})`;
-            c.fillRect(0,y,width,2);}
-            break;
-    }
-    return cvs;
-}
 
 // ============================================
 // 🎮 STATO GIOCO
@@ -924,26 +773,14 @@ function selectType(type, el) {
     if (type === 'image') renderImageOptions();
 }
 
+// Mostra solo l'eventuale immagine caricata dall'utente (nessun set predefinito).
 function renderImageOptions() {
-    const grid = document.getElementById('image-grid');
-    grid.innerHTML = '';
-    PUZZLE_IMAGES.forEach(img => {
-        const div = document.createElement('div');
-        div.className = `image-option ${img.id === selectedImageId ? 'selected' : ''}`;
-        const cvs = generateImage(img.generate, 100, 100);
-        div.appendChild(cvs);
-        const label = document.createElement('div');
-        label.className = 'img-label';
-        label.textContent = img.name;
-        div.appendChild(label);
-        div.onclick = () => {
-            selectedImageId = img.id;
-            customImageData = null;
-            document.querySelectorAll('.image-option').forEach(o => o.classList.remove('selected'));
-            div.classList.add('selected');
-        };
-        grid.appendChild(div);
-    });
+    const hint = document.getElementById('image-hint');
+    if (hint) {
+        hint.textContent = customImageData
+            ? 'Immagine caricata. Puoi sostituirla quando vuoi.'
+            : 'Carica una tua foto per usarla come puzzle.';
+    }
 }
 
 function loadCustomImage(e) {
@@ -953,11 +790,9 @@ function loadCustomImage(e) {
     reader.onload = function(ev) {
         customImageData = ev.target.result;
         selectedImageId = 'custom';
-        document.querySelectorAll('.image-option').forEach(o => o.classList.remove('selected'));
-        // Add custom option
+        // Anteprima unica dell'immagine caricata.
         const grid = document.getElementById('image-grid');
-        const existing = grid.querySelector('[data-custom]');
-        if (existing) existing.remove();
+        grid.innerHTML = '';
         const div = document.createElement('div');
         div.className = 'image-option selected';
         div.setAttribute('data-custom', '1');
@@ -968,12 +803,8 @@ function loadCustomImage(e) {
         label.className = 'img-label';
         label.textContent = 'La tua!';
         div.appendChild(label);
-        div.onclick = () => {
-            selectedImageId = 'custom';
-            document.querySelectorAll('.image-option').forEach(o => o.classList.remove('selected'));
-            div.classList.add('selected');
-        };
         grid.appendChild(div);
+        renderImageOptions();
     };
     reader.readAsDataURL(file);
 }
@@ -1113,8 +944,9 @@ function preparePuzzleImage(callback) {
         };
         img.src = customImageData;
     } else {
-        const gen = PUZZLE_IMAGES.find(p => p.id === selectedImageId);
-        puzzleImageCanvas = generateImage(gen ? gen.generate : 'landscape', boardPx, boardPx);
+        // Nessuna immagine caricata: si ripiega sul classico coi numeri.
+        selectedType = 'numbers';
+        puzzleImageCanvas = null;
         callback();
     }
 }
@@ -1160,11 +992,6 @@ if (initial) {
                 prevCtx.textAlign = 'center';
                 prevCtx.textBaseline = 'middle';
                 prevCtx.fillText(val, c * tileSize + tileSize / 2, r * tileSize + tileSize / 2);
-            } else if (selectedType === 'emoji') {
-                prevCtx.font = `${tileSize * 0.45}px sans-serif`;
-                prevCtx.textAlign = 'center';
-                prevCtx.textBaseline = 'middle';
-                prevCtx.fillText(EMOJI_SETS[(val - 1) % EMOJI_SETS.length], c * tileSize + tileSize / 2, r * tileSize + tileSize / 2);
             }
         }
     }
@@ -1221,17 +1048,6 @@ if (initial) {
                     // Small number overlay
                     const numOverlay = document.createElement('div');
                     numOverlay.style.cssText = 'position:absolute;bottom:2px;right:4px;font-size:0.4rem;color:rgba(255,255,255,0.5);z-index:3;';
-                    numOverlay.textContent = val;
-                    tile.appendChild(numOverlay);
-                }
-                else if (selectedType === 'emoji') {
-                    tile.style.background = theme.tileColor;
-                    tile.style.borderColor = theme.tileBorder;
-                    tile.style.fontSize = Math.max(tileSize * 0.4, 16) + 'px';
-                    tile.textContent = EMOJI_SETS[(val - 1) % EMOJI_SETS.length];
-                    // Small number
-                    const numOverlay = document.createElement('div');
-                    numOverlay.style.cssText = 'position:absolute;bottom:2px;right:4px;font-size:0.35rem;color:rgba(255,255,255,0.35);';
                     numOverlay.textContent = val;
                     tile.appendChild(numOverlay);
                 }
@@ -1550,6 +1366,16 @@ function hideAllScreens() {
 
 function startGame() {
     if (gameActive) return;
+    // Tipo "immagine" senza foto caricata: avviso e stop, niente puzzle vuoto.
+    if (selectedType === 'image' && !customImageData) {
+        const hint = document.getElementById('image-hint');
+        if (hint) {
+            hint.textContent = '⚠️ Carica prima un\'immagine, oppure scegli NUMERI.';
+            hint.style.color = '#ff9900';
+        }
+        document.getElementById('image-select-section').style.display = 'block';
+        return;
+    }
     hideAllScreens();
 
     // Calculate tile size based on viewport
@@ -1820,7 +1646,7 @@ function openStats() {
 
     const sizeNames = { 3: '3×3', 4: '4×4', 5: '5×5', 6: '6×6' };
     [3,4,5,6].forEach(s => {
-        ['numbers','image','emoji'].forEach(t => {
+        ['numbers','image'].forEach(t => {
             const key = `${s}_${t}`;
             const rec = saveData.records[key];
             if (rec) {
