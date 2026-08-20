@@ -1,12 +1,10 @@
 /**
  * Temi grafici globali.
  *
- * Ogni arena ha gia' la sua palette in THEMES (arenas.js). Un tema NON la
- * sostituisce: la trasforma. Cosi' le arene restano riconoscibili (il ghiaccio
- * resta chiaro, la giungla resta verde) ma l'insieme cambia atmosfera.
- *
- * `apply(base)` riceve la palette dell'arena e ne restituisce una nuova.
- * `ui` porta le variabili CSS di menu e HUD, applicate su <html>.
+ * Un tema non e' piu' soltanto un filtro colore: oltre alla palette espone uno
+ * `style` e i parametri dei materiali. Arena, racchette e illuminazione possono
+ * cosi' cambiare davvero aspetto (erba e legno, campo da calcio e scarponi,
+ * ghiaccio, materiali opachi...), senza perdere le regole dell'arena scelta.
  */
 
 // --- utility colore (interi 0xRRGGBB) ---
@@ -45,129 +43,270 @@ function mul(c, k) {
 function mono(c, hue) {
   const l = lum(c);
   const h = toRgb(hue);
-  // curva morbida: i colori scuri restano scuri, i chiari saturano sulla tinta
   return toInt(h.r * l, h.g * l, h.b * l);
 }
 
 const hex = (c) => "#" + c.toString(16).padStart(6, "0");
 
+/** Parametri comuni al solo tema che deve davvero sembrare al neon. */
+const neonMaterials = {
+  style: "neon",
+  tableMetalness: 0.35,
+  tableRoughness: 0.38,
+  tableEmissive: 0.04,
+  rimGlow: 0.35,
+  paddleMetalness: 0.55,
+  paddleRoughness: 0.22,
+  paddleEmissive: 0.22,
+  edgeGlow: 1.4,
+  ballMetalness: 0.65,
+  ballRoughness: 0.18,
+  ballEmissive: 0.18,
+  ballLight: 1.6,
+  showStars: true,
+  showRings: true,
+  accentIntensity: 1,
+  sunIntensity: 1.15,
+  hemiIntensity: 0.7
+};
+
+const matteMaterials = {
+  tableMetalness: 0,
+  tableRoughness: 0.88,
+  tableEmissive: 0,
+  rimGlow: 0.02,
+  paddleMetalness: 0,
+  paddleRoughness: 0.76,
+  paddleEmissive: 0,
+  edgeGlow: 0,
+  ballMetalness: 0.05,
+  ballRoughness: 0.62,
+  ballEmissive: 0,
+  ballLight: 0.12,
+  showStars: false,
+  showRings: false,
+  accentIntensity: 0.18,
+  sunIntensity: 1.65,
+  hemiIntensity: 1.05
+};
+
 export const THEME_DEFS = {
   neon: {
     id: "neon",
     name: "Neon",
-    desc: "Il look originale: nero profondo e accenti al neon.",
+    desc: "Il look originale: metallo scuro, riflessi e accenti al neon.",
     swatch: [0x3dffd1, 0xff3d7f, 0xffc857],
-    apply: (b) => ({ ...b }),
+    apply: (b) => ({ ...b, ...neonMaterials }),
     ui: null // usa i valori di default del CSS
+  },
+
+  jungle: {
+    id: "jungle",
+    name: "Giungla",
+    desc: "Erba vera sul tavolo, ciuffi ai bordi e racchette di legno avvolte dalle liane.",
+    swatch: [0x75a843, 0x274e2b, 0xc49a5a],
+    apply: (b) => ({
+      ...b,
+      ...matteMaterials,
+      style: "jungle",
+      bg: 0x101b12,
+      fog: 0x18281a,
+      table: tint(sat(b.table, 0.35), 0x477c38, 0.82),
+      line: 0xd9d29a,
+      p1: 0x8fcf58,
+      p2: 0xe28b46,
+      hemi: 0xc7d9a4,
+      bloom: 0.03,
+      exposure: 1.08,
+      accentIntensity: 0.08,
+      sunIntensity: 2,
+      hemiIntensity: 1.15
+    }),
+    ui: {
+      "--bg": "#101b12", "--panel": "rgba(18, 31, 19, 0.86)",
+      "--panel-2": "rgba(26, 44, 27, 0.95)", "--line": "rgba(199, 217, 164, 0.2)",
+      "--mint": "#8fcf58", "--mint-dim": "rgba(143, 207, 88, 0.17)",
+      "--pink": "#e28b46", "--pink-dim": "rgba(226, 139, 70, 0.17)",
+      "--gold": "#d9d29a", "--ice": "#a9c980",
+      "--text": "#f1f1dc", "--muted": "#93a886"
+    }
+  },
+
+  boot: {
+    id: "boot",
+    name: "Scarpone",
+    desc: "Un campo da calcio opaco: le barre diventano veri scarponi con lacci e tacchetti.",
+    swatch: [0x2f8a43, 0xf4efe1, 0xe04848],
+    apply: (b) => ({
+      ...b,
+      ...matteMaterials,
+      style: "boot",
+      bg: 0x17251a,
+      fog: 0x253629,
+      table: 0x317f43,
+      line: 0xf4efe1,
+      p1: 0x3e8ee8,
+      p2: 0xe64a4a,
+      hemi: 0xe8f0db,
+      bloom: 0,
+      exposure: 1.12,
+      accentIntensity: 0,
+      sunIntensity: 2.15,
+      hemiIntensity: 1.2
+    }),
+    ui: {
+      "--bg": "#111b13", "--panel": "rgba(18, 31, 21, 0.88)",
+      "--panel-2": "rgba(27, 45, 31, 0.96)", "--line": "rgba(244, 239, 225, 0.2)",
+      "--mint": "#66aaff", "--mint-dim": "rgba(102, 170, 255, 0.17)",
+      "--pink": "#ff6464", "--pink-dim": "rgba(255, 100, 100, 0.17)",
+      "--gold": "#f4efe1", "--ice": "#cde6cf",
+      "--text": "#fffdf5", "--muted": "#9caf9e"
+    }
   },
 
   retro: {
     id: "retro",
-    name: "Retro",
-    desc: "Monitor a fosfori verdi, come le sale giochi anni '70.",
-    swatch: [0x00ff66, 0x00c04a, 0x9dff00],
-    apply: (b) => {
-      const G = 0x00ff66;
-      return {
-        ...b,
-        bg: 0x020a04,
-        fog: 0x020a04,
-        table: mono(b.table, G),
-        line: G,
-        p1: G,
-        p2: 0x9dff00,
-        hemi: 0x66ffaa,
-        bloom: (b.bloom ?? 0.4) + 0.16,
-        exposure: (b.exposure ?? 1.05) * 0.98
-      };
-    },
+    name: "Retro CRT",
+    desc: "Cabinet anni '70: fosfori verdi, griglia a pixel e materiali opachi, senza cromature.",
+    swatch: [0x36df68, 0x10351b, 0xb4ff4a],
+    apply: (b) => ({
+      ...b,
+      ...matteMaterials,
+      style: "retro",
+      bg: 0x010703,
+      fog: 0x010703,
+      table: mono(b.table, 0x2a9b4b),
+      line: 0x54f27a,
+      p1: 0x54f27a,
+      p2: 0xb4ff4a,
+      hemi: 0x83b990,
+      tableRoughness: 0.72,
+      paddleEmissive: 0.08,
+      edgeGlow: 0.18,
+      ballEmissive: 0.06,
+      ballLight: 0.25,
+      bloom: 0.1,
+      exposure: 0.95,
+      accentIntensity: 0.16,
+      sunIntensity: 0.72,
+      hemiIntensity: 0.55
+    }),
     ui: {
-      "--bg": "#020a04", "--panel": "rgba(3, 16, 8, 0.82)",
-      "--panel-2": "rgba(4, 22, 11, 0.94)", "--line": "rgba(0, 255, 102, 0.22)",
-      "--mint": "#00ff66", "--mint-dim": "rgba(0, 255, 102, 0.16)",
-      "--pink": "#9dff00", "--pink-dim": "rgba(157, 255, 0, 0.16)",
-      "--gold": "#ccff33", "--ice": "#66ffaa",
-      "--text": "#d6ffe4", "--muted": "#4f9668"
+      "--bg": "#010703", "--panel": "rgba(2, 14, 6, 0.9)",
+      "--panel-2": "rgba(4, 22, 9, 0.96)", "--line": "rgba(84, 242, 122, 0.22)",
+      "--mint": "#54f27a", "--mint-dim": "rgba(84, 242, 122, 0.15)",
+      "--pink": "#b4ff4a", "--pink-dim": "rgba(180, 255, 74, 0.15)",
+      "--gold": "#d8ff8a", "--ice": "#94f7ac",
+      "--text": "#dcffe4", "--muted": "#568b62"
     }
   },
 
   aurora: {
     id: "aurora",
-    name: "Aurora",
-    desc: "Blu notte e viola freddi, con bagliori tenui.",
-    swatch: [0x7aa2ff, 0xc77dff, 0x8ee7ff],
+    name: "Ghiaccio",
+    desc: "Superfici fredde e levigate, cristalli ai bordi e luce artica soffusa.",
+    swatch: [0x76b7ff, 0xb59bff, 0xd9f5ff],
     apply: (b) => ({
       ...b,
-      bg: 0x070a18,
-      fog: 0x070a18,
-      table: tint(sat(b.table, 0.75), 0x2a3b7a, 0.42),
-      line: tint(b.line, 0x8ee7ff, 0.55),
-      p1: 0x7aa2ff,
-      p2: 0xc77dff,
-      hemi: 0xaebfff,
-      bloom: (b.bloom ?? 0.4) + 0.1
+      style: "ice",
+      bg: 0x09101e,
+      fog: 0x111d32,
+      table: tint(sat(b.table, 0.35), 0xaad9eb, 0.68),
+      line: 0xd9f5ff,
+      p1: 0x76b7ff,
+      p2: 0xb59bff,
+      hemi: 0xdceeff,
+      bloom: 0.12,
+      exposure: 1.08,
+      tableMetalness: 0.05,
+      tableRoughness: 0.18,
+      tableEmissive: 0.01,
+      rimGlow: 0.12,
+      paddleMetalness: 0.08,
+      paddleRoughness: 0.2,
+      paddleEmissive: 0.03,
+      edgeGlow: 0.18,
+      ballMetalness: 0.12,
+      ballRoughness: 0.12,
+      ballEmissive: 0.02,
+      ballLight: 0.25,
+      showStars: true,
+      showRings: false,
+      accentIntensity: 0.24,
+      sunIntensity: 1.75,
+      hemiIntensity: 1.2
     }),
     ui: {
-      "--bg": "#070a18", "--panel": "rgba(10, 14, 32, 0.8)",
-      "--panel-2": "rgba(16, 20, 44, 0.93)", "--line": "rgba(160, 180, 255, 0.14)",
-      "--mint": "#7aa2ff", "--mint-dim": "rgba(122, 162, 255, 0.16)",
-      "--pink": "#c77dff", "--pink-dim": "rgba(199, 125, 255, 0.16)",
-      "--gold": "#8ee7ff", "--ice": "#aebfff",
-      "--text": "#eef2ff", "--muted": "#8b95c7"
+      "--bg": "#09101e", "--panel": "rgba(12, 23, 42, 0.84)",
+      "--panel-2": "rgba(20, 34, 58, 0.95)", "--line": "rgba(217, 245, 255, 0.17)",
+      "--mint": "#76b7ff", "--mint-dim": "rgba(118, 183, 255, 0.16)",
+      "--pink": "#b59bff", "--pink-dim": "rgba(181, 155, 255, 0.16)",
+      "--gold": "#d9f5ff", "--ice": "#e9fbff",
+      "--text": "#f1f8ff", "--muted": "#879bb5"
     }
   },
 
   sunset: {
     id: "sunset",
-    name: "Tramonto",
-    desc: "Arancio caldo e magenta, atmosfera vaporwave.",
-    swatch: [0xff9d4d, 0xff3d7f, 0xffd166],
+    name: "Terracotta",
+    desc: "Argilla, sabbia e colori caldi: tutto opaco, come un campo al tramonto.",
+    swatch: [0xe58a4b, 0x913f4b, 0xf1cb85],
     apply: (b) => ({
       ...b,
-      bg: 0x1a0a18,
-      fog: 0x1a0a18,
-      table: tint(b.table, 0x5c1f3d, 0.45),
-      line: tint(b.line, 0xffd166, 0.5),
-      p1: 0xff9d4d,
-      p2: 0xff3d7f,
-      hemi: 0xffc9a8,
-      bloom: (b.bloom ?? 0.4) + 0.12,
-      exposure: (b.exposure ?? 1.05) * 1.05
+      ...matteMaterials,
+      style: "sunset",
+      bg: 0x24130f,
+      fog: 0x382018,
+      table: tint(sat(b.table, 0.45), 0xa55436, 0.67),
+      line: 0xf1cb85,
+      p1: 0xe58a4b,
+      p2: 0xb94c65,
+      hemi: 0xf0c093,
+      bloom: 0.02,
+      exposure: 1.06,
+      accentIntensity: 0.08,
+      sunIntensity: 1.9,
+      hemiIntensity: 1.05
     }),
     ui: {
-      "--bg": "#1a0a18", "--panel": "rgba(32, 12, 28, 0.8)",
-      "--panel-2": "rgba(44, 16, 36, 0.93)", "--line": "rgba(255, 180, 140, 0.16)",
-      "--mint": "#ff9d4d", "--mint-dim": "rgba(255, 157, 77, 0.16)",
-      "--pink": "#ff3d7f", "--pink-dim": "rgba(255, 61, 127, 0.16)",
-      "--gold": "#ffd166", "--ice": "#ffb38a",
-      "--text": "#fff1e8", "--muted": "#b58a94"
+      "--bg": "#24130f", "--panel": "rgba(43, 23, 18, 0.86)",
+      "--panel-2": "rgba(58, 31, 24, 0.95)", "--line": "rgba(241, 203, 133, 0.18)",
+      "--mint": "#e58a4b", "--mint-dim": "rgba(229, 138, 75, 0.17)",
+      "--pink": "#d35f76", "--pink-dim": "rgba(211, 95, 118, 0.17)",
+      "--gold": "#f1cb85", "--ice": "#f0b88d",
+      "--text": "#fff0dd", "--muted": "#b28a76"
     }
   },
 
   mono: {
     id: "mono",
-    name: "Mono",
-    desc: "Bianco e nero ad alto contrasto, massima leggibilita'.",
-    swatch: [0xffffff, 0xbbbbbb, 0x777777],
+    name: "Inchiostro",
+    desc: "Bianco e nero da tavolo tecnico: carta ruvida, ombre nette, zero bagliori.",
+    swatch: [0xf5f1e8, 0x8d8b86, 0x242424],
     apply: (b) => ({
       ...b,
-      bg: 0x000000,
-      fog: 0x000000,
-      table: mul(sat(b.table, 0), 0.75),
-      line: 0xffffff,
-      p1: 0xffffff,
-      p2: 0xbdbdbd,
+      ...matteMaterials,
+      style: "mono",
+      bg: 0x111111,
+      fog: 0x1b1b1b,
+      table: mul(sat(b.table, 0), 0.92),
+      line: 0xf5f1e8,
+      p1: 0xf5f1e8,
+      p2: 0x969696,
       hemi: 0xffffff,
-      bloom: 0.2,
-      exposure: 1.0
+      bloom: 0,
+      exposure: 1.08,
+      accentIntensity: 0,
+      sunIntensity: 2,
+      hemiIntensity: 1.1
     }),
     ui: {
-      "--bg": "#000000", "--panel": "rgba(12, 12, 12, 0.86)",
-      "--panel-2": "rgba(20, 20, 20, 0.95)", "--line": "rgba(255, 255, 255, 0.18)",
-      "--mint": "#ffffff", "--mint-dim": "rgba(255, 255, 255, 0.14)",
-      "--pink": "#bdbdbd", "--pink-dim": "rgba(189, 189, 189, 0.14)",
-      "--gold": "#ffffff", "--ice": "#e0e0e0",
-      "--text": "#ffffff", "--muted": "#9a9a9a"
+      "--bg": "#111111", "--panel": "rgba(20, 20, 20, 0.9)",
+      "--panel-2": "rgba(30, 30, 30, 0.96)", "--line": "rgba(245, 241, 232, 0.2)",
+      "--mint": "#f5f1e8", "--mint-dim": "rgba(245, 241, 232, 0.14)",
+      "--pink": "#a8a8a8", "--pink-dim": "rgba(168, 168, 168, 0.14)",
+      "--gold": "#ded9cd", "--ice": "#ffffff",
+      "--text": "#f5f1e8", "--muted": "#999792"
     }
   }
 };
@@ -193,8 +332,10 @@ const UI_VARS = [
 ];
 
 export function applyThemeToUI(themeId, root = document.documentElement) {
-  const vars = themeById(themeId).ui;
+  const def = themeById(themeId);
+  const vars = def.ui;
   for (const v of UI_VARS) root.style.removeProperty(v);
+  root.dataset.pongTheme = def.id;
   if (!vars) return;
   for (const [k, val] of Object.entries(vars)) root.style.setProperty(k, val);
 }

@@ -140,7 +140,11 @@ export function buildArena(id, engine, world, sizeMul = 1, themeId = "neon") {
     world.triangle = true;
     world.tri = tri;
     world.w = 18; world.d = 16; world.openEnds = false; world.circle = false;
-    ctrl.table = engine.add(makeTriangleTable(tri.verts, tri.edges, theme.table, [0x3dffd1, 0xff3d7f, 0xffc857]));
+    ctrl.table = engine.add(makeTriangleTable(
+      tri.verts, tri.edges, theme.table,
+      [theme.p1 ?? 0x3dffd1, theme.p2 ?? 0xff3d7f, theme.line ?? 0xffc857],
+      theme
+    ));
     const hd = 1.2 * padScale;
     const sides = ["bottom", "east", "west"];
     tri.edges.forEach((e, i) => {
@@ -151,18 +155,19 @@ export function buildArena(id, engine, world, sizeMul = 1, themeId = "neon") {
       p.z = e.mz + e.nz * p.inset;
       world.paddles.push(p);
     });
+    setupThemeDecor(theme, world, engine, ctrl);
     engine.setCamera({ x: 0, y: 20, z: 11.5 }, { x: 0, y: 0, z: 0.4 }, true);
     return ctrl;
   }
 
   if (id === "balloons") {
     world.w = 16; world.d = 16; world.circle = true; world.radius = 7.6; world.openEnds = false;
-    ctrl.table = engine.add(makeCircleTable(7.6, theme.table, theme.line));
+    ctrl.table = engine.add(makeCircleTable(7.6, theme.table, theme.line, theme));
   } else {
     world.circle = false;
     world.w = w; world.d = id === "soccer" || id === "moles" ? 13 : 12;
     world.openEnds = !["soccer", "moles", "walled", "logs", "clown", "jungle", "puck"].includes(id);
-    ctrl.table = engine.add(makeTable(world.w, world.d, theme.table, theme.line, { openEnds: true }));
+    ctrl.table = engine.add(makeTable(world.w, world.d, theme.table, theme.line, { openEnds: true, theme }));
   }
 
   const hd = 1.15 * padScale;
@@ -203,6 +208,7 @@ export function buildArena(id, engine, world, sizeMul = 1, themeId = "neon") {
 
   setupGoals(id, world, engine, theme, ctrl);
   setupSpecial(id, world, engine, theme, ctrl);
+  setupThemeDecor(theme, world, engine, ctrl);
 
   engine.setCamera(
     { x: 0, y: world.circle ? 18 : 16.2, z: world.circle ? 12.5 : 13.2 },
@@ -217,6 +223,111 @@ function makePState(side, role, extra) {
   const p = new Paddle(side, { role, ...extra });
   p.role = role;
   return p;
+}
+
+/** Elementi puramente scenografici che rendono i temi diversi da un filtro. */
+function setupThemeDecor(theme, world, engine, ctrl) {
+  const style = theme.style || "neon";
+  const hx = (world.circle
+    ? world.radius
+    : world.triangle ? Math.max(...world.tri.verts.map((v) => Math.abs(v.x))) : world.w / 2) + 0.35;
+  const hz = (world.circle
+    ? world.radius
+    : world.triangle ? Math.max(...world.tri.verts.map((v) => Math.abs(v.z))) : world.d / 2) + 0.35;
+  const edgePoint = (pad = 1.6) => {
+    if (Math.random() < 0.5) {
+      return [(Math.random() < 0.5 ? -1 : 1) * (hx + Math.random() * pad), (Math.random() - 0.5) * hz * 2.1];
+    }
+    return [(Math.random() - 0.5) * hx * 2.1, (Math.random() < 0.5 ? -1 : 1) * (hz + Math.random() * pad)];
+  };
+
+  if (style === "jungle") {
+    const count = 260;
+    const grass = new THREE.InstancedMesh(
+      new THREE.ConeGeometry(0.055, 0.42, 3),
+      new THREE.MeshStandardMaterial({ color: 0x4f7d36, roughness: 1 }),
+      count
+    );
+    const dummy = new THREE.Object3D();
+    for (let i = 0; i < count; i++) {
+      const [x, z] = edgePoint(2.3);
+      dummy.position.set(x, 0.14 + Math.random() * 0.08, z);
+      dummy.rotation.set((Math.random() - 0.5) * 0.18, Math.random() * Math.PI, (Math.random() - 0.5) * 0.24);
+      dummy.scale.setScalar(0.65 + Math.random() * 0.85);
+      dummy.updateMatrix();
+      grass.setMatrixAt(i, dummy.matrix);
+      grass.setColorAt(i, new THREE.Color(i % 3 === 0 ? 0x729b45 : i % 3 === 1 ? 0x355f2e : 0x547f37));
+    }
+    grass.instanceMatrix.needsUpdate = true;
+    if (grass.instanceColor) grass.instanceColor.needsUpdate = true;
+    grass.receiveShadow = true;
+    engine.add(grass);
+    ctrl.themeDecor = grass;
+
+    // Masse di foglie ai quattro angoli, tenute basse per non coprire il gioco.
+    const leafMat = new THREE.MeshStandardMaterial({ color: 0x315b2d, roughness: 0.95 });
+    for (const [x, z] of [[-hx - 1.4, -hz - 0.8], [hx + 1.4, -hz - 0.8], [-hx - 1.4, hz + 0.8], [hx + 1.4, hz + 0.8]]) {
+      const bush = new THREE.Group();
+      for (let i = 0; i < 5; i++) {
+        const leaf = new THREE.Mesh(new THREE.IcosahedronGeometry(0.48 + Math.random() * 0.25, 1), leafMat);
+        leaf.position.set((Math.random() - 0.5) * 0.8, 0.25 + Math.random() * 0.35, (Math.random() - 0.5) * 0.8);
+        leaf.castShadow = true;
+        bush.add(leaf);
+      }
+      bush.position.set(x, 0, z);
+      engine.add(bush);
+    }
+  }
+
+  if (style === "boot") {
+    // Quattro piccoli fari da stadio: niente glow sul tavolo, solo una silhouette
+    // immediatamente diversa dall'ambiente spaziale del tema Neon.
+    const poleMat = new THREE.MeshStandardMaterial({ color: 0x313733, metalness: 0.18, roughness: 0.72 });
+    const lampMat = new THREE.MeshStandardMaterial({ color: 0xf8f2d8, emissive: 0xf8e7ad, emissiveIntensity: 0.16, roughness: 0.5 });
+    for (const [x, z] of [[-hx - 1, -hz - 0.6], [hx + 1, -hz - 0.6], [-hx - 1, hz + 0.6], [hx + 1, hz + 0.6]]) {
+      const tower = new THREE.Group();
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.09, 3.4, 8), poleMat);
+      pole.position.y = 1.7;
+      const lamps = new THREE.Mesh(new THREE.BoxGeometry(0.78, 0.35, 0.12), lampMat);
+      lamps.position.y = 3.35;
+      lamps.lookAt(-x, 3.1, -z);
+      tower.add(pole, lamps);
+      tower.position.set(x, 0, z);
+      engine.add(tower);
+    }
+  }
+
+  if (style === "ice") {
+    const iceMat = new THREE.MeshStandardMaterial({ color: 0xb9e5f4, roughness: 0.14, metalness: 0.05 });
+    const count = 34;
+    const crystals = new THREE.InstancedMesh(new THREE.ConeGeometry(0.2, 0.8, 5), iceMat, count);
+    const dummy = new THREE.Object3D();
+    for (let i = 0; i < count; i++) {
+      const [x, z] = edgePoint(1.8);
+      const s = 0.55 + Math.random() * 1.2;
+      dummy.position.set(x, 0.28 * s, z);
+      dummy.rotation.set((Math.random() - 0.5) * 0.18, Math.random() * Math.PI, (Math.random() - 0.5) * 0.18);
+      dummy.scale.setScalar(s);
+      dummy.updateMatrix();
+      crystals.setMatrixAt(i, dummy.matrix);
+    }
+    crystals.instanceMatrix.needsUpdate = true;
+    crystals.castShadow = true;
+    engine.add(crystals);
+  }
+
+  if (style === "sunset") {
+    const stoneMat = new THREE.MeshStandardMaterial({ color: 0x8f4e35, roughness: 1 });
+    for (let i = 0; i < 28; i++) {
+      const [x, z] = edgePoint(2.2);
+      const stone = new THREE.Mesh(new THREE.DodecahedronGeometry(0.16 + Math.random() * 0.28, 0), stoneMat);
+      stone.scale.y = 0.5 + Math.random() * 0.45;
+      stone.position.set(x, stone.geometry.parameters.radius * 0.35, z);
+      stone.rotation.set(Math.random(), Math.random(), Math.random());
+      stone.castShadow = true;
+      engine.add(stone);
+    }
+  }
 }
 
 function setupGoals(id, world, engine, theme, ctrl) {

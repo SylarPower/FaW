@@ -4,8 +4,7 @@ import { Particles, BallTrail } from "./particles.js";
 import { input } from "./input.js";
 import { updateAI, SKILL } from "./ai.js";
 import { PowerUpManager, applyPower, POWER_DEFS } from "./powerups.js";
-import { ARENAS, THEMES, buildArena, updateArena, handleArenaEvent, nextBallColor, arenaById } from "./arenas.js";
-import { applyTheme } from "./themes.js";
+import { ARENAS, buildArena, updateArena, handleArenaEvent, nextBallColor, arenaById } from "./arenas.js";
 import { makePaddle, makeBall } from "./models.js";
 import { loadSave, writeSave, SIZE_MUL, SPEED_MUL } from "./save.js";
 import { net } from "./net.js";
@@ -90,6 +89,8 @@ export class Game {
     this.online = false;
     this.triangle = false;
     this.customTarget = null;
+    this.customPowers = null;
+    this.matchOptions = null;
     this.loadArena(pickDemo(), { demo: true });
     this.state = "play";
     this.serve(1);
@@ -105,8 +106,9 @@ export class Game {
     this.trails = [];
     this.world = new World();
     this.powers = new PowerUpManager(this.engine, this.world);
-    const sizeMul = SIZE_MUL[this.save.options.paddleSize] || 1;
-    this.ctrl = buildArena(id, this.engine, this.world, sizeMul, this.save.options.theme);
+    const options = { ...this.save.options, ...(this.matchOptions || {}) };
+    const sizeMul = SIZE_MUL[options.paddleSize] || 1;
+    this.ctrl = buildArena(id, this.engine, this.world, sizeMul, options.theme);
     this.triangle = !!this.world.triangle;
     const def = arenaById(id);
     // L'arena personalizzata detta il proprio pool (anche vuoto): in quel caso
@@ -116,7 +118,7 @@ export class Game {
       pool = this.customPowers.slice();
     } else {
       pool = (def.powerUps || []).slice();
-      if (this.save.options.extraPowers) {
+      if (options.extraPowers) {
         for (const extra of ["grab", "whack", "stretch", "turbo"]) {
           if (!pool.includes(extra)) pool.push(extra);
         }
@@ -127,7 +129,7 @@ export class Game {
 
     for (const p of this.world.paddles) {
       const col = this.sideColor(p.side);
-      p.mesh = makePaddle(col, p.hw, p.hd, p.hh);
+      p.mesh = makePaddle(col, p.hw, p.hd, p.hh, this.ctrl.theme);
       this.engine.add(p.mesh);
       this.syncPaddleMesh(p);
     }
@@ -135,25 +137,19 @@ export class Game {
     if (this.triangle) this.scores = { bottom: 0, east: 0, west: 0 };
     else this.scores = { left: 0, right: 0 };
     this.rally = 0;
-    this.speedMul = SPEED_MUL[this.save.options.ballSpeed] || 1;
+    this.speedMul = SPEED_MUL[options.ballSpeed] || 1;
   }
 
   /**
-   * Riapplica il tema all'arena attualmente in scena, senza ricostruirla.
-   * Usato quando si cambia tema dalle Opzioni mentre gira la demo di sfondo.
+   * I temi ora cambiano anche geometrie e decorazioni. Dalla schermata Opzioni
+   * gira solo la demo, quindi ricostruiamo l'arena invece di limitarci a
+   * ricolorare i materiali gia' presenti.
    */
   refreshTheme() {
     if (!this.ctrl) return;
-    const base = THEMES[this.ctrl.id] || THEMES.classic;
-    const theme = applyTheme(this.save.options.theme, base);
-    this.ctrl.theme = theme;
-    this.engine.setTheme(theme);
-    // Le racchette hanno materiali propri: vanno ritinte a mano.
-    for (const p of this.world.paddles) {
-      const col = this.sideColor(p.side);
-      const mat = p.mesh?.userData?.mat;
-      if (mat) mat.color.setHex(col), mat.emissive.setHex(col);
-    }
+    const id = this.ctrl.id;
+    this.loadArena(id, { demo: this.demo });
+    if (this.demo) this.serve(this.serveDir);
   }
 
   /**
@@ -182,6 +178,9 @@ export class Game {
     this.vsCPU = !!opts.vsCPU;
     this.online = !!opts.online;
     this.customTarget = Number.parseInt(opts.target, 10) || null;
+    // Regole della singola partita personalizzata: non sovrascrivono le
+    // preferenze salvate e valgono quindi anche per la variante contro CPU.
+    this.matchOptions = opts.options ? { ...opts.options } : null;
     // Pool di power-up scelto nell'arena su misura (array, anche vuoto).
     this.customPowers = Array.isArray(opts.powers) ? opts.powers.slice() : null;
     this.triangle = !!opts.triangle || id === "triangle";
@@ -193,8 +192,10 @@ export class Game {
     this.state = "countdown";
     this.cd = 3.2;
     this.serveDir = Math.random() < 0.5 ? 1 : -1;
-    this.showMsg("3", 1.2);
+    // Prima costruiamo l'HUD, poi scriviamo il countdown nel suo elemento:
+    // evita che il primo "3" venga perso durante il cambio schermata.
     this.ui.showHUD(this);
+    this.showMsg("3", 1.2);
   }
 
   computeCpuSides() {
@@ -235,7 +236,7 @@ export class Game {
     b.maxSpeed = 22 * this.speedMul;
     b.color = info.color;
     b.colorId = info.colorId;
-    b.mesh = makeBall(b.color, b.r);
+    b.mesh = makeBall(b.color, b.r, this.ctrl?.theme);
     this.engine.add(b.mesh);
     const trail = new BallTrail(this.engine.scene, b.color);
     b._trail = trail;
@@ -273,7 +274,10 @@ export class Game {
     b.mesh.position.set(b.x, b.y, b.z);
     b.mesh.rotation.x += b.vz * 0.02;
     b.mesh.rotation.z -= b.vx * 0.02;
-    if (b.mesh.userData.light) b.mesh.userData.light.intensity = b.held ? 0.4 : 1.6;
+    if (b.mesh.userData.light) {
+      const base = b.mesh.userData.lightBase ?? 1.6;
+      b.mesh.userData.light.intensity = b.held ? base * 0.25 : base;
+    }
     b.mesh.visible = b.alive;
   }
 
@@ -403,6 +407,7 @@ export class Game {
         this.engine.kick(0.28);
         this.engine.flash(this.flashEl, "#fff4c2", 70);
         this.particles.burst(ev.ball.x, 0.4, ev.ball.z, 0xffc857, 24, 7);
+        this.ui.updateHUD(this); // aggiorna subito «Schianto ×2/×1»
       }
     }
     this._fx = fx;
@@ -484,7 +489,7 @@ export class Game {
     if (!id) return;
     applyPower(id, side, { world: this.world, features: this.ctrl.features, engine: this.engine });
     const def = POWER_DEFS[id];
-    this.showMsg(def?.name || id, 0.6);
+    this.showMsg(id === "whack" ? "SCHIANTO · 3 COLPI" : (def?.name || id), id === "whack" ? 0.9 : 0.6);
     this.ui.updateHUD(this);
   }
 
@@ -528,7 +533,7 @@ export class Game {
     const b = p.heldBall;
     if (!b) return;
     const c = Math.cos(p.angle), s = Math.sin(p.angle);
-    const spd = (13 + Math.abs(p.vz) * 0.3) * this.speedMul * (p.powerHit > 0 ? 1.4 : 1);
+    const spd = (13 + Math.abs(p.vz) * 0.3) * this.speedMul;
     b.held = false;
     b.holder = null;
     b.vx = c * spd;
@@ -638,7 +643,10 @@ export class Game {
       vsCPU: this.vsCPU,
       online: this.online,
       triangle: this.triangle,
-      localSide: this.localSide
+      localSide: this.localSide,
+      target: this.customTarget,
+      powers: this.customPowers,
+      options: this.matchOptions
     });
     if (this.online && this.isHost()) net.start(this.arenaId);
   }
@@ -666,12 +674,16 @@ export class Game {
     if (room?.meta?.status === "play" && (this.demo || this.state === "title")) {
       const id = room.meta.arenaId || "classic";
       const settings = room.meta.settings || {};
-      this.ui.applyPortalSettings?.(settings);
+      // Le opzioni «su misura» valgono solo per il match; quelle provenienti
+      // dal portale conservano invece il comportamento storico persistente.
+      if (!settings.custom) this.ui.applyPortalSettings?.(settings);
       this.beginMatch(id, {
         online: true,
         triangle: room.meta.mode === "tri",
         vsCPU: false,
-        target: settings.target
+        target: settings.target,
+        powers: settings.custom?.powers,
+        options: settings.options
       });
     }
     if (room?.meta?.status === "dead") {
@@ -726,8 +738,8 @@ export class Game {
         p.mesh.scale.z += (1 - p.mesh.scale.z) * Math.min(1, dt * 10);
         p.mesh.scale.x += (1 - p.mesh.scale.x) * Math.min(1, dt * 10);
         this.syncPaddleMesh(p);
-        if (p.barrierT > 0) p.mesh.userData.mat.emissiveIntensity = 0.8;
-        else p.mesh.userData.mat.emissiveIntensity = 0.22;
+        if (p.barrierT > 0) p.mesh.userData.mat.emissiveIntensity = Math.max(0.8, p.mesh.userData.baseEmissive || 0);
+        else p.mesh.userData.mat.emissiveIntensity = p.mesh.userData.baseEmissive ?? 0.22;
       }
     }
     for (const b of this.world.balls) {
