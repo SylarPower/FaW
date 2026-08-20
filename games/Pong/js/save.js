@@ -33,6 +33,7 @@ export function loadSave() {
       legacyTheme === "retro" ? "airhockey" :
       legacyTheme === "sunset" ? "baseball" :
       legacyTheme === "tennis" ? "neon" : // tema rimosso
+      legacyTheme === "mono" ? "colori" : // "Inchiostro" ora è "Colori"
       legacyTheme;
     return {
       ...structuredClone(DEFAULT),

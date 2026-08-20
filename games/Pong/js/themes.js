@@ -134,11 +134,12 @@ export const THEME_DEFS = {
 
   boot: {
     id: "boot",
-    name: "Scarpone",
+    name: "Calcio",
     swatch: [0x2f8a43, 0xf4efe1, 0xe04848],
     spectators: "stadium",
     // Scarpa da calcio: più larga di una barra standard (la lunghezza è
     // uniforme per tutti i temi, il bordo verso il centro è comune).
+    // La scarpa vera e propria può sporgere leggermente fuori dal campo.
     paddle: { wMul: 1.5 },
     ball: { color: 0xf5f5f5, emissive: 0x0, metalness: 0.05, roughness: 0.7, emissiveIntensity: 0, light: 0.3, pattern: "soccer" },
     apply: (b) => ({
@@ -307,19 +308,20 @@ export const THEME_DEFS = {
     }
   },
 
-  mono: {
-    id: "mono",
-    name: "Inchiostro",
-    swatch: [0xf5f1e8, 0x8d8b86, 0x242424],
+  colori: {
+    id: "colori",
+    name: "Colori",
+    swatch: [0xff3d7f, 0x3dffd1, 0xffc857],
     spectators: "silhouette",
     ball: { color: 0xf5f1e8, emissive: 0xffffff, metalness: 0.02, roughness: 0.5, emissiveIntensity: 0.1, light: 0.5 },
     apply: (b) => ({
       ...b,
       ...matteMaterials,
-      style: "mono",
+      style: "colori",
       bg: 0x111111,
       fog: 0x1b1b1b,
-      table: mul(sat(b.table, 0), 0.92),
+      // Tavolo neutro: è la tela su cui atterrano gli splash di colore.
+      table: mul(sat(b.table, 0), 0.95),
       line: 0xf5f1e8,
       p1: 0xf5f1e8,
       p2: 0x969696,

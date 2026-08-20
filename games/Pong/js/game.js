@@ -8,6 +8,7 @@ import { PowerUpManager, applyPower, POWER_DEFS } from "./powerups.js";
 import { ARENAS, buildArena, updateArena, handleArenaEvent, nextBallColor, arenaById } from "./arenas.js";
 import { makePaddle, makeBall, impactParticles, updateBurst, makeGoalCelebration, cheerSpectators } from "./models.js";
 import { loadSave, writeSave, SIZE_MUL, SPEED_MUL } from "./save.js";
+import { applyThemeToUI } from "./themes.js";
 import { net } from "./net.js";
 import { PCOL, DUEL_SIDES, TRI_SIDES } from "./players.js";
 
@@ -98,6 +99,9 @@ export class Game {
     this.customTarget = null;
     this.customPowers = null;
     this.matchOptions = null;
+    // Il tema "su misura" vale solo per la partita: la demo torna al tema
+    // salvato nelle Opzioni (e con lui la grafica di menu/HUD).
+    applyThemeToUI(this.save.options.theme);
     this.loadArena(pickDemo(), { demo: true });
     this.state = "play";
     this.serve(1);
@@ -175,6 +179,11 @@ export class Game {
     return PCOL[side] || 0xffffff;
   }
 
+  /** Tema attivo qui e ora: quello del match su misura, o quello salvato. */
+  currentThemeId() {
+    return this.matchOptions?.theme || this.save.options.theme;
+  }
+
   syncPaddleMesh(p) {
     if (!p.mesh) return;
     p.mesh.position.set(p.x, p.y, p.z);
@@ -194,6 +203,9 @@ export class Game {
     // Regole della singola partita personalizzata: non sovrascrivono le
     // preferenze salvate e valgono quindi anche per la variante contro CPU.
     this.matchOptions = opts.options ? { ...opts.options } : null;
+    // Se la partita su misura impone un tema, menu e HUD lo seguono finché
+    // la partita (e le rivincite) durano.
+    if (this.matchOptions?.theme) applyThemeToUI(this.matchOptions.theme);
     // Pool di power-up scelto nell'arena su misura (array, anche vuoto).
     this.customPowers = Array.isArray(opts.powers) ? opts.powers.slice() : null;
     this.triangle = !!opts.triangle || id === "triangle";
@@ -525,13 +537,14 @@ export class Game {
       if (ev.type === "hit") {
         this.rally++;
         const spd = ev.ball.speed();
-        this.engine.kick(0.08 + spd * 0.006);
+        // Impatto alleggerito: scossa e "squash" della racchetta più discreti.
+        this.engine.kick(0.05 + spd * 0.004);
         this.particles.spark(ev.ball.x, 0.3, ev.ball.z, 1, this.sideColor(ev.paddle.side));
         // Particelle a tema (foglie, salsa di soia, scintille, schegge di ghiaccio).
         const burst = impactParticles(this.engine.arenaRoot, ev.ball.x, ev.ball.z, this.ctrl.theme, this.sideColor(ev.paddle.side));
         if (burst) this._bursts.push(burst);
         // L'impatto si anima in altezza, non lungo la zona di contatto.
-        if (ev.paddle.mesh) ev.paddle.mesh.scale.y = 1.12;
+        if (ev.paddle.mesh) ev.paddle.mesh.scale.y = 1.06;
         // La crescita di velocità è nel fisico (collideBallPaddle): nessun
         // tetto, incrementi sempre più piccoli a ogni rimbalzo.
         if (!isDemo) {
@@ -642,7 +655,9 @@ export class Game {
   }
 
   drivePaddles(dt) {
-    const skill = SKILL[this.save.options.difficulty] || 0.68;
+    // La difficoltà può essere quella salvata o quella della partita su
+    // misura (che vale solo per il match in corso).
+    const skill = SKILL[this.matchOptions?.difficulty ?? this.save.options.difficulty] || 0.68;
     const sides = this.triangle ? TRI_SIDES : DUEL_SIDES;
 
     for (const p of this.world.paddles) {
@@ -967,7 +982,7 @@ export class Game {
       if (p.mesh) {
         p.mesh.scale.z += (1 - p.mesh.scale.z) * Math.min(1, dt * 10);
         p.mesh.scale.x += (1 - p.mesh.scale.x) * Math.min(1, dt * 10);
-        p.mesh.scale.y += (1 - p.mesh.scale.y) * Math.min(1, dt * 10);
+        p.mesh.scale.y += (1 - p.mesh.scale.y) * Math.min(1, dt * 14);
         this.syncPaddleMesh(p);
         // Curva Q/E: piega morbida dell'estremo (i vertici si incurvano
         // all'indietro mantenendo il corpo dritto, stile Pong: Next Level).
