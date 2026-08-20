@@ -280,7 +280,7 @@ export class UI {
             <li>Crea un progetto su <strong>console.firebase.google.com</strong></li>
             <li>Aggiungi un'app Web e copia la config</li>
             <li>Crea un <strong>Realtime Database</strong> (Europa)</li>
-            <li>Incolla le chiavi in <code>js/firebase-config.js</code></li>
+            <li>Incolla le chiavi in <code>games/shared/firebase-config.js</code></li>
             <li>Regole: usa il file <code>database.rules.json</code> di questa cartella</li>
           </ol>
           <p class="sub">Finché la config è YOUR_API_KEY, vs CPU e triangolo vs 2 CPU funzionano comunque.</p>

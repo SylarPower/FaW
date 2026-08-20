@@ -6,6 +6,8 @@
 		<title>Ruzzle dei 🐷</title>
 		<script src="https://www.gstatic.com/firebasejs/9.1.1/firebase-app-compat.js"></script>
 		<script src="https://www.gstatic.com/firebasejs/9.1.1/firebase-firestore-compat.js"></script>
+		<!-- Config Firebase condivisa (prima dello script che inizializza Firebase) -->
+		<script src="../shared/firebase-config.js"></script>
 		<style>
 			@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap');
 			:root {
@@ -1356,14 +1358,13 @@
 		</div>
 		<script>
 			// --- CONFIGURAZIONE FIREBASE ---
-			const firebaseConfig = {
-			  apiKey: "AIzaSyCNo7o2Ft22JDEyJ97BspE3Kur5DNAPKQc",
-			  authDomain: "funatwork-cd237.firebaseapp.com",
-			  projectId: "funatwork-cd237",
-			  storageBucket: "funatwork-cd237.firebasestorage.app",
-			  messagingSenderId: "798226885203",
-			  appId: "1:798226885203:web:ce83f4d9e96b82266274a6"
-			};
+			// Config condivisa da ../shared/firebase-config.js
+			const firebaseConfig = window.FAW_REQUIRE_FIREBASE_CONFIG
+				? window.FAW_REQUIRE_FIREBASE_CONFIG()
+				: window.FAW_FIREBASE_CONFIG;
+			if (!firebaseConfig) {
+				console.error("[FaW] Impossibile inizializzare Firebase: config condivisa non caricata.");
+			}
 			firebase.initializeApp(firebaseConfig);
 			const db = firebase.firestore();
 			const DEBUG_MODE = false;
