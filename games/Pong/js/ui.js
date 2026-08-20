@@ -273,6 +273,7 @@ export class UI {
           <button class="btn ghost" data-act="opt">Opzioni</button>
           <button class="btn ghost" data-act="ctrl">Comandi</button>
           <button class="btn ghost" data-act="pwr">Poteri</button>
+          <button class="btn ghost" data-act="stats">Statistiche</button>
         </div>
       </div>`));
     this._hookScreen({ onBack: () => {} });
@@ -759,6 +760,7 @@ export class UI {
               <div class="hud-meta">
                 <div class="arena">${a.name.toUpperCase()}</div>
                 <div class="need">a ${game.customTarget || a.scoreToWin}${game.vsCPU && !tri ? " · scarto 2" : ""}</div>
+                <div class="speed" id="spd">velocità —</div>
               </div>
             </div>
             <div class="side-info right">
@@ -786,6 +788,12 @@ export class UI {
       const el = document.getElementById("sc-" + s);
       if (el) el.innerHTML = `${game.scores[s] ?? 0}<span class="name">${PNAME[s]}${s === game.localSide ? " · TU" : ""}</span>`;
     }
+    // Indicatore di velocità: la palla accelera senza tetto, tenerla d'occhio.
+    const spdEl = document.getElementById("spd");
+    if (spdEl) {
+      const b = game.liveBall();
+      spdEl.textContent = b && b.alive ? `velocità ${b.speed().toFixed(1)}` : "velocità —";
+    }
     this.renderPow("powL", game.powers, game.localSide, game);
   }
 
@@ -802,6 +810,15 @@ export class UI {
       const all = pads.flatMap((p) => p.stretchTimers || []);
       return all.length ? Math.ceil(Math.max(0, ...all)) : 0;
     };
+    // Curva Q/E: 2 cariche che si ricaricano; mostra lo stato di ricarica.
+    const curve = Math.max(0, ...pads.map((p) => p.curveCharges || 0));
+    const curveCd = pads.length
+      ? Math.min(...pads.map((p) => (p.curveCharges < 2 ? (p.curveCd || 0) : Infinity)))
+      : 0;
+    const curveTag = curve >= 2
+      ? `↩ Curva Q/E ×${curve}`
+      : `↩ Curva Q/E ×${curve} · +${Math.ceil(curveCd)}s`;
+    tags.push(`<div class="slot${curve > 0 ? " active" : ""}" title="Q/E piegano un estremo all'indietro: colpendo sul giusto timing il colpo è più forte. 2 cariche, si ricaricano da sole.">${curveTag}</div>`);
     if (whack) {
       const stepTxt = whackStep > 0 ? ` · ${whackStep}° colpo ${(1.8 + 0.55 * (whackStep - 1)).toFixed(2)}×` : "";
       tags.push(`<div class="slot active" title="I prossimi 3 colpi accelerano la palla: ognuno più veloce del precedente">✸ Schianto ×${whack}${stepTxt}</div>`);
@@ -968,6 +985,7 @@ export class UI {
           <div class="opt"><div><label>Torna indietro / Pausa</label></div><div>Esc</div></div>
           <div class="opt"><div><label>Racchetta</label><span class="hint">Lungo il tuo lato del tavolo</span></div><div>W / S oppure ↑ ↓</div></div>
           <div class="opt"><div><label>Seconda racchetta</label><span class="hint">Portiere / attaccante</span></div><div>A / D oppure ← →</div></div>
+          <div class="opt"><div><label>Curva Q/E</label><span class="hint">Piega un estremo all'indietro; colpendo col giusto timing il colpo è più forte. 2 cariche che si ricaricano da sole</span></div><div>Q / E</div></div>
           <p class="sub" style="margin-top:16px">I power-up si attivano appena li raccogli. Presa, spiaggia e hockey: tieni premuto Spazio vicino alla palla, rilascia per lanciare.</p>
         </div>
       </div>`));
@@ -1014,6 +1032,41 @@ export class UI {
     this._hookScreen();
   }
 
+  /**
+   * Statistiche locali: si aggiornano da sole durante le partite e restano
+   * salvate su questo computer.
+   */
+  showStats() {
+    this.screen = "stats";
+    const s = this.game.save.stats || {};
+    const rows = [
+      ["Partite giocate", s.partite ?? 0],
+      ["Vittorie", s.vinte ?? 0],
+      ["Punti fatti", s.puntiFatti ?? 0],
+      ["Punti subiti", s.puntiSubiti ?? 0],
+      ["Colpi totali", s.colpi ?? 0],
+      ["Scambio più lungo", s.rallyMax ?? 0],
+      ["Velocità massima", `${(s.velMax ?? 0).toFixed(1)}`],
+      ["Colpi in curva Q/E", s.curve ?? 0],
+      ["Colpi Schianto", s.schianti ?? 0]
+    ];
+    this.show(this.el(`
+      <div class="screen">
+        <button class="btn small ghost back" data-act="title">← Indietro</button>
+        <div class="panel options">
+          <h2 class="section">Statistiche</h2>
+          <p class="sub">I tuoi numeri su questo computer. Si salvano da soli alla fine di ogni partita.</p>
+          ${rows.map(([k, v]) => `
+            <div class="opt">
+              <div><label>${k}</label></div>
+              <div class="stat-val">${v}</div>
+            </div>`).join("")}
+          <button class="btn small ghost back" data-act="stats-reset" style="margin-top:14px">Azzera statistiche</button>
+        </div>
+      </div>`));
+    this._hookScreen();
+  }
+
   showMenu() { this.showTitle(); }
 
   toast(msg) {
@@ -1035,6 +1088,16 @@ export class UI {
     if (act === "opt") this.showOptions();
     if (act === "ctrl") this.showControls();
     if (act === "pwr") this.showPowers();
+    if (act === "stats") this.showStats();
+    if (act === "stats-reset") {
+      this.game.save.stats = {
+        partite: 0, vinte: 0, puntiFatti: 0, puntiSubiti: 0,
+        colpi: 0, rallyMax: 0, velMax: 0, curve: 0, schianti: 0
+      };
+      this.game.stats = this.game.save.stats;
+      this.game.persist();
+      this.showStats();
+    }
     if (act === "cpu") { this.triangle = false; this.showZones(true); }
     if (act === "pvp") {
       if (!isFirebaseConfigured()) return this.showFirebaseHelp();

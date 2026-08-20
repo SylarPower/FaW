@@ -9,6 +9,17 @@ const DEFAULT = {
     ballSpeed: "default",
     difficulty: "medio",
     theme: "neon"
+  },
+  stats: {
+    partite: 0,
+    vinte: 0,
+    puntiFatti: 0,
+    puntiSubiti: 0,
+    colpi: 0,
+    rallyMax: 0,
+    velMax: 0,
+    curve: 0,
+    schianti: 0
   }
 };
 
@@ -28,7 +39,8 @@ export function loadSave() {
       ...data,
       options: { ...DEFAULT.options, ...(data.options || {}), ...(theme ? { theme } : {}) },
       unlocked: Array.from(new Set(["classic", ...(data.unlocked || [])])),
-      cleared: data.cleared || []
+      cleared: data.cleared || [],
+      stats: { ...structuredClone(DEFAULT.stats), ...(data.stats || {}) }
     };
   } catch {
     return structuredClone(DEFAULT);

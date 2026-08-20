@@ -28,20 +28,8 @@ export function makePaddle(color, hw, hd, hh, theme = {}) {
   // Tutte le grafiche devono quindi vivere DENTRO body per ridimensionarsi.
   const body = new THREE.Group();
   body.scale.set(hw * 2, hh * 2, hd * 2);
-  // Due perni per la curva Q/E: pivotN sta all'estremo z=-0.5, pivotP
-  // all'estremo z=+0.5. Ogni perno ruota attorno al PROPRIO estremo: Q
-  // (estremo z=-0.5) ruota pivotP, E (estremo z=+0.5) ruota pivotN. Così
-  // l'estremo piegato si incurva all'indietro e l'altro resta fermo; si
-  // possono piegare entrambi insieme.
-  const pivotN = new THREE.Group();
-  const pivotP = new THREE.Group();
   const art = new THREE.Group();
-  pivotN.position.z = -0.5;
-  pivotP.position.z = 1.0;
-  art.position.z = -0.5;
-  pivotP.add(art);
-  pivotN.add(pivotP);
-  body.add(pivotN);
+  body.add(art);
   g.add(body);
 
   if (style === "boot") {
@@ -75,8 +63,11 @@ export function makePaddle(color, hw, hd, hh, theme = {}) {
   });
   g.userData.body = body;
   g.userData.mat = mat;
-  g.userData.curvePivotN = pivotN;
-  g.userData.curvePivotP = pivotP;
+  // Curva Q/E: piega morbida di un estremo, alla Pong: Next Level. I vertici
+  // di ogni mesh vengono spostati all'indietro (asse locale -X) con una curva
+  // liscia che lascia dritto il corpo e arriccia solo l'estremo piegato.
+  const bend = makeBendData(art);
+  g.userData.setBend = (L, R) => applyBend(bend, L, R);
   // I modelli tematici mantengono le proporzioni anche quando Allunga
   // aumenta la misura della hitbox lungo Z: la parte scenica può crescere in Y.
   g.userData.scaleHeightWithLength = style !== "neon";
@@ -97,13 +88,108 @@ function fitPaddleArt(art, body, hitLength) {
   }
 }
 
+// --- Curva Q/E (piega morbida degli estremi) --------------------------------
+// Percentuale di lunghezza, su ciascun estremo, che partecipa alla piega:
+// il corpo centrale resta perfettamente dritto.
+const BEND_REGION = 0.38;
+// Quanto si sposta all'indietro la punta, in frazione della lunghezza.
+const BEND_TIP = 0.3;
+
+/**
+ * Cattura per ogni mesh della racchetta: posizioni di base, coordinate in
+ * spazio-art e la matrice inversa per riportare lo spostamento in locale.
+ * Le geometrie vengono clonate per non deformare quelle condivise in cache.
+ */
+function makeBendData(art) {
+  art.updateMatrixWorld(true);
+  const invArt = art.matrixWorld.clone().invert();
+  const items = [];
+  const v = new THREE.Vector3();
+  art.traverse((o) => {
+    if (!o.isMesh || !o.geometry?.attributes?.position) return;
+    o.geometry = o.geometry.clone();
+    const pos = o.geometry.attributes.position;
+    const base = new Float32Array(pos.array);
+    o.updateMatrixWorld(true);
+    const m = o.matrixWorld.clone().premultiply(invArt);
+    const mInv = m.clone().invert();
+    const artPos = new Float32Array(base.length);
+    for (let i = 0; i < pos.count; i++) {
+      v.fromArray(base, i * 3).applyMatrix4(m);
+      v.toArray(artPos, i * 3);
+    }
+    items.push({ mesh: o, base, artPos, mInv });
+  });
+  // Estensione complessiva lungo Z in spazio-art (per normalizzare t).
+  let zMin = Infinity, zMax = -Infinity;
+  for (const it of items) {
+    for (let i = 0; i < it.artPos.length; i += 3) {
+      const z = it.artPos[i + 2];
+      if (z < zMin) zMin = z;
+      if (z > zMax) zMax = z;
+    }
+  }
+  return { items, zMin, zMax, lastL: -1, lastR: -1 };
+}
+
+/**
+ * Profilo della piega per un estremo: 0 sul corpo, cresce con uno smoothstep
+ * più un ricciolo extra proprio sulla punta. `end` = -1 estremo Q, +1 estremo E.
+ */
+function bendProfile(t, end, amount) {
+  // s=0 al confine interno della zona di piega, s=1 sulla punta (che si
+  // arriccia di più). Q piega t=-0.5, E piega t=+0.5; il corpo resta dritto.
+  const s = clamp01((end < 0 ? (-0.5 + BEND_REGION) - t : t - (0.5 - BEND_REGION)) / BEND_REGION);
+  if (s <= 0) return 0;
+  return amount * s * s * (3 - 2 * s) * (0.55 + 0.45 * s);
+}
+
+function clamp01(v) {
+  return v < 0 ? 0 : v > 1 ? 1 : v;
+}
+
+function applyBend(bend, L, R) {
+  if (L === bend.lastL && R === bend.lastR) return;
+  bend.lastL = L;
+  bend.lastR = R;
+  if (bend.items.length === 0) return;
+  const len = Math.max(0.001, bend.zMax - bend.zMin);
+  const mid = (bend.zMin + bend.zMax) / 2;
+  const aL = L * BEND_TIP, aR = R * BEND_TIP;
+  const v = new THREE.Vector3();
+  const d = new THREE.Vector3();
+  const normal = new THREE.Matrix3();
+  for (const it of bend.items) {
+    const pos = it.mesh.geometry.attributes.position;
+    normal.getNormalMatrix(it.mInv);
+    for (let i = 0; i < pos.count; i++) {
+      const z = it.artPos[i * 3 + 2];
+      const t = (z - mid) / len;
+      // All'indietro = -X locale (la racchetta guarda sempre l'avversario).
+      const dx = -(bendProfile(t, -1, aL) + bendProfile(t, 1, aR)) * len;
+      if (dx === 0) {
+        pos.array[i * 3] = it.base[i * 3];
+        pos.array[i * 3 + 1] = it.base[i * 3 + 1];
+        pos.array[i * 3 + 2] = it.base[i * 3 + 2];
+        continue;
+      }
+      d.set(dx, 0, 0).applyMatrix3(normal);
+      pos.array[i * 3] = it.base[i * 3] + d.x;
+      pos.array[i * 3 + 1] = it.base[i * 3 + 1] + d.y;
+      pos.array[i * 3 + 2] = it.base[i * 3 + 2] + d.z;
+    }
+    pos.needsUpdate = true;
+  }
+}
+
 function buildDefault(body, mat, color, theme, style) {
-  const block = new THREE.Mesh(geo("paddle", () => new THREE.BoxGeometry(1, 1, 1)), mat);
+  // Z segmentata: serve alla piega Q/E per curvare in modo morbido.
+  const block = new THREE.Mesh(geo("paddle", () => new THREE.BoxGeometry(1, 1, 1, 1, 1, 16)), mat);
   body.add(block);
   const edgeCol = style === "ice" ? 0xffffff : (style === "mono" ? 0xcccccc : 0xffffff);
   const edgeThickness = style === "ice" ? 0.22 : 0.14;
   const edge = new THREE.Mesh(
-    geo("paddleEdge-" + style, () => new THREE.BoxGeometry(1.1, edgeThickness, 1.04)),
+    geo("paddleEdge-" + style, () => new THREE.BoxGeometry(1.1, edgeThickness, 1.04, 1, 1, 16)),
     new THREE.MeshStandardMaterial({
       color: edgeCol,
       emissive: color,
@@ -741,13 +827,6 @@ export function makeTable(w, d, color, lineColor, opts = {}) {
   mid.rotation.x = -Math.PI/2; mid.position.y = 0.01; g.add(mid);
   const center = new THREE.Mesh(new THREE.RingGeometry(1.1, 1.18, 48), lineMat);
   center.rotation.x = -Math.PI/2; center.position.y = 0.012; g.add(center);
-  for (const s of [-1, 1]) {
-    const box = new THREE.Mesh(new THREE.PlaneGeometry(w*0.18, d*0.55), lineMat.clone());
-    box.material.opacity = 0.18;
-    box.rotation.x = -Math.PI/2;
-    box.position.set(s*w*0.38, 0.011, 0);
-    g.add(box);
-  }
   g.userData.top = top;
   return g;
 }

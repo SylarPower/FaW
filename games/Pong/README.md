@@ -18,11 +18,19 @@ Replica migliorativa 3D di *Pong: The Next Level* (1999). Un giocatore per compu
 | Presa / lancio (quando disponibile) | `Spazio` |
 | Pausa | `Esc` |
 
-Con `Q`/`E` l'estremo della racchetta si piega all'indietro: se la palla arriva
+Con `Q`/`E` un estremo della racchetta si piega all'indietro con una curva
+morbida (il corpo resta dritto, stile Pong: Next Level). Se la palla arriva
 sull'estremo piegato col giusto timing (piega quasi completa) il colpo parte
-molto più forte. Dopo un colpo in curva bisogna rilasciare e ripiegare.
+molto più forte: flash, scossa e messaggio «CURVA!». La curva ha **2 cariche**
+che si ricaricano da sole (~6s l'una); dopo un colpo in curva bisogna
+rilasciare e ripiegare. L'HUD mostra cariche e ricarica.
 
 I power-up si attivano automaticamente appena la palla colpisce il gettone. Gli effetti sono cumulabili; non esiste più una borsa con selezione e uso manuale. I power-up a tempo mostrano i secondi rimanenti nell'HUD.
+
+La palla non ha un tetto di velocità: ogni rimbalzo la accelera un po' meno del
+precedente, ma per sempre. La velocità si vede: scia più accesa e rossa, luce
+più forte e indicatore numerico nell'HUD. Le statistiche locali (partite, colpi,
+rally, curve, schianti…) si salvano sul computer e stanno nel menu «Statistiche».
 
 ## Online (Firebase)
 

@@ -65,12 +65,14 @@ export class BallTrail {
     this.meshes = [];
     this.i = 0;
     this.acc = 0;
+    this.baseColor = new THREE.Color(color);
+    this.hotColor = new THREE.Color(0xff5a3d);
+    this._tmp = new THREE.Color();
     if (this.disabled) return;
-    const c = new THREE.Color(color);
     for (let i = 0; i < max; i++) {
       const m = new THREE.Mesh(
         new THREE.SphereGeometry(0.16, 8, 8),
-        new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0 })
+        new THREE.MeshBasicMaterial({ color: this.baseColor, transparent: true, opacity: 0 })
       );
       m.visible = false;
       scene.add(m);
@@ -78,20 +80,26 @@ export class BallTrail {
     }
   }
   setColor(color) {
-    const c = new THREE.Color(color);
-    for (const m of this.meshes) m.material.color.copy(c);
+    this.baseColor.set(color);
+    for (const m of this.meshes) m.material.color.copy(this.baseColor);
   }
   update(dt, ball) {
     if (this.disabled) return;
     this.acc += dt;
     if (ball && ball.alive && !ball.held && this.acc > 0.018) {
       this.acc = 0;
+      const spd = Math.hypot(ball.vx, ball.vz);
       const m = this.meshes[this.i % this.max];
       this.i++;
       m.visible = true;
       m.position.set(ball.x, ball.y, ball.z);
-      m.material.opacity = 0.45;
-      m.scale.setScalar(1);
+      // Feedback di velocità: la scia diventa più grande, più accesa e più
+      // calda man mano che la palla accelera.
+      const heat = Math.min(1, spd / 55);
+      this._tmp.copy(this.baseColor).lerp(this.hotColor, heat);
+      m.material.color.copy(this._tmp);
+      m.material.opacity = 0.3 + heat * 0.55;
+      m.scale.setScalar(0.7 + heat * 1.5);
     }
     for (const m of this.meshes) {
       if (!m.visible) continue;

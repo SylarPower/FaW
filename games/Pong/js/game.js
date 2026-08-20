@@ -23,6 +23,7 @@ export class Game {
     this.world = new World();
     this.powers = new PowerUpManager(this.engine, this.world);
     this.save = loadSave();
+    this.stats = this.save.stats;
     this._bindPowerPickups();
     this.state = "title";
     this.vsCPU = true;
@@ -333,7 +334,10 @@ export class Game {
     }
     if (b.mesh.userData.light) {
       const base = b.mesh.userData.lightBase ?? 1.6;
-      b.mesh.userData.light.intensity = b.held ? base * 0.25 : base;
+      // Feedback di velocità: più la palla corre, più brilla.
+      const spd = Math.hypot(b.vx, b.vz);
+      const glow = Math.min(2.4, 0.75 + spd / 35);
+      b.mesh.userData.light.intensity = b.held ? base * 0.25 : base * glow;
     }
     b.mesh.visible = b.alive;
   }
@@ -458,6 +462,11 @@ export class Game {
         if (ev.paddle.mesh) ev.paddle.mesh.scale.y = 1.12;
         // La crescita di velocità è nel fisico (collideBallPaddle): nessun
         // tetto, incrementi sempre più piccoli a ogni rimbalzo.
+        if (!isDemo) {
+          this.stats.colpi++;
+          this.stats.rallyMax = Math.max(this.stats.rallyMax, this.rally);
+          this.stats.velMax = Math.max(this.stats.velMax, spd);
+        }
         fx.push("hit");
       }
       if (ev.type === "wall") { fx.push("wall"); }
@@ -486,6 +495,7 @@ export class Game {
         this.engine.flash(this.flashEl, "#fff4c2", 70);
         this.particles.burst(ev.ball.x, 0.4, ev.ball.z, 0xffc857, 24, 7);
         this.showMsg(`SCHIANTO ${ev.step}° · ×${ev.mul.toFixed(2)}`, 0.7);
+        if (!isDemo) this.stats.schianti++;
         this.ui.updateHUD(this); // aggiorna subito «Schianto ×2/×1»
       }
       if (ev.type === "whackbreak") {
@@ -496,10 +506,15 @@ export class Game {
         this.showMsg("SCHIANTO RIENTRATO", 0.55);
       }
       if (ev.type === "curvehit") {
-        this.engine.kick(0.34);
-        this.engine.flash(this.flashEl, "#eaffff", 60);
-        this.particles.burst(ev.ball.x, 0.4, ev.ball.z, this.sideColor(ev.paddle.side), 20, 8);
-        this.showMsg("CURVA!", 0.45);
+        // Feedback pieno del colpo in curva: scossa, flash, anello di
+        // particelle e messaggio col numero di cariche rimaste.
+        this.engine.kick(0.42);
+        this.engine.flash(this.flashEl, "#eaffff", 90);
+        this.particles.burst(ev.ball.x, 0.4, ev.ball.z, this.sideColor(ev.paddle.side), 30, 9);
+        this.particles.burst(ev.ball.x, 0.4, ev.ball.z, 0xffffff, 10, 5);
+        this.showMsg(`CURVA! · ${ev.charges}×`, 0.6);
+        if (!isDemo) this.stats.curve++;
+        this.ui.updateHUD(this);
       }
     }
     this._fx = fx;
@@ -547,10 +562,12 @@ export class Game {
         else if (p.role === "striker") p.inputAxis = inp.axis || 0;
         else { p.inputAxis = inp.axis || 0; p.inputAxis2 = inp.axis2 || 0; }
         // Curva Q/E: dopo un colpo in curva l'estremo resta dritto finché il
-        // tasto non viene rilasciato (serve un nuovo "caricamento").
-        const wantL = !!inp.curveL, wantR = !!inp.curveR;
-        if (!wantL) p.curveLockL = false;
-        if (!wantR) p.curveLockR = false;
+        // tasto non viene rilasciato, e servono cariche disponibili (2, si
+        // ricaricano nel tempo).
+        const wantL = !!inp.curveL && p.curveCharges > 0;
+        const wantR = !!inp.curveR && p.curveCharges > 0;
+        if (!inp.curveL) p.curveLockL = false;
+        if (!inp.curveR) p.curveLockR = false;
         p.curveTargetL = wantL && !p.curveLockL ? 1 : 0;
         p.curveTargetR = wantR && !p.curveLockR ? 1 : 0;
       }
@@ -642,6 +659,10 @@ export class Game {
     this._scoreLock = performance.now();
     if (this.scores[scorer] == null) this.scores[scorer] = 0;
     this.scores[scorer]++;
+    if (!this.demo) {
+      if (scorer === this.localSide) this.stats.puntiFatti++;
+      else this.stats.puntiSubiti++;
+    }
     this.rally = 0;
     // Il punto non decide più il lato del servizio: ogni ripresa è casuale.
     this.serveDir = this.randomServeDir();
@@ -708,11 +729,15 @@ export class Game {
     this.state = "over";
     const win = this.winnerSide();
     const iWon = win === this.localSide;
+    if (!this.demo) {
+      this.stats.partite++;
+      if (iWon) this.stats.vinte++;
+    }
     if (iWon) {
       this.unlockNext();
       if (!this.save.cleared.includes(this.arenaId)) this.save.cleared.push(this.arenaId);
-      this.persist();
     }
+    this.persist();
     this.publishSnap();
     this.ui.showResult(this, iWon, win);
   }
@@ -738,6 +763,7 @@ export class Game {
     this.state = "over";
     if (this.online) await net.leave();
     this.online = false;
+    this.persist();
     this.ui.showMenu();
     this.startDemo();
   }
@@ -766,7 +792,8 @@ export class Game {
       arena: this.arenaId,
       fx: this._fx || [],
       p: this.world.paddles.map((p) => ({
-        s: p.side, x: p.x, z: p.z, hd: p.hd, a: p.angle, o: p.offset || 0
+        s: p.side, x: p.x, z: p.z, hd: p.hd, a: p.angle, o: p.offset || 0,
+        cv: p.curveCharges || 0
       })),
       b: this.world.balls.filter((b) => b.alive).map((b) => ({
         x: b.x, z: b.z, vx: b.vx, vz: b.vz, c: b.color, h: b.held ? 1 : 0
@@ -817,6 +844,7 @@ export class Game {
         const p = this.world.paddles.find((x) => x.side === pd.s);
         if (!p) continue;
         p.x = pd.x; p.z = pd.z; p.hd = pd.hd; p.angle = pd.a; p.offset = pd.o;
+        if (pd.cv != null) p.curveCharges = pd.cv;
       }
     }
     if (snap.b) {
@@ -844,12 +872,9 @@ export class Game {
         p.mesh.scale.x += (1 - p.mesh.scale.x) * Math.min(1, dt * 10);
         p.mesh.scale.y += (1 - p.mesh.scale.y) * Math.min(1, dt * 10);
         this.syncPaddleMesh(p);
-        // Curva Q/E: ogni perno ruota attorno all'estremo OPPOSTO, così
-        // l'estremo piegato si incurva all'indietro e l'altro resta fermo.
-        // Q piega l'estremo z=-0.5 (perno P), E l'estremo z=+0.5 (perno N).
-        const bend = 0.85;
-        if (p.mesh.userData.curvePivotP) p.mesh.userData.curvePivotP.rotation.y = p.curveL * bend;
-        if (p.mesh.userData.curvePivotN) p.mesh.userData.curvePivotN.rotation.y = -p.curveR * bend;
+        // Curva Q/E: piega morbida dell'estremo (i vertici si incurvano
+        // all'indietro mantenendo il corpo dritto, stile Pong: Next Level).
+        if (p.mesh.userData.setBend) p.mesh.userData.setBend(p.curveL, p.curveR);
         if (p.barrierT > 0) p.mesh.userData.mat.emissiveIntensity = Math.max(0.8, p.mesh.userData.baseEmissive || 0);
         else p.mesh.userData.mat.emissiveIntensity = p.mesh.userData.baseEmissive ?? 0.22;
       }

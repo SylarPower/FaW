@@ -225,6 +225,11 @@ h2.section {
   font-family: "Tektur", sans-serif; letter-spacing: 0.22em; font-size: 12px; color: var(--gold);
 }
 .hud-meta .need { color: var(--muted); font-size: 12px; margin-top: 4px; }
+.hud-meta .speed {
+  margin-top: 6px; font-family: "Tektur", sans-serif; font-size: 11px;
+  letter-spacing: 0.18em; color: var(--gold); text-transform: uppercase;
+}
+.stat-val { font-family: "Tektur", sans-serif; font-size: 15px; color: var(--gold); letter-spacing: 0.06em; }
 
 .side-info { display: flex; flex-direction: column; gap: 8px; }
 .side-info.right { align-items: flex-end; text-align: right; }

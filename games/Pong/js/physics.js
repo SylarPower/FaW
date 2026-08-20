@@ -121,6 +121,8 @@ export class Paddle {
     this.curveTargetR = 0;
     this.curveLockL = false;
     this.curveLockR = false;
+    this.curveCharges = 2;// La curva Q/E ha 2 cariche che si ricaricano nel tempo.
+    this.curveCd = 0;
     this.mesh = null;
     this.inputAxis = 0;
     this.inputAxis2 = 0;
@@ -211,6 +213,16 @@ export class World {
     const curveRise = 16, curveFall = 9;
     p.curveL += clamp(p.curveTargetL - p.curveL, -curveFall * dt, curveRise * dt);
     p.curveR += clamp(p.curveTargetR - p.curveR, -curveFall * dt, curveRise * dt);
+    // 2 cariche di curva: si ricaricano una alla volta.
+    if (p.curveCharges < 2) {
+      p.curveCd -= dt;
+      if (p.curveCd <= 0) {
+        p.curveCharges++;
+        if (p.curveCharges < 2) p.curveCd = CURVE_RECHARGE;
+      }
+    } else if (p.curveCd !== 0) {
+      p.curveCd = 0;
+    }
     if (p.turboT > 0) p.turboT -= dt;
     if (p.grabT > 0) p.grabT -= dt;
     if (p.barrierT > 0) p.barrierT -= dt;
@@ -475,14 +487,20 @@ export class World {
     const relQ = rel * flip;
     const needBend = 0.55;
     let curveHit = false;
-    if (relQ < -0.55 && p.curveL > needBend) {
+    // La curva costa una carica (si ricaricano nel tempo): senza cariche il
+    // colpo sull'estremo resta normale.
+    if (relQ < -0.55 && p.curveL > needBend && p.curveCharges > 0) {
       curveHit = true;
+      p.curveCharges--;
+      p.curveCd = CURVE_RECHARGE;
       p.curveL = 0; p.curveTargetL = 0; p.curveLockL = true;
-      this.emit("curvehit", { ball: b, paddle: p, end: "q" });
-    } else if (relQ > 0.55 && p.curveR > needBend) {
+      this.emit("curvehit", { ball: b, paddle: p, end: "q", charges: p.curveCharges });
+    } else if (relQ > 0.55 && p.curveR > needBend && p.curveCharges > 0) {
       curveHit = true;
+      p.curveCharges--;
+      p.curveCd = CURVE_RECHARGE;
       p.curveR = 0; p.curveTargetR = 0; p.curveLockR = true;
-      this.emit("curvehit", { ball: b, paddle: p, end: "e" });
+      this.emit("curvehit", { ball: b, paddle: p, end: "e", charges: p.curveCharges });
     }
     if (curveHit) b.vz += rel * 4.5; // fiondata extra verso il punto di contatto
 
@@ -583,6 +601,9 @@ function wrapAngle(a) {
   while (a < -Math.PI) a += Math.PI * 2;
   return a;
 }
+
+/** Secondi per ricaricare una carica della curva Q/E. */
+const CURVE_RECHARGE = 6;
 
 export function predictZ(ball, targetX, gravityX = 0, gravityZ = 0, windX = 0, windZ = 0, zBound = 6) {
   let x = ball.x, z = ball.z, vx = ball.vx, vz = ball.vz;
