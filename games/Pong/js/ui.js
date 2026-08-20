@@ -17,14 +17,32 @@ class MenuNav {
     this.items = [];
     this.onConfirm = null;
   }
+  itemKey(el) {
+    if (!el) return "";
+    const data = el.dataset || {};
+    if (data.opt) return `opt:${data.opt}:${data.val || ""}`;
+    if (data.cst) return `cst:${data.cst}:${data.val || ""}`;
+    if (data.power) return `power:${data.power}`;
+    if (data.act) return `act:${data.act}`;
+    return el.textContent.trim();
+  }
   attach(root, { onBack } = {}) {
+    const previous = this.items[this.index];
+    const previousKey = this.itemKey(previous);
     this.root = root;
     this.onBack = onBack || null;
     // Tutti gli elementi interattivi del menu che vogliamo selezionare.
     this.items = Array.from(root.querySelectorAll(
       ".btn, button.card, .pw-pick, [data-cst], [data-opt], [data-power], button.pw-pick"
     )).filter((b) => !b.disabled);
-    this.index = 0;
+    const restored = previousKey ? this.items.findIndex((b) => this.itemKey(b) === previousKey) : -1;
+    this.index = restored >= 0 ? restored : 0;
+    this.items.forEach((item, i) => {
+      item.addEventListener("click", () => {
+        this.index = i;
+        this.focus();
+      });
+    });
     this.focus();
   }
   focus() {
@@ -100,8 +118,10 @@ export class UI {
 
   // Aggancia la navigazione tastiera dopo ogni render.
   _hookScreen(opts = {}) {
-    this.hook();
+    // Prima la navigazione: se Space/Enter scatena un rerender, l'indice
+    // dell'elemento appena scelto viene catturato e ripristinato.
     this.nav.attach(this.root, opts);
+    this.hook();
   }
 
   _tickNav() {

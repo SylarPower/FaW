@@ -210,13 +210,55 @@ export const THEME_DEFS = {
     }
   },
 
+  baseball: {
+    id: "baseball",
+    name: "Baseball",
+    swatch: [0x3f9652, 0xd9e4ea, 0xd84747],
+    spectators: "stadium",
+    ball: { color: 0xf7f4e8, emissive: 0xffffff, metalness: 0.02, roughness: 0.62, emissiveIntensity: 0.08, light: 0.6 },
+    apply: (b) => ({
+      ...b,
+      ...matteMaterials,
+      style: "baseball",
+      bg: 0x08150d,
+      fog: 0x14291b,
+      table: 0x3f9652,
+      line: 0xf7f4e8,
+      p1: 0xd84747,
+      p2: 0x3d82d6,
+      hemi: 0xe2f3dd,
+      tableRoughness: 0.92,
+      paddleMetalness: 0.08,
+      paddleRoughness: 0.7,
+      paddleEmissive: 0.02,
+      edgeGlow: 0.1,
+      ballMetalness: 0.02,
+      ballRoughness: 0.62,
+      ballEmissive: 0.08,
+      ballLight: 0.6,
+      bloom: 0.03,
+      exposure: 1.08,
+      accentIntensity: 0.08,
+      sunIntensity: 1.9,
+      hemiIntensity: 1.1
+    }),
+    ui: {
+      "--bg": "#08150d", "--panel": "rgba(16, 38, 22, 0.9)",
+      "--panel-2": "rgba(23, 57, 32, 0.96)", "--line": "rgba(247, 244, 232, 0.22)",
+      "--mint": "#71cf7b", "--mint-dim": "rgba(113, 207, 123, 0.18)",
+      "--pink": "#f06a6a", "--pink-dim": "rgba(240, 106, 106, 0.18)",
+      "--gold": "#f7f4e8", "--ice": "#d9e4ea",
+      "--text": "#f4faef", "--muted": "#91b096"
+    }
+  },
+
   aurora: {
     id: "aurora",
     name: "Ghiaccio",
     swatch: [0x76b7ff, 0xb59bff, 0xd9f5ff],
     spectators: "ice",
     // La barra sul ghiaccio si vedeva poco: piu' scura, bordo piu' marcato.
-    ball: { color: 0xffc857, emissive: 0xff8a30, metalness: 0.2, roughness: 0.18, emissiveIntensity: 0.82, light: 2.2 },
+    ball: { color: 0xff3d7f, emissive: 0xff165f, metalness: 0.12, roughness: 0.18, emissiveIntensity: 1.0, light: 2.8 },
     apply: (b) => ({
       ...b,
       style: "ice",

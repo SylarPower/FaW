@@ -61,7 +61,11 @@ export class BallTrail {
   constructor(scene, color, max = 14) {
     this.scene = scene;
     this.max = max;
+    this.disabled = max <= 0;
     this.meshes = [];
+    this.i = 0;
+    this.acc = 0;
+    if (this.disabled) return;
     const c = new THREE.Color(color);
     for (let i = 0; i < max; i++) {
       const m = new THREE.Mesh(
@@ -72,14 +76,13 @@ export class BallTrail {
       scene.add(m);
       this.meshes.push(m);
     }
-    this.i = 0;
-    this.acc = 0;
   }
   setColor(color) {
     const c = new THREE.Color(color);
     for (const m of this.meshes) m.material.color.copy(c);
   }
   update(dt, ball) {
+    if (this.disabled) return;
     this.acc += dt;
     if (ball && ball.alive && !ball.held && this.acc > 0.018) {
       this.acc = 0;
@@ -98,6 +101,7 @@ export class BallTrail {
     }
   }
   dispose() {
+    if (this.disabled) return;
     for (const m of this.meshes) {
       this.scene.remove(m);
       m.geometry.dispose();

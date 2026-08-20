@@ -327,6 +327,17 @@ function setupThemeDecor(theme, world, engine, ctrl) {
     }
   }
 
+  if (style === "baseball") {
+    const baseMat = new THREE.MeshStandardMaterial({ color: 0xf7f4e8, roughness: 0.65 });
+    const bases = [[0, 0], [0, -3.4], [-3.1, 0], [3.1, 0]];
+    for (const [x, z] of bases) {
+      const base = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.08, 0.42), baseMat);
+      base.position.set(x, 0.06, z);
+      base.rotation.y = Math.PI / 4;
+      engine.add(base);
+    }
+  }
+
   if (style === "sushi") {
     // Lanterne rosse sospese ai quattro angoli.
     for (const [x, z] of [[-hx - 1, -hz - 1], [hx + 1, -hz - 1], [-hx - 1, hz + 1], [hx + 1, hz + 1]]) {

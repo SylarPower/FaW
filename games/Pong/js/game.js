@@ -9,7 +9,7 @@ import { ARENAS, buildArena, updateArena, handleArenaEvent, nextBallColor, arena
 import { makePaddle, makeBall, impactParticles, updateBurst, makeGoalCelebration, cheerSpectators } from "./models.js";
 import { loadSave, writeSave, SIZE_MUL, SPEED_MUL } from "./save.js";
 import { net } from "./net.js";
-import { PCOL, PNAME, DUEL_SIDES, TRI_SIDES } from "./players.js";
+import { PCOL, DUEL_SIDES, TRI_SIDES } from "./players.js";
 
 function slotSide(triangle, slot) {
   return (triangle ? TRI_SIDES : DUEL_SIDES)[slot];
@@ -178,7 +178,11 @@ export class Game {
     if (!p.mesh) return;
     p.mesh.position.set(p.x, p.y, p.z);
     p.mesh.rotation.y = p.angle;
-    p.mesh.userData.body.scale.set(p.hw * 2, p.hh * 2, p.hd * 2);
+    const lengthRatio = p.baseHd > 0 ? p.hd / p.baseHd : 1;
+    const visualHeight = p.mesh.userData.scaleHeightWithLength
+      ? Math.max(1, Math.min(4.2, lengthRatio))
+      : 1;
+    p.mesh.userData.body.scale.set(p.hw * 2, p.hh * 2 * visualHeight, p.hd * 2);
   }
 
   beginMatch(id, opts = {}) {
@@ -198,12 +202,12 @@ export class Game {
     this.cpuSides = this.computeCpuSides();
     this.loadArena(id);
     this.state = "countdown";
-    this.cd = 3.2;
-    this.serveDir = Math.random() < 0.5 ? 1 : -1;
-    // Prima costruiamo l'HUD, poi scriviamo il countdown nel suo elemento:
-    // evita che il primo "3" venga perso durante il cambio schermata.
+    this.cd = 1.8;
+    this.serveDir = this.randomServeDir();
+    // La partita entra in campo con un segnale breve e leggibile, senza
+    // nessun conto numerico.
     this.ui.showHUD(this);
-    this.showMsg("3", 1.2);
+    this.showMsg("READY", 1.0);
   }
 
   computeCpuSides() {
@@ -225,7 +229,32 @@ export class Game {
     this.ui.setCenter(t);
   }
 
+  randomServeDir() {
+    return Math.random() < 0.5 ? 1 : -1;
+  }
+
+  resetPaddlesForServe() {
+    for (const p of this.world.paddles) {
+      p.vz = 0;
+      p.vx = 0;
+      p.inputAxis = 0;
+      p.inputAxis2 = 0;
+      p.heldBall = null;
+      if (p.edge) {
+        p.offset = 0;
+        p.x = p.edge.mx + p.edge.nx * p.inset;
+        p.z = p.edge.mz + p.edge.nz * p.inset;
+        p.angle = Math.atan2(p.edge.nz, p.edge.nx);
+      } else {
+        p.z = 0;
+        if (p.canMoveX) p.x = (p.xMin + p.xMax) / 2;
+      }
+      this.syncPaddleMesh(p);
+    }
+  }
+
   serve(dir = this.serveDir) {
+    this.resetPaddlesForServe();
     for (const b of this.world.balls) {
       b.alive = false;
       if (b.mesh) {
@@ -246,7 +275,10 @@ export class Game {
     b.colorId = info.colorId;
     b.mesh = makeBall(b.color, b.r, this.ctrl?.theme);
     this.engine.add(b.mesh);
-    const trail = new BallTrail(this.engine.scene, b.color);
+    // La scia sferica confonde la silhouette di ascia e pallottola: in quei
+    // due temi lasciamo leggibile soltanto la decorazione direzionale.
+    const noTrail = ["viking", "western"].includes(this.ctrl?.theme?.style);
+    const trail = new BallTrail(this.engine.scene, b.color, noTrail ? 0 : 14);
     b._trail = trail;
     this.trails.push(trail);
     if (from) {
@@ -284,7 +316,10 @@ export class Game {
     const deco = b.mesh.userData.deco;
     if (deco) {
       const sp = Math.hypot(b.vx, b.vz);
-      if (sp > 0.1) {
+      if (sp > 0.1 && deco.userData.directional) {
+        // Il muso dell'ascia e la punta della pallottola seguono la traiettoria.
+        deco.rotation.y = -Math.atan2(b.vz, b.vx);
+      } else if (sp > 0.1) {
         const axis = new THREE.Vector3(-b.vz / sp, 0, b.vx / sp);
         deco.rotateOnWorldAxis(axis, sp * dt * 0.9);
       }
@@ -340,18 +375,13 @@ export class Game {
 
     if (this.state === "countdown") {
       this.cd -= dt;
-      // Il numero mostrato dipende solo da `cd`, cosi' non ci sono buchi:
-      // 3.2..2.2 -> "3", 2.2..1.2 -> "2", 1.2..0.2 -> "1", poi VIA!.
-      // La durata (1.2s) e' > della fase (1s) perche' il messaggio non svanisca
-      // prima del numero successivo.
-      const n = this.cd > 2.2 ? "3" : this.cd > 1.2 ? "2" : this.cd > 0.2 ? "1" : null;
-      if (n && this.msg !== n) { this.showMsg(n, 1.2); }
+      const n = this.cd > 0.75 ? "READY" : "GO";
+      if (this.msg !== n || this.msgT <= 0) this.showMsg(n, n === "READY" ? 0.8 : 0.45);
       if (this.cd <= 0) {
         this.state = "play";
-        this.showMsg("VIA!", 0.5);
         this.serve(this.serveDir);
       }
-      this.drivePaddles(dt);
+      this.resetPaddlesForServe();
       this.syncVisuals(dt);
       this.publishSnap();
       input.endFrame();
@@ -360,13 +390,16 @@ export class Game {
 
     if (this.state === "point") {
       this.cd -= dt;
+      const n = this.cd > 0.75 ? "READY" : "GO";
+      if (this.msg !== n || this.msgT <= 0) this.showMsg(n, n === "READY" ? 0.8 : 0.45);
+      this.resetPaddlesForServe();
       this.syncVisuals(dt);
       this.publishSnap();
       if (this.cd <= 0) {
         if (this.checkWin()) this.endMatch();
         else {
           this.state = "play";
-          this.serve(this.serveDir);
+          this.serve(this.randomServeDir());
         }
       }
       input.endFrame();
@@ -414,7 +447,8 @@ export class Game {
         // Particelle a tema (foglie, salsa di soia, scintille, schegge di ghiaccio).
         const burst = impactParticles(this.engine.arenaRoot, ev.ball.x, ev.ball.z, this.ctrl.theme, this.sideColor(ev.paddle.side));
         if (burst) this._bursts.push(burst);
-        if (ev.paddle.mesh) ev.paddle.mesh.scale.z = 1.12;
+        // L'impatto si anima in altezza, non lungo la zona di contatto.
+        if (ev.paddle.mesh) ev.paddle.mesh.scale.y = 1.12;
         // Dopo molti scambi la palla accelera leggermente (fino a un tetto).
         if (this.rally > 6) {
           const factor = Math.min(1.25, 1 + (this.rally - 6) * 0.012);
@@ -574,13 +608,15 @@ export class Game {
     if (this.scores[scorer] == null) this.scores[scorer] = 0;
     this.scores[scorer]++;
     this.rally = 0;
-    this.serveDir = scorer === "left" || scorer === "bottom" || scorer === "west" ? 1 : -1;
+    // Il punto non decide più il lato del servizio: ogni ripresa è casuale.
+    this.serveDir = this.randomServeDir();
+    this.resetPaddlesForServe();
     this.engine.kick(0.32);
     const hex = "#" + this.sideColor(scorer).toString(16).padStart(6, "0");
     this.engine.flash(this.flashEl, hex, 90);
     if (!this.demo) {
       this.ui.updateHUD(this);
-      this.showMsg("PUNTO " + (PNAME[scorer] || scorer.toUpperCase()), 0.8);
+      this.showMsg("READY", 1.0);
     }
     if (opts.keepBall) {
       if (this.checkWin() && !this.demo) this.endMatch();
@@ -607,8 +643,11 @@ export class Game {
 
   serveSoon() {
     if (this.state !== "play") return;
+    this.resetPaddlesForServe();
+    this.serveDir = this.randomServeDir();
     this.state = "point";
-    this.cd = 1.25;
+    this.cd = 1.8;
+    this.showMsg("READY", 1.0);
   }
 
   checkWin() {
@@ -768,6 +807,7 @@ export class Game {
       if (p.mesh) {
         p.mesh.scale.z += (1 - p.mesh.scale.z) * Math.min(1, dt * 10);
         p.mesh.scale.x += (1 - p.mesh.scale.x) * Math.min(1, dt * 10);
+        p.mesh.scale.y += (1 - p.mesh.scale.y) * Math.min(1, dt * 10);
         this.syncPaddleMesh(p);
         if (p.barrierT > 0) p.mesh.userData.mat.emissiveIntensity = Math.max(0.8, p.mesh.userData.baseEmissive || 0);
         else p.mesh.userData.mat.emissiveIntensity = p.mesh.userData.baseEmissive ?? 0.22;

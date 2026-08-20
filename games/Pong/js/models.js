@@ -44,6 +44,8 @@ export function makePaddle(color, hw, hd, hh, theme = {}) {
     buildWesternPlank(art, mat);
   } else if (style === "airhockey") {
     buildAirHockey(art, mat, color);
+  } else if (style === "baseball") {
+    buildBaseball(art, mat);
   } else if (style === "tennis") {
     buildTennis(art, mat);
   } else {
@@ -63,6 +65,9 @@ export function makePaddle(color, hw, hd, hh, theme = {}) {
   });
   g.userData.body = body;
   g.userData.mat = mat;
+  // I modelli tematici mantengono le proporzioni anche quando Allunga
+  // aumenta la misura della hitbox lungo Z: la parte scenica può crescere in Y.
+  g.userData.scaleHeightWithLength = style !== "neon";
   g.userData.baseEmissive = theme.paddleEmissive ?? 0.22;
   return g;
 }
@@ -120,10 +125,13 @@ function buildBoot(body, leather) {
   heel.position.set(0, 0.1, -0.32);
   const toeCap = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.2, 0.16), white);
   toeCap.position.set(0, 0.06, 0.48);
-  const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.34, 0.36, 14), leather);
-  collar.position.set(0, 0.47, -0.22);
-  const tongue = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.18, 0.45), leather);
-  tongue.position.set(0, 0.39, 0.03);
+  // Colletto alto: la racchetta deve leggere come uno scarpone anche di lato.
+  const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.38, 0.92, 14), leather);
+  collar.position.set(0, 0.65, -0.22);
+  const cuff = new THREE.Mesh(new THREE.TorusGeometry(0.31, 0.055, 7, 14), white);
+  cuff.position.set(0, 1.08, -0.22);
+  const tongue = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.26, 0.48), leather);
+  tongue.position.set(0, 0.58, 0.03);
 
   // Lacci trasversali sopra la linguetta.
   for (let i = 0; i < 4; i++) {
@@ -148,7 +156,7 @@ function buildBoot(body, leather) {
       body.add(stud);
     }
   }
-  body.add(sole, upper, toe, heel, toeCap, collar, tongue);
+  body.add(sole, upper, toe, heel, toeCap, collar, cuff, tongue);
 }
 
 function buildJungle(body, barkMat) {
@@ -175,58 +183,22 @@ function buildJungle(body, barkMat) {
 }
 
 function buildSushi(body, _mat) {
-  // MAKI ROLL riconoscibile: cilindro di riso bianco lungo la Z (la lunghezza
-  // della racchetta), avvolto da una spessa fascia nori e con puntini colorati
-  // di pesce/avocado sulle estremità tagliate.
+  // Un solo maki: riso visibile soltanto sulle due piccole estremità, nori
+  // avvolto quasi per tutta la lunghezza. Nessun accessorio sporge dal rotolo.
   const riceMat = new THREE.MeshStandardMaterial({ color: 0xf7f2e4, roughness: 0.65 });
-  const noriMat = new THREE.MeshStandardMaterial({ color: 0x0b1516, roughness: 0.9 });
-  const fishMat = new THREE.MeshStandardMaterial({ color: 0xff7b6b, roughness: 0.5, emissive: 0x501810, emissiveIntensity: 0.1 });
-  const avoMat  = new THREE.MeshStandardMaterial({ color: 0x7dc268, roughness: 0.6 });
-  const cucMat  = new THREE.MeshStandardMaterial({ color: 0xffb84d, roughness: 0.55 });
-  // Ricorda: body viene scalato da game.js con (hw*2, hh*2, hd*2).
-  // Un cilindro lungo Z è quindi il rotolo di maki «sdraiato» sulla racchetta.
-  const R = 0.46, L = 0.98;
+  const noriMat = new THREE.MeshStandardMaterial({ color: 0x0b1516, roughness: 0.9, side: THREE.DoubleSide });
+  const R = 0.46;
+  const L = 0.98;
   const rice = new THREE.Mesh(new THREE.CylinderGeometry(R, R, L, 24), riceMat);
   rice.rotation.x = Math.PI / 2;
-  // Fascia esterna di nori: un cilindro leggermente più largo ma corto, come
-  // la striscia di alga che avvolge il rotolo (non le estremità).
+
+  // Il bordo nori lascia solo l'ultimo 5% di ciascun lato al riso bianco.
+  const noriLength = L * 0.9;
   const nori = new THREE.Mesh(
-    new THREE.CylinderGeometry(R + 0.012, R + 0.012, L * 0.78, 24, 1, true),
+    new THREE.CylinderGeometry(R + 0.008, R + 0.008, noriLength, 24, 1, true),
     noriMat
   );
   nori.rotation.x = Math.PI / 2;
-  nori.side = THREE.DoubleSide;
-  // Chiusure di alga alle due estremità (dischi neri visibili di taglio).
-  for (const z of [-L/2 + 0.02, L/2 - 0.02]) {
-    const cap = new THREE.Mesh(
-      new THREE.RingGeometry(0.0, R + 0.008, 24),
-      noriMat
-    );
-    cap.rotation.y = Math.PI / 2;
-    cap.position.z = z;
-    body.add(cap);
-  }
-  // Ripieni visibili sulle due estremità (cerchietti colorati che danno l'idea
-  // del rotolo tagliato: salmone, avocado, cetriolo).
-  const fillMats = [fishMat, avoMat, cucMat, fishMat, avoMat];
-  for (const side of [-1, 1]) {
-    for (let i = 0; i < 5; i++) {
-      const a = (i / 5) * Math.PI * 2;
-      const fr = 0.2;
-      const bit = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 6), fillMats[i]);
-      bit.position.set(Math.cos(a) * fr, Math.sin(a) * fr * 0.9, side * (L/2 + 0.02));
-      bit.scale.set(1, 1, 0.5);
-      body.add(bit);
-    }
-  }
-  // Un paio di bacchette appoggiate diagonalmente, per rendere il tema subito chiaro.
-  const stickMat = new THREE.MeshStandardMaterial({ color: 0xc89968, roughness: 0.8 });
-  for (const y of [-0.1, 0.1]) {
-    const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.018, 1.2, 8), stickMat);
-    stick.rotation.z = Math.PI / 2;
-    stick.position.set(0.15, y + 0.42, 0);
-    body.add(stick);
-  }
   body.add(rice, nori);
 }
 
@@ -351,11 +323,31 @@ function buildAirHockey(body, _mat, color) {
   const rim = new THREE.Mesh(new THREE.TorusGeometry(0.45, 0.055, 8, 24), dark);
   rim.rotation.x = Math.PI / 2;
   rim.position.y = -0.01;
-  const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.14, 0.42, 12), dark);
-  handle.position.y = 0.28;
-  const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.06, 12), baseMat);
-  cap.position.y = 0.49;
+  const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.15, 0.86, 12), dark);
+  handle.position.y = 0.48;
+  const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.17, 0.08, 12), baseMat);
+  cap.position.y = 0.94;
   body.add(base, rim, handle, cap);
+}
+
+function buildBaseball(body, _mat) {
+  // Mazza da baseball: canna larga, manico sottile e pomello. L'asse Z è la
+  // lunghezza di contatto, mentre la parte alta può crescere senza falsare la hitbox.
+  const batMat = new THREE.MeshStandardMaterial({ color: 0xc58a4a, roughness: 0.72 });
+  const gripMat = new THREE.MeshStandardMaterial({ color: 0x30231a, roughness: 0.9 });
+  const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.14, 0.72, 16), batMat);
+  barrel.rotation.x = Math.PI / 2;
+  barrel.position.z = 0.12;
+  const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.09, 0.48, 12), gripMat);
+  handle.rotation.x = Math.PI / 2;
+  handle.position.z = -0.48;
+  const knob = new THREE.Mesh(new THREE.SphereGeometry(0.12, 12, 8), gripMat);
+  knob.scale.set(1.15, 0.7, 0.8);
+  knob.position.z = -0.72;
+  const tape = new THREE.Mesh(new THREE.TorusGeometry(0.085, 0.018, 6, 12), gripMat);
+  tape.rotation.x = Math.PI / 2;
+  tape.position.z = -0.55;
+  body.add(barrel, handle, knob, tape);
 }
 
 function buildTennis(body, _mat) {
@@ -380,7 +372,14 @@ function buildTennis(body, _mat) {
   butt.position.set(0, -0.2, -0.66);
   const tennisBall = new THREE.Mesh(new THREE.SphereGeometry(0.11, 12, 8), ball);
   tennisBall.position.set(0.18, 0.38, 0.16);
-  body.add(hoop, net, handle, butt, tennisBall);
+  // Seconda lettura in altezza: una racchetta da tennis riconoscibile anche
+  // dal profilo, non solo come un anello schiacciato sul tavolo.
+  const uprightHoop = new THREE.Mesh(new THREE.TorusGeometry(0.36, 0.055, 8, 18), frame);
+  uprightHoop.scale.set(0.78, 1.25, 1);
+  uprightHoop.position.set(0, 0.62, 0.02);
+  const uprightNet = new THREE.Mesh(new THREE.PlaneGeometry(0.55, 0.74), strings);
+  uprightNet.position.set(0, 0.62, 0.08);
+  body.add(hoop, net, handle, butt, tennisBall, uprightHoop, uprightNet);
 }
 
 function darken(hex, k) {
@@ -420,9 +419,24 @@ export function makeBall(color = 0xffffff, r = 0.22, theme = {}) {
 
   // Decorazioni tematiche visibili.
   const deco = new THREE.Group();
+  if (style === "viking" || style === "western") {
+    // Più grande della sfera-collisore e orientata nella direzione del volo:
+    // la forma resta leggibile anche senza la scia.
+    deco.scale.setScalar(1.45);
+    deco.userData.directional = true;
+  }
   mesh.add(deco);
 
-  if (style === "boot") {
+  if (style === "baseball") {
+    const white = new THREE.MeshStandardMaterial({ color: 0xf7f4e8, roughness: 0.62 });
+    const red = new THREE.MeshBasicMaterial({ color: 0xd84747 });
+    const base = new THREE.Mesh(new THREE.SphereGeometry(0.92, 20, 14), white);
+    const seamA = new THREE.Mesh(new THREE.TorusGeometry(0.68, 0.035, 6, 24), red);
+    const seamB = seamA.clone();
+    seamA.rotation.set(0.65, 0.25, 0.2);
+    seamB.rotation.set(-0.65, -0.25, 0.2);
+    deco.add(base, seamA, seamB);
+  } else if (style === "boot") {
     // Pallone da calcio classico: base bianca + pentagoni neri.
     const whiteMat = new THREE.MeshStandardMaterial({ color: 0xf5f5f5, roughness: 0.55 });
     const base = new THREE.Mesh(new THREE.SphereGeometry(0.92, 24, 18), whiteMat);
@@ -511,12 +525,14 @@ export function makeBall(color = 0xffffff, r = 0.22, theme = {}) {
   } else if (style === "ice") {
     // Sul ghiaccio una pallina quasi bianca si perdeva nel tavolo. Usiamo un
     // cristallo ambra ad alto contrasto, con bordo ghiacciato e luce intensa.
+    const iceColor = styleData?.color ?? 0xff3d7f;
+    const iceGlow = styleData?.emissive ?? 0xff165f;
     const ice = new THREE.Mesh(geo("ball-ice", () => new THREE.IcosahedronGeometry(0.9, 1)),
-      new THREE.MeshStandardMaterial({ color: 0xffc857, emissive: 0xff8a30, emissiveIntensity: 0.85, metalness: 0.2, roughness: 0.18 }));
+      new THREE.MeshStandardMaterial({ color: iceColor, emissive: iceGlow, emissiveIntensity: 1.0, metalness: 0.12, roughness: 0.18 }));
     const facets = new THREE.Mesh(new THREE.IcosahedronGeometry(1.02, 1),
-      new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.62, wireframe: true }));
-    const halo = new THREE.Mesh(new THREE.TorusGeometry(1.06, 0.035, 6, 24),
-      new THREE.MeshBasicMaterial({ color: 0xffe7a0, transparent: true, opacity: 0.9 }));
+      new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.76, wireframe: true }));
+    const halo = new THREE.Mesh(new THREE.TorusGeometry(1.06, 0.045, 6, 24),
+      new THREE.MeshBasicMaterial({ color: 0xffb4d2, transparent: true, opacity: 0.98 }));
     halo.rotation.x = Math.PI / 2;
     deco.add(ice, facets, halo);
   } else if (style === "tennis") {
@@ -600,7 +616,7 @@ export function tickBallMesh(mesh, vx, vz, dt) {
 // ============================================================
 const surfaceTextures = new Map();
 function surfaceTexture(style) {
-  const styles = ["jungle", "boot", "airhockey", "western", "sushi", "viking", "tennis"];
+  const styles = ["jungle", "boot", "airhockey", "baseball", "western", "sushi", "viking", "tennis"];
   if (!styles.includes(style)) return null;
   if (surfaceTextures.has(style)) return surfaceTextures.get(style);
   const S = 256;
@@ -614,6 +630,16 @@ function surfaceTexture(style) {
     c.strokeStyle = "rgba(29,105,170,.24)";
     c.strokeRect(18, 18, S - 36, S - 36);
     c.beginPath(); c.arc(S / 2, S / 2, 36, 0, Math.PI * 2); c.stroke();
+  } else if (style === "baseball") {
+    c.fillStyle = "#3f9652"; c.fillRect(0, 0, S, S);
+    for (let y = 0; y < S; y += 24) {
+      c.fillStyle = y % 48 ? "rgba(255,255,255,.025)" : "rgba(5,60,24,.08)";
+      c.fillRect(0, y, S, 24);
+    }
+    c.strokeStyle = "rgba(247,244,232,.85)"; c.lineWidth = 3;
+    c.beginPath(); c.moveTo(S / 2, S / 2); c.lineTo(S / 2, S - 20); c.lineTo(S - 20, S - 20); c.stroke();
+    c.strokeStyle = "rgba(216,71,71,.5)"; c.lineWidth = 2;
+    c.strokeRect(18, 18, S - 36, S - 36);
   } else if (style === "western") {
     c.fillStyle = "#8a5022"; c.fillRect(0, 0, S, S);
     for (let y = 0; y < S; y += 2) {
@@ -1032,6 +1058,8 @@ export function impactParticles(scene, x, z, theme, color) {
     particles = makeBurst(scene, x, z, [0xb9e5f4, 0xffffff, 0x76b7ff], { ice: true });
   } else if (style === "airhockey") {
     particles = makeBurst(scene, x, z, [0x4dc6ff, 0xf5fbff], { spark: true });
+  } else if (style === "baseball") {
+    particles = makeBurst(scene, x, z, [0xd84747, 0xf7f4e8, 0xc58a4a], { spark: true });
   } else if (style === "tennis") {
     particles = makeBurst(scene, x, z, [0xc8f23d, 0xf7f0dd], { spark: true });
   } else {
