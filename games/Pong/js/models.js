@@ -253,7 +253,7 @@ function buildBoot(body, leather, hw, hd) {
   // Suola: leggermente più larga e sporgente sotto la tomaia.
   const sole = new THREE.Mesh(
     new THREE.BoxGeometry(d + 0.09, 0.09, 0.90),
-    soleMat
+    soletMat
   );
   sole.position.set(cxOuter(d + 0.09), -0.40, 0.0);
 
