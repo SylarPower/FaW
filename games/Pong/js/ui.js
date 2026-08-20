@@ -770,6 +770,7 @@ export class UI {
             <div class="keys">
               <span><span class="k">W S</span> racchetta</span>
               <span><span class="k">A D</span> 2ª</span>
+              <span><span class="k">Q E</span> curva (colpo forte sul timing)</span>
               <span><span class="k">Spazio</span> presa (se disponibile)</span>
             </div>
             <div class="keys"><span class="k">Esc</span> pausa</div>
@@ -794,12 +795,21 @@ export class UI {
     const pads = game.world.paddles.filter((p) => p.side === side);
     const tags = [];
     const whack = Math.max(0, ...pads.map((p) => p.powerHit || 0));
+    const whackStep = Math.max(0, ...pads.map((p) => p.whackStep || 0));
     const stretch = Math.max(0, ...pads.map((p) => p.stretchStacks || 0));
     const timers = (key) => Math.ceil(Math.max(0, ...pads.map((p) => p[key] || 0)));
-    if (whack) tags.push(`<div class="slot active" title="Ogni raccolta aggiunge 3 rimbalzi">✸ Schianto ×${whack}</div>`);
-    if (stretch) tags.push(`<div class="slot active">↔ Allunga ×${stretch}</div>`);
+    const stretchLeft = () => {
+      const all = pads.flatMap((p) => p.stretchTimers || []);
+      return all.length ? Math.ceil(Math.max(0, ...all)) : 0;
+    };
+    if (whack) {
+      const stepTxt = whackStep > 0 ? ` · ${whackStep}° colpo ${(1.8 + 0.55 * (whackStep - 1)).toFixed(2)}×` : "";
+      tags.push(`<div class="slot active" title="I prossimi 3 colpi accelerano la palla: ognuno più veloce del precedente">✸ Schianto ×${whack}${stepTxt}</div>`);
+    }
+    if (stretch) tags.push(`<div class="slot active" title="Allunga la racchetta; gli effetti si sommano">↔ Allunga ×${stretch} · ${stretchLeft()}s</div>`);
     if (timers("grabT")) tags.push(`<div class="slot active">✋ Presa ${timers("grabT")}s</div>`);
     if (timers("turboT")) tags.push(`<div class="slot active">≫ Turbo ${timers("turboT")}s</div>`);
+    if (timers("barrierT")) tags.push(`<div class="slot active">▤ Barriera ${timers("barrierT")}s</div>`);
     if (timers("invert")) tags.push(`<div class="slot active">⇄ Caos ${timers("invert")}s</div>`);
     if (timers("burn")) tags.push(`<div class="slot active">☠ Bruciatura ${timers("burn")}s</div>`);
     if (!tags.length) tags.push(`<div class="slot">—</div>`);

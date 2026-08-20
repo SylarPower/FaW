@@ -14,10 +14,15 @@ Replica migliorativa 3D di *Pong: The Next Level* (1999). Un giocatore per compu
 |---|---|
 | Racchetta | `W` `S` oppure `↑` `↓` |
 | Seconda racchetta | `A` `D` oppure `←` `→` |
+| Curva (piega un estremo all'indietro) | `Q` (estremo sinistro) `E` (estremo destro) |
 | Presa / lancio (quando disponibile) | `Spazio` |
 | Pausa | `Esc` |
 
-I power-up si attivano automaticamente appena la palla colpisce il gettone. Gli effetti sono cumulabili; non esiste più una borsa con selezione e uso manuale.
+Con `Q`/`E` l'estremo della racchetta si piega all'indietro: se la palla arriva
+sull'estremo piegato col giusto timing (piega quasi completa) il colpo parte
+molto più forte. Dopo un colpo in curva bisogna rilasciare e ripiegare.
+
+I power-up si attivano automaticamente appena la palla colpisce il gettone. Gli effetti sono cumulabili; non esiste più una borsa con selezione e uso manuale. I power-up a tempo mostrano i secondi rimanenti nell'HUD.
 
 ## Online (Firebase)
 

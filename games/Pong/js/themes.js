@@ -137,6 +137,8 @@ export const THEME_DEFS = {
     name: "Scarpone",
     swatch: [0x2f8a43, 0xf4efe1, 0xe04848],
     spectators: "stadium",
+    // Scarpa da calcio: più corta e larga di una barra standard, stessa area.
+    paddle: { wMul: 1.5, lMul: 0.667 },
     ball: { color: 0xf5f5f5, emissive: 0x0, metalness: 0.05, roughness: 0.7, emissiveIntensity: 0, light: 0.3, pattern: "soccer" },
     apply: (b) => ({
       ...b,
@@ -170,6 +172,8 @@ export const THEME_DEFS = {
     name: "Air Hockey",
     swatch: [0x4dc6ff, 0xff5368, 0xf5fbff],
     spectators: "stadium",
+    // Mazza tonda: larghezza e lunghezza quasi uguali, area invariata.
+    paddle: { wMul: 2.05, lMul: 0.49 },
     ball: { color: 0xf5fbff, emissive: 0x74d5ff, metalness: 0.55, roughness: 0.16, emissiveIntensity: 0.35, light: 1.4 },
     apply: (b) => ({
       ...b,
@@ -215,6 +219,8 @@ export const THEME_DEFS = {
     name: "Baseball",
     swatch: [0x3f9652, 0xd9e4ea, 0xd84747],
     spectators: "stadium",
+    // Mazza: lunga e sottile, stessa area di una barra standard.
+    paddle: { wMul: 0.55, lMul: 1.82 },
     ball: { color: 0xf7f4e8, emissive: 0xffffff, metalness: 0.02, roughness: 0.62, emissiveIntensity: 0.08, light: 0.6 },
     apply: (b) => ({
       ...b,
@@ -300,44 +306,6 @@ export const THEME_DEFS = {
     }
   },
 
-  tennis: {
-    id: "tennis",
-    name: "Tennis",
-    swatch: [0xb85c38, 0x2f8d4e, 0xc8f23d],
-    spectators: "stadium",
-    ball: { color: 0xc8f23d, emissive: 0x718d16, metalness: 0.02, roughness: 0.52, emissiveIntensity: 0.18, light: 0.55 },
-    apply: (b) => ({
-      ...b,
-      ...matteMaterials,
-      style: "tennis",
-      bg: 0x1d110d,
-      fog: 0x382018,
-      table: 0xb85c38,
-      line: 0xf7f0dd,
-      p1: 0x2fbd66,
-      p2: 0xf2b544,
-      hemi: 0xffe4c2,
-      bloom: 0.04,
-      exposure: 1.1,
-      tableRoughness: 0.9,
-      paddleEmissive: 0.02,
-      edgeGlow: 0.12,
-      ballEmissive: 0.18,
-      ballLight: 0.55,
-      accentIntensity: 0.1,
-      sunIntensity: 2.05,
-      hemiIntensity: 1.1
-    }),
-    ui: {
-      "--bg": "#1d110d", "--panel": "rgba(43, 23, 18, 0.88)",
-      "--panel-2": "rgba(58, 31, 24, 0.96)", "--line": "rgba(247, 240, 221, 0.22)",
-      "--mint": "#5bd681", "--mint-dim": "rgba(91, 214, 129, 0.18)",
-      "--pink": "#f2b544", "--pink-dim": "rgba(242, 181, 68, 0.18)",
-      "--gold": "#f7f0dd", "--ice": "#c8f23d",
-      "--text": "#fff5e6", "--muted": "#b99276"
-    }
-  },
-
   mono: {
     id: "mono",
     name: "Inchiostro",
@@ -376,6 +344,8 @@ export const THEME_DEFS = {
     name: "Sushi",
     swatch: [0xff7a7a, 0x2c2c2c, 0xf5f0dd],
     spectators: "sushi",
+    // Maki: rotolo più corto e largo, stessa area.
+    paddle: { wMul: 1.35, lMul: 0.74 },
     ball: { color: 0xff9a9a, emissive: 0xff5050, metalness: 0.05, roughness: 0.45, emissiveIntensity: 0.25, light: 0.7 },
     apply: (b) => ({
       ...b,
@@ -510,9 +480,10 @@ export function applyTheme(themeId, base) {
   const def = themeById(themeId);
   const res = def.apply(base);
   // Porta in risultato anche le proprietà specifiche del tema (palla,
-  // spettatori, stile) che la funzione apply() non setta da sola.
+  // spettatori, forma racchetta, stile) che apply() non setta da sola.
   if (def.ball) res.ball = def.ball;
   if (def.spectators) res.spectators = def.spectators;
+  if (def.paddle) res.paddle = def.paddle;
   if (!res.style && def.id === "neon") res.style = "neon";
   return res;
 }

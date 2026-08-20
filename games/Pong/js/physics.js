@@ -42,7 +42,8 @@ export class Ball {
     this.vx = 0; this.vy = 0; this.vz = 0;
     this.r = r;
     this.minSpeed = 8;
-    this.maxSpeed = 22;
+    this.maxSpeed = Infinity; // Nessun tetto: la palla può solo accelerare.
+    this.baseSpeed = 9.5;     // Velocità di servizio: base della crescita rally.
     this.alive = true;
     this.held = false;
     this.holder = null;
@@ -52,6 +53,9 @@ export class Ball {
     this.lastHit = null;
     this.age = 0;
     this.ghost = 0;
+    this.hits = 0;        // Rimbalzi sulle racchette da questo servizio.
+    this.whackMul = 1;    // Moltiplicatore Schianto cumulato (da annullare).
+    this.whackSide = null;// Lato a cui appartiene la catena Schianto attiva.
     this.mesh = null;
     this.light = null;
     this.trail = [];
@@ -69,6 +73,7 @@ export class Ball {
     const ang = rand(-0.42, 0.42);
     this.vx = Math.cos(ang) * speed * dirX;
     this.vz = Math.sin(ang) * speed;
+    this.baseSpeed = speed;
     this.held = false;
     this.holder = null;
     this.alive = true;
@@ -103,12 +108,19 @@ export class Paddle {
     this.stretchStacks = 0;
     this.stretchTimers = [];
     this.powerHit = 0;
+    this.whackStep = 0;   // Colpi Schianto già sferrati in questa catena.
     this.stun = 0;
     this.burn = 0;
     this.invert = 0;
     this.grabT = 0;
     this.barrierT = 0;
     this.turboT = 0;
+    this.curveL = 0;      // Q: estremo z=-0.5 piegato all'indietro (0..1)
+    this.curveR = 0;      // E: estremo z=+0.5 piegato all'indietro (0..1)
+    this.curveTargetL = 0;
+    this.curveTargetR = 0;
+    this.curveLockL = false;
+    this.curveLockR = false;
     this.mesh = null;
     this.inputAxis = 0;
     this.inputAxis2 = 0;
@@ -193,6 +205,12 @@ export class World {
     const stretchFactor = Math.min(4.2, 1 + (p.stretchStacks || 0) * 0.7);
     const targetHd = p.baseHd * stretchFactor;
     p.hd = lerp(p.hd, targetHd, 1 - Math.pow(0.001, dt));
+    // Curva Q/E: la racchetta si piega in fretta e torna elastica un po' più
+    // lentamente. Il lock (dopo un colpo in curva) viene tolto da game.js
+    // quando il tasto viene rilasciato.
+    const curveRise = 16, curveFall = 9;
+    p.curveL += clamp(p.curveTargetL - p.curveL, -curveFall * dt, curveRise * dt);
+    p.curveR += clamp(p.curveTargetR - p.curveR, -curveFall * dt, curveRise * dt);
     if (p.turboT > 0) p.turboT -= dt;
     if (p.grabT > 0) p.grabT -= dt;
     if (p.barrierT > 0) p.barrierT -= dt;
@@ -258,7 +276,8 @@ export class World {
     }
 
     const spd = b.speed();
-    if (spd > b.maxSpeed) b.setSpeed(b.maxSpeed);
+    // Niente tetto massimo: la velocità cresce sempre, ma i rimbalzi la
+    // aumentano sempre meno (vedi collideBallPaddle).
     if (spd < 3 && spd > 0 && !this.drag) b.setSpeed(Math.max(b.minSpeed * 0.7, spd));
 
     b.x += b.vx * dt;
@@ -433,8 +452,11 @@ export class World {
     b.z += nz * overlap;
     const vn = b.vx * nx + b.vz * nz;
     if (vn < 0) {
-      b.vx -= 2.05 * vn * nx;
-      b.vz -= 2.05 * vn * nz;
+      // Rimbalzo elastico esatto: l'unica fonte di accelerazione è il boost
+      // progressivo qui sotto, così la crescita resta sotto controllo e
+      // rallenta con i colpi invece di esplodere.
+      b.vx -= 2.0 * vn * nx;
+      b.vz -= 2.0 * vn * nz;
     }
     const rel = clamp((b.z - p.z) / p.hd, -1, 1);
     b.vz += rel * 6.5 + p.vz * 0.35;
@@ -446,21 +468,61 @@ export class World {
       if (p.side === "right" && b.vx > -1.5) b.vx = -Math.abs(b.vx) - 1.2;
     }
 
-    let spd = b.speed();
-    let boost = 1.035;
-    if (p.powerHit > 0) {
-      boost = 1.55;
-      // Schianto ha tre cariche per giocatore, non tre per ogni eventuale
-      // racchetta dell'arena: sincronizziamo il contatore su tutte le sue barre.
-      const charges = p.powerHit - 1;
-      for (const mate of this.paddles) {
-        if (mate.side === p.side) mate.powerHit = charges;
-      }
-      this.emit("powerhit", { ball: b, paddle: p, charges });
+    // --- Curva Q/E: colpendo con l'estremo piegato all'indietro (e con la
+    // piega quasi completa, quindi col giusto timing) il colpo è più forte.
+    // relQ = -1 sull'estremo piegato da Q, +1 su quello piegato da E.
+    const flip = !p.edge && Math.cos(p.angle) < 0 ? -1 : 1;
+    const relQ = rel * flip;
+    const needBend = 0.55;
+    let curveHit = false;
+    if (relQ < -0.55 && p.curveL > needBend) {
+      curveHit = true;
+      p.curveL = 0; p.curveTargetL = 0; p.curveLockL = true;
+      this.emit("curvehit", { ball: b, paddle: p, end: "q" });
+    } else if (relQ > 0.55 && p.curveR > needBend) {
+      curveHit = true;
+      p.curveR = 0; p.curveTargetR = 0; p.curveLockR = true;
+      this.emit("curvehit", { ball: b, paddle: p, end: "e" });
     }
-    spd = clamp(spd * boost, b.minSpeed, b.maxSpeed);
-    b.setSpeed(spd);
+    if (curveHit) b.vz += rel * 4.5; // fiondata extra verso il punto di contatto
+
+    // --- Schianto: 3 colpi potenziati, ognuno più veloce del precedente.
+    // Il colpo di un avversario spegne la catena e la palla riparte a
+    // velocità normale (le cariche restano a chi le possiede).
+    let whackMul = 1;
+    if (p.powerHit > 0) {
+      if ((b.whackMul || 1) > 1 && b.whackSide && b.whackSide !== p.side) {
+        b.whackMul = 1; // la catena avversaria viene assorbita
+      }
+      const step = (p.whackStep || 0) + 1;
+      whackMul = 1.8 + 0.55 * (step - 1); // 1° colpo 1.8×, 2° 2.35×, 3° 2.9×
+      const charges = p.powerHit - 1;
+      // Le cariche sono del giocatore, non della singola barra:
+      // sincronizziamo contatore e catena su tutte le sue racchette.
+      for (const mate of this.paddles) {
+        if (mate.side === p.side) { mate.powerHit = charges; mate.whackStep = step; }
+      }
+      b.whackMul = (b.whackMul || 1) * whackMul;
+      b.whackSide = p.side;
+      this.emit("powerhit", { ball: b, paddle: p, charges, mul: whackMul, step });
+    } else if ((b.whackMul || 1) > 1 && b.whackSide && b.whackSide !== p.side) {
+      const oldMul = b.whackMul;
+      b.whackMul = 1;
+      b.whackSide = null;
+      this.emit("whackbreak", { ball: b, paddle: p, mul: oldMul });
+    }
+
+    // --- Velocità SENZA tetto: dipende solo da quanti colpi ha già preso la
+    // palla da questo servizio. Curva logaritmica: ogni rimbalzo accelera
+    // meno del precedente, ma la velocità non smette mai di crescere.
+    const h = b.hits;
+    const base = b.baseSpeed || b.minSpeed * 1.19;
+    let target = base * (1 + 1.2 * Math.log(1 + h / 6));
+    if (curveHit) target *= 1.6;
+    target = Math.max(target * whackMul, b.minSpeed);
+    b.setSpeed(target);
     b.lastHit = p.side;
+    b.hits++;
     b.ghost = 0.04;
     return true;
   }

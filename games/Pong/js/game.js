@@ -240,6 +240,12 @@ export class Game {
       p.inputAxis = 0;
       p.inputAxis2 = 0;
       p.heldBall = null;
+      p.curveL = 0;
+      p.curveR = 0;
+      p.curveTargetL = 0;
+      p.curveTargetR = 0;
+      p.curveLockL = false;
+      p.curveLockR = false;
       if (p.edge) {
         p.offset = 0;
         p.x = p.edge.mx + p.edge.nx * p.inset;
@@ -270,7 +276,6 @@ export class Game {
     const info = colorId ? { color, colorId } : nextBallColor(this.ctrl);
     const b = new Ball(0.22);
     b.minSpeed = 8 * this.speedMul;
-    b.maxSpeed = 22 * this.speedMul;
     b.color = info.color;
     b.colorId = info.colorId;
     b.mesh = makeBall(b.color, b.r, this.ctrl?.theme);
@@ -287,12 +292,14 @@ export class Game {
       const s = (10 + rand(0, 4)) * this.speedMul;
       b.vx = Math.cos(a) * s;
       b.vz = Math.sin(a) * s;
+      b.baseSpeed = s;
     } else if (this.triangle) {
       b.x = 0; b.z = 0; b.y = b.r;
       const a = rand(0, Math.PI * 2);
       const s = 9.5 * this.speedMul;
       b.vx = Math.cos(a) * s;
       b.vz = Math.sin(a) * s;
+      b.baseSpeed = s;
       b.ghost = 0.2;
     } else {
       b.serve(dir, 9.5 * this.speedMul);
@@ -449,11 +456,8 @@ export class Game {
         if (burst) this._bursts.push(burst);
         // L'impatto si anima in altezza, non lungo la zona di contatto.
         if (ev.paddle.mesh) ev.paddle.mesh.scale.y = 1.12;
-        // Dopo molti scambi la palla accelera leggermente (fino a un tetto).
-        if (this.rally > 6) {
-          const factor = Math.min(1.25, 1 + (this.rally - 6) * 0.012);
-          ev.ball.minSpeed = 8 * this.speedMul * factor;
-        }
+        // La crescita di velocità è nel fisico (collideBallPaddle): nessun
+        // tetto, incrementi sempre più piccoli a ogni rimbalzo.
         fx.push("hit");
       }
       if (ev.type === "wall") { fx.push("wall"); }
@@ -478,10 +482,24 @@ export class Game {
         this.ui.updateHUD(this);
       }
       if (ev.type === "powerhit") {
-        this.engine.kick(0.28);
+        this.engine.kick(0.3 + ev.mul * 0.06);
         this.engine.flash(this.flashEl, "#fff4c2", 70);
         this.particles.burst(ev.ball.x, 0.4, ev.ball.z, 0xffc857, 24, 7);
+        this.showMsg(`SCHIANTO ${ev.step}° · ×${ev.mul.toFixed(2)}`, 0.7);
         this.ui.updateHUD(this); // aggiorna subito «Schianto ×2/×1»
+      }
+      if (ev.type === "whackbreak") {
+        // L'avversario ha respinto: la catena Schianto si spegne.
+        this.engine.kick(0.18);
+        this.engine.flash(this.flashEl, "#9be7ff", 60);
+        this.particles.burst(ev.ball.x, 0.35, ev.ball.z, 0x9be7ff, 16, 5);
+        this.showMsg("SCHIANTO RIENTRATO", 0.55);
+      }
+      if (ev.type === "curvehit") {
+        this.engine.kick(0.34);
+        this.engine.flash(this.flashEl, "#eaffff", 60);
+        this.particles.burst(ev.ball.x, 0.4, ev.ball.z, this.sideColor(ev.paddle.side), 20, 8);
+        this.showMsg("CURVA!", 0.45);
       }
     }
     this._fx = fx;
@@ -501,6 +519,16 @@ export class Game {
     }
 
     this.syncVisuals(dt);
+
+    // I timer dei power-up scorrono anche senza eventi: l'HUD mostra i
+    // secondi rimanenti e va rinfrescato di continuo.
+    if (!isDemo) {
+      this._hudT = (this._hudT || 0) + dt;
+      if (this._hudT > 0.2) {
+        this._hudT = 0;
+        this.ui.updateHUD(this);
+      }
+    }
   }
 
   drivePaddles(dt) {
@@ -518,6 +546,13 @@ export class Game {
         if (p.role === "goalie") p.inputAxis = inp.axis2 || 0;
         else if (p.role === "striker") p.inputAxis = inp.axis || 0;
         else { p.inputAxis = inp.axis || 0; p.inputAxis2 = inp.axis2 || 0; }
+        // Curva Q/E: dopo un colpo in curva l'estremo resta dritto finché il
+        // tasto non viene rilasciato (serve un nuovo "caricamento").
+        const wantL = !!inp.curveL, wantR = !!inp.curveR;
+        if (!wantL) p.curveLockL = false;
+        if (!wantR) p.curveLockR = false;
+        p.curveTargetL = wantL && !p.curveLockL ? 1 : 0;
+        p.curveTargetR = wantR && !p.curveLockR ? 1 : 0;
       }
     };
 
@@ -809,6 +844,12 @@ export class Game {
         p.mesh.scale.x += (1 - p.mesh.scale.x) * Math.min(1, dt * 10);
         p.mesh.scale.y += (1 - p.mesh.scale.y) * Math.min(1, dt * 10);
         this.syncPaddleMesh(p);
+        // Curva Q/E: ogni perno ruota attorno all'estremo OPPOSTO, così
+        // l'estremo piegato si incurva all'indietro e l'altro resta fermo.
+        // Q piega l'estremo z=-0.5 (perno P), E l'estremo z=+0.5 (perno N).
+        const bend = 0.85;
+        if (p.mesh.userData.curvePivotP) p.mesh.userData.curvePivotP.rotation.y = p.curveL * bend;
+        if (p.mesh.userData.curvePivotN) p.mesh.userData.curvePivotN.rotation.y = -p.curveR * bend;
         if (p.barrierT > 0) p.mesh.userData.mat.emissiveIntensity = Math.max(0.8, p.mesh.userData.baseEmissive || 0);
         else p.mesh.userData.mat.emissiveIntensity = p.mesh.userData.baseEmissive ?? 0.22;
       }

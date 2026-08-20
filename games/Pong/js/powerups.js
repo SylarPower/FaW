@@ -2,7 +2,7 @@ import { makePowerToken, POWER_PICKUP_RADIUS } from "./models.js";
 
 export const POWER_DEFS = {
   grab: { id: "grab", glyph: "✋", name: "Presa", desc: "Permette di trattenere e lanciare la palla", color: 0x3dffd1, hold: true },
-  whack: { id: "whack", glyph: "✸", name: "Schianto", desc: "I prossimi 3 rimbalzi accelerano la palla", color: 0xffc857, charges: 3 },
+  whack: { id: "whack", glyph: "✸", name: "Schianto", desc: "3 colpi potenziati: ognuno più veloce del precedente", color: 0xffc857, charges: 3 },
   stretch: { id: "stretch", glyph: "↔", name: "Allunga", desc: "Allunga ancora la racchetta; gli effetti si sommano", color: 0x8ee7ff },
   turbo: { id: "turbo", glyph: "≫", name: "Turbo", desc: "Aumenta temporaneamente la velocità di movimento", color: 0xff7a3d },
   spike: { id: "spike", glyph: "▲", name: "Spine", desc: "Alza le spine difensive", color: 0xff5a5a },
@@ -110,14 +110,18 @@ export function applyPower(id, side, ctx) {
       break;
     case "whack":
       // Ogni raccolta aggiunge tre rimbalzi, condivisi tra tutte le racchette.
-      for (const p of pads) p.powerHit = (p.powerHit || 0) + 3;
+      // Una nuova raccolta fa ripartire la catena dal primo colpo.
+      for (const p of pads) {
+        p.powerHit = (p.powerHit || 0) + 3;
+        p.whackStep = 0;
+      }
       break;
     case "stretch":
       // Un timer per ogni raccolta: quando si raccolgono più Allunga insieme,
       // la racchetta cresce di più invece di sostituire il potere precedente.
       for (const p of pads) {
         if (!p.stretchTimers) p.stretchTimers = [];
-        p.stretchTimers.push(8);
+        p.stretchTimers.push(10);
         p.stretchStacks = p.stretchTimers.length;
       }
       break;

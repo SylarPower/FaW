@@ -18,7 +18,11 @@ export function loadSave() {
     if (!raw) return structuredClone(DEFAULT);
     const data = JSON.parse(raw);
     const legacyTheme = data.options?.theme;
-    const theme = legacyTheme === "retro" ? "airhockey" : legacyTheme === "sunset" ? "tennis" : legacyTheme;
+    const theme =
+      legacyTheme === "retro" ? "airhockey" :
+      legacyTheme === "sunset" ? "baseball" :
+      legacyTheme === "tennis" ? "neon" : // tema rimosso
+      legacyTheme;
     return {
       ...structuredClone(DEFAULT),
       ...data,

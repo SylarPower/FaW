@@ -133,6 +133,11 @@ export function buildArena(id, engine, world, sizeMul = 1, themeId = "neon") {
   const ctrl = { id, def, theme, extras: [], snow: null, features: {}, table: null, goldHits: 0 };
 
   const padScale = sizeMul;
+  // Forma racchetta dettata dal tema: larghezza e lunghezza cambiano ma
+  // l'area (hw × hd) resta la stessa per tutti i temi.
+  const aspect = theme.paddle || { wMul: 1, lMul: 1 };
+  const hwBase = 0.22 * padScale * (aspect.wMul ?? 1);
+  const hdBase = 1.15 * padScale * (aspect.lMul ?? 1);
   const w = 20, d = 12;
 
   if (id === "triangle") {
@@ -145,11 +150,18 @@ export function buildArena(id, engine, world, sizeMul = 1, themeId = "neon") {
       [theme.p1 ?? 0x3dffd1, theme.p2 ?? 0xff3d7f, theme.line ?? 0xffc857],
       theme
     ));
-    const hd = 1.2 * padScale;
+    const hd = 1.2 * padScale * (aspect.lMul ?? 1);
     const sides = ["bottom", "east", "west"];
     tri.edges.forEach((e, i) => {
+      const hw = 0.22 * padScale * (aspect.wMul ?? 1);
       const p = makePState(sides[i], "main", {
-        hd, edge: e, inset: 0.62, angle: Math.atan2(e.nz, e.nx)
+        hw,
+        hd,
+        // Il bordo vicino alla linea resta a distanza fissa anche con
+        // racchette più larghe: inset cresce con hw.
+        inset: 0.4 + hw,
+        edge: e,
+        angle: Math.atan2(e.nz, e.nx)
       });
       p.x = e.mx + e.nx * p.inset;
       p.z = e.mz + e.nz * p.inset;
@@ -170,31 +182,31 @@ export function buildArena(id, engine, world, sizeMul = 1, themeId = "neon") {
     ctrl.table = engine.add(makeTable(world.w, world.d, theme.table, theme.line, { openEnds: true, theme }));
   }
 
-  const hd = 1.15 * padScale;
+  const hd = hdBase;
   const makePads = (count, opts = {}) => {
     const sides = ["left", "right"];
     for (const side of sides) {
       if (count === 1) {
         world.paddles.push(makePState(side, "main", {
           x: side === "left" ? -world.w / 2 + 0.7 : world.w / 2 - 0.7,
-          hd, ...opts
+          hw: hwBase, hd, ...opts
         }));
       } else {
         const gx = side === "left" ? -world.w / 2 + 0.55 : world.w / 2 - 0.55;
         const sx = side === "left" ? -world.w / 2 + 2.6 : world.w / 2 - 2.6;
         world.paddles.push(makePState(side, "goalie", {
-          x: gx, hd: hd * 0.85, zMin: -2.2, zMax: 2.2, ...opts
+          x: gx, hw: hwBase, hd: hd * 0.85, zMin: -2.2, zMax: 2.2, ...opts
         }));
         world.paddles.push(makePState(side, "striker", {
-          x: sx, hd, ...opts
+          x: sx, hw: hwBase, hd, ...opts
         }));
       }
     }
   };
 
   if (id === "balloons") {
-    world.paddles.push(makePState("left", "main", { x: -5.8, hd, canMoveX: true, xMin: -6.6, xMax: -2.2 }));
-    world.paddles.push(makePState("right", "main", { x: 5.8, hd, canMoveX: true, xMin: 2.2, xMax: 6.6 }));
+    world.paddles.push(makePState("left", "main", { x: -5.8, hw: hwBase, hd, canMoveX: true, xMin: -6.6, xMax: -2.2 }));
+    world.paddles.push(makePState("right", "main", { x: 5.8, hw: hwBase, hd, canMoveX: true, xMin: 2.2, xMax: 6.6 }));
   } else if (id === "classic" || id === "penguin" || id === "snowstorm" || id === "tilt" || id === "pinball") {
     makePads(1);
   } else if (id === "logs" || id === "clown" || id === "jungle" || id === "puck") {
@@ -314,17 +326,6 @@ function setupThemeDecor(theme, world, engine, ctrl) {
     crystals.instanceMatrix.needsUpdate = true;
     crystals.castShadow = true;
     engine.add(crystals);
-  }
-
-  if (style === "tennis") {
-    const ballMat = new THREE.MeshStandardMaterial({ color: 0xc8f23d, roughness: 0.55, emissive: 0x718d16, emissiveIntensity: 0.12 });
-    for (let i = 0; i < 18; i++) {
-      const [x, z] = edgePoint(2.2);
-      const ball = new THREE.Mesh(new THREE.SphereGeometry(0.14 + Math.random() * 0.08, 10, 8), ballMat);
-      ball.position.set(x, ball.geometry.parameters.radius, z);
-      ball.castShadow = true;
-      engine.add(ball);
-    }
   }
 
   if (style === "baseball") {

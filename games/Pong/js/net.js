@@ -192,6 +192,8 @@ export const net = {
     this.fb.set(this.roomRef(this.code, `inputs/${this.slot}`), {
       axis: inp.axis || 0,
       axis2: inp.axis2 || 0,
+      curveL: !!inp.curveL,
+      curveR: !!inp.curveR,
       power: !!inp.power,
       powerHeld: !!inp.powerHeld,
       switch: !!inp.switch,
