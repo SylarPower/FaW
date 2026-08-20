@@ -23,6 +23,7 @@ export class Game {
     this.world = new World();
     this.powers = new PowerUpManager(this.engine, this.world);
     this.save = loadSave();
+    this._bindPowerPickups();
     this.state = "title";
     this.vsCPU = true;
     this.online = false;
@@ -84,6 +85,10 @@ export class Game {
 
   persist() { writeSave(this.save); }
 
+  _bindPowerPickups() {
+    this.powers.onPickup = (side, id) => this.activatePower(side, id);
+  }
+
   startDemo() {
     this.demo = true;
     this.vsCPU = true;
@@ -107,6 +112,7 @@ export class Game {
     this.trails = [];
     this.world = new World();
     this.powers = new PowerUpManager(this.engine, this.world);
+    this._bindPowerPickups();
     const options = { ...this.save.options, ...(this.matchOptions || {}) };
     const sizeMul = SIZE_MUL[options.paddleSize] || 1;
     this.ctrl = buildArena(id, this.engine, this.world, sizeMul, options.theme);
@@ -300,7 +306,7 @@ export class Game {
 
     // Navigazione tastiera nei menu: W/S muovono, Spazio conferma, Esc torna indietro.
     // Funziona ogni volta che c'e' una UI di menu sullo schermo (non in partita HUD).
-    const nonMenuScreens = new Set(["hud", "load"]);
+    const nonMenuScreens = new Set(["hud", "load", "pause"]);
     const inMenu = this.demo || !nonMenuScreens.has(this.ui.screen);
     if (inMenu && this.ui.updateMenuNav) {
       this.ui.updateMenuNav(input);
@@ -493,35 +499,20 @@ export class Game {
       list.forEach((side, i) => {
         if (side === this.localSide) return;
         if (this.cpuSides.includes(side)) {
-          updateAI(this.world, side, skill, dt, { usePower: () => this.tryPower(side) });
+          updateAI(this.world, side, skill, dt);
         } else {
           applyInp(side, net.inputFor(i));
         }
       });
     } else if (!this.online) {
       for (const s of this.cpuSides) {
-        updateAI(this.world, s, skill, dt, { usePower: () => this.tryPower(s) });
+        updateAI(this.world, s, skill, dt);
       }
-    }
-
-    if (input.switch) this.powers.cycle(this.localSide);
-    if (input.power) this.tryPower(this.localSide);
-
-    if (this.online && this.isHost()) {
-      const list = this.triangle ? TRI_SIDES : DUEL_SIDES;
-      list.forEach((side, i) => {
-        if (side === this.localSide || this.cpuSides.includes(side)) return;
-        const inp = net.inputFor(i);
-        if (inp?.switch) this.powers.cycle(side);
-        if (inp?.power) this.tryPower(side);
-      });
     }
   }
 
-  tryPower(side) {
-    const id = this.powers.consume(side);
-    if (!id) return;
-    applyPower(id, side, { world: this.world, features: this.ctrl.features, engine: this.engine });
+  activatePower(side, id) {
+    applyPower(id, side, { world: this.world, features: this.ctrl?.features, engine: this.engine });
     const def = POWER_DEFS[id];
     this.showMsg(id === "whack" ? "SCHIANTO · 3 COLPI" : (def?.name || id), id === "whack" ? 0.9 : 0.6);
     this.ui.updateHUD(this);
@@ -593,6 +584,10 @@ export class Game {
     }
     if (opts.keepBall) {
       if (this.checkWin() && !this.demo) this.endMatch();
+      else if (!this.demo) {
+        this.state = "point";
+        this.cd = 1.8;
+      }
       return;
     }
     if (this.demo) {
@@ -605,13 +600,15 @@ export class Game {
       return;
     }
     this.state = "point";
-    this.cd = 1.15;
+    // Lasciamo respirare il punto: il nuovo servizio non parte subito sotto
+    // alle dita del giocatore.
+    this.cd = 1.8;
   }
 
   serveSoon() {
     if (this.state !== "play") return;
     this.state = "point";
-    this.cd = 0.8;
+    this.cd = 1.25;
   }
 
   checkWin() {

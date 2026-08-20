@@ -7,7 +7,6 @@ const bind = {
   altup: ["KeyA", "KeyQ", "ArrowLeft"],
   altdown: ["KeyD", "ArrowRight"],
   power: ["Space"],
-  switch: ["KeyE"],
   pause: ["Escape", "KeyP"],
   confirm: ["Enter", "Space"]
 };
@@ -37,7 +36,6 @@ export const input = {
   axisJustAltDown: false,
   power: false,
   powerHeld: false,
-  switch: false,
   pause: false,
   confirm: false,
   anyKey: false,
@@ -60,8 +58,7 @@ export const input = {
       axis: this.axis,
       axis2: this.axis2,
       power: this.power,
-      powerHeld: this.powerHeld,
-      switch: this.switch
+      powerHeld: this.powerHeld
     };
   },
 
@@ -76,7 +73,6 @@ export const input = {
     this.axis2 = a2;
     this.power = anyJust(bind.power);
     this.powerHeld = any(bind.power);
-    this.switch = anyJust(bind.switch);
     this.pause = anyJust(bind.pause);
     this.confirm = anyJust(bind.confirm);
   },
@@ -87,7 +83,6 @@ export const input = {
     this.pause = false;
     this.confirm = false;
     this.power = false;
-    this.switch = false;
     this.axisJustUp = false;
     this.axisJustDown = false;
     this.axisJustAltUp = false;

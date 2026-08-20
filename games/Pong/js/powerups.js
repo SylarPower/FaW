@@ -1,41 +1,42 @@
 import { makePowerToken, POWER_PICKUP_RADIUS } from "./models.js";
-import * as THREE from "three";
 
 export const POWER_DEFS = {
-  grab: { id: "grab", glyph: "✋", name: "Presa", desc: "Trattieni e lancia la palla", color: 0x3dffd1, hold: true },
-  whack: { id: "whack", glyph: "✸", name: "Schianto", desc: "Attivalo prima del contatto: i prossimi 3 rimbalzi su una qualsiasi delle tue racchette consumano una carica condivisa e accelerano la palla del 55%, fino al limite", color: 0xffc857, charges: 3 },
-  stretch: { id: "stretch", glyph: "↔", name: "Allunga", desc: "Racchetta extra-larga", color: 0x8ee7ff },
-  turbo: { id: "turbo", glyph: "≫", name: "Turbo", desc: "Scatto di velocità", color: 0xff7a3d },
+  grab: { id: "grab", glyph: "✋", name: "Presa", desc: "Permette di trattenere e lanciare la palla", color: 0x3dffd1, hold: true },
+  whack: { id: "whack", glyph: "✸", name: "Schianto", desc: "I prossimi 3 rimbalzi accelerano la palla", color: 0xffc857, charges: 3 },
+  stretch: { id: "stretch", glyph: "↔", name: "Allunga", desc: "Allunga ancora la racchetta; gli effetti si sommano", color: 0x8ee7ff },
+  turbo: { id: "turbo", glyph: "≫", name: "Turbo", desc: "Aumenta temporaneamente la velocità di movimento", color: 0xff7a3d },
   spike: { id: "spike", glyph: "▲", name: "Spine", desc: "Alza le spine difensive", color: 0xff5a5a },
-  invert: { id: "invert", glyph: "⇄", name: "Caos", desc: "Inverte i comandi avversari", color: 0xc77dff },
-  barrier: { id: "barrier", glyph: "▤", name: "Barriera", desc: "Muro temporaneo in porta", color: 0x9be7ff },
+  invert: { id: "invert", glyph: "⇄", name: "Caos", desc: "Inverte temporaneamente i comandi avversari", color: 0xc77dff },
+  barrier: { id: "barrier", glyph: "▤", name: "Barriera", desc: "Crea un muro temporaneo in porta", color: 0x9be7ff },
   fan: { id: "fan", glyph: "✺", name: "Ventilatore", desc: "Soffia il disco via da te", color: 0x7ad7ff },
   tilt: { id: "tilt", glyph: "◣", name: "Inclinazione", desc: "Inclina il tavolo", color: 0xffb347 },
-  hill: { id: "hill", glyph: "⌒", name: "Collina", desc: "Crea un dosso al centro", color: 0x86c06c },
-  dip: { id: "dip", glyph: "⌄", name: "Conca", desc: "Crea una conca al centro", color: 0x5aa9e6 },
+  hill: { id: "hill", glyph: "⌒", name: "Collina", desc: "Crea o rafforza il dosso al centro", color: 0x86c06c },
+  dip: { id: "dip", glyph: "⌄", name: "Conca", desc: "Crea o rafforza la conca al centro", color: 0x5aa9e6 },
   spinlog: { id: "spinlog", glyph: "↻", name: "Rotazione", desc: "Fa girare i tronchi", color: 0xd27d2c },
   bear: { id: "bear", glyph: "❆", name: "Orso Polare", desc: "Alza il tuo bordo: la palla non passa", color: 0xf2f0ea },
   seal: { id: "seal", glyph: "◕", name: "Foca", desc: "Una foca ti aiuta a parare", color: 0x8aa0b2 },
   skull: { id: "skull", glyph: "☠", name: "Teschio", desc: "Effetto ostile sull'avversario", color: 0xff3d7f }
 };
 
+/**
+ * I gettoni non finiscono più in una borsa: la raccolta è l'attivazione.
+ * `onPickup` viene chiamato subito, nello stesso frame del contatto con la palla.
+ */
 export class PowerUpManager {
   constructor(engine, world) {
     this.engine = engine;
     this.world = world;
     this.tokens = [];
-    this.inventory = emptyInv();
-    this.selected = emptySel();
     this.spawnT = 0;
     this.enabled = [];
     this.spawnEvery = 7;
+    this.onPickup = null;
   }
 
   setPool(ids) {
     this.enabled = ids.slice();
-    this.inventory = emptyInv();
-    this.selected = emptySel();
     this.clearTokens();
+    this.spawnT = 0;
   }
 
   clearTokens() {
@@ -92,62 +93,42 @@ export class PowerUpManager {
   }
 
   give(side, id) {
-    const list = this.inventory[side];
-    if (list.length >= 3) list.shift();
-    list.push(id);
-    this.selected[side] = list.length - 1;
+    // Non c'è più una selezione da cambiare: il potere parte ora.
+    this.onPickup?.(side, id);
   }
-
-  current(side) {
-    const list = this.inventory[side];
-    return list[this.selected[side]] || null;
-  }
-
-  cycle(side) {
-    const list = this.inventory[side];
-    if (list.length < 2) return;
-    this.selected[side] = (this.selected[side] + 1) % list.length;
-  }
-
-  consume(side) {
-    const list = this.inventory[side];
-    if (!list.length) return null;
-    const i = this.selected[side] % list.length;
-    const id = list.splice(i, 1)[0];
-    this.selected[side] = Math.min(i, Math.max(0, list.length - 1));
-    return id;
-  }
-}
-
-function emptyInv() {
-  return { left: [], right: [], bottom: [], east: [], west: [] };
-}
-function emptySel() {
-  return { left: 0, right: 0, bottom: 0, east: 0, west: 0 };
 }
 
 export function applyPower(id, side, ctx) {
   const other = side === "left" || side === "west" ? "right" : side === "bottom" ? "east" : "left";
   const pads = ctx.world.paddles.filter((p) => p.side === side);
   const opps = ctx.world.paddles.filter((p) => p.side === other);
+  const addTime = (p, key, seconds) => { p[key] = (p[key] || 0) + seconds; };
+
   switch (id) {
     case "grab":
-      for (const p of pads) p.grabT = 8;
+      for (const p of pads) addTime(p, "grabT", 8);
       break;
     case "whack":
-      for (const p of pads) p.powerHit = 3;
+      // Ogni raccolta aggiunge tre rimbalzi, condivisi tra tutte le racchette.
+      for (const p of pads) p.powerHit = (p.powerHit || 0) + 3;
       break;
     case "stretch":
-      for (const p of pads) p.stretchT = 8;
+      // Un timer per ogni raccolta: quando si raccolgono più Allunga insieme,
+      // la racchetta cresce di più invece di sostituire il potere precedente.
+      for (const p of pads) {
+        if (!p.stretchTimers) p.stretchTimers = [];
+        p.stretchTimers.push(8);
+        p.stretchStacks = p.stretchTimers.length;
+      }
       break;
     case "turbo":
-      for (const p of pads) p.turboT = 6;
+      for (const p of pads) addTime(p, "turboT", 6);
       break;
     case "invert":
-      for (const p of opps) p.invert = 5;
+      for (const p of opps) addTime(p, "invert", 5);
       break;
     case "barrier":
-      for (const p of pads) p.barrierT = 6;
+      for (const p of pads) addTime(p, "barrierT", 6);
       ctx.features?.raiseBarrier?.(side, 6);
       break;
     case "spike":
@@ -176,9 +157,15 @@ export function applyPower(id, side, ctx) {
       break;
     case "skull":
       ctx.features?.skull?.(side);
-      for (const p of opps) p.burn = 5;
+      for (const p of opps) addTime(p, "burn", 5);
       break;
     default:
       break;
   }
+}
+
+// Lasciate esportate per eventuali integrazioni esterne, ma senza più stato di
+// inventario: servono solo a descrivere i lati della partita.
+export function sidesForPowerState() {
+  return ["left", "right", "bottom", "east", "west"];
 }

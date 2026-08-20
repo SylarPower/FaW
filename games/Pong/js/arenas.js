@@ -316,16 +316,14 @@ function setupThemeDecor(theme, world, engine, ctrl) {
     engine.add(crystals);
   }
 
-  if (style === "sunset") {
-    const stoneMat = new THREE.MeshStandardMaterial({ color: 0x8f4e35, roughness: 1 });
-    for (let i = 0; i < 28; i++) {
+  if (style === "tennis") {
+    const ballMat = new THREE.MeshStandardMaterial({ color: 0xc8f23d, roughness: 0.55, emissive: 0x718d16, emissiveIntensity: 0.12 });
+    for (let i = 0; i < 18; i++) {
       const [x, z] = edgePoint(2.2);
-      const stone = new THREE.Mesh(new THREE.DodecahedronGeometry(0.16 + Math.random() * 0.28, 0), stoneMat);
-      stone.scale.y = 0.5 + Math.random() * 0.45;
-      stone.position.set(x, stone.geometry.parameters.radius * 0.35, z);
-      stone.rotation.set(Math.random(), Math.random(), Math.random());
-      stone.castShadow = true;
-      engine.add(stone);
+      const ball = new THREE.Mesh(new THREE.SphereGeometry(0.14 + Math.random() * 0.08, 10, 8), ballMat);
+      ball.position.set(x, ball.geometry.parameters.radius, z);
+      ball.castShadow = true;
+      engine.add(ball);
     }
   }
 
@@ -697,15 +695,16 @@ function setupSpecial(id, world, engine, theme, ctrl) {
   ctrl.features = {
     spinLogs(side) {
       const dir = side === "left" ? 1 : -1;
-      for (const l of ctrl.logs || []) l.omega = 6 * dir;
+      for (const l of ctrl.logs || []) l.omega = (l.omega || 0) + 6 * dir;
     },
     tilt(side) {
       const dir = side === "left" ? 1 : -1;
-      world.gravityX = 6 * dir;
-      ctrl.tiltWant = dir * 0.12;
+      world.gravityX = (world.gravityX || 0) + 6 * dir;
+      ctrl.tiltWant = Math.max(-0.32, Math.min(0.32, (ctrl.tiltWant || 0) + dir * 0.12));
     },
     makeHill() {
       world.gravityX = 0;
+      ctrl.hillStacks = (ctrl.hillStacks || 0) + 1;
       if (!ctrl.centerHill) {
         const mesh = makeHill(1.4, 0.7);
         mesh.position.set(0, 0, 0);
@@ -713,10 +712,15 @@ function setupSpecial(id, world, engine, theme, ctrl) {
         ctrl.centerHill = { type: "hill", x: 0, z: 0, hw: 1.1, hd: 1.1, mesh };
         world.obstacles.push(ctrl.centerHill);
       }
+      const scale = 1 + Math.min(1.2, (ctrl.hillStacks - 1) * 0.15);
+      ctrl.centerHill.mesh.scale.setScalar(scale);
+      ctrl.centerHill.hw = 1.1 * scale;
+      ctrl.centerHill.hd = 1.1 * scale;
     },
     makeDip() {
       world.gravityX = 0;
       world.gravityZ = 0;
+      ctrl.dipStacks = (ctrl.dipStacks || 0) + 1;
       ctrl.dip = true;
     },
     blowFan(side) {
@@ -724,8 +728,9 @@ function setupSpecial(id, world, engine, theme, ctrl) {
       if (ctrl.puck) {
         ctrl.puck.vx += dir * 4;
       }
+      ctrl.fanDir = dir;
+      ctrl.fanT = (ctrl.fanT || 0) + 2.5;
       world.windX = dir * 7;
-      setTimeout(() => { if (Math.sign(world.windX) === dir) world.windX = 0; }, 2500);
     },
     raiseSpikes(side) {
       const other = side === "left" ? "right" : "left";
@@ -737,8 +742,9 @@ function setupSpecial(id, world, engine, theme, ctrl) {
       if (ctrl.barrier) {
         const old = ctrl.barrier[side];
         if (old) {
-          world.obstacles = world.obstacles.filter((o) => o !== old.obs);
-          if (old.mesh) engine.arenaRoot.remove(old.mesh);
+          // La seconda barriera non sostituisce la prima: ne prolunga la vita.
+          old.t += duration;
+          return;
         }
       } else {
         ctrl.barrier = {};
@@ -757,6 +763,10 @@ function setupSpecial(id, world, engine, theme, ctrl) {
       ctrl.barrier[side] = { obs, mesh, t: duration, mat };
     },
     polarBear(side) {
+      if (ctrl.bear) {
+        ctrl.bear.t += 5;
+        return;
+      }
       const mesh = makePolarBear();
       const x = side === "left" ? -world.w / 2 + 1.8 : world.w / 2 - 1.8;
       mesh.position.set(x, 0, 0);
@@ -767,6 +777,10 @@ function setupSpecial(id, world, engine, theme, ctrl) {
       ctrl.bearWall = wall;
     },
     spawnSeal(side) {
+      if (ctrl.seal) {
+        ctrl.seal.t += 10;
+        return;
+      }
       const mesh = makeSeal();
       engine.add(mesh);
       const x = side === "left" ? -world.w / 2 + 1.6 : world.w / 2 - 1.6;
@@ -850,6 +864,12 @@ export function updateArena(ctrl, world, dt, engine, game) {
     }
   }
 
+  if (ctrl.fanT > 0) {
+    ctrl.fanT -= dt;
+    world.windX = (ctrl.fanDir || 1) * 7;
+    if (ctrl.fanT <= 0) world.windX = 0;
+  }
+
   if (ctrl.puck) {
     const p = ctrl.puck;
     p.vx *= Math.pow(0.55, dt);
@@ -879,8 +899,9 @@ export function updateArena(ctrl, world, dt, engine, game) {
     world.gravityX = ctrl.tilt.x * 28;
     if (ctrl.dip) {
       for (const b of world.balls) {
-        b.vx += -b.x * 1.8 * dt;
-        b.vz += -b.z * 1.8 * dt;
+        const dipForce = 1.8 * Math.max(1, ctrl.dipStacks || 1);
+        b.vx += -b.x * dipForce * dt;
+        b.vz += -b.z * dipForce * dt;
       }
     }
   }

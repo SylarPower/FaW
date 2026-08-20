@@ -100,6 +100,8 @@ export class Paddle {
     this.holding = false;
     this.heldBall = null;
     this.stretchT = 0;
+    this.stretchStacks = 0;
+    this.stretchTimers = [];
     this.powerHit = 0;
     this.stun = 0;
     this.burn = 0;
@@ -178,12 +180,19 @@ export class World {
     if (p.stun > 0) p.stun -= dt;
     if (p.burn > 0) p.burn -= dt;
     if (p.invert > 0) p.invert -= dt;
-    if (p.stretchT > 0) {
-      p.stretchT -= dt;
-      p.hd = lerp(p.hd, p.baseHd * 1.7, 1 - Math.pow(0.001, dt));
+    // Ogni Allunga ha il suo timer: più raccolte nello stesso momento
+    // producono una racchetta progressivamente più lunga.
+    if (p.stretchTimers?.length) {
+      p.stretchTimers = p.stretchTimers.map((t) => t - dt).filter((t) => t > 0);
+      p.stretchStacks = p.stretchTimers.length;
+      p.stretchT = Math.max(...p.stretchTimers, 0);
     } else {
-      p.hd = lerp(p.hd, p.baseHd, 1 - Math.pow(0.02, dt));
+      p.stretchStacks = 0;
+      p.stretchT = 0;
     }
+    const stretchFactor = Math.min(4.2, 1 + (p.stretchStacks || 0) * 0.7);
+    const targetHd = p.baseHd * stretchFactor;
+    p.hd = lerp(p.hd, targetHd, 1 - Math.pow(0.001, dt));
     if (p.turboT > 0) p.turboT -= dt;
     if (p.grabT > 0) p.grabT -= dt;
     if (p.barrierT > 0) p.barrierT -= dt;
