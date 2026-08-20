@@ -23,7 +23,7 @@ Replica migliorativa 3D di *Pong: The Next Level* (1999). Un giocatore per compu
 1. Crea un progetto su [Firebase Console](https://console.firebase.google.com)
 2. Aggiungi un’app **Web**, copia la config
 3. Crea un **Realtime Database** (regione Europa)
-4. Incolla le chiavi in `js/firebase-config.js` (togli il prefisso `YOUR_`)
+4. Incolla le chiavi in `games/shared/firebase-config.js` (config condivisa con il portale e gli altri giochi; `js/firebase-config.js` è solo l'adapter ES module che la rilegge)
 5. Pubblica le regole: `database.rules.json`
 6. Hosting: `firebase deploy` (opzionale) oppure GitHub Pages sulla cartella
 

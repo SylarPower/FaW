@@ -156,8 +156,16 @@ export class World {
     return ball;
   }
 
+  /**
+   * Avanza la simulazione di `dt`.
+   *
+   * NB: gli eventi NON vengono azzerati qui. Il game loop esegue piu' sotto-step
+   * per frame (acc/STEP in game.js) e legge world.events una volta sola a fine
+   * frame: azzerando a ogni step si perdevano punti, rimbalzi e power-up
+   * avvenuti nei sotto-step precedenti. Ora e' il chiamante a fare resetEvents()
+   * una volta per frame, prima della serie di step.
+   */
   step(dt) {
-    this.resetEvents();
     for (const p of this.paddles) this.stepPaddle(p, dt);
     for (const b of this.balls) {
       if (!b.alive) continue;
@@ -286,6 +294,55 @@ export class World {
     if (b.x < -hx) this.handleEnd(b, "left");
   }
 
+  /**
+   * Tavolo a triangolo (1v1v1).
+   *
+   * Ogni lato di `world.tri.edges` ha una normale (nx, nz) rivolta verso il
+   * centro del tavolo (garantito da makeTri). La distanza con segno dal lato e'
+   * quindi: dot(pos - mid, n); positiva dentro, negativa fuori.
+   *
+   * Nel triangolo ogni lato e' una porta: se la palla lo oltrepassa emettiamo
+   * "score" con `side` = lato attraversato, come fa collideCircle con le porte.
+   * Sara' game.js a decidere chi segna (chi ha toccato per ultimo,
+   * `ball.lastHit`) e ad annullare l'autogol.
+   *
+   * Un lato rimbalza SOLO se non ha racchette (caso anomalo: senza rimbalzo la
+   * palla scapperebbe all'infinito da un lato scoperto). Con le tre racchette
+   * standard i lati restano quindi sempre "aperti" e il punto e' possibile.
+   */
+  collideTriangle(b) {
+    const tri = this.tri;
+    if (!tri) { this.collideRect(b); return; }
+
+    for (const e of tri.edges) {
+      // Distanza con segno dal lato: positiva verso l'interno del tavolo.
+      const dist = (b.x - e.mx) * e.nx + (b.z - e.mz) * e.nz;
+
+      const guarded = this.paddles.some((p) => p.side === e.side);
+      if (guarded) {
+        // Lato-porta: punto quando la palla e' uscita del tutto.
+        if (dist < -b.r) {
+          this.emit("score", { ball: b, side: e.side, edge: e });
+          b.alive = false;
+          return;
+        }
+        continue;
+      }
+
+      // Lato scoperto: muro pieno, la palla rimbalza dentro.
+      if (dist < b.r) {
+        b.x += e.nx * (b.r - dist);
+        b.z += e.nz * (b.r - dist);
+        const vn = b.vx * e.nx + b.vz * e.nz;
+        if (vn < 0) {
+          b.vx -= 2 * vn * e.nx;
+          b.vz -= 2 * vn * e.nz;
+        }
+        this.emit("wall", { ball: b, edge: e });
+      }
+    }
+  }
+
   collideCircle(b) {
     const dist = Math.hypot(b.x, b.z);
     const max = this.radius - b.r;
@@ -342,6 +399,17 @@ export class World {
 
   collideBallPaddle(b, p) {
     if (b.ghost > 0) return false;
+
+    // La palla ha gia' superato il piano di gioco della racchetta? Allora e'
+    // un punto in arrivo: non deve piu' essere colpita, altrimenti il rimbalzo
+    // forzato qui sotto la rispedisce in campo e il punto non viene assegnato.
+    // (Solo per le racchette "dritte": quelle su un lato del triangolo hanno
+    // una normale propria e usano il controllo generico.)
+    if (!p.edge) {
+      if (p.side === "left" && b.x < p.x - p.hw) return false;
+      if (p.side === "right" && b.x > p.x + p.hw) return false;
+    }
+
     const closestX = clamp(b.x, p.x - p.hw, p.x + p.hw);
     const closestZ = clamp(b.z, p.z - p.hd, p.z + p.hd);
     const dx = b.x - closestX;
@@ -361,8 +429,13 @@ export class World {
     }
     const rel = clamp((b.z - p.z) / p.hd, -1, 1);
     b.vz += rel * 6.5 + p.vz * 0.35;
-    if (p.side === "left" && b.vx < 1.5) b.vx = Math.abs(b.vx) + 1.2;
-    if (p.side === "right" && b.vx > -1.5) b.vx = -Math.abs(b.vx) - 1.2;
+    // Spinta minima verso il campo avversario, così la palla non resta
+    // "incollata" alla racchetta. Applicata solo se la palla è davanti alla
+    // racchetta (per le racchette dritte il controllo sopra lo garantisce già).
+    if (!p.edge) {
+      if (p.side === "left" && b.vx < 1.5) b.vx = Math.abs(b.vx) + 1.2;
+      if (p.side === "right" && b.vx > -1.5) b.vx = -Math.abs(b.vx) - 1.2;
+    }
 
     let spd = b.speed();
     let boost = 1.035;

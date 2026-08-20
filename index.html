@@ -17,6 +17,8 @@
 		<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 		<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 		<!-- <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-check-compat.js"></script> -->
+		<!-- Config Firebase condivisa (deve stare prima dello script che inizializza Firebase) -->
+		<script src="games/shared/firebase-config.js"></script>
 		<style>
 			/* ✅ RESET E BASE */
 			* {
@@ -644,14 +646,13 @@
 		</div>
 		<script>
 			// --- 1. CONFIGURAZIONE FIREBASE ---
-			const firebaseConfig = {
-			  apiKey: "AIzaSyCNo7o2Ft22JDEyJ97BspE3Kur5DNAPKQc",
-			  authDomain: "funatwork-cd237.firebaseapp.com",
-			  projectId: "funatwork-cd237",
-			  storageBucket: "funatwork-cd237.firebasestorage.app",
-			  messagingSenderId: "798226885203",
-			  appId: "1:798226885203:web:ce83f4d9e96b82266274a6"
-			};
+			// La config vive in games/shared/firebase-config.js (script caricato nell'head).
+			const firebaseConfig = window.FAW_REQUIRE_FIREBASE_CONFIG
+				? window.FAW_REQUIRE_FIREBASE_CONFIG()
+				: window.FAW_FIREBASE_CONFIG;
+			if (!firebaseConfig) {
+				console.error("[FaW] Impossibile inizializzare Firebase: config condivisa non caricata.");
+			}
 			firebase.initializeApp(firebaseConfig);
 			/*const appCheck = firebase.appCheck();
 			appCheck.activate(

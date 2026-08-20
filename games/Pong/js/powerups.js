@@ -2,21 +2,21 @@ import { makePowerToken } from "./models.js";
 import * as THREE from "three";
 
 export const POWER_DEFS = {
-  grab: { id: "grab", name: "Presa", desc: "Trattieni e lancia la palla", color: 0x3dffd1, hold: true },
-  whack: { id: "whack", name: "Schianto", desc: "I prossimi 3 colpi sono devastanti", color: 0xffc857 },
-  stretch: { id: "stretch", name: "Allunga", desc: "Racchetta extra-larga", color: 0x8ee7ff },
-  turbo: { id: "turbo", name: "Turbo", desc: "Scatto di velocità", color: 0xff7a3d },
-  spike: { id: "spike", name: "Spine", desc: "Alza le spine difensive", color: 0xff5a5a },
-  invert: { id: "invert", name: "Caos", desc: "Inverte i comandi avversari", color: 0xc77dff },
-  barrier: { id: "barrier", name: "Barriera", desc: "Muro temporaneo in porta", color: 0x9be7ff },
-  fan: { id: "fan", name: "Ventilatore", desc: "Soffia il disco via da te", color: 0x7ad7ff },
-  tilt: { id: "tilt", name: "Inclinazione", desc: "Inclina il tavolo", color: 0xffb347 },
-  hill: { id: "hill", name: "Collina", desc: "Crea un dosso al centro", color: 0x86c06c },
-  dip: { id: "dip", name: "Conca", desc: "Crea una conca al centro", color: 0x5aa9e6 },
-  spinlog: { id: "spinlog", name: "Rotazione", desc: "Fa girare i tronchi", color: 0xd27d2c },
-  bear: { id: "bear", name: "Orso Polare", desc: "Alza il tuo bordo: la palla non passa", color: 0xf2f0ea },
-  seal: { id: "seal", name: "Foca", desc: "Una foca ti aiuta a parare", color: 0x8aa0b2 },
-  skull: { id: "skull", name: "Teschio", desc: "Effetto ostile sull'avversario", color: 0xff3d7f }
+  grab: { id: "grab", glyph: "✋", name: "Presa", desc: "Trattieni e lancia la palla", color: 0x3dffd1, hold: true },
+  whack: { id: "whack", glyph: "✸", name: "Schianto", desc: "I prossimi 3 colpi sono devastanti", color: 0xffc857 },
+  stretch: { id: "stretch", glyph: "↔", name: "Allunga", desc: "Racchetta extra-larga", color: 0x8ee7ff },
+  turbo: { id: "turbo", glyph: "≫", name: "Turbo", desc: "Scatto di velocità", color: 0xff7a3d },
+  spike: { id: "spike", glyph: "▲", name: "Spine", desc: "Alza le spine difensive", color: 0xff5a5a },
+  invert: { id: "invert", glyph: "⇄", name: "Caos", desc: "Inverte i comandi avversari", color: 0xc77dff },
+  barrier: { id: "barrier", glyph: "▤", name: "Barriera", desc: "Muro temporaneo in porta", color: 0x9be7ff },
+  fan: { id: "fan", glyph: "✺", name: "Ventilatore", desc: "Soffia il disco via da te", color: 0x7ad7ff },
+  tilt: { id: "tilt", glyph: "◣", name: "Inclinazione", desc: "Inclina il tavolo", color: 0xffb347 },
+  hill: { id: "hill", glyph: "⌒", name: "Collina", desc: "Crea un dosso al centro", color: 0x86c06c },
+  dip: { id: "dip", glyph: "⌄", name: "Conca", desc: "Crea una conca al centro", color: 0x5aa9e6 },
+  spinlog: { id: "spinlog", glyph: "↻", name: "Rotazione", desc: "Fa girare i tronchi", color: 0xd27d2c },
+  bear: { id: "bear", glyph: "❆", name: "Orso Polare", desc: "Alza il tuo bordo: la palla non passa", color: 0xf2f0ea },
+  seal: { id: "seal", glyph: "◕", name: "Foca", desc: "Una foca ti aiuta a parare", color: 0x8aa0b2 },
+  skull: { id: "skull", glyph: "☠", name: "Teschio", desc: "Effetto ostile sull'avversario", color: 0xff3d7f }
 };
 
 export class PowerUpManager {
@@ -52,7 +52,8 @@ export class PowerUpManager {
       }
     }
     for (const t of this.tokens) {
-      t.mesh.rotation.z += dt * 2;
+      // Ruota solo il disco: il simbolo e' uno sprite e deve restare leggibile.
+      if (t.mesh.userData.disc) t.mesh.userData.disc.rotation.y += dt * 2;
       t.mesh.position.y = 0.42 + Math.sin(performance.now() * 0.004 + t.mesh.position.x) * 0.08;
     }
     for (const b of this.world.balls) {
@@ -77,7 +78,7 @@ export class PowerUpManager {
     const def = POWER_DEFS[id];
     const x = (Math.random() - 0.5) * this.world.w * 0.45;
     const z = (Math.random() - 0.5) * this.world.d * 0.55;
-    const mesh = makePowerToken(def.color);
+    const mesh = makePowerToken(def.color, def.glyph || "?", def.name);
     mesh.position.set(x, 0.42, z);
     this.engine.add(mesh);
     this.tokens.push({ id, x, z, mesh });

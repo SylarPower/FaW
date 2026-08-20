@@ -1,19 +1,30 @@
 /**
- * Config Web del progetto Firebase usato anche dagli altri giochi FaW.
- * Pong usa Realtime Database per le stanze online.
+ * Adapter ES module verso la config Firebase condivisa di FaW.
+ *
+ * La config NON vive piu' qui: sta in `games/shared/firebase-config.js`, che
+ * index.html di Pong carica come script classico PRIMA di `js/main.js`
+ * (`type="module"`), quindi `window.FAW_FIREBASE_CONFIG` e' gia' disponibile
+ * quando questo modulo viene valutato.
+ *
+ * Include `databaseURL`, necessario al Realtime Database delle stanze online.
  */
-export const firebaseConfig = {
-  apiKey: "AIzaSyCNo7o2Ft22JDEyJ97BspE3Kur5DNAPKQc",
-  authDomain: "funatwork-cd237.firebaseapp.com",
-  databaseURL: "https://funatwork-cd237-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "funatwork-cd237",
-  storageBucket: "funatwork-cd237.firebasestorage.app",
-  messagingSenderId: "798226885203",
-  appId: "1:798226885203:web:ce83f4d9e96b82266274a6"
-};
+
+const sharedConfig = typeof window !== "undefined" ? window.FAW_FIREBASE_CONFIG : undefined;
+
+if (!sharedConfig) {
+  console.error(
+    "[Pong] Config Firebase condivisa non trovata: assicurati che " +
+    '<script src="../shared/firebase-config.js"></script> sia caricato in index.html ' +
+    'prima di <script type="module" src="js/main.js"></script>. ' +
+    "L'online resta disabilitato, vs CPU funziona comunque."
+  );
+}
+
+export const firebaseConfig = sharedConfig || null;
 
 export function isFirebaseConfigured() {
-  return typeof firebaseConfig.apiKey === "string" &&
+  return !!firebaseConfig &&
+    typeof firebaseConfig.apiKey === "string" &&
     firebaseConfig.apiKey.length > 8 &&
     !firebaseConfig.apiKey.startsWith("YOUR_");
 }

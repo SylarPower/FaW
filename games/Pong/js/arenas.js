@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { Paddle, clamp, rand, pick, makeTri } from "./physics.js";
+import { applyTheme } from "./themes.js";
 import {
   makeTable, makeCircleTable, makeTriangleTable, makePenguin, makeLog, makeHill,
   makeBalloon, makePuck, makeBumper, makeGoalFrame, makeSpike,
@@ -124,9 +125,10 @@ export const THEMES = {
 const P1 = 0x3dffd1;
 const P2 = 0xff3d7f;
 
-export function buildArena(id, engine, world, sizeMul = 1) {
+export function buildArena(id, engine, world, sizeMul = 1, themeId = "neon") {
   const def = arenaById(id);
-  const theme = THEMES[id] || THEMES.classic;
+  // La palette dell'arena viene filtrata dal tema globale scelto in Opzioni.
+  const theme = applyTheme(themeId, THEMES[id] || THEMES.classic);
   engine.setTheme(theme);
   const ctrl = { id, def, theme, extras: [], snow: null, features: {}, table: null, goldHits: 0 };
 

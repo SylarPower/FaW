@@ -1,8 +1,8 @@
 import { ARENAS, arenaById } from "./arenas.js";
-import { audio } from "./audio.js";
 import { POWER_DEFS } from "./powerups.js";
 import { net, isFirebaseConfigured, codeFromSeed } from "./net.js";
 import { PNAME, TRI_SIDES, DUEL_SIDES } from "./players.js";
+import { THEME_IDS, themeById, applyThemeToUI } from "./themes.js";
 
 export class UI {
   constructor(root) {
@@ -164,6 +164,7 @@ export class UI {
           <button class="btn" data-act="play">Gioca</button>
           <button class="btn ghost" data-act="opt">Opzioni</button>
           <button class="btn ghost" data-act="ctrl">Comandi</button>
+          <button class="btn ghost" data-act="pwr">Poteri</button>
           <button class="btn ghost" data-act="cred">Crediti</button>
         </div>
       </div>`));
@@ -181,8 +182,10 @@ export class UI {
         <div class="menu">
           <button class="btn" data-act="cpu">1 vs Computer</button>
           <button class="btn pink" data-act="pvp">${fb ? "1 vs Giocatore · online" : "1 vs Giocatore · configura Firebase"}</button>
-          <button class="btn gold" data-act="tri-cpu">Triangolo 1v1v1 · vs 2 CPU</button>
-          <button class="btn gold" data-act="tri-on">${fb ? "Triangolo 1v1v1 · online" : "Triangolo online · configura Firebase"}</button>
+          <!-- Triangolo 1v1v1 temporaneamente nascosto: la resa a schermo non e'
+               all'altezza del 1v1 e va riprogettata. Il codice resta al suo posto
+               (arena "triangle", collideTriangle, TRI_SIDES) e per riattivarlo
+               basta rimettere qui i due bottoni tri-cpu / tri-on. -->
         </div>
       </div>`));
     this.hook();
@@ -221,22 +224,149 @@ export class UI {
         </div>
       </div>`).join("");
 
+    // Nell'online si puo' costruire un'arena su misura (regole + power-up).
+    const customBlock = vsCPU ? "" : `
+      <div class="zone-block">
+        <h3>Su misura</h3>
+        <div class="cards">
+          <button class="card card-custom" data-act="custom">
+            <div class="tag">Personalizzata</div>
+            <h4>Arena su misura</h4>
+            <p>Scegli tavolo, punteggio, velocità, racchette e quali power-up entrano in campo.</p>
+          </button>
+        </div>
+      </div>`;
+
     this.show(this.el(`
       <div class="screen">
         <button class="btn small ghost back" data-act="play">← Indietro</button>
         <div class="panel">
           <h2 class="section">${vsCPU ? "Campagna" : "Scontro online"}</h2>
           <p class="sub">${vsCPU ? "Vinci con 2 punti di scarto per sbloccare la successiva." : "Scegli l'arena. Poi crei una stanza e mandi il codice al collega."}</p>
-          <div class="zones">${cards}</div>
+          <div class="zones">${customBlock}${cards}</div>
         </div>
       </div>`));
     this.hook();
     this.root.querySelectorAll("[data-arena]").forEach((btn) => {
       btn.addEventListener("click", () => {
-        audio.confirm();
         this.showBrief(btn.dataset.arena, vsCPU);
       });
     });
+  }
+
+  /**
+   * Arena personalizzata (solo online): l'host sceglie tavolo di base, regole e
+   * quali power-up entrano in campo. Le scelte finiscono in `settings.custom`
+   * dentro la stanza Firebase, quindi valgono anche per chi si unisce.
+   */
+  showCustom() {
+    this.screen = "custom";
+    const c = this._custom || (this._custom = {
+      base: "classic",
+      target: 10,
+      ballSpeed: "default",
+      paddleSize: "default",
+      powers: ["whack", "stretch", "turbo", "grab"]
+    });
+
+    const bases = this.campaignArenas().filter((a) => !a.triangle);
+    const baseOpts = bases.map((a) =>
+      `<button data-cst="base" data-val="${a.id}" class="${c.base === a.id ? "on" : ""}">${a.name}</button>`).join("");
+    const seg = (key, vals) => vals.map((v) =>
+      `<button data-cst="${key}" data-val="${v.id}" class="${String(c[key]) === String(v.id) ? "on" : ""}">${v.label}</button>`).join("");
+
+    const powerCards = Object.keys(POWER_DEFS).map((id) => {
+      const p = POWER_DEFS[id];
+      const on = c.powers.includes(id);
+      const hex = "#" + p.color.toString(16).padStart(6, "0");
+      return `
+        <button class="pw-pick ${on ? "on" : ""}" data-power="${id}">
+          <span class="pw-dot" style="background:${hex};box-shadow:0 0 10px ${hex}"></span>
+          <span class="pw-pick-name"><span class="pw-glyph" style="color:${hex}">${p.glyph || ""}</span> ${p.name}</span>
+          <span class="pw-pick-desc">${p.desc}</span>
+        </button>`;
+    }).join("");
+
+    this.show(this.el(`
+      <div class="screen">
+        <button class="btn small ghost back" data-act="zones">← Arene</button>
+        <div class="panel">
+          <h2 class="section">Arena su misura</h2>
+          <p class="sub">Configura la partita, poi crea la stanza e manda il codice al collega.</p>
+
+          <div class="opt">
+            <div><label>Tavolo di base</label><span class="hint">Ostacoli e forma del campo</span></div>
+            <div class="seg th-seg">${baseOpts}</div>
+          </div>
+          <div class="opt">
+            <div><label>Punti per vincere</label></div>
+            <div class="seg">${seg("target", [
+              { id: 5, label: "5" }, { id: 7, label: "7" }, { id: 10, label: "10" }, { id: 15, label: "15" }
+            ])}</div>
+          </div>
+          <div class="opt">
+            <div><label>Velocità palla</label></div>
+            <div class="seg">${seg("ballSpeed", [
+              { id: "slow", label: "Lenta" }, { id: "default", label: "Media" }, { id: "fast", label: "Veloce" }
+            ])}</div>
+          </div>
+          <div class="opt">
+            <div><label>Dimensione racchetta</label></div>
+            <div class="seg">${seg("paddleSize", [
+              { id: "small", label: "Piccola" }, { id: "default", label: "Media" },
+              { id: "medium", label: "Grande" }, { id: "large", label: "Maxi" }
+            ])}</div>
+          </div>
+
+          <div style="margin-top:18px">
+            <label style="font-weight:600">Power-up in campo</label>
+            <span class="hint" style="display:block;margin:3px 0 10px">Tocca per attivarli o spegnerli. Nessuno selezionato = partita pulita.</span>
+            <div class="pw-picks">${powerCards}</div>
+          </div>
+
+          <div class="row" style="margin-top:20px">
+            <button class="btn" id="cstGo">Crea stanza</button>
+            <button class="btn small ghost" id="cstNone">Nessun potere</button>
+            <button class="btn small ghost" id="cstAll">Tutti</button>
+          </div>
+        </div>
+      </div>`));
+    this.hook();
+
+    this.root.querySelectorAll("[data-cst]").forEach((b) => {
+      b.addEventListener("click", () => {
+        const k = b.dataset.cst;
+        let v = b.dataset.val;
+        if (k === "target") v = Number.parseInt(v, 10);
+        this._custom[k] = v;
+        this.showCustom();
+      });
+    });
+    this.root.querySelectorAll("[data-power]").forEach((b) => {
+      b.addEventListener("click", () => {
+        const id = b.dataset.power;
+        const i = this._custom.powers.indexOf(id);
+        if (i >= 0) this._custom.powers.splice(i, 1);
+        else this._custom.powers.push(id);
+        this.showCustom();
+      });
+    });
+    this.root.querySelector("#cstNone").onclick = () => { this._custom.powers = []; this.showCustom(); };
+    this.root.querySelector("#cstAll").onclick = () => { this._custom.powers = Object.keys(POWER_DEFS); this.showCustom(); };
+    this.root.querySelector("#cstGo").onclick = async () => {
+      const cfg = this._custom;
+      await this.createRoom({
+        mode: "duel",
+        arenaId: cfg.base,
+        seats: 2,
+        settings: {
+          arenaId: cfg.base,
+          target: cfg.target,
+          custom: { powers: cfg.powers.slice() },
+          options: { ballSpeed: cfg.ballSpeed, paddleSize: cfg.paddleSize }
+        }
+      });
+    };
   }
 
   showBrief(id, vsCPU) {
@@ -262,7 +392,6 @@ export class UI {
       </div>`));
     this.hook();
     this.root.querySelector("[data-start]").addEventListener("click", async () => {
-      audio.confirm();
       if (vsCPU) this.game.beginMatch(id, { vsCPU: true });
       else await this.createRoom({ mode: "duel", arenaId: id, seats: 2 });
     });
@@ -280,7 +409,7 @@ export class UI {
             <li>Crea un progetto su <strong>console.firebase.google.com</strong></li>
             <li>Aggiungi un'app Web e copia la config</li>
             <li>Crea un <strong>Realtime Database</strong> (Europa)</li>
-            <li>Incolla le chiavi in <code>js/firebase-config.js</code></li>
+            <li>Incolla le chiavi in <code>games/shared/firebase-config.js</code></li>
             <li>Regole: usa il file <code>database.rules.json</code> di questa cartella</li>
           </ol>
           <p class="sub">Finché la config è YOUR_API_KEY, vs CPU e triangolo vs 2 CPU funzionano comunque.</p>
@@ -331,7 +460,6 @@ export class UI {
     const go = async () => {
       const code = this.root.querySelector("#code").value;
       try {
-        audio.confirm();
         await net.join(code, this.game.save.nick || "Ospite");
         this.game.online = true;
         this.showLobby();
@@ -409,7 +537,6 @@ export class UI {
       </div>`));
 
     this.root.querySelector("#leaveLobby").onclick = async () => {
-      audio.ui();
       await net.leave();
       this.game.online = false;
       this.showMain();
@@ -425,7 +552,6 @@ export class UI {
       }
     });
     this.root.querySelector("#goPlay")?.addEventListener("click", async () => {
-      audio.confirm();
       const id = meta.arenaId || this._pendingArena || (seats === 3 ? "triangle" : "classic");
       const settings = meta.settings || {};
       for (let i = 0; i < seats; i++) {
@@ -438,7 +564,8 @@ export class UI {
         online: true,
         triangle: seats === 3,
         vsCPU: false,
-        target: settings.target
+        target: settings.target,
+        powers: settings.custom?.powers
       });
     });
   }
@@ -507,7 +634,7 @@ export class UI {
     el.innerHTML = list.map((pid, i) => {
       const d = POWER_DEFS[pid];
       const sel = i === mgr.selected[side];
-      return `<div class="slot ${sel ? "ready" : ""}">${d?.name || pid}</div>`;
+      return `<div class="slot ${sel ? "ready" : ""}">${d?.glyph ? d.glyph + " " : ""}${d?.name || pid}</div>`;
     }).join("");
   }
 
@@ -529,9 +656,9 @@ export class UI {
         </div>
       </div>`);
     this.root.appendChild(overlay);
-    overlay.querySelector("[data-act=resume]").onclick = () => { audio.ui(); game.resume(); };
-    overlay.querySelector("[data-act=rematch]")?.addEventListener("click", () => { audio.ui(); game.rematch(); });
-    overlay.querySelector("[data-act=leave]").onclick = () => { audio.ui(); game.forfeit(); this.showTitle(); };
+    overlay.querySelector("[data-act=resume]").onclick = () => { game.resume(); };
+    overlay.querySelector("[data-act=rematch]")?.addEventListener("click", () => { game.rematch(); });
+    overlay.querySelector("[data-act=leave]").onclick = () => { game.forfeit(); this.showTitle(); };
   }
 
   hidePause() { document.getElementById("pauseScr")?.remove(); }
@@ -557,9 +684,9 @@ export class UI {
           </div>
         </div>
       </div>`));
-    this.root.querySelector("[data-act=again]")?.addEventListener("click", () => { audio.confirm(); game.rematch(); });
-    this.root.querySelector("[data-act=play]").onclick = () => { audio.ui(); game.forfeit(); this.showMain(); };
-    this.root.querySelector("[data-act=title]").onclick = () => { audio.ui(); game.forfeit(); this.showTitle(); };
+    this.root.querySelector("[data-act=again]")?.addEventListener("click", () => { game.rematch(); });
+    this.root.querySelector("[data-act=play]").onclick = () => { game.forfeit(); this.showMain(); };
+    this.root.querySelector("[data-act=title]").onclick = () => { game.forfeit(); this.showTitle(); };
   }
 
   showOptions() {
@@ -573,6 +700,15 @@ export class UI {
         <div class="panel options">
           <h2 class="section">Opzioni</h2>
           <p class="sub">Restano salvate su questo browser.</p>
+          <div class="opt">
+            <div><label>Tema grafica</label><span class="hint">${themeById(o.theme).desc}</span></div>
+            <div class="seg th-seg">${THEME_IDS.map((id) => {
+              const t = themeById(id);
+              const dots = t.swatch.map((c) =>
+                `<i style="background:#${c.toString(16).padStart(6, "0")}"></i>`).join("");
+              return `<button data-opt="theme" data-val="${id}" class="${o.theme === id ? "on" : ""}" title="${t.desc}"><span class="th-dots">${dots}</span>${t.name}</button>`;
+            }).join("")}</div>
+          </div>
           <div class="opt">
             <div><label>Dimensione racchetta</label><span class="hint">Default, piccola, media, grande</span></div>
             <div class="seg">${seg("paddleSize", [
@@ -608,18 +744,22 @@ export class UI {
     this.hook();
     this.root.querySelectorAll("[data-opt]").forEach((b) => {
       b.addEventListener("click", () => {
-        audio.ui();
         const key = b.dataset.opt;
         let val = b.dataset.val;
         if (val === "true") val = true;
         else if (val === "false") val = false;
         this.game.save.options[key] = val;
         this.game.persist();
+        if (key === "theme") {
+          // Effetto immediato: variabili CSS di menu/HUD + ricolorazione della
+          // scena 3D che sta girando dietro (demo o partita in corso).
+          applyThemeToUI(val);
+          this.game.refreshTheme();
+        }
         this.showOptions();
       });
     });
     this.root.querySelector("[data-act=unlock]").onclick = () => {
-      audio.confirm();
       this.game.save.unlocked = ARENAS.map((a) => a.id);
       this.game.persist();
       this.toast("Tutte le arene sono aperte.");
@@ -644,6 +784,59 @@ export class UI {
           <div class="opt"><div><label>Potere</label></div><div>Spazio · cambia con E</div></div>
           <div class="opt"><div><label>Pausa</label></div><div>Esc oppure P</div></div>
           <p class="sub" style="margin-top:16px">Spiaggia e hockey: tieni premuto Spazio vicino alla palla, rilascia per lanciare.</p>
+        </div>
+      </div>`));
+    this.hook();
+  }
+
+  /**
+   * Elenco dei poteri: cosa fanno, come si usano e in quali arene compaiono.
+   * Le arene vengono ricavate da ARENAS.powerUps, cosi' la pagina resta
+   * allineata da sola se un'arena cambia pool.
+   */
+  showPowers() {
+    this.screen = "powers";
+    const ALWAYS = ["grab", "whack", "stretch", "turbo"];
+
+    const arenasFor = (id) => ARENAS.filter((a) => (a.powerUps || []).includes(id));
+
+    // Ordine: prima quelli sempre disponibili, poi gli altri per nome.
+    const ids = Object.keys(POWER_DEFS).sort((a, b) => {
+      const aa = ALWAYS.includes(a), bb = ALWAYS.includes(b);
+      if (aa !== bb) return aa ? -1 : 1;
+      return POWER_DEFS[a].name.localeCompare(POWER_DEFS[b].name);
+    });
+
+    const cards = ids.map((id) => {
+      const p = POWER_DEFS[id];
+      const hex = "#" + p.color.toString(16).padStart(6, "0");
+      const used = arenasFor(id);
+      const extra = ALWAYS.includes(id);
+      const unused = !used.length && !extra;
+      const where = used.length
+        ? used.map((a) => a.name).join(" · ")
+        : "Nessuna arena al momento";
+      return `
+        <div class="pw-card${unused ? " pw-unused" : ""}">
+          <div class="pw-head">
+            <span class="pw-dot" style="background:${hex};box-shadow:0 0 12px ${hex}"></span>
+            <h4><span class="pw-glyph" style="color:${hex}">${p.glyph || ""}</span> ${p.name}</h4>
+            ${p.hold ? `<span class="pw-flag">TIENI PREMUTO</span>` : ""}
+          </div>
+          <p class="pw-desc">${p.desc}</p>
+          <div class="pw-where"><span>Arene</span>${where}</div>
+          ${extra ? `<div class="pw-where"><span>Extra</span>Sempre disponibile con «Poteri extra»</div>` : ""}
+        </div>`;
+    }).join("");
+
+    this.show(this.el(`
+      <div class="screen">
+        <button class="btn small ghost back" data-act="title">← Indietro</button>
+        <div class="panel">
+          <h2 class="section">Poteri</h2>
+          <p class="sub">Colpisci il gettone che compare sul tavolo per raccoglierlo. Ne tieni al massimo 3: <b class="k">E</b> per cambiare, <b class="k">Spazio</b> per usarlo.</p>
+          <div class="pw-grid">${cards}</div>
+          <p class="sub" style="margin:18px 0 0">Ogni arena mette in campo solo i suoi poteri. In Opzioni puoi attivare «Poteri extra» per aggiungere ovunque Presa, Schianto, Allunga e Turbo.</p>
         </div>
       </div>`));
     this.hook();
@@ -680,11 +873,11 @@ export class UI {
   }
 
   async onAct(act) {
-    audio.ui();
     if (act === "play") this.showMain();
     if (act === "title") this.showTitle();
     if (act === "opt") this.showOptions();
     if (act === "ctrl") this.showControls();
+    if (act === "pwr") this.showPowers();
     if (act === "cred") this.showCredits();
     if (act === "cpu") { this.triangle = false; this.showZones(true); }
     if (act === "pvp") {
@@ -693,6 +886,7 @@ export class UI {
       this.showOnlineHub(false);
     }
     if (act === "pvp-create") this.showZones(false);
+    if (act === "custom") this.showCustom();
     if (act === "tri-cpu") {
       this.game.beginMatch("triangle", { vsCPU: true, triangle: true });
     }
