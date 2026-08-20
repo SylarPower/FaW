@@ -14,9 +14,10 @@ Replica migliorativa 3D di *Pong: The Next Level* (1999). Un giocatore per compu
 |---|---|
 | Racchetta | `W` `S` oppure `↑` `↓` |
 | Seconda racchetta | `A` `D` oppure `←` `→` |
-| Potere | `Spazio` |
-| Cambia potere | `E` |
+| Presa / lancio (quando disponibile) | `Spazio` |
 | Pausa | `Esc` |
+
+I power-up si attivano automaticamente appena la palla colpisce il gettone. Gli effetti sono cumulabili; non esiste più una borsa con selezione e uso manuale.
 
 ## Online (Firebase)
 

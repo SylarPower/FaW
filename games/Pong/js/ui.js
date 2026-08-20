@@ -17,14 +17,32 @@ class MenuNav {
     this.items = [];
     this.onConfirm = null;
   }
+  itemKey(el) {
+    if (!el) return "";
+    const data = el.dataset || {};
+    if (data.opt) return `opt:${data.opt}:${data.val || ""}`;
+    if (data.cst) return `cst:${data.cst}:${data.val || ""}`;
+    if (data.power) return `power:${data.power}`;
+    if (data.act) return `act:${data.act}`;
+    return el.textContent.trim();
+  }
   attach(root, { onBack } = {}) {
+    const previous = this.items[this.index];
+    const previousKey = this.itemKey(previous);
     this.root = root;
     this.onBack = onBack || null;
     // Tutti gli elementi interattivi del menu che vogliamo selezionare.
     this.items = Array.from(root.querySelectorAll(
       ".btn, button.card, .pw-pick, [data-cst], [data-opt], [data-power], button.pw-pick"
     )).filter((b) => !b.disabled);
-    this.index = 0;
+    const restored = previousKey ? this.items.findIndex((b) => this.itemKey(b) === previousKey) : -1;
+    this.index = restored >= 0 ? restored : 0;
+    this.items.forEach((item, i) => {
+      item.addEventListener("click", () => {
+        this.index = i;
+        this.focus();
+      });
+    });
     this.focus();
   }
   focus() {
@@ -100,8 +118,10 @@ export class UI {
 
   // Aggancia la navigazione tastiera dopo ogni render.
   _hookScreen(opts = {}) {
-    this.hook();
+    // Prima la navigazione: se Space/Enter scatena un rerender, l'indice
+    // dell'elemento appena scelto viene catturato e ripristinato.
     this.nav.attach(this.root, opts);
+    this.hook();
   }
 
   _tickNav() {
@@ -750,8 +770,7 @@ export class UI {
             <div class="keys">
               <span><span class="k">W S</span> racchetta</span>
               <span><span class="k">A D</span> 2ª</span>
-              <span><span class="k">Spazio</span> potere</span>
-              <span><span class="k">E</span> cambia</span>
+              <span><span class="k">Spazio</span> presa (se disponibile)</span>
             </div>
             <div class="keys"><span class="k">Esc</span> pausa</div>
           </div>
@@ -769,23 +788,22 @@ export class UI {
     this.renderPow("powL", game.powers, game.localSide, game);
   }
 
-  renderPow(id, mgr, side, game) {
+  renderPow(id, _mgr, side, game) {
     const el = document.getElementById(id);
     if (!el) return;
-    const list = mgr.inventory[side] || [];
-    const charges = Math.max(0, ...game.world.paddles.filter((p) => p.side === side).map((p) => p.powerHit || 0));
-    const active = charges > 0
-      ? `<div class="slot active" title="I prossimi ${charges} rimbalzi accelerano la palla del 55%">✸ Schianto ×${charges}</div>`
-      : "";
-    if (!list.length && !active) {
-      el.innerHTML = `<div class="slot">—</div>`;
-      return;
-    }
-    el.innerHTML = active + list.map((pid, i) => {
-      const d = POWER_DEFS[pid];
-      const sel = i === mgr.selected[side];
-      return `<div class="slot ${sel ? "ready" : ""}">${d?.glyph ? d.glyph + " " : ""}${d?.name || pid}</div>`;
-    }).join("");
+    const pads = game.world.paddles.filter((p) => p.side === side);
+    const tags = [];
+    const whack = Math.max(0, ...pads.map((p) => p.powerHit || 0));
+    const stretch = Math.max(0, ...pads.map((p) => p.stretchStacks || 0));
+    const timers = (key) => Math.ceil(Math.max(0, ...pads.map((p) => p[key] || 0)));
+    if (whack) tags.push(`<div class="slot active" title="Ogni raccolta aggiunge 3 rimbalzi">✸ Schianto ×${whack}</div>`);
+    if (stretch) tags.push(`<div class="slot active">↔ Allunga ×${stretch}</div>`);
+    if (timers("grabT")) tags.push(`<div class="slot active">✋ Presa ${timers("grabT")}s</div>`);
+    if (timers("turboT")) tags.push(`<div class="slot active">≫ Turbo ${timers("turboT")}s</div>`);
+    if (timers("invert")) tags.push(`<div class="slot active">⇄ Caos ${timers("invert")}s</div>`);
+    if (timers("burn")) tags.push(`<div class="slot active">☠ Bruciatura ${timers("burn")}s</div>`);
+    if (!tags.length) tags.push(`<div class="slot">—</div>`);
+    el.innerHTML = tags.join("");
   }
 
   setCenter(t) {
@@ -855,6 +873,7 @@ export class UI {
   }
 
   showOptions() {
+    this.screen = "options";
     const o = this.game.save.options;
     const seg = (key, vals) => vals.map((v) =>
       `<button data-opt="${key}" data-val="${v.id}" class="${String(o[key]) === String(v.id) ? "on" : ""}">${v.label}</button>`
@@ -926,6 +945,7 @@ export class UI {
   }
 
   showControls() {
+    this.screen = "controls";
     this.show(this.el(`
       <div class="screen">
         <button class="btn small ghost back" data-act="title">← Indietro</button>
@@ -933,12 +953,12 @@ export class UI {
           <h2 class="section">Comandi</h2>
           <p class="sub">Ogni giocatore sta sul proprio computer. Puoi giocare anche solo con W/S, Spazio ed Esc.</p>
           <div class="opt"><div><label>Muovi selezione menu</label><span class="hint">Solo nei menu</span></div><div>W / S oppure ↑ ↓</div></div>
-          <div class="opt"><div><label>Conferma / Usa potere</label></div><div>Spazio</div></div>
+          <div class="opt"><div><label>Conferma nei menu</label></div><div>Spazio / Invio</div></div>
+          <div class="opt"><div><label>Presa / lancio (quando disponibile)</label></div><div>Spazio</div></div>
           <div class="opt"><div><label>Torna indietro / Pausa</label></div><div>Esc</div></div>
           <div class="opt"><div><label>Racchetta</label><span class="hint">Lungo il tuo lato del tavolo</span></div><div>W / S oppure ↑ ↓</div></div>
           <div class="opt"><div><label>Seconda racchetta</label><span class="hint">Portiere / attaccante</span></div><div>A / D oppure ← →</div></div>
-          <div class="opt"><div><label>Cambia potere</label></div><div>E</div></div>
-          <p class="sub" style="margin-top:16px">Spiaggia e hockey: tieni premuto Spazio vicino alla palla, rilascia per lanciare.</p>
+          <p class="sub" style="margin-top:16px">I power-up si attivano appena li raccogli. Presa, spiaggia e hockey: tieni premuto Spazio vicino alla palla, rilascia per lanciare.</p>
         </div>
       </div>`));
     this._hookScreen();
@@ -964,7 +984,7 @@ export class UI {
           <div class="pw-head">
             <span class="pw-dot" style="background:${hex};box-shadow:0 0 12px ${hex}"></span>
             <h4><span class="pw-glyph" style="color:${hex}">${p.glyph || ""}</span> ${p.name}</h4>
-            ${p.hold ? `<span class="pw-flag">TIENI PREMUTO</span>` : p.charges ? `<span class="pw-flag">${p.charges} COLPI</span>` : ""}
+            ${p.hold ? `<span class="pw-flag">DOPO LA RACCOLTA</span>` : p.charges ? `<span class="pw-flag">+${p.charges} COLPI</span>` : ""}
           </div>
           <p class="pw-desc">${p.desc}</p>
           <div class="pw-where"><span>Arene</span>${where}</div>
@@ -976,7 +996,7 @@ export class UI {
         <button class="btn small ghost back" data-act="title">← Indietro</button>
         <div class="panel">
           <h2 class="section">Poteri</h2>
-          <p class="sub">Colpisci il gettone che compare sul tavolo per raccoglierlo. Ne tieni al massimo 3: <b class="k">E</b> per cambiare, <b class="k">Spazio</b> per usarlo.</p>
+          <p class="sub">Colpisci il gettone che compare sul tavolo: ogni potere si attiva immediatamente e gli effetti si sommano. Non c'è più una borsa da gestire.</p>
           <div class="pw-grid">${cards}</div>
           <p class="sub" style="margin:18px 0 0">Ogni arena ha il suo set di poteri. Nell'arena personalizzata puoi scegliere tu quali far comparire.</p>
         </div>

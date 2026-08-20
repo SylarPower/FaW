@@ -17,10 +17,12 @@ export function loadSave() {
     const raw = localStorage.getItem(KEY);
     if (!raw) return structuredClone(DEFAULT);
     const data = JSON.parse(raw);
+    const legacyTheme = data.options?.theme;
+    const theme = legacyTheme === "retro" ? "airhockey" : legacyTheme === "sunset" ? "tennis" : legacyTheme;
     return {
       ...structuredClone(DEFAULT),
       ...data,
-      options: { ...DEFAULT.options, ...(data.options || {}) },
+      options: { ...DEFAULT.options, ...(data.options || {}), ...(theme ? { theme } : {}) },
       unlocked: Array.from(new Set(["classic", ...(data.unlocked || [])])),
       cleared: data.cleared || []
     };

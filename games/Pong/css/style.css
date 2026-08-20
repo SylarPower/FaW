@@ -382,6 +382,8 @@ h2.section {
 /* Evidenziazione dell'elemento "attivo" nella navigazione tastiera */
 .btn.active,
 button.card.active,
+.seg button.active,
+[data-opt].active,
 .pw-pick.active {
   transform: translateY(-2px);
   border-color: var(--mint) !important;
