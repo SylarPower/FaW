@@ -4,7 +4,7 @@ import { applyTheme } from "./themes.js";
 import {
   makeTable, makeCircleTable, makeTriangleTable, makePenguin, makeLog, makeHill,
   makeBalloon, makePuck, makeBumper, makeGoalFrame, makeSpike,
-  makeSeal, makePolarBear
+  makeSeal, makePolarBear, makeSpectators
 } from "./models.js";
 
 export const ARENAS = [
@@ -327,6 +327,76 @@ function setupThemeDecor(theme, world, engine, ctrl) {
       stone.castShadow = true;
       engine.add(stone);
     }
+  }
+
+  if (style === "sushi") {
+    // Lanterne rosse sospese ai quattro angoli.
+    for (const [x, z] of [[-hx - 1, -hz - 1], [hx + 1, -hz - 1], [-hx - 1, hz + 1], [hx + 1, hz + 1]]) {
+      const lantern = new THREE.Group();
+      const pole = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.03, 0.03, 3.0, 6),
+        new THREE.MeshStandardMaterial({ color: 0x2c2c2c, roughness: 0.6 })
+      );
+      pole.position.y = 1.5;
+      const bulb = new THREE.Mesh(
+        new THREE.SphereGeometry(0.32, 12, 10),
+        new THREE.MeshStandardMaterial({ color: 0xff5050, emissive: 0xff2020, emissiveIntensity: 0.6, roughness: 0.6 })
+      );
+      bulb.scale.y = 0.85;
+      bulb.position.y = 2.9;
+      const light = new THREE.PointLight(0xff6060, 0.7, 8, 2);
+      light.position.y = 2.9;
+      lantern.add(pole, bulb, light);
+      lantern.position.set(x, 0, z);
+      engine.add(lantern);
+    }
+  }
+
+  if (style === "viking") {
+    // Pali con tende di cuoio e bracieri.
+    const wood = new THREE.MeshStandardMaterial({ color: 0x4a2f18, roughness: 0.9 });
+    for (const [x, z] of [[-hx - 0.8, 0], [hx + 0.8, 0], [0, -hz - 0.8], [0, hz + 0.8]]) {
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.11, 2.6, 8), wood);
+      post.position.set(x, 1.3, z);
+      post.castShadow = true;
+      engine.add(post);
+      // Braciere
+      const bowl = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.25, 0.18, 0.2, 10),
+        new THREE.MeshStandardMaterial({ color: 0x2a2220, metalness: 0.5, roughness: 0.5 })
+      );
+      bowl.position.set(x, 2.7, z);
+      const fire = new THREE.PointLight(0xff8030, 0.9, 7, 2);
+      fire.position.set(x, 2.9, z);
+      engine.add(bowl, fire);
+    }
+  }
+
+  if (style === "western") {
+    // Steccato di legno ai lati e un cactus per angolo.
+    const wood = new THREE.MeshStandardMaterial({ color: 0x6b4022, roughness: 0.95 });
+    const addFence = (x, z, w) => {
+      const horiz1 = new THREE.Mesh(new THREE.BoxGeometry(w, 0.08, 0.06), wood);
+      horiz1.position.set(x, 0.35, z);
+      const horiz2 = horiz1.clone();
+      horiz2.position.y = 0.65;
+      for (let i = -w / 2; i <= w / 2 + 0.01; i += 0.8) {
+        const post = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.85, 0.08), wood);
+        post.position.set(x + i, 0.42, z);
+        engine.add(post);
+      }
+      engine.add(horiz1, horiz2);
+    };
+    addFence(0, -hz - 0.6, hx * 2);
+    addFence(0, hz + 0.6, hx * 2);
+  }
+
+  // Spettatori a tema attorno al tavolo.
+  const spectatorKind = theme.spectators || null;
+  if (spectatorKind) {
+    const crowd = makeSpectators(spectatorKind, theme, hx, hz);
+    engine.add(crowd);
+    ctrl.spectators = crowd;
   }
 }
 
@@ -661,8 +731,30 @@ function setupSpecial(id, world, engine, theme, ctrl) {
       const other = side === "left" ? "right" : "left";
       raiseSpikesVisual(ctrl, other, world, true);
     },
-    raiseBarrier(side) {
-      /* paddle.barrierT already set */
+    raiseBarrier(side, duration = 6) {
+      // Un muro temporaneo davanti alla porta del giocatore (lato opposto).
+      // Se c'e' gia' una barriera per questo lato, la rinfreschiamo.
+      if (ctrl.barrier) {
+        const old = ctrl.barrier[side];
+        if (old) {
+          world.obstacles = world.obstacles.filter((o) => o !== old.obs);
+          if (old.mesh) engine.arenaRoot.remove(old.mesh);
+        }
+      } else {
+        ctrl.barrier = {};
+      }
+      const x = side === "left" ? -world.w / 2 + 0.9 : world.w / 2 - 0.9;
+      const hw = 0.18, hd = world.d / 2 - 1.2;
+      const mat = new THREE.MeshStandardMaterial({
+        color: 0x9be7ff, emissive: 0x5fbfff, emissiveIntensity: 0.8,
+        transparent: true, opacity: 0.75, roughness: 0.2, metalness: 0.2
+      });
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(hw * 2, 1.0, hd * 2), mat);
+      mesh.position.set(x, 0.5, 0);
+      engine.add(mesh);
+      const obs = { type: "wall", x, z: 0, hw, hd, mesh };
+      world.obstacles.push(obs);
+      ctrl.barrier[side] = { obs, mesh, t: duration, mat };
     },
     polarBear(side) {
       const mesh = makePolarBear();
@@ -822,6 +914,20 @@ export function updateArena(ctrl, world, dt, engine, game) {
       for (const s of ctrl.spikes[side]) {
         const want = s.userData.wantY ?? -0.7;
         s.position.y = lerp(s.position.y, want, 1 - Math.pow(0.05, dt));
+      }
+    }
+  }
+
+  // Barriere temporanee (potere Barriera).
+  if (ctrl.barrier) {
+    for (const side of Object.keys(ctrl.barrier)) {
+      const b = ctrl.barrier[side];
+      b.t -= dt;
+      if (b.mat) b.mat.opacity = Math.max(0, Math.min(0.75, b.t > 0.5 ? 0.75 : b.t));
+      if (b.t <= 0) {
+        world.obstacles = world.obstacles.filter((o) => o !== b.obs);
+        if (b.mesh) engine.arenaRoot.remove(b.mesh);
+        delete ctrl.barrier[side];
       }
     }
   }

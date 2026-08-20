@@ -31,6 +31,10 @@ function clamp(v, a, b) {
 export const input = {
   axis: 0,
   axis2: 0,
+  axisJustUp: false,
+  axisJustDown: false,
+  axisJustAltUp: false,
+  axisJustAltDown: false,
   power: false,
   powerHeld: false,
   switch: false,
@@ -62,8 +66,14 @@ export const input = {
   },
 
   update() {
-    this.axis = clamp(axisFrom(bind.up, bind.down), -1, 1);
-    this.axis2 = clamp(axisFrom(bind.altup, bind.altdown), -1, 1);
+    const a = clamp(axisFrom(bind.up, bind.down), -1, 1);
+    const a2 = clamp(axisFrom(bind.altup, bind.altdown), -1, 1);
+    this.axisJustUp = this.axis === 0 && a < 0;
+    this.axisJustDown = this.axis === 0 && a > 0;
+    this.axisJustAltUp = this.axis2 === 0 && a2 < 0;
+    this.axisJustAltDown = this.axis2 === 0 && a2 > 0;
+    this.axis = a;
+    this.axis2 = a2;
     this.power = anyJust(bind.power);
     this.powerHeld = any(bind.power);
     this.switch = anyJust(bind.switch);
@@ -78,5 +88,9 @@ export const input = {
     this.confirm = false;
     this.power = false;
     this.switch = false;
+    this.axisJustUp = false;
+    this.axisJustDown = false;
+    this.axisJustAltUp = false;
+    this.axisJustAltDown = false;
   }
 };

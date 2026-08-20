@@ -4,6 +4,62 @@ import { net, isFirebaseConfigured, codeFromSeed } from "./net.js";
 import { PNAME, TRI_SIDES, DUEL_SIDES } from "./players.js";
 import { THEME_IDS, themeById, applyThemeToUI } from "./themes.js";
 
+/**
+ * Navigazione da tastiera per i menu: W/S oppure ↑/↓ per muovere la selezione,
+ * SPAZIO (o Enter) per confermare, ESC per tornare alla schermata precedente.
+ * Funziona su ogni schermata agganciando `.menu-focusable` come elementi
+ * selezionabili (bottoni, slot, ecc.).
+ */
+class MenuNav {
+  constructor(ui) {
+    this.ui = ui;
+    this.index = 0;
+    this.items = [];
+    this.onConfirm = null;
+  }
+  attach(root, { onBack } = {}) {
+    this.root = root;
+    this.onBack = onBack || null;
+    // Tutti gli elementi interattivi del menu che vogliamo selezionare.
+    this.items = Array.from(root.querySelectorAll(
+      ".btn, button.card, .pw-pick, [data-cst], [data-opt], [data-power], button.pw-pick"
+    )).filter((b) => !b.disabled);
+    this.index = 0;
+    this.focus();
+  }
+  focus() {
+    this.items.forEach((b, i) => b.classList.toggle("active", i === this.index));
+    const el = this.items[this.index];
+    if (el && el.scrollIntoView) {
+      el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
+  }
+  move(delta) {
+    if (!this.items.length) return;
+    this.index = (this.index + delta + this.items.length) % this.items.length;
+    this.focus();
+  }
+  confirm() {
+    const el = this.items[this.index];
+    if (!el) return;
+    el.click();
+  }
+  back() {
+    if (this.onBack) this.onBack();
+    else {
+      const backBtn = this.root?.querySelector(".back");
+      if (backBtn) backBtn.click();
+    }
+  }
+  handleInput(input) {
+    // axis = -1 (su) / +1 (giu') — leggiamo un solo step per pressione.
+    if (input.axisJustUp) this.move(-1);
+    else if (input.axisJustDown) this.move(1);
+    if (input.confirm) this.confirm();
+    if (input.pause) this.back();
+  }
+}
+
 export class UI {
   constructor(root) {
     this.root = root;
@@ -12,6 +68,9 @@ export class UI {
     this.vsCPU = true;
     this.online = false;
     this.triangle = false;
+    this.nav = new MenuNav(this);
+    this._previewArena = null;
+    this._previewSize = null;
   }
 
   bind(game) {
@@ -28,7 +87,40 @@ export class UI {
   }
 
   clear() { this.root.innerHTML = ""; }
-  show(node) { this.clear(); this.root.appendChild(node); }
+  show(node) {
+    this.clear();
+    this.root.appendChild(node);
+    // Aggiungi la legenda dei tasti in tutti i menu (non in HUD/Pausa/Portale di
+    // caricamento dove non servirebbe o disturberebbe).
+    if (this.screen !== "hud" && this.screen !== "load" && this.screen !== "pause") {
+      const hint = this.el(`<p class="hint-keys"><span class="k">W</span><span class="k">S</span> muovi · <span class="k">Spazio</span> seleziona · <span class="k">Esc</span> indietro</p>`);
+      this.root.appendChild(hint);
+    }
+  }
+
+  // Aggancia la navigazione tastiera dopo ogni render.
+  _hookScreen(opts = {}) {
+    this.hook();
+    this.nav.attach(this.root, opts);
+  }
+
+  _tickNav() {
+    // Usato dal loop principale (game.tickPlay non c'entra: leggiamo input
+    // direttamente qui per i menu). Richiamato da updateMenu() sotto.
+    // Importato dinamicamente per evitare cicli.
+  }
+
+  // Chiamato dal main loop quando siamo in un menu (non in partita).
+  updateMenuNav(input) {
+    if (!this.nav.items.length) return;
+    if (input.axisJustUp) this.nav.move(-1);
+    else if (input.axisJustDown) this.nav.move(1);
+    if (input.confirm) this.nav.confirm();
+    if (input.pause) {
+      // Esc in menu = torna indietro, tranne che nella title dove non c'e' back.
+      if (this.screen !== "title" && this.screen !== "load" && this.screen !== "hud") this.nav.back();
+    }
+  }
 
   showLoad() {
     this.screen = "load";
@@ -47,8 +139,6 @@ export class UI {
     const b = document.getElementById("loadbar");
     if (b) b.style.width = `${Math.floor(p * 100)}%`;
   }
-
-
 
   async fetchPortalSettings(matchId) {
     try {
@@ -80,7 +170,6 @@ export class UI {
       target,
       mode,
       options: {
-        extraPowers: mode === "power",
         ballSpeed: mode === "hardcore" ? "fast" : "default",
         paddleSize: mode === "hardcore" ? "small" : "default"
       }
@@ -150,7 +239,6 @@ export class UI {
     }
   }
 
-
   showTitle() {
     this.screen = "title";
     this.show(this.el(`
@@ -158,17 +246,16 @@ export class UI {
         <div class="brand">
           <div class="kicker">Due PC · Un tavolo</div>
           <h1>PONG<span>NEXT LEVEL</span></h1>
-          <p>Vs CPU, 1v1 online, triangolo 1v1v1. Solo tastiera.</p>
+          <p>Vs CPU, 1v1 online. Solo tastiera.</p>
         </div>
         <div class="menu">
           <button class="btn" data-act="play">Gioca</button>
           <button class="btn ghost" data-act="opt">Opzioni</button>
           <button class="btn ghost" data-act="ctrl">Comandi</button>
           <button class="btn ghost" data-act="pwr">Poteri</button>
-          <button class="btn ghost" data-act="cred">Crediti</button>
         </div>
       </div>`));
-    this.hook();
+    this._hookScreen({ onBack: () => {} });
   }
 
   showMain() {
@@ -182,13 +269,9 @@ export class UI {
         <div class="menu">
           <button class="btn" data-act="cpu">1 vs Computer</button>
           <button class="btn pink" data-act="pvp">${fb ? "1 vs Giocatore · online" : "1 vs Giocatore · configura Firebase"}</button>
-          <!-- Triangolo 1v1v1 temporaneamente nascosto: la resa a schermo non e'
-               all'altezza del 1v1 e va riprogettata. Il codice resta al suo posto
-               (arena "triangle", collideTriangle, TRI_SIDES) e per riattivarlo
-               basta rimettere qui i due bottoni tri-cpu / tri-on. -->
         </div>
       </div>`));
-    this.hook();
+    this._hookScreen();
   }
 
   campaignArenas() {
@@ -216,7 +299,7 @@ export class UI {
             return `
               <button class="card ${lock ? "locked" : ""} ${cleared ? "cleared" : ""}" data-arena="${a.id}" ${lock ? "disabled" : ""}>
                 <div class="tag">${a.tag}</div>
-                <h4>${a.name}</h4>
+                <h4 class="card-arena-title">${a.name}</h4>
                 <p>${a.desc}</p>
                 ${lock ? `<span class="lock">BLOCCATA</span>` : ""}
               </button>`;
@@ -224,14 +307,13 @@ export class UI {
         </div>
       </div>`).join("");
 
-    // La partita su misura e' disponibile sia online sia contro la CPU.
     const customBlock = `
       <div class="zone-block">
         <h3>Su misura</h3>
         <div class="cards">
           <button class="card card-custom" data-act="custom">
             <div class="tag">Personalizzata · ${vsCPU ? "vs CPU" : "online"}</div>
-            <h4>Arena su misura</h4>
+            <h4 class="card-arena-title">Arena su misura</h4>
             <p>Scegli tavolo, punteggio, velocità, racchette e quali power-up entrano in campo.</p>
           </button>
         </div>
@@ -246,7 +328,7 @@ export class UI {
           <div class="zones">${customBlock}${cards}</div>
         </div>
       </div>`));
-    this.hook();
+    this._hookScreen();
     this.root.querySelectorAll("[data-arena]").forEach((btn) => {
       btn.addEventListener("click", () => {
         this.showBrief(btn.dataset.arena, vsCPU);
@@ -255,19 +337,27 @@ export class UI {
   }
 
   /**
-   * Arena personalizzata contro CPU o online. In rete le scelte finiscono in
-   * `settings.custom`; in locale vengono passate direttamente a beginMatch.
+   * Arena personalizzata contro CPU o online. Mostra subito in sfondo il tavolo
+   * e la dimensione racchetta scelti, ricaricando la demo in tempo reale.
    */
   showCustom() {
     this.screen = "custom";
     const vsCPU = this.vsCPU;
-    const c = this._custom || (this._custom = {
-      base: "classic",
-      target: 10,
-      ballSpeed: "default",
-      paddleSize: "default",
-      powers: ["whack", "stretch", "turbo", "grab"]
-    });
+    if (!this._custom) {
+      const opts = this.game?.save?.options || {};
+      this._custom = {
+        base: "classic",
+        target: 10,
+        ballSpeed: opts.ballSpeed || "default",
+        paddleSize: opts.paddleSize || "default",
+        powers: ["whack", "stretch", "turbo", "grab"]
+      };
+    }
+    const c = this._custom;
+
+    // Appena entriamo, aggiorniamo la demo del background con il tavolo e la
+    // dimensione scelti. Poi riagganciamo quando cambiano.
+    this._applyCustomPreview();
 
     const bases = this.campaignArenas().filter((a) => !a.triangle);
     const baseOpts = bases.map((a) =>
@@ -297,7 +387,7 @@ export class UI {
             : "Configura la partita, poi crea la stanza e manda il codice al collega."}</p>
 
           <div class="opt">
-            <div><label>Tavolo di base</label><span class="hint">Ostacoli e forma del campo</span></div>
+            <div><label>Tavolo di base</label><span class="hint">Ostacoli e forma del campo (anteprima sullo sfondo)</span></div>
             <div class="seg th-seg">${baseOpts}</div>
           </div>
           <div class="opt">
@@ -313,7 +403,7 @@ export class UI {
             ])}</div>
           </div>
           <div class="opt">
-            <div><label>Dimensione racchetta</label></div>
+            <div><label>Dimensione racchetta</label><span class="hint">Anteprima sullo sfondo</span></div>
             <div class="seg">${seg("paddleSize", [
               { id: "small", label: "Piccola" }, { id: "default", label: "Media" },
               { id: "medium", label: "Grande" }, { id: "large", label: "Maxi" }
@@ -333,7 +423,7 @@ export class UI {
           </div>
         </div>
       </div>`));
-    this.hook();
+    this._hookScreen();
 
     this.root.querySelectorAll("[data-cst]").forEach((b) => {
       b.addEventListener("click", () => {
@@ -341,6 +431,7 @@ export class UI {
         let v = b.dataset.val;
         if (k === "target") v = Number.parseInt(v, 10);
         this._custom[k] = v;
+        if (k === "base" || k === "paddleSize") this._applyCustomPreview();
         this.showCustom();
       });
     });
@@ -358,6 +449,8 @@ export class UI {
     this.root.querySelector("#cstGo").onclick = async () => {
       const cfg = this._custom;
       const options = { ballSpeed: cfg.ballSpeed, paddleSize: cfg.paddleSize };
+      // Ripristina la demo standard quando usciamo.
+      this._clearCustomPreview();
       if (vsCPU) {
         this.game.beginMatch(cfg.base, {
           vsCPU: true,
@@ -381,15 +474,52 @@ export class UI {
     };
   }
 
+  _applyCustomPreview() {
+    if (!this._custom || !this.game) return;
+    const c = this._custom;
+    const changed =
+      this._previewArena !== c.base ||
+      this._previewSize !== c.paddleSize ||
+      this._previewBall !== c.ballSpeed;
+    if (!changed) return;
+    this._previewArena = c.base;
+    this._previewSize = c.paddleSize;
+    this._previewBall = c.ballSpeed;
+    // Sostituiamo la demo con una preview del tavolo/palla/racchetta scelti.
+    this.game.matchOptions = { paddleSize: c.paddleSize, ballSpeed: c.ballSpeed };
+    this.game.customPowers = [];
+    this.game.customTarget = null;
+    this.game.demo = true;
+    this.game.loadArena(c.base, { demo: true });
+    this.game.serve(1);
+  }
+
+  _clearCustomPreview() {
+    this._previewArena = null;
+    this._previewSize = null;
+    this._previewBall = null;
+    this.game.matchOptions = null;
+    this.game.customPowers = null;
+    // Torna a una demo casuale invece di lasciare in scena l'ultimo tavolo
+    // della preview.
+    if (this.game.demo) {
+      this.game.loadArena(pickDemoSafe(), { demo: true });
+      this.game.serve(1);
+    }
+  }
+
   showBrief(id, vsCPU) {
     this.screen = "brief";
     const a = arenaById(id);
+    const theme = themeById(this.game.save.options.theme);
+    // Titolo con massimo contrasto: testo chiaro, contorno scuro spesso.
+    const titleColor = theme.ui?.["--gold"] || "var(--gold)";
     this.show(this.el(`
       <div class="screen">
         <button class="btn small ghost back" data-act="zones">← Arene</button>
         <div class="panel brief">
           <div class="tag" style="color:var(--gold);letter-spacing:.28em;font-size:11px;font-weight:700">${a.zone} · ${a.tag}</div>
-          <div class="arena-name">${a.name}</div>
+          <div class="arena-name" style="color:${titleColor};text-shadow:0 0 18px rgba(0,0,0,.9),0 3px 0 #000,0 0 24px ${titleColor}">${a.name}</div>
           <p class="sub">${a.desc}</p>
           <div class="vs">
             <span class="chip p1">Tu · W S</span>
@@ -402,7 +532,7 @@ export class UI {
           </div>
         </div>
       </div>`));
-    this.hook();
+    this._hookScreen();
     this.root.querySelector("[data-start]").addEventListener("click", async () => {
       if (vsCPU) this.game.beginMatch(id, { vsCPU: true });
       else await this.createRoom({ mode: "duel", arenaId: id, seats: 2 });
@@ -424,10 +554,10 @@ export class UI {
             <li>Incolla le chiavi in <code>games/shared/firebase-config.js</code></li>
             <li>Regole: usa il file <code>database.rules.json</code> di questa cartella</li>
           </ol>
-          <p class="sub">Finché la config è YOUR_API_KEY, vs CPU e triangolo vs 2 CPU funzionano comunque.</p>
+          <p class="sub">Finché la config è YOUR_API_KEY, vs CPU funziona comunque.</p>
         </div>
       </div>`));
-    this.hook();
+    this._hookScreen();
   }
 
   showOnlineHub(triangle) {
@@ -449,7 +579,7 @@ export class UI {
           </div>
         </div>
       </div>`));
-    this.hook();
+    this._hookScreen();
     this.root.querySelector("#nick").addEventListener("change", (e) => {
       this.game.save.nick = e.target.value.trim();
       this.game.persist();
@@ -468,7 +598,7 @@ export class UI {
           <button class="btn" id="doJoin">Entra</button>
         </div>
       </div>`));
-    this.hook();
+    this._hookScreen();
     const go = async () => {
       const code = this.root.querySelector("#code").value;
       try {
@@ -548,6 +678,9 @@ export class UI {
         </div>
       </div>`));
 
+    this._hookScreen({ onBack: async () => {
+      await net.leave(); this.game.online = false; this.showMain();
+    }});
     this.root.querySelector("#leaveLobby").onclick = async () => {
       await net.leave();
       this.game.online = false;
@@ -567,7 +700,7 @@ export class UI {
       const id = meta.arenaId || this._pendingArena || (seats === 3 ? "triangle" : "classic");
       const settings = meta.settings || {};
       for (let i = 0; i < seats; i++) {
-        const pl = net.playersList().find((p) => p.slot === i && p.in);
+        const pl = playersList_safe().find((p) => p.slot === i && p.in);
         if (!pl) await net.fillCpu(i, "CPU " + (i + 1));
       }
       await net.start(id);
@@ -662,14 +795,13 @@ export class UI {
     el.style.display = t ? "block" : "none";
     el.classList.remove("center-pop");
     if (t) {
-      // Riavvia l'animazione senza mai perdere translate(-50%, -50%): anche il
-      // primo frame di 3, 2, 1 e «Punto rosa» resta centrato.
       void el.offsetWidth;
       el.classList.add("center-pop");
     }
   }
 
   showPause(game) {
+    this.screen = "pause";
     const overlay = this.el(`
       <div class="screen" id="pauseScr">
         <div class="pause-title">PAUSA</div>
@@ -680,12 +812,18 @@ export class UI {
         </div>
       </div>`);
     this.root.appendChild(overlay);
-    overlay.querySelector("[data-act=resume]").onclick = () => { game.resume(); };
-    overlay.querySelector("[data-act=rematch]")?.addEventListener("click", () => { game.rematch(); });
-    overlay.querySelector("[data-act=leave]").onclick = () => { game.forfeit(); this.showTitle(); };
+    this.nav.attach(overlay, {
+      onBack: () => { this.hidePause(); game.resume(); }
+    });
+    overlay.querySelector("[data-act=resume]").onclick = () => { this.hidePause(); game.resume(); };
+    overlay.querySelector("[data-act=rematch]")?.addEventListener("click", () => { this.hidePause(); game.rematch(); });
+    overlay.querySelector("[data-act=leave]").onclick = () => { this.hidePause(); game.forfeit(); this.showTitle(); };
   }
 
-  hidePause() { document.getElementById("pauseScr")?.remove(); }
+  hidePause() {
+    document.getElementById("pauseScr")?.remove();
+    this.screen = "hud";
+  }
 
   showResult(game, iWon, winSide) {
     const a = game.ctrl.def;
@@ -694,11 +832,13 @@ export class UI {
     const just = iWon && nxt && game.save.unlocked.includes(nxt);
     const scoreLine = (game.triangle ? TRI_SIDES : DUEL_SIDES)
       .map((s) => `${PNAME[s]} ${game.scores[s] ?? 0}`).join("  ·  ");
+    const theme = themeById(game.save.options.theme);
+    const titleColor = iWon ? (theme.ui?.["--mint"] || "var(--mint)") : (theme.ui?.["--pink"] || "var(--pink)");
     this.show(this.el(`
       <div class="screen">
         <div class="panel result">
           <div class="kicker" style="letter-spacing:.3em;color:var(--gold);font-size:11px">${a.name.toUpperCase()}</div>
-          <div class="who ${iWon ? "win" : "lose"}">${iWon ? "HAI VINTO" : "VINCE " + (PNAME[winSide] || "")}</div>
+          <div class="who ${iWon ? "win" : "lose"}" style="color:${titleColor};text-shadow:0 0 22px rgba(0,0,0,.85),0 2px 0 #000,0 0 28px ${titleColor}">${iWon ? "HAI VINTO" : "VINCE " + (PNAME[winSide] || "")}</div>
           <div class="final-score">${scoreLine}</div>
           ${just ? `<p class="sub">Nuova arena sbloccata: <strong style="color:var(--mint)">${arenaById(nxt).name}</strong></p>` : ""}
           <div class="menu">
@@ -708,6 +848,7 @@ export class UI {
           </div>
         </div>
       </div>`));
+    this._hookScreen();
     this.root.querySelector("[data-act=again]")?.addEventListener("click", () => { game.rematch(); });
     this.root.querySelector("[data-act=play]").onclick = () => { game.forfeit(); this.showMain(); };
     this.root.querySelector("[data-act=title]").onclick = () => { game.forfeit(); this.showTitle(); };
@@ -725,16 +866,16 @@ export class UI {
           <h2 class="section">Opzioni</h2>
           <p class="sub">Restano salvate su questo browser.</p>
           <div class="opt">
-            <div><label>Tema grafica</label><span class="hint">${themeById(o.theme).desc}</span></div>
+            <div><label>Tema grafica</label></div>
             <div class="seg th-seg">${THEME_IDS.map((id) => {
               const t = themeById(id);
               const dots = t.swatch.map((c) =>
                 `<i style="background:#${c.toString(16).padStart(6, "0")}"></i>`).join("");
-              return `<button data-opt="theme" data-val="${id}" class="${o.theme === id ? "on" : ""}" title="${t.desc}"><span class="th-dots">${dots}</span>${t.name}</button>`;
+              return `<button data-opt="theme" data-val="${id}" class="${o.theme === id ? "on" : ""}"><span class="th-dots">${dots}</span>${t.name}</button>`;
             }).join("")}</div>
           </div>
           <div class="opt">
-            <div><label>Dimensione racchetta</label><span class="hint">Default, piccola, media, grande</span></div>
+            <div><label>Dimensione racchetta</label></div>
             <div class="seg">${seg("paddleSize", [
               { id: "small", label: "Piccola" }, { id: "default", label: "Default" },
               { id: "medium", label: "Media" }, { id: "large", label: "Grande" }
@@ -753,19 +894,12 @@ export class UI {
               { id: "difficile", label: "Difficile" }, { id: "leggenda", label: "Leggenda" }
             ])}</div>
           </div>
-          <div class="opt">
-            <div><label>Power-up extra</label><span class="hint">Presa, schianto, allunga, turbo in ogni arena</span></div>
-            <div class="seg">${seg("extraPowers", [
-              { id: "false", label: "Off" }, { id: "true", label: "On" }
-            ])}</div>
-          </div>
           <div class="row" style="margin-top:18px">
-            <button class="btn small gold" data-act="unlock">Sblocca tutto</button>
             <button class="btn small ghost" data-act="reset">Reset progressi</button>
           </div>
         </div>
       </div>`));
-    this.hook();
+    this._hookScreen();
     this.root.querySelectorAll("[data-opt]").forEach((b) => {
       b.addEventListener("click", () => {
         const key = b.dataset.opt;
@@ -775,19 +909,14 @@ export class UI {
         this.game.save.options[key] = val;
         this.game.persist();
         if (key === "theme") {
-          // Effetto immediato: variabili CSS di menu/HUD + ricolorazione della
-          // scena 3D che sta girando dietro (demo o partita in corso).
           applyThemeToUI(val);
+          this.game.refreshTheme();
+        } else if (key === "paddleSize" || key === "ballSpeed") {
           this.game.refreshTheme();
         }
         this.showOptions();
       });
     });
-    this.root.querySelector("[data-act=unlock]").onclick = () => {
-      this.game.save.unlocked = ARENAS.map((a) => a.id);
-      this.game.persist();
-      this.toast("Tutte le arene sono aperte.");
-    };
     this.root.querySelector("[data-act=reset]").onclick = () => {
       this.game.save.unlocked = ["classic"];
       this.game.save.cleared = [];
@@ -802,46 +931,36 @@ export class UI {
         <button class="btn small ghost back" data-act="title">← Indietro</button>
         <div class="panel options">
           <h2 class="section">Comandi</h2>
-          <p class="sub">Ogni giocatore sta sul proprio computer. Stessi tasti per tutti.</p>
-          <div class="opt"><div><label>Racchetta</label><span class="hint">Lungo il tuo lato del tavolo</span></div><div>W / S oppure frecce ↑ ↓</div></div>
+          <p class="sub">Ogni giocatore sta sul proprio computer. Puoi giocare anche solo con W/S, Spazio ed Esc.</p>
+          <div class="opt"><div><label>Muovi selezione menu</label><span class="hint">Solo nei menu</span></div><div>W / S oppure ↑ ↓</div></div>
+          <div class="opt"><div><label>Conferma / Usa potere</label></div><div>Spazio</div></div>
+          <div class="opt"><div><label>Torna indietro / Pausa</label></div><div>Esc</div></div>
+          <div class="opt"><div><label>Racchetta</label><span class="hint">Lungo il tuo lato del tavolo</span></div><div>W / S oppure ↑ ↓</div></div>
           <div class="opt"><div><label>Seconda racchetta</label><span class="hint">Portiere / attaccante</span></div><div>A / D oppure ← →</div></div>
-          <div class="opt"><div><label>Potere</label></div><div>Spazio · cambia con E</div></div>
-          <div class="opt"><div><label>Pausa</label></div><div>Esc oppure P</div></div>
+          <div class="opt"><div><label>Cambia potere</label></div><div>E</div></div>
           <p class="sub" style="margin-top:16px">Spiaggia e hockey: tieni premuto Spazio vicino alla palla, rilascia per lanciare.</p>
         </div>
       </div>`));
-    this.hook();
+    this._hookScreen();
   }
 
   /**
-   * Elenco dei poteri: cosa fanno, come si usano e in quali arene compaiono.
-   * Le arene vengono ricavate da ARENAS.powerUps, cosi' la pagina resta
-   * allineata da sola se un'arena cambia pool.
+   * Elenco dei poteri.
    */
   showPowers() {
     this.screen = "powers";
-    const ALWAYS = ["grab", "whack", "stretch", "turbo"];
-
     const arenasFor = (id) => ARENAS.filter((a) => (a.powerUps || []).includes(id));
-
-    // Ordine: prima quelli sempre disponibili, poi gli altri per nome.
-    const ids = Object.keys(POWER_DEFS).sort((a, b) => {
-      const aa = ALWAYS.includes(a), bb = ALWAYS.includes(b);
-      if (aa !== bb) return aa ? -1 : 1;
-      return POWER_DEFS[a].name.localeCompare(POWER_DEFS[b].name);
-    });
+    const ids = Object.keys(POWER_DEFS).sort((a, b) => POWER_DEFS[a].name.localeCompare(POWER_DEFS[b].name));
 
     const cards = ids.map((id) => {
       const p = POWER_DEFS[id];
       const hex = "#" + p.color.toString(16).padStart(6, "0");
       const used = arenasFor(id);
-      const extra = ALWAYS.includes(id);
-      const unused = !used.length && !extra;
       const where = used.length
         ? used.map((a) => a.name).join(" · ")
         : "Nessuna arena al momento";
       return `
-        <div class="pw-card${unused ? " pw-unused" : ""}">
+        <div class="pw-card">
           <div class="pw-head">
             <span class="pw-dot" style="background:${hex};box-shadow:0 0 12px ${hex}"></span>
             <h4><span class="pw-glyph" style="color:${hex}">${p.glyph || ""}</span> ${p.name}</h4>
@@ -849,7 +968,6 @@ export class UI {
           </div>
           <p class="pw-desc">${p.desc}</p>
           <div class="pw-where"><span>Arene</span>${where}</div>
-          ${extra ? `<div class="pw-where"><span>Extra</span>Sempre disponibile con «Poteri extra»</div>` : ""}
         </div>`;
     }).join("");
 
@@ -860,25 +978,10 @@ export class UI {
           <h2 class="section">Poteri</h2>
           <p class="sub">Colpisci il gettone che compare sul tavolo per raccoglierlo. Ne tieni al massimo 3: <b class="k">E</b> per cambiare, <b class="k">Spazio</b> per usarlo.</p>
           <div class="pw-grid">${cards}</div>
-          <p class="sub" style="margin:18px 0 0">Ogni arena mette in campo solo i suoi poteri. In Opzioni puoi attivare «Poteri extra» per aggiungere ovunque Presa, Schianto, Allunga e Turbo.</p>
+          <p class="sub" style="margin:18px 0 0">Ogni arena ha il suo set di poteri. Nell'arena personalizzata puoi scegliere tu quali far comparire.</p>
         </div>
       </div>`));
-    this.hook();
-  }
-
-  showCredits() {
-    this.show(this.el(`
-      <div class="screen">
-        <button class="btn small ghost back" data-act="title">← Indietro</button>
-        <div class="panel credits">
-          <h2 class="section">Crediti</h2>
-          <p>Ispirato a <strong>Pong: The Next Level</strong> (Hasbro / Atari, 1999).</p>
-          <p>Edizione interna: 3D moderno, 1v1 online su Firebase, tavolo a triangolo 1v1v1.</p>
-          <p>Motore 3D: Three.js · SFX procedurali · Un giocatore, un PC.</p>
-          <p style="margin-top:18px;color:var(--gold);letter-spacing:.2em;font-size:12px">KEEP THE BALL IN PLAY</p>
-        </div>
-      </div>`));
-    this.hook();
+    this._hookScreen();
   }
 
   showMenu() { this.showTitle(); }
@@ -898,11 +1001,10 @@ export class UI {
 
   async onAct(act) {
     if (act === "play") this.showMain();
-    if (act === "title") this.showTitle();
+    if (act === "title") { this._clearCustomPreview(); this.showTitle(); }
     if (act === "opt") this.showOptions();
     if (act === "ctrl") this.showControls();
     if (act === "pwr") this.showPowers();
-    if (act === "cred") this.showCredits();
     if (act === "cpu") { this.triangle = false; this.showZones(true); }
     if (act === "pvp") {
       if (!isFirebaseConfigured()) return this.showFirebaseHelp();
@@ -922,6 +1024,15 @@ export class UI {
       await this.createRoom({ mode: "tri", arenaId: "triangle", seats: 3 });
     }
     if (act === "join") this.showJoin();
-    if (act === "zones") this.showZones(this.vsCPU);
+    if (act === "zones") { this._clearCustomPreview(); this.showZones(this.vsCPU); }
   }
+}
+
+function playersList_safe() {
+  return net.playersList ? net.playersList() : [];
+}
+
+function pickDemoSafe() {
+  const pool = ["classic", "soccer", "penguin", "tilt", "logs"];
+  return pool[(Math.random() * pool.length) | 0];
 }
