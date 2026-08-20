@@ -220,6 +220,25 @@
 			border-color: #03dac6;
 			background: #1a3a3a;
 			}
+			.game-badge {
+			display: inline-block;
+			margin-top: 6px;
+			padding: 2px 7px;
+			border-radius: 999px;
+			font-size: 0.65rem;
+			font-weight: 800;
+			letter-spacing: 0.03em;
+			background: #03dac6;
+			color: #000;
+			white-space: nowrap;
+			}
+			.game-badge.solo {
+			background: #f1c40f;
+			}
+			.game-badge.online {
+			background: #9b59b6;
+			color: #fff;
+			}
 			/* ========================================
 			🎯 MODAL
 			======================================== */
@@ -522,28 +541,34 @@
 						<div class="game-card selected" onclick="selezionaGioco('ruzzle', this)" id="game-ruzzle">
 							<span style="font-size:2rem;">🔠</span>
 							<br>Ruzzle
+							<div class="game-badge online">SFIDA</div>
 						</div>
-						<div class="game-card" onclick="window.location.href='games/neonwar/index.html'" id="game-neonwar">
+						<div class="game-card" onclick="selezionaGioco('neonwar', this)" id="game-neonwar">
 						    <span style="font-size:2rem;">🚀</span><br>Neon War
+						    <div class="game-badge solo">SOLO</div>
 						</div>
 						<div class="game-card" onclick="selezionaGioco('pictionary', this)" id="game-pictionary">
 						    <span style="font-size:2rem;">🎨</span><br>Pictionary
+						    <div class="game-badge online">ONLINE</div>
 						</div>
 						<div class="game-card" onclick="selezionaGioco('gameof15', this)" id="game-gameof15">
 						    <span style="font-size:2rem;">🧩</span><br>Gioco del 15
+						    <div class="game-badge online">SFIDA</div>
 						</div>
 						<div class="game-card" onclick="selezionaGioco('pong', this)" id="game-pong">
 						    <span style="font-size:2rem;">🏓</span><br>Pong
+						    <div class="game-badge online">ONLINE</div>
 						</div>
-						<div class="game-card" onclick="window.location.href='games/palestra/index.html'" id="game-palestra">
+						<div class="game-card" onclick="selezionaGioco('palestra', this)" id="game-palestra">
 						    <span style="font-size:2rem;">🏋️</span><br>Palestra
+						    <div class="game-badge solo">SOLO</div>
 						</div>
 						<!-- Aggiungi nuovi giochi in games/<nome>/ (index.html + css/ + js/) -->
 					</div>
 				</div>
 				<div class="box">
 					<h3>⭐ I tuoi Amici</h3>
-					<p style="font-size:0.8rem; opacity:0.6;">Clicca sui nomi per selezionare più amici e sfidarli insieme!</p>
+					<p id="testo-selezione-amici" style="font-size:0.8rem; opacity:0.6;">Clicca sui nomi per selezionare più amici e sfidarli insieme!</p>
 					<button id="btn-sfida-multipla" class="btn-sfida-multi" onclick="apriModalSfida()">SFIDA IL GRUPPO ⚔️</button>
 					<div id="lista-amici"></div>
 				</div>
@@ -653,6 +678,9 @@
 			    const base = GAME_PATHS[gioco] || ('games/' + gioco + '/index.html');
 			    return query ? (base + '?' + query) : base;
 			}
+			function isGiocoSolo(gioco = giocoSelezionato) {
+			    return GIOCHI_CONFIG[gioco]?.soloOnly === true;
+			}
 			let partiteCache = {
 			    ruzzle: [],
 			    pictionary: [],
@@ -754,7 +782,8 @@
 			         { id: "hardcore", label: "HARDCORE", colore: "#ff0055", testo: "white" }
 			     ],
 			     minGiocatori: 1,
-			     maxGiocatori: 8
+			     maxGiocatori: 1,
+			     soloOnly: true
 			 },
 pictionary: {
     nome: "Pictionary",
@@ -832,12 +861,13 @@ pong: {
         {
             id: "arena",
             label: "Arena",
-            default: "neon",
+            default: "classic",
             valori: [
-                { value: "neon", label: "Neon Club" },
-                { value: "dusk", label: "Sunset" },
-                { value: "ice", label: "Ice Rink" },
-                { value: "arcade", label: "Arcade" }
+                { value: "classic", label: "Pong Classico" },
+                { value: "walled", label: "Muro Spezzato" },
+                { value: "soccer", label: "Calcio Stelle" },
+                { value: "penguin", label: "Pinguini sul Ghiaccio" },
+                { value: "beach", label: "Festa in Spiaggia" }
             ]
         }
     ],
@@ -848,6 +878,16 @@ pong: {
     ],
     minGiocatori: 2,
     maxGiocatori: 2
+},
+
+palestra: {
+    nome: "Palestra",
+    icona: "🏋️",
+    opzioni: [],
+    modalita: [],
+    minGiocatori: 1,
+    maxGiocatori: 1,
+    soloOnly: true
 },
 			  // Aggiungerai qui altri giochi in futuro
 			};
@@ -968,7 +1008,7 @@ if (mioNome && passwordHashSalvato) {
 			    disponibile: localStorage.getItem('disponibile') !== 'false'
 			  });
 			}
-			
+
 function listen() {
     let presenzeData = {};
     let amicizieSnapshot = null;
@@ -982,6 +1022,7 @@ function listen() {
                 presenzeData[u.nome] = u;
             }
         });
+        window.presenzeDataGlobal = presenzeData;
         if (amicizieSnapshot) {
             aggiornaListaAmici(amicizieSnapshot, presenzeData);
         }
@@ -991,6 +1032,7 @@ function listen() {
     // LISTENER 2: Amicizie
     db.collection("amicizie").onSnapshot(snap => {
         amicizieSnapshot = snap;
+        window.amicizieSnapshotGlobal = snap;
         aggiornaListaAmici(snap, presenzeData);
     });
 
@@ -1002,7 +1044,7 @@ partiteCache.ruzzle = [];
 partiteCache.neonwar = [];
 partiteCache.gameof15 = [];
 partiteCache.pong = [];
-			
+
 	snap.forEach(doc => {
 	    const data = { id: doc.id, ...doc.data() };
 	    if (data.gioco === 'neonwar') partiteCache.neonwar.push(data);
@@ -1010,7 +1052,7 @@ partiteCache.pong = [];
 	    else if (data.gioco === 'pong') partiteCache.pong.push(data);
 	    else if (data.gioco !== 'pictionary') partiteCache.ruzzle.push(data);
 	});
-            
+
             renderTutteLePartite();
         });
 
@@ -1021,21 +1063,21 @@ partiteCache.pong = [];
 
 async function caricaPartitePictionary() {
     if (!mioNome) return;
-    
+
     try {
         const snap = await db.collection("pictionary_rooms")
             .where("players", "array-contains", mioNome)
             .get();
-        
+
         partiteCache.pictionary = [];
-        
+
         snap.forEach(doc => {
             const data = doc.data();
             if (data && data.players && Array.isArray(data.players) && data.stato !== 'results') {
                 partiteCache.pictionary.push({ id: doc.id, ...data });
             }
         });
-        
+
         renderTutteLePartite();
     } catch (e) {
         console.warn("⚠️ Errore caricamento Pictionary:", e.message);
@@ -1048,7 +1090,7 @@ async function caricaPartitePictionary() {
 function renderTutteLePartite() {
     const div = document.getElementById('lista-partite');
     const configGioco = GIOCHI_CONFIG[giocoSelezionato] || GIOCHI_CONFIG.ruzzle;
-    
+
     // Reset completo
     const soloHref = gameHref(giocoSelezionato);
     div.innerHTML = `
@@ -1056,13 +1098,13 @@ function renderTutteLePartite() {
             <span>🎯 Allenamento Solo (${configGioco.nome})</span>
             <button>GIOCA</button>
         </div>`;
-    
+
     // Render Ruzzle
     partiteCache.ruzzle.forEach(p => renderPartitaRuzzle(p, div));
-    
+
     // Render NeonWar
     partiteCache.neonwar.forEach(p => renderPartitaRuzzle(p, div));
-    
+
 // Render Gioco del 15
 partiteCache.gameof15.forEach(p => renderPartitaRuzzle(p, div));
 partiteCache.pong.forEach(p => renderPartitaRuzzle(p, div));
@@ -1076,14 +1118,14 @@ partiteCache.pictionary.forEach(p => renderPartitaPictionary(p, div));
 // ========================================
 function renderPartitaRuzzle(p, div) {
     const partitaId = p.id;
-    
+
     if (p.stato === "conclusa") return;
-    
+
     const rifiutanti = p.rivincitaRifiutataDa || [];
     const accettanti = p.rivincitaAccettataDa || [];
     const creatore = p.partecipanti[0];
     const altriGiocatori = p.partecipanti.filter(x => x !== creatore);
-    
+
     // Rifiuti
     if (rifiutanti.length > 0) {
         const ioHoRifiutato = rifiutanti.includes(mioNome);
@@ -1102,7 +1144,7 @@ function renderPartitaRuzzle(p, div) {
         }
         return;
     }
-    
+
     // Attesa
     if (p.stato === "attesa") {
         if (creatore === mioNome) {
@@ -1170,17 +1212,17 @@ function renderPartitaPictionary(p, div) {
         console.warn('⚠️ Dati Pictionary incompleti:', p);
         return;
     }
-    
+
     const roomId = p.id;
-    
+
     if (p.stato === 'results') return;
-    
+
     const altri = p.players.filter(n => n !== mioNome).join(", ");
-    const statoText = p.stato === 'lobby' ? 'In attesa' : 
+    const statoText = p.stato === 'lobby' ? 'In attesa' :
                      p.stato === 'drawing' ? 'Disegno' :
                      p.stato === 'interpreting' ? 'Ridisegno' :
                      p.stato === 'voting' ? 'Votazione' : 'In corso';
-    
+
     div.innerHTML += `
         <div class="user-item live-match" style="border-left-color: #e94560;">
             <span>🎨 ${altri.length > 0 ? `vs ${altri}` : 'Pictionary'} (${statoText})</span>
@@ -1190,10 +1232,31 @@ function renderPartitaPictionary(p, div) {
             </div>
         </div>`;
 }
+			function aggiornaTestoSelezioneAmici() {
+			  const testo = document.getElementById('testo-selezione-amici');
+			  if (!testo) return;
+			  if (isGiocoSolo()) {
+			    const nome = GIOCHI_CONFIG[giocoSelezionato]?.nome || 'questo gioco';
+			    testo.textContent = `${nome} è solo allenamento: seleziona il gioco e poi clicca “Gioca” in Allenamento Solo.`;
+			    testo.style.color = '#f1c40f';
+			    return;
+			  }
+			  testo.textContent = 'Clicca sui nomi per selezionare più amici e sfidarli insieme!';
+			  testo.style.color = '';
+			}
+
+			function aggiornaListaAmiciDaCache() {
+			  if (window.amicizieSnapshotGlobal) {
+			    aggiornaListaAmici(window.amicizieSnapshotGlobal, window.presenzeDataGlobal || {});
+			  }
+			}
+
 			// FUNZIONE 1: Aggiorna lista amici
 			function aggiornaListaAmici(amicizieSnap, presenzeData) {
 			  const div = document.getElementById('lista-amici');
+			  aggiornaTestoSelezioneAmici();
 			  div.innerHTML = "";
+			  const giocoSolo = isGiocoSolo();
 			  const amiciSet = new Set();
 			  amicizieSnap.forEach(doc => {
 			    const d = doc.data();
@@ -1214,10 +1277,14 @@ function renderPartitaPictionary(p, div) {
 			    const isOnline = !!presenza.nome;
 			    const inPartita = presenza.inPartita || false;
 			    const disponibile = presenza.disponibile !== false;
-			    // ✅ NUOVO: Determina se è selezionabile
-			    const isSelezionabile = isOnline && disponibile && !inPartita;
+			    // ✅ Determina se è selezionabile: i giochi solo allenamento non permettono sfide ad amici
+			    const isSelezionabile = !giocoSolo && isOnline && disponibile && !inPartita;
 			    let statoIcon, statoColor, statoText;
-			    if (!isOnline) {
+			    if (giocoSolo) {
+			      statoIcon = '🚫';
+			      statoColor = '#f1c40f';
+			      statoText = 'Disabilitato: gioco solo allenamento';
+			    } else if (!isOnline) {
 			      statoIcon = '⚫';
 			      statoColor = '#555';
 			      statoText = 'Offline';
@@ -1234,16 +1301,16 @@ function renderPartitaPictionary(p, div) {
 			      statoColor = '#2ecc71';
 			      statoText = 'Disponibile';
 			    }
-			    const isSel = amiciSelezionati.has(nomeAmico);
-			    // ✅ NUOVO: Se non selezionabile e era selezionato, rimuovilo
+			    // ✅ Se non selezionabile e era selezionato, rimuovilo
 			    if (!isSelezionabile && amiciSelezionati.has(nomeAmico)) {
 			      amiciSelezionati.delete(nomeAmico);
 			      aggiornaBottoneSfida();
 			    }
+			    const isSel = amiciSelezionati.has(nomeAmico);
 			    div.innerHTML += `
-			      
-											<div class="user-item ${isSel ? 'selected' : ''}" 
-			           onclick="${isSelezionabile ? `toggleAmico('${nomeAmico}', this)` : 'mostraMessaggioNonDisponibile()'}" 
+
+											<div class="user-item ${isSel ? 'selected' : ''}"
+			           onclick="${isSelezionabile ? `toggleAmico('${nomeAmico}', this)` : 'mostraMessaggioNonDisponibile()'}"
 			           style="opacity: ${isSelezionabile ? 1 : 0.5}; cursor: ${isSelezionabile ? 'pointer' : 'not-allowed'};">
 												<div style="display:flex; align-items:center; gap:10px;">
 													<span style="font-size:1.2rem;">${statoIcon}</span>
@@ -1273,8 +1340,14 @@ function renderPartitaPictionary(p, div) {
 			    }
 			  });
 			}
-			
+
 			function toggleAmico(nome, el) {
+			  if (isGiocoSolo()) {
+			    amiciSelezionati.clear();
+			    aggiornaBottoneSfida();
+			    mostraToast('🎯 Questo gioco è disponibile solo in Allenamento Solo');
+			    return;
+			  }
 			  if (amiciSelezionati.has(nome)) {
 			    amiciSelezionati.delete(nome);
 			    el.classList.remove('selected');
@@ -1287,6 +1360,11 @@ function renderPartitaPictionary(p, div) {
 			// ✅ NUOVA FUNZIONE: Aggiorna il bottone sfida
 			function aggiornaBottoneSfida() {
 			  const btn = document.getElementById('btn-sfida-multipla');
+			  if (isGiocoSolo()) {
+			    amiciSelezionati.clear();
+			    btn.style.display = 'none';
+			    return;
+			  }
 			  if (amiciSelezionati.size > 0) {
 			    btn.style.display = 'block';
 			    btn.textContent = `SFIDA ${amiciSelezionati.size} AMICI ⚔️`;
@@ -1298,7 +1376,7 @@ function renderPartitaPictionary(p, div) {
 			function mostraMessaggioNonDisponibile() {
 			  // Toast leggero invece di alert fastidioso
 			  const toast = document.createElement('div');
-			  toast.textContent = '❌ Giocatore non disponibile';
+			  toast.textContent = isGiocoSolo() ? '🎯 Questo gioco è disponibile solo in Allenamento Solo' : '❌ Giocatore non disponibile';
 			  toast.style.cssText = `
 			  position: fixed;
 			  bottom: 20px;
@@ -1315,16 +1393,24 @@ function renderPartitaPictionary(p, div) {
 			  document.body.appendChild(toast);
 			  setTimeout(() => toast.remove(), 2000);
 			}
-			
+
 			function selezionaGioco(g, el) {
 			  giocoSelezionato = g;
 			  document.querySelectorAll('.game-card').forEach(c => c.classList.remove('selected'));
 			  el.classList.add('selected');
-			  
+
+			  if (isGiocoSolo()) {
+			    amiciSelezionati.clear();
+			    document.querySelectorAll('.user-item.selected').forEach(item => item.classList.remove('selected'));
+			    removeGameBanner();
+			  }
+			  aggiornaBottoneSfida();
+			  aggiornaListaAmiciDaCache();
+
 			  // ✅ Aggiorna il pulsante Allenamento Solo
 			  aggiornaAllenamentoSolo();
 			}
-			
+
 			// ✅ Nuova funzione per aggiornare l'allenamento solo
 			function aggiornaAllenamentoSolo() {
 			  const config = GIOCHI_CONFIG[giocoSelezionato];
@@ -1334,9 +1420,16 @@ function renderPartitaPictionary(p, div) {
 			    allenamentoDiv.querySelector('span').textContent = `🎯 Allenamento Solo (${config.nome})`;
 			  }
 			}
-			
+
 			function apriModalSfida() {
 			  const config = GIOCHI_CONFIG[giocoSelezionato];
+			  if (isGiocoSolo()) {
+			    amiciSelezionati.clear();
+			    aggiornaBottoneSfida();
+			    aggiornaListaAmiciDaCache();
+			    mostraToast('🎯 Questo gioco è disponibile solo in Allenamento Solo');
+			    return;
+			  }
 			  if (!config) {
 			    mostraToast('❌ Gioco non configurato');
 			    return;
@@ -1367,7 +1460,7 @@ function renderPartitaPictionary(p, div) {
 			  banner.className = 'game-banner';
 			  banner.style.background = 'linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%)';
 			  banner.innerHTML = `
-			  
+
 											<div class="banner-left">
 												<span style="font-size:1.5rem;">${config.icona}</span>
 												<div>
@@ -1378,18 +1471,18 @@ function renderPartitaPictionary(p, div) {
 											<div class="banner-right">
 			      ${opzioniHtml}
 			      ${modalitaHtml}
-			      
+
 												<button class="btn-banner btn-cancel-banner" onclick="chiudiBannerSfida()">✖️</button>
 											</div>
 			`;
 			  document.body.appendChild(banner);
 			}
-			
+
 			function removeGameBanner() {
 			  const existing = document.getElementById('game-banner');
 			  if (existing) existing.remove();
 			}
-			
+
 			function chiudiBannerSfida() {
 			  removeGameBanner();
 			  // ✅ Deseleziona tutti gli amici
@@ -1400,7 +1493,7 @@ function renderPartitaPictionary(p, div) {
 			async function creaPartitaDaBanner(modalitaId) {
 			    const config = GIOCHI_CONFIG[giocoSelezionato];
 			    if (!config) return;
-			    
+
 			    // Raccogli opzioni dinamicamente
 			    const opzioni = { mode: modalitaId };
 			    config.opzioni.forEach(opt => {
@@ -1410,12 +1503,12 @@ function renderPartitaPictionary(p, div) {
 			            localStorage.setItem(`ultimo_${giocoSelezionato}_${opt.id}`, el.value);
 			        }
 			    });
-			    
+
 			    // Aggiungi seed
 			    opzioni.seed = Math.random().toString(36).substring(7).toUpperCase();
-			    
+
 			    const partecipanti = [mioNome, ...Array.from(amiciSelezionati)];
-			    
+
 			    // Validazione
 			    if (partecipanti.length < config.minGiocatori) {
 			        mostraToast(`❌ Servono almeno ${config.minGiocatori} giocatori`);
@@ -1428,21 +1521,21 @@ function renderPartitaPictionary(p, div) {
 // ✅ GESTIONE SPECIFICA PER PICTIONARY (CORRETTA)
 if (giocoSelezionato === 'pictionary') {
     showLoadingBanner('Creazione sfida Pictionary...');
-    
+
     try {
         const roomCode = Math.random().toString(36).substring(2, 7).toUpperCase();
-        
+
         // ✅ Determina il numero di round in base alla modalità
-        const numRounds = modalitaId === 'guessit' 
+        const numRounds = modalitaId === 'guessit'
             ? partecipanti.length * 2
             : partecipanti.length;
-        
+
         // ✅ CREA LA ROOM
         await db.collection("pictionary_rooms").doc(roomCode).set({
             host: mioNome,
             players: partecipanti,
             ready: [],
-            settings: { 
+            settings: {
                 mode: modalitaId,
                 timePerRound: parseInt(opzioni.timePerRound || 60)
             },
@@ -1458,23 +1551,23 @@ if (giocoSelezionato === 'pictionary') {
             dataOra: new Date().toLocaleString('it-IT'),
             sfidaDiretta: true
         });
-        
+
         console.log(`✅ Room Pictionary creata: ${roomCode}`);
-        
+
         // Salva ultima modalità
         localStorage.setItem('ultimo_pictionary_mode', modalitaId);
-        
+
         // ✅ ASPETTA 500ms prima del redirect (evita race condition)
         setTimeout(() => {
             // Deseleziona amici
             amiciSelezionati.clear();
             document.querySelectorAll('.user-item.selected').forEach(el => el.classList.remove('selected'));
             aggiornaBottoneSfida();
-            
+
             // Redirect
             window.location.href = gameHref('pictionary', 'room=' + roomCode);
         }, 500);
-        
+
     } catch (e) {
         console.error("❌ Errore creazione Pictionary:", e);
         removeGameBanner();
@@ -1482,7 +1575,7 @@ if (giocoSelezionato === 'pictionary') {
     }
     return;
 }
-			    
+
     // ✅ CONTINUA CON LA LOGICA NORMALE PER GLI ALTRI GIOCHI
     let pIniziali = {};
     let paroleIniziali = {};
@@ -1490,9 +1583,9 @@ if (giocoSelezionato === 'pictionary') {
 			        pIniziali[p] = 0;
 			        paroleIniziali[p] = [];
 			    });
-			    
+
 			    showLoadingBanner('Creazione sfida...');
-			    
+
 			    try {
 			        const doc = await db.collection("partite").add({
 			            gioco: giocoSelezionato,
@@ -1514,12 +1607,12 @@ if (giocoSelezionato === 'pictionary') {
 			            timestamp: Date.now(),
 			            opzioni: opzioni
 			        });
-			        
+
 			        // Deseleziona amici
 			        amiciSelezionati.clear();
 			        document.querySelectorAll('.user-item.selected').forEach(el => el.classList.remove('selected'));
 			        aggiornaBottoneSfida();
-			        
+
 			        // Mostra conferma
 			        showSuccessBanner(doc.id);
 			    } catch (e) {
@@ -1528,7 +1621,7 @@ if (giocoSelezionato === 'pictionary') {
 			        mostraToast('❌ Errore creazione sfida');
 			    }
 			}
-			
+
 			function showLoadingBanner(messaggio) {
 			  removeGameBanner();
 			  // Aggiungi animazione spin se non esiste
@@ -1543,7 +1636,7 @@ if (giocoSelezionato === 'pictionary') {
 			  banner.className = 'game-banner';
 			  banner.style.background = 'linear-gradient(135deg, #3498db 0%, #2980b9 100%)';
 			  banner.innerHTML = `
-			  
+
 											<div class="banner-left">
 												<span style="font-size:1.5rem;">⏳</span>
 												<div>
@@ -1557,7 +1650,7 @@ if (giocoSelezionato === 'pictionary') {
 			`;
 			  document.body.appendChild(banner);
 			}
-			
+
 			function showSuccessBanner(partitaId) {
 			  removeGameBanner();
 			  const banner = document.createElement('div');
@@ -1565,7 +1658,7 @@ if (giocoSelezionato === 'pictionary') {
 			  banner.className = 'game-banner';
 			  banner.style.background = 'linear-gradient(135deg, #27ae60 0%, #1e8449 100%)';
 			  banner.innerHTML = `
-			  
+
 											<div class="banner-left">
 												<span style="font-size:1.5rem;">✅</span>
 												<div>
@@ -1599,14 +1692,14 @@ if (giocoSelezionato === 'pictionary') {
 			      div.innerHTML += `
 											<div class="history-item">
 												<span>${p.dataOra} - ${p.gioco.toUpperCase()}</span>
-												<span>Vinto da: 
+												<span>Vinto da:
 													<b>${vincitore}</b>
 												</span>
 											</div>`;
 			    });
 			  });
 			}
-			
+
 			function addFriend(n) {
 			  db.collection("amicizie").doc(mioNome + "_" + n).set({
 			    da: mioNome,
@@ -1638,7 +1731,7 @@ if (giocoSelezionato === 'pictionary') {
 			    console.error("Errore annullamento:", e);
 			  }
 			}
-			
+
 			function mostraToast(messaggio) {
 			  const toast = document.createElement('div');
 			  toast.textContent = messaggio;
@@ -1658,7 +1751,7 @@ if (giocoSelezionato === 'pictionary') {
 			  document.body.appendChild(toast);
 			  setTimeout(() => toast.remove(), 2000);
 			}
-			
+
 			function logout() {
 			  localStorage.clear();
 			  window.location.reload();
@@ -1845,7 +1938,7 @@ if (giocoSelezionato === 'pictionary') {
 			    const heightPercent = (day.count / maxCount) * 100;
 			    const barClass = day.isToday ? 'bar today' : 'bar';
 			    return `
-			      
+
 											<div class="day-bar">
 												<div class="count">${day.count}</div>
 												<div class="${barClass}" style="height: ${Math.max(heightPercent, 5)}%;"></div>
@@ -1883,7 +1976,7 @@ if (giocoSelezionato === 'pictionary') {
 			});
 			// Aggiorna ogni minuto (per aggiornare "oggi" se cambia giorno)
 			setInterval(aggiornaStatsUI, 60000);
-			
+
 			function resetTutteLeStatistiche() {
 			  if (!confirm("⚠️ ATTENZIONE!\n\nQuesta azione cancellerà TUTTE le statistiche:\n- Partite giocate\n- Punteggi\n- Achievement\n- Storico\n\nSei sicuro?")) return;
 			  // Cancella statistiche Ruzzle
@@ -1893,7 +1986,7 @@ if (giocoSelezionato === 'pictionary') {
 			  alert("✅ Statistiche azzerate!");
 			  location.reload();
 			}
-			
+
 			function toggleDisponibilita() {
 			  const attuale = localStorage.getItem('disponibile') !== 'false';
 			  const nuovo = !attuale;
@@ -1901,7 +1994,7 @@ if (giocoSelezionato === 'pictionary') {
 			  aggiornaUIDisponibilita();
 			  aggiornaPresenza(); // Aggiorna Firebase
 			}
-			
+
 			function aggiornaUIDisponibilita() {
 			  const disponibile = localStorage.getItem('disponibile') !== 'false';
 			  const btn = document.getElementById('btn-disponibilita');

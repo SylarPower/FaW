@@ -8,6 +8,22 @@ function makeCode(n = 4) {
   return s;
 }
 
+export function codeFromSeed(seed, n = 6) {
+  let h = 2166136261;
+  const txt = String(seed || "PONG");
+  for (let i = 0; i < txt.length; i++) {
+    h ^= txt.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  let x = h >>> 0;
+  let s = "";
+  for (let i = 0; i < n; i++) {
+    x = (Math.imul(x, 1664525) + 1013904223) >>> 0;
+    s += ALPH[x % ALPH.length];
+  }
+  return s;
+}
+
 function uid() {
   const k = "pong-nl-uid";
   let id = localStorage.getItem(k);
@@ -70,19 +86,21 @@ export const net = {
     return this.fb.ref(this.db, `rooms/${code}${path ? "/" + path : ""}`);
   },
 
-  async create({ mode, arenaId, nick, seats }) {
+  async create({ mode, arenaId, nick, seats, codeHint = null, settings = {} }) {
     await this.init();
     if (!this.ready) throw new Error("Firebase non configurato");
     this.leave();
-    let code = makeCode();
+    let code = codeHint ? String(codeHint).toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6) : makeCode();
+    if (code.length < 4) code = codeFromSeed(codeHint || Date.now());
     for (let i = 0; i < 6; i++) {
       const snap = await this.fb.get(this.roomRef(code));
       if (!snap.exists()) break;
+      if (codeHint) throw new Error("Stanza già esistente");
       code = makeCode();
     }
     const now = Date.now();
     const room = {
-      meta: { mode, arenaId, host: this.me, seats, status: "lobby", created: now, beat: now },
+      meta: { mode, arenaId, host: this.me, seats, status: "lobby", created: now, beat: now, settings },
       players: {
         0: { id: this.me, nick: nick || "Blu", slot: 0, cpu: false, in: true }
       },

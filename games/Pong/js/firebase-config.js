@@ -1,19 +1,15 @@
 /**
- * Incolla qui la config Web del tuo progetto Firebase.
- * Console → Impostazioni progetto → Le tue app → SDK snippiet.
- * Serve Realtime Database (non solo Firestore).
- *
- * Finché apiKey inizia con YOUR_ il gioco resta in locale
- * (vs CPU e triangolo vs 2 CPU). Online si attiva da solo.
+ * Config Web del progetto Firebase usato anche dagli altri giochi FaW.
+ * Pong usa Realtime Database per le stanze online.
  */
 export const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT.firebaseapp.com",
-  databaseURL: "https://YOUR_PROJECT-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "YOUR_PROJECT",
-  storageBucket: "YOUR_PROJECT.appspot.com",
-  messagingSenderId: "000000000000",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyCNo7o2Ft22JDEyJ97BspE3Kur5DNAPKQc",
+  authDomain: "funatwork-cd237.firebaseapp.com",
+  databaseURL: "https://funatwork-cd237-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "funatwork-cd237",
+  storageBucket: "funatwork-cd237.firebasestorage.app",
+  messagingSenderId: "798226885203",
+  appId: "1:798226885203:web:ce83f4d9e96b82266274a6"
 };
 
 export function isFirebaseConfigured() {
