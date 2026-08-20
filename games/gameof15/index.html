@@ -408,7 +408,7 @@
 
         <div style="margin:10px 0;" id="streak-container"></div>
 
-        <div>
+        <div id="solo-actions">
             <button class="btn btn-play" onclick="openModeSelect()">🎮 GIOCA</button>
             <button class="btn btn-shop" onclick="openShop()">🛒 NEGOZIO</button>
         </div>
@@ -424,12 +424,12 @@
 
         <p style="font-size:0.6rem; color:#aaa; margin-bottom:10px;">📐 DIMENSIONE GRIGLIA</p>
         <div class="mode-grid" id="size-select">
-            <div class="mode-card selected" data-size="3" onclick="selectSize(3, this)">
+            <div class="mode-card" data-size="3" onclick="selectSize(3, this)">
                 <div class="mode-icon">🟩</div>
                 <div class="mode-name">3×3</div>
                 <div class="mode-desc">8 TESSERE<br>FACILE</div>
             </div>
-            <div class="mode-card" data-size="4" onclick="selectSize(4, this)">
+            <div class="mode-card selected" data-size="4" onclick="selectSize(4, this)">
                 <div class="mode-icon">🟦</div>
                 <div class="mode-name">4×4</div>
                 <div class="mode-desc">15 TESSERE<br>CLASSICO</div>
@@ -521,8 +521,20 @@
         </div>
     </div>
 
+    <!-- ===== LOBBY MULTIPLAYER ===== -->
+    <div id="mp-lobby-screen" class="overlay-screen" style="display:none;">
+        <h2 style="color:#a78bfa; margin-bottom:8px;">🧩 SFIDA IN CORSO</h2>
+        <p style="font-size:0.7rem; color:#888; margin-bottom:18px;" id="mp-lobby-meta">In attesa dei giocatori</p>
+        <div id="mp-lobby-players" style="max-width:420px; width:90%; margin-bottom:20px;"></div>
+        <div>
+            <button class="btn btn-play" id="mp-ready-btn" onclick="toggleMpReady()">✅ SONO PRONTO</button>
+            <button class="btn" onclick="tornaHome()">⬅ ESCI</button>
+        </div>
+    </div>
+
     <!-- ===== AREA PUZZLE ===== -->
     <div id="puzzle-container">
+        <div id="puzzle-board"></div>
         <div id="preview-toggle">
             <button class="btn btn-small" onmousedown="showPreview()" onmouseup="hidePreview()" ontouchstart="showPreview()" ontouchend="hidePreview()">
                 👁️ TIENI PREMUTO PER ANTEPRIMA
@@ -567,6 +579,9 @@ let gameDuration = 180;
 let timeRemaining = 180;
 let mpTimerInterval = null;
 let unsubscribePartita = null;
+let matchSeed = null;
+let matchData = null;
+let mpReadyBusy = false;
 
 if (matchId && mioNome) {
     isMultiplayer = true;
@@ -574,20 +589,89 @@ if (matchId && mioNome) {
     unsubscribePartita = db.collection("partite").doc(matchId).onSnapshot(doc => {
         const data = doc.data();
         if (!data) return;
-        if (data.opzioni && data.opzioni.durata) {
-            gameDuration = parseInt(data.opzioni.durata);
-            timeRemaining = gameDuration;
+        matchData = data;
+        if (data.opzioni) {
+            if (data.opzioni.durata) {
+                gameDuration = parseInt(data.opzioni.durata);
+                timeRemaining = gameDuration;
+            }
+            if (data.opzioni.griglia) selectedSize = parseInt(data.opzioni.griglia) || selectedSize;
+            if (data.opzioni.mode) selectedType = data.opzioni.mode;
+            if (data.opzioni.seed) matchSeed = data.opzioni.seed;
+        }
+        if (data.stato === "conclusa" && gameActive) {
+            winGame(true);
+            return;
         }
         if (data.stato === "in_corso" && !gameActive) {
-            document.getElementById('start-screen').style.display = 'none';
-            openModeSelect();
+            hideAllScreens();
+            startGame();
+            return;
+        }
+        if (!gameActive && data.stato !== "conclusa") {
+            renderMpLobby(data);
         }
     });
 }
 
 function tornaHome() {
     if (unsubscribePartita) unsubscribePartita();
-    window.location.href = 'index.html';
+    window.location.href = '../../index.html';
+}
+
+function renderMpLobby(data) {
+    hideAllScreens();
+    const screen = document.getElementById('mp-lobby-screen');
+    screen.style.display = 'flex';
+    document.getElementById('solo-actions').style.display = 'none';
+
+    const size = (data.opzioni && data.opzioni.griglia) || selectedSize;
+    const mode = (data.opzioni && data.opzioni.mode) || selectedType;
+    const durata = (data.opzioni && data.opzioni.durata) || gameDuration;
+    const modeLabel = { numbers: 'Numeri', image: 'Immagine', emoji: 'Emoji' }[mode] || mode;
+    document.getElementById('mp-lobby-meta').textContent =
+        `${size}×${size} • ${modeLabel} • ${Math.round(durata / 60)} min`;
+
+    const pronti = data.pronti || [];
+    const list = document.getElementById('mp-lobby-players');
+    list.innerHTML = (data.partecipanti || []).map(n => {
+        const ready = pronti.includes(n);
+        return `<div style="display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,0.05);padding:12px 16px;border-radius:10px;margin:6px 0;border:1px solid ${ready ? '#22c55e' : 'rgba(255,255,255,0.08)'};">
+            <span>${n === mioNome ? '👤 ' : ''}${n}</span>
+            <span style="color:${ready ? '#22c55e' : '#888'};font-size:0.7rem;">${ready ? '✅ PRONTO' : '⏳ IN ATTESA'}</span>
+        </div>`;
+    }).join('');
+
+    const meReady = pronti.includes(mioNome);
+    const btn = document.getElementById('mp-ready-btn');
+    btn.textContent = meReady ? '⏸️ ANNULLA' : '✅ SONO PRONTO';
+}
+
+async function toggleMpReady() {
+    if (!matchId || mpReadyBusy) return;
+    mpReadyBusy = true;
+    try {
+        const snap = await db.collection("partite").doc(matchId).get();
+        const data = snap.data();
+        if (!data || data.stato === 'in_corso') return;
+        const pronti = data.pronti || [];
+        const meReady = pronti.includes(mioNome);
+        await db.collection("partite").doc(matchId).update({
+            pronti: meReady
+                ? firebase.firestore.FieldValue.arrayRemove(mioNome)
+                : firebase.firestore.FieldValue.arrayUnion(mioNome)
+        });
+        const fresh = await db.collection("partite").doc(matchId).get();
+        const d = fresh.data();
+        const allReady = (d.partecipanti || []).every(n => (d.pronti || []).includes(n));
+        if (allReady && (d.partecipanti || []).length > 0) {
+            await db.collection("partite").doc(matchId).update({ stato: 'in_corso' });
+        }
+    } catch (e) {
+        console.error(e);
+    } finally {
+        mpReadyBusy = false;
+    }
 }
 
 function registraPartita(gioco) {
@@ -924,20 +1008,36 @@ function isSolvable(flat, n) {
     }
 }
 
-function shuffleArray(arr) {
+function rngFromSeed(seed) {
+    let h = 1779033703;
+    const s = String(seed == null ? Math.random() : seed);
+    for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 597399067);
+    let a = h >>> 0;
+    return function () {
+        a |= 0; a = a + 0x6D2B79F5 | 0;
+        let t = Math.imul(a ^ a >>> 15, 1 | a);
+        t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+        return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+}
+
+function shuffleArray(arr, rng) {
+    const r = rng || Math.random;
     for (let i = arr.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
+        const j = Math.floor(r() * (i + 1));
         [arr[i], arr[j]] = [arr[j], arr[i]];
     }
 }
 
-function generateBoard(n) {
+function generateBoard(n, seed) {
+    const rng = rngFromSeed(seed != null ? seed : (Date.now() + ':' + Math.random()));
     let flat = [];
     for (let i = 0; i < n * n; i++) flat.push(i);
     let attempts = 0;
     do {
-        shuffleArray(flat);
+        shuffleArray(flat, rng);
         attempts++;
+        if (attempts > 800) break;
     } while (!isSolvable(flat, n) || isSolved(flat, n));
 
     board = [];
@@ -1396,7 +1496,7 @@ function hidePreview() {
 // 🔀 SHUFFLE
 // ============================================
 function shuffleBoard() {
-    if (!gameActive) return;
+    if (!gameActive || isMultiplayer) return;
     if (!confirm('Rimescolare? Le mosse verranno azzerate.')) return;
     moves = 0;
     hintsUsed = 0;
@@ -1441,12 +1541,14 @@ function closeModeSelect() {
 }
 
 function hideAllScreens() {
-    ['start-screen','mode-screen','shop-screen','win-screen','stats-screen'].forEach(id => {
-        document.getElementById(id).style.display = 'none';
+    ['start-screen','mode-screen','shop-screen','win-screen','stats-screen','mp-lobby-screen'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = 'none';
     });
 }
 
 function startGame() {
+    if (gameActive) return;
     hideAllScreens();
 
     // Calculate tile size based on viewport
@@ -1458,13 +1560,15 @@ function startGame() {
     hintsUsed = 0;
     previewVisible = false;
 
-    generateBoard(selectedSize);
+    generateBoard(selectedSize, isMultiplayer ? (matchSeed || matchId) : null);
 
     document.getElementById('ui-layer').style.display = 'block';
     document.getElementById('hud-right').style.display = 'block';
     document.getElementById('game-buttons').style.display = 'flex';
     document.getElementById('puzzle-container').style.display = 'block';
-    document.getElementById('fixed-home-btn').style.display = 'none';
+    document.getElementById('fixed-home-btn').style.display = isMultiplayer ? 'block' : 'none';
+    const shuffleBtn = document.querySelector('#game-buttons button[onclick="shuffleBoard()"]');
+    if (shuffleBtn) shuffleBtn.style.display = isMultiplayer ? 'none' : '';
 
     const recordKey = `${selectedSize}_${selectedType}`;
     const rec = saveData.records[recordKey];
@@ -1566,8 +1670,7 @@ async function winGame() {
     document.getElementById('win-record').style.display = isNewRecord ? 'block' : 'none';
 
     // Multiplayer results
-    if (isMultiplayer && matchId && mioNome) {
-        // Score: lower moves = better. We send a "score" inversely proportional
+    if (isMultiplayer && matchId && mioNome && !fromRemote) {
         const mpScore = solved ? Math.max(1, 10000 - moves * 10 - elapsedSeconds) : 0;
         await db.collection("partite").doc(matchId).update({
             [`punteggi.${mioNome}`]: mpScore,
@@ -1584,7 +1687,20 @@ async function winGame() {
             });
             document.getElementById('results-list').innerHTML = html;
             document.getElementById('multiplayer-results').style.display = 'block';
+            const finiti = data.finito || [];
+            if ((data.partecipanti || []).every(n => finiti.includes(n))) {
+                await db.collection("partite").doc(matchId).update({ stato: 'conclusa' });
+            }
         }
+    } else if (isMultiplayer && matchData && matchData.punteggi) {
+        const classifica = Object.entries(matchData.punteggi).sort((a,b) => b[1]-a[1]);
+        let html = '';
+        classifica.forEach(([nome, punti], idx) => {
+            const medal = idx===0?'🥇':idx===1?'🥈':idx===2?'🥉':`${idx+1}.`;
+            html += `<div style="margin:5px 0;">${medal} ${nome}: ${punti} pt</div>`;
+        });
+        document.getElementById('results-list').innerHTML = html;
+        document.getElementById('multiplayer-results').style.display = 'block';
     }
 
     if (solved) spawnConfetti(100);
@@ -1795,7 +1911,7 @@ function drawBg() {
     for (let x = 0; x < bgCanvas.width; x += 60) {
         bgCtx.beginPath(); bgCtx.moveTo(x, 0); bgCtx.lineTo(x, bgCanvas.height); bgCtx.stroke();
     }
-    for (let y = 0; y < bgCanvas.height; y += 60) {
+        for (let y = 0; y < bgCanvas.height; y += 60) {
         bgCtx.beginPath(); bgCtx.moveTo(0, y); bgCtx.lineTo(bgCanvas.width, y); bgCtx.stroke();
     }
 
@@ -1816,6 +1932,10 @@ drawBg();
 updateWalletUI();
 showMainRecords();
 document.getElementById('fixed-home-btn').style.display = 'block';
+if (isMultiplayer) {
+    const solo = document.getElementById('solo-actions');
+    if (solo) solo.style.display = 'none';
+}
 </script>
 </body>
 </html>

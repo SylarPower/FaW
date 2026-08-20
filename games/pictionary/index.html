@@ -1725,21 +1725,35 @@ const THEMES_DATABASE = {
 // FUNZIONE PER OTTENERE TEMA + CATEGORIA
 // ========================================
 
+const CATEGORY_LABELS = {
+    allPlay: '🎭 Concetto',
+    difficult: '💀 Difficile',
+    actions: '🏃 Azione',
+    personPlaceAnimal: '👤 Persona / Luogo / Animale',
+    objects: '📦 Oggetto',
+    funny: '🤪 Bonus'
+};
+
 function getRandomTheme() {
-    // Ottieni tutte le categorie
     const categories = Object.keys(THEMES_DATABASE);
-    
-    // Scegli categoria casuale
     const category = categories[Math.floor(Math.random() * categories.length)];
-    
-    // Scegli parola casuale dalla categoria
     const words = THEMES_DATABASE[category];
     const word = words[Math.floor(Math.random() * words.length)];
-    
     return {
         word: word,
-        category: category
+        category: CATEGORY_LABELS[category] || category
     };
+}
+
+function normalizeGuess(s) {
+    return String(s || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toUpperCase()
+        .replace(/[^A-Z0-9 ]/g, ' ')
+        .replace(/\b(UN|UNA|UNO|IL|LO|LA|I|GLI|LE|L|THE|A|AN)\b/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
 }
 
 // ✅ Array THEMES per compatibilità (flatten di tutto)
@@ -1948,7 +1962,7 @@ function handleRoomUpdate(doc) {
         document.getElementById('loading-screen').innerHTML = `
             <div style="text-align: center; padding: 40px;">
                 <h2 style="color: #f39c12;">⚠️ Room Eliminata</h2>
-                <button onclick="window.location.href='index.html'" 
+                <button onclick="window.location.href='../../index.html'" 
                         style="padding: 15px 30px; background: #e94560; color: white; 
                                border: none; border-radius: 10px; cursor: pointer; margin-top: 20px;">
                     🏠 Torna alla Home
@@ -2173,6 +2187,9 @@ async function leaveRoom() {
 // ========================================
 async function startGame() {
     if (!state.isHost) return;
+    if (state.isAdvancing) return;
+    state.isAdvancing = true;
+    setTimeout(() => { state.isAdvancing = false; }, 2500);
     
     const data = state.roomData;
     const players = data.players;
@@ -2906,7 +2923,7 @@ async function playAgain() {
 }
 
 function goHome() {
-    window.location.href = 'index.html';
+    window.location.href = '../../index.html';
 }
 
 // ========================================
@@ -3292,19 +3309,22 @@ window.onload = async () => {
     console.log(`🎨 Pictionary: room=${roomCode}, user=${mioNome}`);
     
     // ✅ VALIDAZIONE SENZA REDIRECT AUTOMATICO
-    if (!roomCode || !mioNome) {
+    if (!mioNome) {
         document.getElementById('loading-screen').innerHTML = `
             <div style="text-align: center; padding: 40px;">
-                <h2 style="color: #e94560;">❌ Errore</h2>
-                <p>${!roomCode ? 'Room mancante' : 'Devi fare il login'}</p>
-                <button onclick="window.location.href='index.html'" 
+                <h2 style="color: #e94560;">❌ Login richiesto</h2>
+                <button onclick="window.location.href='../../index.html'" 
                         style="padding: 15px 30px; background: #e94560; color: white; 
                                border: none; border-radius: 10px; cursor: pointer; margin-top: 20px;">
                     🏠 Torna alla Home
                 </button>
             </div>
         `;
-        return; // ✅ STOP QUI, niente redirect automatico
+        return;
+    }
+    if (!roomCode) {
+        startPracticeMode(mioNome);
+        return;
     }
     
     state.playerName = mioNome;
@@ -3322,7 +3342,7 @@ window.onload = async () => {
                 <div style="text-align: center; padding: 40px;">
                     <h2 style="color: #e94560;">❌ Room Non Trovata</h2>
                     <p>La room "${roomCode}" non esiste</p>
-                    <button onclick="window.location.href='index.html'" 
+                    <button onclick="window.location.href='../../index.html'" 
                             style="padding: 15px 30px; background: #e94560; color: white; 
                                    border: none; border-radius: 10px; cursor: pointer; margin-top: 20px;">
                         🏠 Torna alla Home
@@ -3355,7 +3375,7 @@ window.onload = async () => {
             document.getElementById('loading-screen').innerHTML = `
                 <div style="text-align: center; padding: 40px;">
                     <h2 style="color: #f39c12;">⚠️ Partita già iniziata</h2>
-                    <button onclick="window.location.href='index.html'" 
+                    <button onclick="window.location.href='../../index.html'" 
                             style="padding: 15px 30px; background: #e94560; color: white; 
                                    border: none; border-radius: 10px; cursor: pointer; margin-top: 20px;">
                         🏠 Torna alla Home
@@ -3370,7 +3390,7 @@ window.onload = async () => {
             <div style="text-align: center; padding: 40px;">
                 <h2 style="color: #e94560;">❌ Errore</h2>
                 <p>${e.message}</p>
-                <button onclick="window.location.href='index.html'" 
+                <button onclick="window.location.href='../../index.html'" 
                         style="padding: 15px 30px; background: #e94560; color: white; 
                                border: none; border-radius: 10px; cursor: pointer; margin-top: 20px;">
                     🏠 Torna alla Home
@@ -3393,7 +3413,7 @@ function tornaHome() {
         clearInterval(timerInterval);
     }
     
-    window.location.href = 'index.html';
+    window.location.href = '../../index.html';
 }
 
 function showHomeButton() {
@@ -3502,13 +3522,12 @@ function handleGuessItPhase(data) {
 // GESTIONE VINCITORE ROUND
 if (gi.roundWinner && !guessIt.roundEndedLocally) {
     guessIt.roundEndedLocally = true;
-    
-    // Disabilita il disegno per il disegnatore
-    if (guessIt.isDrawer) {
-        disableDrawerCanvas();
-    }
-    
+    if (guessIt.isDrawer) disableDrawerCanvas();
     showRoundWinnerBanner(gi.roundWinner, gi.currentWord, gi.currentDrawer, data);
+} else if (gi.timeUp && !gi.roundWinner && !guessIt.roundEndedLocally) {
+    guessIt.roundEndedLocally = true;
+    if (guessIt.isDrawer) disableDrawerCanvas();
+    showTimeUpBanner(gi.currentWord, gi.currentDrawer, data);
 }
 }
 
@@ -4097,6 +4116,11 @@ function startGuessItTimer(seconds) {
                 const gi = state.roomData?.guessIt;
                 if (gi) {
                     showTimeUpBanner(gi.currentWord, gi.currentDrawer, state.roomData);
+                    if (guessIt.isDrawer || state.isHost) {
+                        db.collection("pictionary_rooms").doc(state.roomId).update({
+                            'guessIt.timeUp': true
+                        }).catch(() => {});
+                    }
                 }
             }
         }
@@ -4126,11 +4150,7 @@ async function submitGuessItAnswer() {
         return;
     }
     
-    const correctWord = gi.currentWord.toUpperCase().trim();
-    const userAnswer = answer.toUpperCase().trim();
-    
-    const normalize = (s) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim();
-    const isCorrect = normalize(userAnswer) === normalize(correctWord);
+    const isCorrect = normalizeGuess(answer) === normalizeGuess(gi.currentWord);
     
     const guessId = Date.now().toString();
     
@@ -4227,7 +4247,7 @@ async function advanceGuessItRound() {
             });
         } else {
         // Prossimo round
-        const playerOrder = gi.playerOrder || data.players;   // usa l'ordine salvato
+        const playerOrder = gi.playerOrder || freshData.players;
         const nextDrawerIdx = nextRound % playerOrder.length;
         const nextDrawer = playerOrder[nextDrawerIdx];
         
@@ -4243,7 +4263,8 @@ async function advanceGuessItRound() {
             'guessIt.roundWinner': null,
             'guessIt.roundWinnerPoints': null,
             'guessIt.roundDrawerPoints': null,
-            'guessIt.roundStartedAt': Date.now()
+            'guessIt.roundStartedAt': Date.now(),
+            'guessIt.timeUp': false
         });
         }
     } catch (e) {
@@ -4305,6 +4326,42 @@ function updateGuessItFeed(guesses, currentDrawer) {
     
     feed.scrollTop = 0;
 }
+
+function startPracticeMode(playerName) {
+    state.playerName = playerName;
+    state.roomId = null;
+    state.isHost = true;
+    const theme = getRandomTheme();
+    state.myCurrentTheme = theme.word;
+    state.receivedDrawing = null;
+    state.myChainId = 0;
+    showScreen('game-ui');
+    showHomeButton();
+    canvas = document.getElementById('mainCanvas');
+    ctx = canvas.getContext('2d', { willReadFrequently: true });
+    setupCanvas(canvas);
+    renderQuickColors();
+    currentColor = '#000000';
+    currentSize = 8;
+    currentTool = 'pen';
+    setTool('pen');
+    setColorFromPicker('#000000');
+    setSize(8);
+    const badge = document.getElementById('canvas-theme-badge');
+    if (badge) {
+        badge.innerHTML = `<div style="font-size:0.65rem;opacity:0.8;">${theme.category} • ALLENAMENTO</div><div>${theme.word}</div>`;
+    }
+    document.getElementById('ui-round-info').textContent = 'PRATICA';
+    document.getElementById('ui-player').textContent = playerName;
+    document.getElementById('timer').textContent = '∞';
+    attachCanvasListeners();
+    const doneBtn = document.querySelector('#game-ui .btn.btn-success');
+    if (doneBtn) {
+        doneBtn.textContent = '🎲 NUOVA PAROLA';
+        doneBtn.onclick = () => startPracticeMode(playerName);
+    }
+}
+
 </script>
 
 </body>
