@@ -1,78 +1,32 @@
 <!DOCTYPE html>
 <html lang="it">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>PONG</title>
-  <link rel="stylesheet" href="css/style.css">
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>PONG: NEXT LEVEL — Edizione Interna</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Tektur:wght@500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/",
+      "firebase/app": "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js",
+      "firebase/database": "https://www.gstatic.com/firebasejs/11.0.2/firebase-database.js"
+    }
+  }
+  </script>
 </head>
 <body>
-  <canvas id="game-canvas"></canvas>
-
-  <div class="hud">
-    <div class="score left" id="score-left">0</div>
-    <div class="score right" id="score-right">0</div>
+  <div id="app">
+    <canvas id="gl"></canvas>
+    <div id="vignette"></div>
+    <div id="scanlines"></div>
+    <div id="flash"></div>
+    <div id="ui"></div>
   </div>
-  <div class="meta" id="match-meta">PONG</div>
-
-  <div id="menu-screen" class="overlay">
-    <h1>PONG</h1>
-    <div class="subtitle">Focus at Work</div>
-    <div class="card" id="stats-box"></div>
-    <div class="mode-grid" id="versus-chips">
-      <button class="chip active" data-versus="cpu">VS CPU</button>
-      <button class="chip" data-versus="local2">2 GIOCATORI</button>
-    </div>
-    <div class="mode-grid">
-      <button class="chip active" data-mode="classic">CLASSICA</button>
-      <button class="chip" data-mode="power">POWER-UP</button>
-      <button class="chip" data-mode="hardcore">HARDCORE</button>
-    </div>
-    <div class="arena-grid" id="arena-chips"></div>
-    <label class="subtitle" for="target-score" style="letter-spacing:0.12em;">Punti vittoria</label>
-    <select id="target-score" style="margin-bottom:18px;background:#0c1020;color:#e8f6ff;border:1px solid rgba(0,255,200,0.35);padding:8px 12px;border-radius:8px;">
-      <option value="5">5</option>
-      <option value="7" selected>7</option>
-      <option value="11">11</option>
-      <option value="15">15</option>
-    </select>
-    <div class="btn-row">
-      <button class="btn primary" id="btn-play">GIOCA</button>
-    </div>
-  </div>
-
-  <div id="pause-screen" class="overlay hidden">
-    <h1>PAUSA</h1>
-    <div class="btn-row">
-      <button class="btn primary" id="btn-resume">RIPRENDI</button>
-      <button class="btn" id="btn-menu">MENU</button>
-    </div>
-  </div>
-
-  <div id="end-screen" class="overlay hidden">
-    <h1 id="end-title">FINE</h1>
-    <p id="end-sub" class="subtitle" style="letter-spacing:0.12em;"></p>
-    <div class="btn-row">
-      <button class="btn primary" id="btn-again">MENU</button>
-    </div>
-  </div>
-
-  <div id="home-btn"><button class="btn" type="button">🏠 HOME</button></div>
-
-  <script src="js/models.js"></script>
-  <script src="js/save.js"></script>
-  <script src="js/audio.js"></script>
-  <script src="js/particles.js"></script>
-  <script src="js/arenas.js"></script>
-  <script src="js/physics.js"></script>
-  <script src="js/powerups.js"></script>
-  <script src="js/ai.js"></script>
-  <script src="js/input.js"></script>
-  <script src="js/engine.js"></script>
-  <script src="js/ui.js"></script>
-  <script src="js/game.js"></script>
-  <script src="js/main.js"></script>
+  <script type="module" src="js/main.js"></script>
 </body>
 </html>
