@@ -6,84 +6,197 @@ function geo(key, fn) {
   return geoCache.get(key);
 }
 
-export function makePaddle(color, hw, hd, hh) {
+/**
+ * Racchetta coerente con il tema. Il gruppo `body` usa coordinate normalizzate
+ * e viene scalato da game.js: anche Allunga continua quindi a funzionare con
+ * scarponi, tronchi e barre classiche senza cambiare la hitbox.
+ */
+export function makePaddle(color, hw, hd, hh, theme = {}) {
   const g = new THREE.Group();
+  const style = theme.style || "neon";
   const mat = new THREE.MeshStandardMaterial({
     color,
-    metalness: 0.55,
-    roughness: 0.22,
+    metalness: theme.paddleMetalness ?? 0.55,
+    roughness: theme.paddleRoughness ?? 0.22,
     emissive: color,
-    emissiveIntensity: 0.22
+    emissiveIntensity: theme.paddleEmissive ?? 0.22
   });
-  const body = new THREE.Mesh(
-    geo("paddle", () => new THREE.BoxGeometry(1, 1, 1)),
-    mat
-  );
+  const body = new THREE.Group();
   body.scale.set(hw * 2, hh * 2, hd * 2);
-  body.castShadow = true;
-  body.receiveShadow = true;
   g.add(body);
 
-  const edge = new THREE.Mesh(
-    geo("paddleEdge", () => new THREE.BoxGeometry(1.08, 0.12, 1.02)),
-    new THREE.MeshStandardMaterial({
-      color: 0xffffff,
-      emissive: color,
-      emissiveIntensity: 1.4,
-      roughness: 0.2,
-      metalness: 0.1
-    })
-  );
-  edge.position.y = hh + 0.02;
-  edge.scale.set(hw * 2, 1, hd * 2);
-  g.add(edge);
+  if (style === "boot") {
+    // Tomaia, punta rialzata, suola, lacci e tacchetti: la barra e' davvero
+    // leggibile come uno scarpone, ma resta contenuta nella hitbox originale.
+    const leather = mat;
+    const soleMat = new THREE.MeshStandardMaterial({ color: 0x171717, roughness: 0.88 });
+    const laceMat = new THREE.MeshStandardMaterial({ color: 0xf4efe1, roughness: 0.7 });
+    const upper = new THREE.Mesh(new THREE.BoxGeometry(0.82, 0.58, 0.68), leather);
+    upper.position.set(0, 0.07, -0.12);
+    const heel = new THREE.Mesh(new THREE.BoxGeometry(0.76, 0.82, 0.3), leather);
+    heel.position.set(0, 0.18, -0.36);
+    const toe = new THREE.Mesh(new THREE.SphereGeometry(0.5, 16, 10), leather);
+    toe.scale.set(0.88, 0.42, 0.7);
+    toe.position.set(0, -0.02, 0.32);
+    const sole = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.13, 0.94), soleMat);
+    sole.position.y = -0.4;
+    body.add(upper, heel, toe, sole);
+    for (let i = 0; i < 3; i++) {
+      const lace = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.035, 0.045), laceMat);
+      lace.position.set(0, 0.4, -0.08 + i * 0.13);
+      body.add(lace);
+    }
+    for (const x of [-0.28, 0.28]) {
+      for (const z of [-0.3, 0.05, 0.32]) {
+        const stud = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.075, 0.16, 8), soleMat);
+        stud.position.set(x, -0.51, z);
+        body.add(stud);
+      }
+    }
+  } else if (style === "jungle") {
+    const bark = mat;
+    const dark = new THREE.MeshStandardMaterial({ color: 0x3a2415, roughness: 1 });
+    const vine = new THREE.MeshStandardMaterial({ color: 0x4c7a32, roughness: 0.95 });
+    const log = new THREE.Mesh(new THREE.CylinderGeometry(0.44, 0.5, 1, 10), bark);
+    log.rotation.x = Math.PI / 2;
+    body.add(log);
+    for (const z of [-0.32, 0.28]) {
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.47, 0.045, 6, 14), z < 0 ? dark : vine);
+      ring.position.z = z;
+      body.add(ring);
+    }
+    for (const [x, y, z] of [[0.38, 0.25, -0.05], [-0.35, 0.2, 0.18]]) {
+      const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 6), vine);
+      leaf.scale.set(0.55, 0.3, 1.25);
+      leaf.position.set(x, y, z);
+      body.add(leaf);
+    }
+  } else {
+    const block = new THREE.Mesh(geo("paddle", () => new THREE.BoxGeometry(1, 1, 1)), mat);
+    body.add(block);
+    const edge = new THREE.Mesh(
+      geo("paddleEdge", () => new THREE.BoxGeometry(1.08, 0.12, 1.02)),
+      new THREE.MeshStandardMaterial({
+        color: style === "mono" ? 0x2b2b2b : 0xffffff,
+        emissive: color,
+        emissiveIntensity: theme.edgeGlow ?? 1.4,
+        roughness: style === "ice" ? 0.1 : 0.52,
+        metalness: style === "ice" ? 0.08 : 0
+      })
+    );
+    edge.position.y = 0.54;
+    body.add(edge);
+  }
 
+  body.traverse((o) => {
+    if (o.isMesh) {
+      o.castShadow = true;
+      o.receiveShadow = true;
+    }
+  });
   g.userData.body = body;
   g.userData.mat = mat;
+  g.userData.baseEmissive = theme.paddleEmissive ?? 0.22;
   return g;
 }
 
-export function makeBall(color = 0xffffff, r = 0.22) {
+export function makeBall(color = 0xffffff, r = 0.22, theme = {}) {
   const mat = new THREE.MeshStandardMaterial({
     color,
-    metalness: 0.65,
-    roughness: 0.18,
+    metalness: theme.ballMetalness ?? 0.65,
+    roughness: theme.ballRoughness ?? 0.18,
     emissive: color,
-    emissiveIntensity: 0.18
+    emissiveIntensity: theme.ballEmissive ?? 0.18
   });
   const mesh = new THREE.Mesh(geo("ball", () => new THREE.SphereGeometry(1, 24, 18)), mat);
   mesh.scale.setScalar(r);
   mesh.castShadow = true;
-  const light = new THREE.PointLight(color, 1.6, 6, 2);
+  const lightBase = theme.ballLight ?? 1.6;
+  const light = new THREE.PointLight(color, lightBase, 6, 2);
   mesh.add(light);
   mesh.userData.light = light;
+  mesh.userData.lightBase = lightBase;
   mesh.userData.mat = mat;
   return mesh;
 }
 
+const surfaceTextures = new Map();
+function surfaceTexture(style) {
+  if (!["jungle", "boot", "retro"].includes(style)) return null;
+  if (surfaceTextures.has(style)) return surfaceTextures.get(style);
+  const S = 256;
+  const cvs = document.createElement("canvas");
+  cvs.width = cvs.height = S;
+  const c = cvs.getContext("2d");
+
+  if (style === "retro") {
+    c.fillStyle = "#626262";
+    c.fillRect(0, 0, S, S);
+    c.strokeStyle = "rgba(210,255,220,.24)";
+    c.lineWidth = 2;
+    for (let x = 0; x <= S; x += 32) { c.beginPath(); c.moveTo(x, 0); c.lineTo(x, S); c.stroke(); }
+    for (let y = 0; y <= S; y += 32) { c.beginPath(); c.moveTo(0, y); c.lineTo(S, y); c.stroke(); }
+  } else {
+    c.fillStyle = style === "boot" ? "#a8c59d" : "#a3b68b";
+    c.fillRect(0, 0, S, S);
+    if (style === "boot") {
+      for (let x = 0; x < S; x += 64) {
+        c.fillStyle = (x / 64) % 2 ? "rgba(35,75,35,.14)" : "rgba(255,255,220,.05)";
+        c.fillRect(x, 0, 32, S);
+      }
+    }
+    // Tratti corti e irregolari: a distanza sembrano fili d'erba e non una
+    // superficie plastica riflettente.
+    let seed = style === "boot" ? 91 : 37;
+    const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
+    for (let i = 0; i < 900; i++) {
+      const x = rnd() * S, y = rnd() * S;
+      c.strokeStyle = rnd() > 0.5 ? "rgba(24,68,24,.2)" : "rgba(235,245,190,.12)";
+      c.lineWidth = 1;
+      c.beginPath(); c.moveTo(x, y); c.lineTo(x + rnd() * 3 - 1.5, y - 2 - rnd() * 4); c.stroke();
+    }
+  }
+
+  const tex = new THREE.CanvasTexture(cvs);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(4, 3);
+  tex.anisotropy = 4;
+  surfaceTextures.set(style, tex);
+  return tex;
+}
+
+function themedStandardMaterial(color, theme = {}, extra = {}) {
+  const style = theme.style || "neon";
+  return new THREE.MeshStandardMaterial({
+    color,
+    map: surfaceTexture(style),
+    metalness: theme.tableMetalness ?? 0.35,
+    roughness: theme.tableRoughness ?? 0.38,
+    emissive: color,
+    emissiveIntensity: theme.tableEmissive ?? 0.04,
+    ...extra
+  });
+}
+
 export function makeTable(w, d, color, lineColor, opts = {}) {
   const g = new THREE.Group();
+  const theme = opts.theme || {};
   const thick = opts.thick ?? 0.35;
   const top = new THREE.Mesh(
     new THREE.BoxGeometry(w, thick, d),
-    new THREE.MeshStandardMaterial({
-      color,
-      metalness: 0.35,
-      roughness: 0.38,
-      emissive: color,
-      emissiveIntensity: 0.04
-    })
+    themedStandardMaterial(color, theme)
   );
   top.position.y = -thick / 2;
   top.receiveShadow = true;
   g.add(top);
 
   const rimMat = new THREE.MeshStandardMaterial({
-    color: 0x0a0c12,
-    metalness: 0.7,
-    roughness: 0.25,
+    color: theme.style === "jungle" ? 0x4b3420 : theme.style === "boot" ? 0xe7e1d4 : 0x0a0c12,
+    metalness: theme.style === "neon" ? 0.7 : 0,
+    roughness: theme.style === "neon" ? 0.25 : 0.78,
     emissive: lineColor,
-    emissiveIntensity: 0.35
+    emissiveIntensity: theme.rimGlow ?? 0.35
   });
   const rimH = 0.42;
   const rimT = 0.22;
@@ -125,7 +238,7 @@ export function makeTable(w, d, color, lineColor, opts = {}) {
   return g;
 }
 
-export function makeTriangleTable(verts, edges, color, edgeColors) {
+export function makeTriangleTable(verts, edges, color, edgeColors, theme = {}) {
   const g = new THREE.Group();
   const shape = new THREE.Shape();
   shape.moveTo(verts[0].x, -verts[0].z);
@@ -133,12 +246,7 @@ export function makeTriangleTable(verts, edges, color, edgeColors) {
   shape.lineTo(verts[2].x, -verts[2].z);
   shape.closePath();
   const geo = new THREE.ExtrudeGeometry(shape, { depth: 0.35, bevelEnabled: false, steps: 1 });
-  const top = new THREE.Mesh(
-    geo,
-    new THREE.MeshStandardMaterial({
-      color, metalness: 0.35, roughness: 0.38, emissive: color, emissiveIntensity: 0.05
-    })
-  );
+  const top = new THREE.Mesh(geo, themedStandardMaterial(color, theme));
   top.rotation.x = -Math.PI / 2;
   top.position.y = 0;
   top.receiveShadow = true;
@@ -151,7 +259,11 @@ export function makeTriangleTable(verts, edges, color, edgeColors) {
     const bar = new THREE.Mesh(
       new THREE.BoxGeometry(len, 0.38, 0.18),
       new THREE.MeshStandardMaterial({
-        color: 0x0a0c12, metalness: 0.6, roughness: 0.28, emissive: col, emissiveIntensity: 0.55
+        color: theme.style === "jungle" ? 0x4b3420 : 0x0a0c12,
+        metalness: theme.style === "neon" ? 0.6 : 0,
+        roughness: theme.style === "neon" ? 0.28 : 0.78,
+        emissive: col,
+        emissiveIntensity: theme.rimGlow ?? 0.55
       })
     );
     bar.position.set(e.mx - e.nx * 0.08, 0.18, e.mz - e.nz * 0.08);
@@ -168,20 +280,24 @@ export function makeTriangleTable(verts, edges, color, edgeColors) {
   return g;
 }
 
-export function makeCircleTable(radius, color, lineColor) {
+export function makeCircleTable(radius, color, lineColor, theme = {}) {
   const g = new THREE.Group();
   const top = new THREE.Mesh(
     new THREE.CylinderGeometry(radius, radius, 0.35, 64),
-    new THREE.MeshStandardMaterial({
-      color, metalness: 0.32, roughness: 0.4, emissive: color, emissiveIntensity: 0.05
-    })
+    themedStandardMaterial(color, theme)
   );
   top.position.y = -0.175;
   top.receiveShadow = true;
   g.add(top);
   const ring = new THREE.Mesh(
     new THREE.TorusGeometry(radius + 0.08, 0.12, 10, 64),
-    new THREE.MeshStandardMaterial({ color: 0x0a0c12, emissive: lineColor, emissiveIntensity: 0.5, metalness: 0.6, roughness: 0.3 })
+    new THREE.MeshStandardMaterial({
+      color: theme.style === "jungle" ? 0x4b3420 : 0x0a0c12,
+      emissive: lineColor,
+      emissiveIntensity: theme.rimGlow ?? 0.5,
+      metalness: theme.style === "neon" ? 0.6 : 0,
+      roughness: theme.style === "neon" ? 0.3 : 0.78
+    })
   );
   ring.rotation.x = Math.PI / 2;
   ring.position.y = 0.12;
@@ -349,51 +465,21 @@ function powerGlyphTexture(glyph, color) {
   return tex;
 }
 
-/** Etichetta col nome del potere, da mostrare sotto il gettone. */
-function powerLabelSprite(text, color) {
-  const W = 256, H = 64;
-  const cvs = document.createElement("canvas");
-  cvs.width = W; cvs.height = H;
-  const c = cvs.getContext("2d");
-  const hex = "#" + color.toString(16).padStart(6, "0");
+// Il raggio e' condiviso da grafica e collisione: il cerchio a terra mostra
+// esattamente quanto vicino deve passare il centro della palla per raccogliere.
+export const POWER_PICKUP_RADIUS = 0.68;
 
-  const label = String(text).toUpperCase();
-  c.font = `700 ${H * 0.46}px "Outfit", system-ui, sans-serif`;
-  const tw = c.measureText(label).width;
-  const pad = H * 0.28;
-  const bw = Math.min(W, tw + pad * 2), bx = (W - bw) / 2;
-
-  c.beginPath();
-  if (c.roundRect) c.roundRect(bx, H * 0.18, bw, H * 0.64, H * 0.32);
-  else c.rect(bx, H * 0.18, bw, H * 0.64);
-  c.fillStyle = "rgba(6, 8, 14, 0.85)";
-  c.fill();
-  c.lineWidth = 2;
-  c.strokeStyle = hex;
-  c.stroke();
-
-  c.font = `700 ${H * 0.46}px "Outfit", system-ui, sans-serif`;
-  c.textAlign = "center";
-  c.textBaseline = "middle";
-  c.fillStyle = hex;
-  c.fillText(label, W / 2, H * 0.52);
-
-  const tex = new THREE.CanvasTexture(cvs);
-  tex.anisotropy = 4;
-  return tex;
-}
-
-export function makePowerToken(color, glyph = "?", label = "") {
+export function makePowerToken(color, glyph = "?") {
   const g = new THREE.Group();
+  const floaters = new THREE.Group();
   const disc = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.34, 0.34, 0.08, 24),
+    new THREE.CylinderGeometry(0.42, 0.42, 0.1, 28),
     new THREE.MeshStandardMaterial({
-      color, emissive: color, emissiveIntensity: 0.85, metalness: 0.3, roughness: 0.25
+      color, emissive: color, emissiveIntensity: 0.72, metalness: 0.18, roughness: 0.38
     })
   );
   disc.rotation.x = Math.PI / 2;
 
-  // Il simbolo e' un billboard: game.js lo tiene rivolto alla telecamera.
   const badge = new THREE.Sprite(
     new THREE.SpriteMaterial({
       map: powerGlyphTexture(glyph, color),
@@ -401,30 +487,45 @@ export function makePowerToken(color, glyph = "?", label = "") {
       depthTest: false
     })
   );
-  badge.scale.set(0.62, 0.62, 1);
-  badge.position.y = 0.34;
+  badge.scale.set(0.78, 0.78, 1);
+  badge.position.y = 0.38;
   badge.renderOrder = 5;
 
-  const glow = new THREE.PointLight(color, 1.2, 4);
-  g.add(disc, badge, glow);
+  const glow = new THREE.PointLight(color, 0.85, 3.5);
+  glow.position.y = 0.2;
+  floaters.add(disc, badge, glow);
+  floaters.position.y = 0.4;
+  g.add(floaters);
 
-  if (label) {
-    const tag = new THREE.Sprite(
-      new THREE.SpriteMaterial({
-        map: powerLabelSprite(label, color),
-        transparent: true,
-        depthTest: false
-      })
-    );
-    tag.scale.set(1.15, 0.29, 1);
-    tag.position.y = -0.16;
-    tag.renderOrder = 5;
-    g.add(tag);
-    g.userData.tag = tag;
-  }
+  // Zona di presa sempre appoggiata al tavolo. Nessuna scritta sotto al token:
+  // il simbolo grande identifica il potere, l'anello identifica la hit area.
+  const area = new THREE.Mesh(
+    new THREE.CircleGeometry(POWER_PICKUP_RADIUS, 48),
+    new THREE.MeshBasicMaterial({
+      color, transparent: true, opacity: 0.11, side: THREE.DoubleSide,
+      depthWrite: false
+    })
+  );
+  area.rotation.x = -Math.PI / 2;
+  area.position.y = 0.006;
+  area.renderOrder = 2;
+  const rim = new THREE.Mesh(
+    new THREE.RingGeometry(POWER_PICKUP_RADIUS - 0.055, POWER_PICKUP_RADIUS, 48),
+    new THREE.MeshBasicMaterial({
+      color, transparent: true, opacity: 0.82, side: THREE.DoubleSide,
+      depthWrite: false
+    })
+  );
+  rim.rotation.x = -Math.PI / 2;
+  rim.position.y = 0.009;
+  rim.renderOrder = 3;
+  g.add(area, rim);
 
   g.userData.disc = disc;
   g.userData.badge = badge;
+  g.userData.floaters = floaters;
+  g.userData.pickupArea = area;
+  g.userData.pickupRim = rim;
   return g;
 }
 

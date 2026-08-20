@@ -224,13 +224,13 @@ export class UI {
         </div>
       </div>`).join("");
 
-    // Nell'online si puo' costruire un'arena su misura (regole + power-up).
-    const customBlock = vsCPU ? "" : `
+    // La partita su misura e' disponibile sia online sia contro la CPU.
+    const customBlock = `
       <div class="zone-block">
         <h3>Su misura</h3>
         <div class="cards">
           <button class="card card-custom" data-act="custom">
-            <div class="tag">Personalizzata</div>
+            <div class="tag">Personalizzata · ${vsCPU ? "vs CPU" : "online"}</div>
             <h4>Arena su misura</h4>
             <p>Scegli tavolo, punteggio, velocità, racchette e quali power-up entrano in campo.</p>
           </button>
@@ -255,12 +255,12 @@ export class UI {
   }
 
   /**
-   * Arena personalizzata (solo online): l'host sceglie tavolo di base, regole e
-   * quali power-up entrano in campo. Le scelte finiscono in `settings.custom`
-   * dentro la stanza Firebase, quindi valgono anche per chi si unisce.
+   * Arena personalizzata contro CPU o online. In rete le scelte finiscono in
+   * `settings.custom`; in locale vengono passate direttamente a beginMatch.
    */
   showCustom() {
     this.screen = "custom";
+    const vsCPU = this.vsCPU;
     const c = this._custom || (this._custom = {
       base: "classic",
       target: 10,
@@ -292,7 +292,9 @@ export class UI {
         <button class="btn small ghost back" data-act="zones">← Arene</button>
         <div class="panel">
           <h2 class="section">Arena su misura</h2>
-          <p class="sub">Configura la partita, poi crea la stanza e manda il codice al collega.</p>
+          <p class="sub">${vsCPU
+            ? "Configura la partita libera e affronta la CPU con le tue regole."
+            : "Configura la partita, poi crea la stanza e manda il codice al collega."}</p>
 
           <div class="opt">
             <div><label>Tavolo di base</label><span class="hint">Ostacoli e forma del campo</span></div>
@@ -325,7 +327,7 @@ export class UI {
           </div>
 
           <div class="row" style="margin-top:20px">
-            <button class="btn" id="cstGo">Crea stanza</button>
+            <button class="btn" id="cstGo">${vsCPU ? "Gioca contro CPU" : "Crea stanza"}</button>
             <button class="btn small ghost" id="cstNone">Nessun potere</button>
             <button class="btn small ghost" id="cstAll">Tutti</button>
           </div>
@@ -355,6 +357,16 @@ export class UI {
     this.root.querySelector("#cstAll").onclick = () => { this._custom.powers = Object.keys(POWER_DEFS); this.showCustom(); };
     this.root.querySelector("#cstGo").onclick = async () => {
       const cfg = this._custom;
+      const options = { ballSpeed: cfg.ballSpeed, paddleSize: cfg.paddleSize };
+      if (vsCPU) {
+        this.game.beginMatch(cfg.base, {
+          vsCPU: true,
+          target: cfg.target,
+          powers: cfg.powers.slice(),
+          options
+        });
+        return;
+      }
       await this.createRoom({
         mode: "duel",
         arenaId: cfg.base,
@@ -363,7 +375,7 @@ export class UI {
           arenaId: cfg.base,
           target: cfg.target,
           custom: { powers: cfg.powers.slice() },
-          options: { ballSpeed: cfg.ballSpeed, paddleSize: cfg.paddleSize }
+          options
         }
       });
     };
@@ -559,13 +571,14 @@ export class UI {
         if (!pl) await net.fillCpu(i, "CPU " + (i + 1));
       }
       await net.start(id);
-      this.applyPortalSettings(settings);
+      if (!settings.custom) this.applyPortalSettings(settings);
       this.game.beginMatch(id, {
         online: true,
         triangle: seats === 3,
         vsCPU: false,
         target: settings.target,
-        powers: settings.custom?.powers
+        powers: settings.custom?.powers,
+        options: settings.options
       });
     });
   }
@@ -620,18 +633,22 @@ export class UI {
       const el = document.getElementById("sc-" + s);
       if (el) el.innerHTML = `${game.scores[s] ?? 0}<span class="name">${PNAME[s]}${s === game.localSide ? " · TU" : ""}</span>`;
     }
-    this.renderPow("powL", game.powers, game.localSide);
+    this.renderPow("powL", game.powers, game.localSide, game);
   }
 
-  renderPow(id, mgr, side) {
+  renderPow(id, mgr, side, game) {
     const el = document.getElementById(id);
     if (!el) return;
     const list = mgr.inventory[side] || [];
-    if (!list.length) {
+    const charges = Math.max(0, ...game.world.paddles.filter((p) => p.side === side).map((p) => p.powerHit || 0));
+    const active = charges > 0
+      ? `<div class="slot active" title="I prossimi ${charges} rimbalzi accelerano la palla del 55%">✸ Schianto ×${charges}</div>`
+      : "";
+    if (!list.length && !active) {
       el.innerHTML = `<div class="slot">—</div>`;
       return;
     }
-    el.innerHTML = list.map((pid, i) => {
+    el.innerHTML = active + list.map((pid, i) => {
       const d = POWER_DEFS[pid];
       const sel = i === mgr.selected[side];
       return `<div class="slot ${sel ? "ready" : ""}">${d?.glyph ? d.glyph + " " : ""}${d?.name || pid}</div>`;
@@ -643,6 +660,13 @@ export class UI {
     if (!el) return;
     el.textContent = t;
     el.style.display = t ? "block" : "none";
+    el.classList.remove("center-pop");
+    if (t) {
+      // Riavvia l'animazione senza mai perdere translate(-50%, -50%): anche il
+      // primo frame di 3, 2, 1 e «Punto rosa» resta centrato.
+      void el.offsetWidth;
+      el.classList.add("center-pop");
+    }
   }
 
   showPause(game) {
@@ -821,7 +845,7 @@ export class UI {
           <div class="pw-head">
             <span class="pw-dot" style="background:${hex};box-shadow:0 0 12px ${hex}"></span>
             <h4><span class="pw-glyph" style="color:${hex}">${p.glyph || ""}</span> ${p.name}</h4>
-            ${p.hold ? `<span class="pw-flag">TIENI PREMUTO</span>` : ""}
+            ${p.hold ? `<span class="pw-flag">TIENI PREMUTO</span>` : p.charges ? `<span class="pw-flag">${p.charges} COLPI</span>` : ""}
           </div>
           <p class="pw-desc">${p.desc}</p>
           <div class="pw-where"><span>Arene</span>${where}</div>

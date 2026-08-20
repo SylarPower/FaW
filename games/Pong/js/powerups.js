@@ -1,9 +1,9 @@
-import { makePowerToken } from "./models.js";
+import { makePowerToken, POWER_PICKUP_RADIUS } from "./models.js";
 import * as THREE from "three";
 
 export const POWER_DEFS = {
   grab: { id: "grab", glyph: "✋", name: "Presa", desc: "Trattieni e lancia la palla", color: 0x3dffd1, hold: true },
-  whack: { id: "whack", glyph: "✸", name: "Schianto", desc: "I prossimi 3 colpi sono devastanti", color: 0xffc857 },
+  whack: { id: "whack", glyph: "✸", name: "Schianto", desc: "Attivalo prima del contatto: i prossimi 3 rimbalzi su una qualsiasi delle tue racchette consumano una carica condivisa e accelerano la palla del 55%, fino al limite", color: 0xffc857, charges: 3 },
   stretch: { id: "stretch", glyph: "↔", name: "Allunga", desc: "Racchetta extra-larga", color: 0x8ee7ff },
   turbo: { id: "turbo", glyph: "≫", name: "Turbo", desc: "Scatto di velocità", color: 0xff7a3d },
   spike: { id: "spike", glyph: "▲", name: "Spine", desc: "Alza le spine difensive", color: 0xff5a5a },
@@ -52,16 +52,23 @@ export class PowerUpManager {
       }
     }
     for (const t of this.tokens) {
-      // Ruota solo il disco: il simbolo e' uno sprite e deve restare leggibile.
+      // Il token fluttua, mentre l'anello resta sul tavolo e rende esplicita la
+      // vera zona di raccolta.
       if (t.mesh.userData.disc) t.mesh.userData.disc.rotation.y += dt * 2;
-      t.mesh.position.y = 0.42 + Math.sin(performance.now() * 0.004 + t.mesh.position.x) * 0.08;
+      const wave = Math.sin(performance.now() * 0.004 + t.mesh.position.x);
+      if (t.mesh.userData.floaters) t.mesh.userData.floaters.position.y = 0.42 + wave * 0.08;
+      if (t.mesh.userData.pickupRim) {
+        const pulse = 1 + wave * 0.035;
+        t.mesh.userData.pickupRim.scale.setScalar(pulse);
+        t.mesh.userData.pickupRim.material.opacity = 0.72 + wave * 0.12;
+      }
     }
     for (const b of this.world.balls) {
       if (!b.alive || b.held) continue;
       for (let i = this.tokens.length - 1; i >= 0; i--) {
         const t = this.tokens[i];
         const dx = b.x - t.x, dz = b.z - t.z;
-        if (dx * dx + dz * dz < 0.55 * 0.55) {
+        if (dx * dx + dz * dz < POWER_PICKUP_RADIUS * POWER_PICKUP_RADIUS) {
           const side = b.lastHit || (b.vx > 0 ? "left" : "right");
           this.give(side, t.id);
           this.engine.arenaRoot.remove(t.mesh);
@@ -78,8 +85,8 @@ export class PowerUpManager {
     const def = POWER_DEFS[id];
     const x = (Math.random() - 0.5) * this.world.w * 0.45;
     const z = (Math.random() - 0.5) * this.world.d * 0.55;
-    const mesh = makePowerToken(def.color, def.glyph || "?", def.name);
-    mesh.position.set(x, 0.42, z);
+    const mesh = makePowerToken(def.color, def.glyph || "?");
+    mesh.position.set(x, 0.012, z);
     this.engine.add(mesh);
     this.tokens.push({ id, x, z, mesh });
   }

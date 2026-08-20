@@ -441,8 +441,13 @@ export class World {
     let boost = 1.035;
     if (p.powerHit > 0) {
       boost = 1.55;
-      p.powerHit--;
-      this.emit("powerhit", { ball: b, paddle: p });
+      // Schianto ha tre cariche per giocatore, non tre per ogni eventuale
+      // racchetta dell'arena: sincronizziamo il contatore su tutte le sue barre.
+      const charges = p.powerHit - 1;
+      for (const mate of this.paddles) {
+        if (mate.side === p.side) mate.powerHit = charges;
+      }
+      this.emit("powerhit", { ball: b, paddle: p, charges });
     }
     spd = clamp(spd * boost, b.minSpeed, b.maxSpeed);
     b.setSpeed(spd);

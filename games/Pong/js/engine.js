@@ -107,9 +107,16 @@ export class Engine {
     this.scene.fog.color.set(theme.fog ?? theme.bg ?? 0x07080e);
     this.accentA.color.set(theme.p1 ?? 0x3dffd1);
     this.accentB.color.set(theme.p2 ?? 0xff3d7f);
+    const accent = theme.accentIntensity ?? 1;
+    this.accentA.intensity = 1.4 * accent;
+    this.accentB.intensity = 1.3 * accent;
     this.hemi.color.set(theme.hemi ?? 0xb9c6ff);
+    this.hemi.intensity = theme.hemiIntensity ?? 0.7;
+    this.sun.intensity = theme.sunIntensity ?? 1.15;
     this.bloom.strength = theme.bloom ?? 0.38;
     this.renderer.toneMappingExposure = theme.exposure ?? 1.05;
+    if (this.stars) this.stars.visible = theme.showStars !== false;
+    for (const ring of this.bgBits) ring.visible = theme.showRings !== false;
   }
 
   setCamera(pos, look, immediate = false) {
