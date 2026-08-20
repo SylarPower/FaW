@@ -286,6 +286,55 @@ export class World {
     if (b.x < -hx) this.handleEnd(b, "left");
   }
 
+  /**
+   * Tavolo a triangolo (1v1v1).
+   *
+   * Ogni lato di `world.tri.edges` ha una normale (nx, nz) rivolta verso il
+   * centro del tavolo (garantito da makeTri). La distanza con segno dal lato e'
+   * quindi: dot(pos - mid, n); positiva dentro, negativa fuori.
+   *
+   * Nel triangolo ogni lato e' una porta: se la palla lo oltrepassa emettiamo
+   * "score" con `side` = lato attraversato, come fa collideCircle con le porte.
+   * Sara' game.js a decidere chi segna (chi ha toccato per ultimo,
+   * `ball.lastHit`) e ad annullare l'autogol.
+   *
+   * Un lato rimbalza SOLO se non ha racchette (caso anomalo: senza rimbalzo la
+   * palla scapperebbe all'infinito da un lato scoperto). Con le tre racchette
+   * standard i lati restano quindi sempre "aperti" e il punto e' possibile.
+   */
+  collideTriangle(b) {
+    const tri = this.tri;
+    if (!tri) { this.collideRect(b); return; }
+
+    for (const e of tri.edges) {
+      // Distanza con segno dal lato: positiva verso l'interno del tavolo.
+      const dist = (b.x - e.mx) * e.nx + (b.z - e.mz) * e.nz;
+
+      const guarded = this.paddles.some((p) => p.side === e.side);
+      if (guarded) {
+        // Lato-porta: punto quando la palla e' uscita del tutto.
+        if (dist < -b.r) {
+          this.emit("score", { ball: b, side: e.side, edge: e });
+          b.alive = false;
+          return;
+        }
+        continue;
+      }
+
+      // Lato scoperto: muro pieno, la palla rimbalza dentro.
+      if (dist < b.r) {
+        b.x += e.nx * (b.r - dist);
+        b.z += e.nz * (b.r - dist);
+        const vn = b.vx * e.nx + b.vz * e.nz;
+        if (vn < 0) {
+          b.vx -= 2 * vn * e.nx;
+          b.vz -= 2 * vn * e.nz;
+        }
+        this.emit("wall", { ball: b, edge: e });
+      }
+    }
+  }
+
   collideCircle(b) {
     const dist = Math.hypot(b.x, b.z);
     const max = this.radius - b.r;

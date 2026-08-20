@@ -52,7 +52,7 @@ Dalla pagina del gioco, il ritorno alla home è `../../index.html`.
 La config Firebase sta in **un solo file**: `games/shared/firebase-config.js`.
 È uno script browser classico (non un modulo ES) che espone `window.FAW_FIREBASE_CONFIG`.
 
-- Pagine **compat** (`index.html`, `test.html`, ruzzle, pictionary, gameof15, palestra):
+- Pagine **compat** (`index.html`, ruzzle, pictionary, gameof15, palestra):
   includono `games/shared/firebase-config.js` (o `../shared/firebase-config.js`)
   **prima** dello script che chiama `firebase.initializeApp(firebaseConfig)`.
 - **Pong** (Firebase modulare): `games/Pong/index.html` carica lo stesso file prima di

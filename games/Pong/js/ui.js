@@ -164,6 +164,7 @@ export class UI {
           <button class="btn" data-act="play">Gioca</button>
           <button class="btn ghost" data-act="opt">Opzioni</button>
           <button class="btn ghost" data-act="ctrl">Comandi</button>
+          <button class="btn ghost" data-act="pwr">Poteri</button>
           <button class="btn ghost" data-act="cred">Crediti</button>
         </div>
       </div>`));
@@ -649,6 +650,59 @@ export class UI {
     this.hook();
   }
 
+  /**
+   * Elenco dei poteri: cosa fanno, come si usano e in quali arene compaiono.
+   * Le arene vengono ricavate da ARENAS.powerUps, cosi' la pagina resta
+   * allineata da sola se un'arena cambia pool.
+   */
+  showPowers() {
+    this.screen = "powers";
+    const ALWAYS = ["grab", "whack", "stretch", "turbo"];
+
+    const arenasFor = (id) => ARENAS.filter((a) => (a.powerUps || []).includes(id));
+
+    // Ordine: prima quelli sempre disponibili, poi gli altri per nome.
+    const ids = Object.keys(POWER_DEFS).sort((a, b) => {
+      const aa = ALWAYS.includes(a), bb = ALWAYS.includes(b);
+      if (aa !== bb) return aa ? -1 : 1;
+      return POWER_DEFS[a].name.localeCompare(POWER_DEFS[b].name);
+    });
+
+    const cards = ids.map((id) => {
+      const p = POWER_DEFS[id];
+      const hex = "#" + p.color.toString(16).padStart(6, "0");
+      const used = arenasFor(id);
+      const extra = ALWAYS.includes(id);
+      const unused = !used.length && !extra;
+      const where = used.length
+        ? used.map((a) => a.name).join(" · ")
+        : "Nessuna arena al momento";
+      return `
+        <div class="pw-card${unused ? " pw-unused" : ""}">
+          <div class="pw-head">
+            <span class="pw-dot" style="background:${hex};box-shadow:0 0 12px ${hex}"></span>
+            <h4>${p.name}</h4>
+            ${p.hold ? `<span class="pw-flag">TIENI PREMUTO</span>` : ""}
+          </div>
+          <p class="pw-desc">${p.desc}</p>
+          <div class="pw-where"><span>Arene</span>${where}</div>
+          ${extra ? `<div class="pw-where"><span>Extra</span>Sempre disponibile con «Poteri extra»</div>` : ""}
+        </div>`;
+    }).join("");
+
+    this.show(this.el(`
+      <div class="screen">
+        <button class="btn small ghost back" data-act="title">← Indietro</button>
+        <div class="panel">
+          <h2 class="section">Poteri</h2>
+          <p class="sub">Colpisci il gettone che compare sul tavolo per raccoglierlo. Ne tieni al massimo 3: <b class="k">E</b> per cambiare, <b class="k">Spazio</b> per usarlo.</p>
+          <div class="pw-grid">${cards}</div>
+          <p class="sub" style="margin:18px 0 0">Ogni arena mette in campo solo i suoi poteri. In Opzioni puoi attivare «Poteri extra» per aggiungere ovunque Presa, Schianto, Allunga e Turbo.</p>
+        </div>
+      </div>`));
+    this.hook();
+  }
+
   showCredits() {
     this.show(this.el(`
       <div class="screen">
@@ -685,6 +739,7 @@ export class UI {
     if (act === "title") this.showTitle();
     if (act === "opt") this.showOptions();
     if (act === "ctrl") this.showControls();
+    if (act === "pwr") this.showPowers();
     if (act === "cred") this.showCredits();
     if (act === "cpu") { this.triangle = false; this.showZones(true); }
     if (act === "pvp") {
