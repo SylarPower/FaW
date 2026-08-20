@@ -23,6 +23,7 @@ export class Game {
     this.world = new World();
     this.powers = new PowerUpManager(this.engine, this.world);
     this.save = loadSave();
+    this.stats = this.save.stats;
     this._bindPowerPickups();
     this.state = "title";
     this.vsCPU = true;
@@ -233,6 +234,78 @@ export class Game {
     return Math.random() < 0.5 ? 1 : -1;
   }
 
+  /**
+   * A ogni punto fatto tutti i power-up si azzerano: cariche, timer ed
+   * effetti temporanei sul campo tornano puliti per il servizio successivo.
+   * Le cariche della curva Q/E non sono un power-up e restano.
+   */
+  resetPowerups() {
+    for (const p of this.world.paddles) {
+      p.powerHit = 0;
+      p.whackStep = 0;
+      p.stretchTimers = [];
+      p.stretchStacks = 0;
+      p.stretchT = 0;
+      p.hd = p.baseHd;
+      p.grabT = 0;
+      p.turboT = 0;
+      p.invert = 0;
+      p.burn = 0;
+      p.barrierT = 0;
+      p.magnetT = 0;
+      p.spinHit = 0;
+    }
+    const c = this.ctrl;
+    if (!c) return;
+    // Barriere temporanee.
+    if (c.barrier) {
+      for (const side of Object.keys(c.barrier)) {
+        const b = c.barrier[side];
+        this.world.obstacles = this.world.obstacles.filter((o) => o !== b.obs);
+        if (b.mesh) this.engine.arenaRoot.remove(b.mesh);
+      }
+      c.barrier = {};
+    }
+    // Foca.
+    if (c.seal) {
+      this.world.obstacles = this.world.obstacles.filter((o) => o !== c.seal);
+      this.engine.arenaRoot.remove(c.seal.mesh);
+      c.seal = null;
+    }
+    // Orso polare.
+    if (c.bear) {
+      this.world.obstacles = this.world.obstacles.filter((o) => o !== c.bearWall);
+      this.engine.arenaRoot.remove(c.bear.mesh);
+      c.bear = null;
+      c.bearWall = null;
+    }
+    // Ventilatore.
+    if (c.fanT > 0) {
+      c.fanT = 0;
+      this.world.windX = 0;
+    }
+    // Tavolo folle: inclinazione, collina e conca da power-up.
+    if (c.tiltWant) c.tiltWant = 0;
+    this.world.gravityX = 0;
+    this.world.gravityZ = 0;
+    if (c.centerHill) {
+      this.world.obstacles = this.world.obstacles.filter((o) => o !== c.centerHill);
+      this.engine.arenaRoot.remove(c.centerHill.mesh);
+      c.centerHill = null;
+      c.hillStacks = 0;
+    }
+    if (c.dip) {
+      c.dip = false;
+      c.dipStacks = 0;
+    }
+    // Nebbia.
+    if (c.fog) {
+      this.engine.arenaRoot.remove(c.fog.mesh);
+      c.fog = null;
+    }
+    this.ui.updateHUD(this);
+  }
+
   resetPaddlesForServe() {
     for (const p of this.world.paddles) {
       p.vz = 0;
@@ -240,6 +313,12 @@ export class Game {
       p.inputAxis = 0;
       p.inputAxis2 = 0;
       p.heldBall = null;
+      p.curveL = 0;
+      p.curveR = 0;
+      p.curveTargetL = 0;
+      p.curveTargetR = 0;
+      p.curveLockL = false;
+      p.curveLockR = false;
       if (p.edge) {
         p.offset = 0;
         p.x = p.edge.mx + p.edge.nx * p.inset;
@@ -270,7 +349,6 @@ export class Game {
     const info = colorId ? { color, colorId } : nextBallColor(this.ctrl);
     const b = new Ball(0.22);
     b.minSpeed = 8 * this.speedMul;
-    b.maxSpeed = 22 * this.speedMul;
     b.color = info.color;
     b.colorId = info.colorId;
     b.mesh = makeBall(b.color, b.r, this.ctrl?.theme);
@@ -287,12 +365,14 @@ export class Game {
       const s = (10 + rand(0, 4)) * this.speedMul;
       b.vx = Math.cos(a) * s;
       b.vz = Math.sin(a) * s;
+      b.baseSpeed = s;
     } else if (this.triangle) {
       b.x = 0; b.z = 0; b.y = b.r;
       const a = rand(0, Math.PI * 2);
       const s = 9.5 * this.speedMul;
       b.vx = Math.cos(a) * s;
       b.vz = Math.sin(a) * s;
+      b.baseSpeed = s;
       b.ghost = 0.2;
     } else {
       b.serve(dir, 9.5 * this.speedMul);
@@ -326,7 +406,10 @@ export class Game {
     }
     if (b.mesh.userData.light) {
       const base = b.mesh.userData.lightBase ?? 1.6;
-      b.mesh.userData.light.intensity = b.held ? base * 0.25 : base;
+      // Feedback di velocità: più la palla corre, più brilla.
+      const spd = Math.hypot(b.vx, b.vz);
+      const glow = Math.min(2.4, 0.75 + spd / 35);
+      b.mesh.userData.light.intensity = b.held ? base * 0.25 : base * glow;
     }
     b.mesh.visible = b.alive;
   }
@@ -449,10 +532,12 @@ export class Game {
         if (burst) this._bursts.push(burst);
         // L'impatto si anima in altezza, non lungo la zona di contatto.
         if (ev.paddle.mesh) ev.paddle.mesh.scale.y = 1.12;
-        // Dopo molti scambi la palla accelera leggermente (fino a un tetto).
-        if (this.rally > 6) {
-          const factor = Math.min(1.25, 1 + (this.rally - 6) * 0.012);
-          ev.ball.minSpeed = 8 * this.speedMul * factor;
+        // La crescita di velocità è nel fisico (collideBallPaddle): nessun
+        // tetto, incrementi sempre più piccoli a ogni rimbalzo.
+        if (!isDemo) {
+          this.stats.colpi++;
+          this.stats.rallyMax = Math.max(this.stats.rallyMax, this.rally);
+          this.stats.velMax = Math.max(this.stats.velMax, spd);
         }
         fx.push("hit");
       }
@@ -478,10 +563,38 @@ export class Game {
         this.ui.updateHUD(this);
       }
       if (ev.type === "powerhit") {
-        this.engine.kick(0.28);
+        this.engine.kick(0.3 + ev.mul * 0.06);
         this.engine.flash(this.flashEl, "#fff4c2", 70);
         this.particles.burst(ev.ball.x, 0.4, ev.ball.z, 0xffc857, 24, 7);
+        this.showMsg(`SCHIANTO ${ev.step}° · ×${ev.mul.toFixed(2)}`, 0.7);
+        if (!isDemo) this.stats.schianti++;
         this.ui.updateHUD(this); // aggiorna subito «Schianto ×2/×1»
+      }
+      if (ev.type === "whackbreak") {
+        // L'avversario ha respinto: la catena Schianto si spegne.
+        this.engine.kick(0.18);
+        this.engine.flash(this.flashEl, "#9be7ff", 60);
+        this.particles.burst(ev.ball.x, 0.35, ev.ball.z, 0x9be7ff, 16, 5);
+        this.showMsg("SCHIANTO RIENTRATO", 0.55);
+      }
+      if (ev.type === "curvehit") {
+        // Feedback pieno del colpo in curva: scossa, flash, anello di
+        // particelle e messaggio col numero di cariche rimaste.
+        this.engine.kick(0.42);
+        this.engine.flash(this.flashEl, "#eaffff", 90);
+        this.particles.burst(ev.ball.x, 0.4, ev.ball.z, this.sideColor(ev.paddle.side), 30, 9);
+        this.particles.burst(ev.ball.x, 0.4, ev.ball.z, 0xffffff, 10, 5);
+        this.showMsg(`CURVA! · ${ev.charges}×`, 0.6);
+        if (!isDemo) this.stats.curve++;
+        this.ui.updateHUD(this);
+      }
+      if (ev.type === "spinhit") {
+        // Effetto: la fiondata laterale è partita.
+        this.engine.kick(0.32);
+        this.engine.flash(this.flashEl, "#7cffd2", 70);
+        this.particles.burst(ev.ball.x, 0.4, ev.ball.z, 0x66e3b0, 22, 8);
+        this.showMsg("EFFETTO!", 0.55);
+        this.ui.updateHUD(this);
       }
     }
     this._fx = fx;
@@ -501,6 +614,31 @@ export class Game {
     }
 
     this.syncVisuals(dt);
+
+    // I timer dei power-up scorrono anche senza eventi: l'HUD mostra i
+    // secondi rimanenti e va rinfrescato di continuo.
+    if (!isDemo) {
+      this._hudT = (this._hudT || 0) + dt;
+      if (this._hudT > 0.2) {
+        this._hudT = 0;
+        this.ui.updateHUD(this);
+      }
+      // Aura della Calamita: scintille che volano dalla palla verso la
+      // racchetta del possessore.
+      this._magnetT = (this._magnetT || 0) - dt;
+      if (this._magnetT <= 0) {
+        this._magnetT = 0.14;
+        for (const p of this.world.paddles) {
+          if (p.magnetT <= 0) continue;
+          const inHalf = (b) => (p.side === "left" ? b.x < 0 : b.x > 0);
+          for (const b of this.world.balls) {
+            if (b.alive && !b.held && inHalf(b)) {
+              this.particles.spark(b.x, 0.3, b.z, 1, 0xb48cff);
+            }
+          }
+        }
+      }
+    }
   }
 
   drivePaddles(dt) {
@@ -518,6 +656,15 @@ export class Game {
         if (p.role === "goalie") p.inputAxis = inp.axis2 || 0;
         else if (p.role === "striker") p.inputAxis = inp.axis || 0;
         else { p.inputAxis = inp.axis || 0; p.inputAxis2 = inp.axis2 || 0; }
+        // Curva Q/E: dopo un colpo in curva l'estremo resta dritto finché il
+        // tasto non viene rilasciato, e servono cariche disponibili (2, si
+        // ricaricano nel tempo).
+        const wantL = !!inp.curveL && p.curveCharges > 0;
+        const wantR = !!inp.curveR && p.curveCharges > 0;
+        if (!inp.curveL) p.curveLockL = false;
+        if (!inp.curveR) p.curveLockR = false;
+        p.curveTargetL = wantL && !p.curveLockL ? 1 : 0;
+        p.curveTargetR = wantR && !p.curveLockR ? 1 : 0;
       }
     };
 
@@ -607,7 +754,13 @@ export class Game {
     this._scoreLock = performance.now();
     if (this.scores[scorer] == null) this.scores[scorer] = 0;
     this.scores[scorer]++;
+    if (!this.demo) {
+      if (scorer === this.localSide) this.stats.puntiFatti++;
+      else this.stats.puntiSubiti++;
+    }
     this.rally = 0;
+    // Punto fatto: tutti i power-up si azzerano.
+    this.resetPowerups();
     // Il punto non decide più il lato del servizio: ogni ripresa è casuale.
     this.serveDir = this.randomServeDir();
     this.resetPaddlesForServe();
@@ -673,11 +826,15 @@ export class Game {
     this.state = "over";
     const win = this.winnerSide();
     const iWon = win === this.localSide;
+    if (!this.demo) {
+      this.stats.partite++;
+      if (iWon) this.stats.vinte++;
+    }
     if (iWon) {
       this.unlockNext();
       if (!this.save.cleared.includes(this.arenaId)) this.save.cleared.push(this.arenaId);
-      this.persist();
     }
+    this.persist();
     this.publishSnap();
     this.ui.showResult(this, iWon, win);
   }
@@ -703,6 +860,7 @@ export class Game {
     this.state = "over";
     if (this.online) await net.leave();
     this.online = false;
+    this.persist();
     this.ui.showMenu();
     this.startDemo();
   }
@@ -731,7 +889,8 @@ export class Game {
       arena: this.arenaId,
       fx: this._fx || [],
       p: this.world.paddles.map((p) => ({
-        s: p.side, x: p.x, z: p.z, hd: p.hd, a: p.angle, o: p.offset || 0
+        s: p.side, x: p.x, z: p.z, hd: p.hd, a: p.angle, o: p.offset || 0,
+        cv: p.curveCharges || 0
       })),
       b: this.world.balls.filter((b) => b.alive).map((b) => ({
         x: b.x, z: b.z, vx: b.vx, vz: b.vz, c: b.color, h: b.held ? 1 : 0
@@ -782,6 +941,7 @@ export class Game {
         const p = this.world.paddles.find((x) => x.side === pd.s);
         if (!p) continue;
         p.x = pd.x; p.z = pd.z; p.hd = pd.hd; p.angle = pd.a; p.offset = pd.o;
+        if (pd.cv != null) p.curveCharges = pd.cv;
       }
     }
     if (snap.b) {
@@ -809,8 +969,18 @@ export class Game {
         p.mesh.scale.x += (1 - p.mesh.scale.x) * Math.min(1, dt * 10);
         p.mesh.scale.y += (1 - p.mesh.scale.y) * Math.min(1, dt * 10);
         this.syncPaddleMesh(p);
-        if (p.barrierT > 0) p.mesh.userData.mat.emissiveIntensity = Math.max(0.8, p.mesh.userData.baseEmissive || 0);
-        else p.mesh.userData.mat.emissiveIntensity = p.mesh.userData.baseEmissive ?? 0.22;
+        // Curva Q/E: piega morbida dell'estremo (i vertici si incurvano
+        // all'indietro mantenendo il corpo dritto, stile Pong: Next Level).
+        if (p.mesh.userData.setBend) p.mesh.userData.setBend(p.curveL, p.curveR);
+        if (p.barrierT > 0) {
+          p.mesh.userData.mat.emissiveIntensity = Math.max(0.8, p.mesh.userData.baseEmissive || 0);
+        } else if (p.magnetT > 0) {
+          // Calamita: la racchetta pulsa.
+          p.mesh.userData.mat.emissiveIntensity = Math.max(0.8, p.mesh.userData.baseEmissive || 0) *
+            (0.75 + 0.25 * Math.sin(performance.now() * 0.02));
+        } else {
+          p.mesh.userData.mat.emissiveIntensity = p.mesh.userData.baseEmissive ?? 0.22;
+        }
       }
     }
     for (const b of this.world.balls) {

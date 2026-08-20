@@ -42,7 +42,8 @@ export class Ball {
     this.vx = 0; this.vy = 0; this.vz = 0;
     this.r = r;
     this.minSpeed = 8;
-    this.maxSpeed = 22;
+    this.maxSpeed = Infinity; // Nessun tetto: la palla può solo accelerare.
+    this.baseSpeed = 9.5;     // Velocità di servizio: base della crescita rally.
     this.alive = true;
     this.held = false;
     this.holder = null;
@@ -52,6 +53,9 @@ export class Ball {
     this.lastHit = null;
     this.age = 0;
     this.ghost = 0;
+    this.hits = 0;        // Rimbalzi sulle racchette da questo servizio.
+    this.whackMul = 1;    // Moltiplicatore Schianto cumulato (da annullare).
+    this.whackSide = null;// Lato a cui appartiene la catena Schianto attiva.
     this.mesh = null;
     this.light = null;
     this.trail = [];
@@ -69,6 +73,7 @@ export class Ball {
     const ang = rand(-0.42, 0.42);
     this.vx = Math.cos(ang) * speed * dirX;
     this.vz = Math.sin(ang) * speed;
+    this.baseSpeed = speed;
     this.held = false;
     this.holder = null;
     this.alive = true;
@@ -103,12 +108,23 @@ export class Paddle {
     this.stretchStacks = 0;
     this.stretchTimers = [];
     this.powerHit = 0;
+    this.whackStep = 0;   // Colpi Schianto già sferrati in questa catena.
     this.stun = 0;
     this.burn = 0;
     this.invert = 0;
     this.grabT = 0;
     this.barrierT = 0;
     this.turboT = 0;
+    this.curveL = 0;      // Q: estremo z=-0.5 piegato all'indietro (0..1)
+    this.curveR = 0;      // E: estremo z=+0.5 piegato all'indietro (0..1)
+    this.curveTargetL = 0;
+    this.curveTargetR = 0;
+    this.curveLockL = false;
+    this.curveLockR = false;
+    this.curveCharges = 2;// La curva Q/E ha 2 cariche che si ricaricano nel tempo.
+    this.curveCd = 0;
+    this.magnetT = 0;     // Calamita: attira la palla verso questa racchetta.
+    this.spinHit = 0;     // Effetto: colpi con fiondata laterale rimasti.
     this.mesh = null;
     this.inputAxis = 0;
     this.inputAxis2 = 0;
@@ -193,9 +209,26 @@ export class World {
     const stretchFactor = Math.min(4.2, 1 + (p.stretchStacks || 0) * 0.7);
     const targetHd = p.baseHd * stretchFactor;
     p.hd = lerp(p.hd, targetHd, 1 - Math.pow(0.001, dt));
+    // Curva Q/E: la racchetta si piega in fretta e torna elastica un po' più
+    // lentamente. Il lock (dopo un colpo in curva) viene tolto da game.js
+    // quando il tasto viene rilasciato.
+    const curveRise = 16, curveFall = 9;
+    p.curveL += clamp(p.curveTargetL - p.curveL, -curveFall * dt, curveRise * dt);
+    p.curveR += clamp(p.curveTargetR - p.curveR, -curveFall * dt, curveRise * dt);
+    // 2 cariche di curva: si ricaricano una alla volta.
+    if (p.curveCharges < 2) {
+      p.curveCd -= dt;
+      if (p.curveCd <= 0) {
+        p.curveCharges++;
+        if (p.curveCharges < 2) p.curveCd = CURVE_RECHARGE;
+      }
+    } else if (p.curveCd !== 0) {
+      p.curveCd = 0;
+    }
     if (p.turboT > 0) p.turboT -= dt;
     if (p.grabT > 0) p.grabT -= dt;
     if (p.barrierT > 0) p.barrierT -= dt;
+    if (p.magnetT > 0) p.magnetT -= dt;
     if (p.powerHit > 0) { /* charges, not time */ }
 
     if (p.locked || p.stun > 0) {
@@ -257,8 +290,25 @@ export class World {
       b.vz *= d;
     }
 
+    // Calamita: mentre la palla è nella metà campo del possessore, viene
+    // attratta con dolcezza verso la sua racchetta (aiuto in difesa, non
+    // un buco nero).
+    for (const p of this.paddles) {
+      if (p.magnetT <= 0) continue;
+      const inHalf = (p.side === "left" || p.side === "west" || p.side === "bottom")
+        ? b.x < 0 : b.x > 0;
+      if (!inHalf) continue;
+      const dx = p.x - b.x, dz = p.z - b.z;
+      const d = Math.hypot(dx, dz);
+      if (d < 0.5) continue;
+      const pull = 6 * Math.min(1.5, d / 5);
+      b.vx += (dx / d) * pull * dt;
+      b.vz += (dz / d) * pull * dt;
+    }
+
     const spd = b.speed();
-    if (spd > b.maxSpeed) b.setSpeed(b.maxSpeed);
+    // Niente tetto massimo: la velocità cresce sempre, ma i rimbalzi la
+    // aumentano sempre meno (vedi collideBallPaddle).
     if (spd < 3 && spd > 0 && !this.drag) b.setSpeed(Math.max(b.minSpeed * 0.7, spd));
 
     b.x += b.vx * dt;
@@ -433,8 +483,11 @@ export class World {
     b.z += nz * overlap;
     const vn = b.vx * nx + b.vz * nz;
     if (vn < 0) {
-      b.vx -= 2.05 * vn * nx;
-      b.vz -= 2.05 * vn * nz;
+      // Rimbalzo elastico esatto: l'unica fonte di accelerazione è il boost
+      // progressivo qui sotto, così la crescita resta sotto controllo e
+      // rallenta con i colpi invece di esplodere.
+      b.vx -= 2.0 * vn * nx;
+      b.vz -= 2.0 * vn * nz;
     }
     const rel = clamp((b.z - p.z) / p.hd, -1, 1);
     b.vz += rel * 6.5 + p.vz * 0.35;
@@ -446,21 +499,76 @@ export class World {
       if (p.side === "right" && b.vx > -1.5) b.vx = -Math.abs(b.vx) - 1.2;
     }
 
-    let spd = b.speed();
-    let boost = 1.035;
-    if (p.powerHit > 0) {
-      boost = 1.55;
-      // Schianto ha tre cariche per giocatore, non tre per ogni eventuale
-      // racchetta dell'arena: sincronizziamo il contatore su tutte le sue barre.
-      const charges = p.powerHit - 1;
-      for (const mate of this.paddles) {
-        if (mate.side === p.side) mate.powerHit = charges;
-      }
-      this.emit("powerhit", { ball: b, paddle: p, charges });
+    // --- Curva Q/E: colpendo con l'estremo piegato all'indietro (e con la
+    // piega quasi completa, quindi col giusto timing) il colpo è più forte.
+    // relQ = -1 sull'estremo piegato da Q, +1 su quello piegato da E.
+    const flip = !p.edge && Math.cos(p.angle) < 0 ? -1 : 1;
+    const relQ = rel * flip;
+    const needBend = 0.55;
+    let curveHit = false;
+    // La curva costa una carica (si ricaricano nel tempo): senza cariche il
+    // colpo sull'estremo resta normale.
+    if (relQ < -0.55 && p.curveL > needBend && p.curveCharges > 0) {
+      curveHit = true;
+      p.curveCharges--;
+      p.curveCd = CURVE_RECHARGE;
+      p.curveL = 0; p.curveTargetL = 0; p.curveLockL = true;
+      this.emit("curvehit", { ball: b, paddle: p, end: "q", charges: p.curveCharges });
+    } else if (relQ > 0.55 && p.curveR > needBend && p.curveCharges > 0) {
+      curveHit = true;
+      p.curveCharges--;
+      p.curveCd = CURVE_RECHARGE;
+      p.curveR = 0; p.curveTargetR = 0; p.curveLockR = true;
+      this.emit("curvehit", { ball: b, paddle: p, end: "e", charges: p.curveCharges });
     }
-    spd = clamp(spd * boost, b.minSpeed, b.maxSpeed);
-    b.setSpeed(spd);
+    if (curveHit) b.vz += rel * 4.5; // fiondata extra verso il punto di contatto
+
+    // --- Schianto: 3 colpi potenziati, ognuno più veloce del precedente.
+    // Il colpo di un avversario spegne la catena e la palla riparte a
+    // velocità normale (le cariche restano a chi le possiede).
+    let whackMul = 1;
+    if (p.powerHit > 0) {
+      if ((b.whackMul || 1) > 1 && b.whackSide && b.whackSide !== p.side) {
+        b.whackMul = 1; // la catena avversaria viene assorbita
+      }
+      const step = (p.whackStep || 0) + 1;
+      whackMul = 1.8 + 0.55 * (step - 1); // 1° colpo 1.8×, 2° 2.35×, 3° 2.9×
+      const charges = p.powerHit - 1;
+      // Le cariche sono del giocatore, non della singola barra:
+      // sincronizziamo contatore e catena su tutte le sue racchette.
+      for (const mate of this.paddles) {
+        if (mate.side === p.side) { mate.powerHit = charges; mate.whackStep = step; }
+      }
+      b.whackMul = (b.whackMul || 1) * whackMul;
+      b.whackSide = p.side;
+      this.emit("powerhit", { ball: b, paddle: p, charges, mul: whackMul, step });
+    } else if ((b.whackMul || 1) > 1 && b.whackSide && b.whackSide !== p.side) {
+      const oldMul = b.whackMul;
+      b.whackMul = 1;
+      b.whackSide = null;
+      this.emit("whackbreak", { ball: b, paddle: p, mul: oldMul });
+    }
+
+    // --- Velocità SENZA tetto: dipende solo da quanti colpi ha già preso la
+    // palla da questo servizio. Curva logaritmica: ogni rimbalzo accelera
+    // meno del precedente, ma la velocità non smette mai di crescere.
+    const h = b.hits;
+    const base = b.baseSpeed || b.minSpeed * 1.19;
+    let target = base * (1 + 1.2 * Math.log(1 + h / 6));
+    if (curveHit) target *= 1.6;
+    target = Math.max(target * whackMul, b.minSpeed);
+    b.setSpeed(target);
+    // Effetto: fiondata laterale fortissima, una carica per colpo.
+    if (p.spinHit > 0) {
+      const charges = p.spinHit - 1;
+      for (const mate of this.paddles) {
+        if (mate.side === p.side) mate.spinHit = charges;
+      }
+      b.vz += (20 + rand(0, 6)) * (Math.random() < 0.5 ? 1 : -1);
+      this.emit("spinhit", { ball: b, paddle: p, charges });
+    }
     b.lastHit = p.side;
+    b.hits++;
     b.ghost = 0.04;
     return true;
   }
@@ -521,6 +629,9 @@ function wrapAngle(a) {
   while (a < -Math.PI) a += Math.PI * 2;
   return a;
 }
+
+/** Secondi per ricaricare una carica della curva Q/E. */
+const CURVE_RECHARGE = 6;
 
 export function predictZ(ball, targetX, gravityX = 0, gravityZ = 0, windX = 0, windZ = 0, zBound = 6) {
   let x = ball.x, z = ball.z, vx = ball.vx, vz = ball.vz;

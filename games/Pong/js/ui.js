@@ -273,6 +273,7 @@ export class UI {
           <button class="btn ghost" data-act="opt">Opzioni</button>
           <button class="btn ghost" data-act="ctrl">Comandi</button>
           <button class="btn ghost" data-act="pwr">Poteri</button>
+          <button class="btn ghost" data-act="stats">Statistiche</button>
         </div>
       </div>`));
     this._hookScreen({ onBack: () => {} });
@@ -370,7 +371,7 @@ export class UI {
         target: 10,
         ballSpeed: opts.ballSpeed || "default",
         paddleSize: opts.paddleSize || "default",
-        powers: ["whack", "stretch", "turbo", "grab"]
+        powers: ["whack", "stretch", "turbo", "grab", "magnet"]
       };
     }
     const c = this._custom;
@@ -407,8 +408,15 @@ export class UI {
             : "Configura la partita, poi crea la stanza e manda il codice al collega."}</p>
 
           <div class="opt">
-            <div><label>Tavolo di base</label><span class="hint">Ostacoli e forma del campo (anteprima sullo sfondo)</span></div>
+            <div><label>Tavolo di base</label></div>
             <div class="seg th-seg">${baseOpts}</div>
+          </div>
+          <div class="custom-base-desc">
+            <strong>${arenaById(c.base)?.name || ""} —</strong>
+            ${arenaById(c.base)?.desc || ""}
+            Il tavolo scelto porta con sé forma del campo, ostacoli e regole
+            (porte, buche, multiball…); i settaggi qui sotto (punti, velocità,
+            dimensione racchetta e power-up) si applicano sopra di esso.
           </div>
           <div class="opt">
             <div><label>Punti per vincere</label></div>
@@ -423,7 +431,7 @@ export class UI {
             ])}</div>
           </div>
           <div class="opt">
-            <div><label>Dimensione racchetta</label><span class="hint">Anteprima sullo sfondo</span></div>
+            <div><label>Dimensione racchetta</label></div>
             <div class="seg">${seg("paddleSize", [
               { id: "small", label: "Piccola" }, { id: "default", label: "Media" },
               { id: "medium", label: "Grande" }, { id: "large", label: "Maxi" }
@@ -438,6 +446,7 @@ export class UI {
 
           <div class="row" style="margin-top:20px">
             <button class="btn" id="cstGo">${vsCPU ? "Gioca contro CPU" : "Crea stanza"}</button>
+            <button class="btn ghost" id="cstPeek">👁 Vedi anteprima — tieni premuto</button>
             <button class="btn small ghost" id="cstNone">Nessun potere</button>
             <button class="btn small ghost" id="cstAll">Tutti</button>
           </div>
@@ -466,6 +475,21 @@ export class UI {
     });
     this.root.querySelector("#cstNone").onclick = () => { this._custom.powers = []; this.showCustom(); };
     this.root.querySelector("#cstAll").onclick = () => { this._custom.powers = Object.keys(POWER_DEFS); this.showCustom(); };
+    // Anteprima: finché il pulsante resta premuto la modale diventa
+    // quasi trasparente e si vede il tavolo che scorre sullo sfondo.
+    const peek = this.root.querySelector("#cstPeek");
+    const scr = this.root.querySelector(".screen");
+    const setPeek = (on) => { if (scr) scr.classList.toggle("peeking", on); };
+    const release = () => setPeek(false);
+    if (this._peekUp) {
+      window.removeEventListener("pointerup", this._peekUp);
+      window.removeEventListener("pointercancel", this._peekUp);
+    }
+    this._peekUp = release;
+    peek.addEventListener("pointerdown", (e) => { e.preventDefault(); setPeek(true); });
+    peek.addEventListener("pointerleave", release);
+    window.addEventListener("pointerup", release);
+    window.addEventListener("pointercancel", release);
     this.root.querySelector("#cstGo").onclick = async () => {
       const cfg = this._custom;
       const options = { ballSpeed: cfg.ballSpeed, paddleSize: cfg.paddleSize };
@@ -759,6 +783,7 @@ export class UI {
               <div class="hud-meta">
                 <div class="arena">${a.name.toUpperCase()}</div>
                 <div class="need">a ${game.customTarget || a.scoreToWin}${game.vsCPU && !tri ? " · scarto 2" : ""}</div>
+                <div class="speed" id="spd">velocità —</div>
               </div>
             </div>
             <div class="side-info right">
@@ -770,6 +795,7 @@ export class UI {
             <div class="keys">
               <span><span class="k">W S</span> racchetta</span>
               <span><span class="k">A D</span> 2ª</span>
+              <span><span class="k">Q E</span> curva (colpo forte sul timing)</span>
               <span><span class="k">Spazio</span> presa (se disponibile)</span>
             </div>
             <div class="keys"><span class="k">Esc</span> pausa</div>
@@ -785,6 +811,12 @@ export class UI {
       const el = document.getElementById("sc-" + s);
       if (el) el.innerHTML = `${game.scores[s] ?? 0}<span class="name">${PNAME[s]}${s === game.localSide ? " · TU" : ""}</span>`;
     }
+    // Indicatore di velocità: la palla accelera senza tetto, tenerla d'occhio.
+    const spdEl = document.getElementById("spd");
+    if (spdEl) {
+      const b = game.liveBall();
+      spdEl.textContent = b && b.alive ? `velocità ${b.speed().toFixed(1)}` : "velocità —";
+    }
     this.renderPow("powL", game.powers, game.localSide, game);
   }
 
@@ -794,12 +826,33 @@ export class UI {
     const pads = game.world.paddles.filter((p) => p.side === side);
     const tags = [];
     const whack = Math.max(0, ...pads.map((p) => p.powerHit || 0));
+    const whackStep = Math.max(0, ...pads.map((p) => p.whackStep || 0));
     const stretch = Math.max(0, ...pads.map((p) => p.stretchStacks || 0));
     const timers = (key) => Math.ceil(Math.max(0, ...pads.map((p) => p[key] || 0)));
-    if (whack) tags.push(`<div class="slot active" title="Ogni raccolta aggiunge 3 rimbalzi">✸ Schianto ×${whack}</div>`);
-    if (stretch) tags.push(`<div class="slot active">↔ Allunga ×${stretch}</div>`);
+    const stretchLeft = () => {
+      const all = pads.flatMap((p) => p.stretchTimers || []);
+      return all.length ? Math.ceil(Math.max(0, ...all)) : 0;
+    };
+    // Curva Q/E: 2 cariche che si ricaricano; mostra lo stato di ricarica.
+    const curve = Math.max(0, ...pads.map((p) => p.curveCharges || 0));
+    const curveCd = pads.length
+      ? Math.min(...pads.map((p) => (p.curveCharges < 2 ? (p.curveCd || 0) : Infinity)))
+      : 0;
+    const curveTag = curve >= 2
+      ? `↩ Curva Q/E ×${curve}`
+      : `↩ Curva Q/E ×${curve} · +${Math.ceil(curveCd)}s`;
+    tags.push(`<div class="slot${curve > 0 ? " active" : ""}" title="Q/E piegano un estremo all'indietro: colpendo sul giusto timing il colpo è più forte. 2 cariche, si ricaricano da sole.">${curveTag}</div>`);
+    if (whack) {
+      const stepTxt = whackStep > 0 ? ` · ${whackStep}° colpo ${(1.8 + 0.55 * (whackStep - 1)).toFixed(2)}×` : "";
+      tags.push(`<div class="slot active" title="I prossimi 3 colpi accelerano la palla: ognuno più veloce del precedente">✸ Schianto ×${whack}${stepTxt}</div>`);
+    }
+    if (timers("magnetT")) tags.push(`<div class="slot active" title="La palla viene attratta verso la tua racchetta">◉ Calamita ${timers("magnetT")}s</div>`);
+    const spin = Math.max(0, ...pads.map((p) => p.spinHit || 0));
+    if (spin) tags.push(`<div class="slot active" title="Il prossimo colpo parte con una fiondata laterale fortissima">〰 Effetto ×${spin}</div>`);
+    if (stretch) tags.push(`<div class="slot active" title="Allunga la racchetta; gli effetti si sommano">↔ Allunga ×${stretch} · ${stretchLeft()}s</div>`);
     if (timers("grabT")) tags.push(`<div class="slot active">✋ Presa ${timers("grabT")}s</div>`);
     if (timers("turboT")) tags.push(`<div class="slot active">≫ Turbo ${timers("turboT")}s</div>`);
+    if (timers("barrierT")) tags.push(`<div class="slot active">▤ Barriera ${timers("barrierT")}s</div>`);
     if (timers("invert")) tags.push(`<div class="slot active">⇄ Caos ${timers("invert")}s</div>`);
     if (timers("burn")) tags.push(`<div class="slot active">☠ Bruciatura ${timers("burn")}s</div>`);
     if (!tags.length) tags.push(`<div class="slot">—</div>`);
@@ -958,6 +1011,7 @@ export class UI {
           <div class="opt"><div><label>Torna indietro / Pausa</label></div><div>Esc</div></div>
           <div class="opt"><div><label>Racchetta</label><span class="hint">Lungo il tuo lato del tavolo</span></div><div>W / S oppure ↑ ↓</div></div>
           <div class="opt"><div><label>Seconda racchetta</label><span class="hint">Portiere / attaccante</span></div><div>A / D oppure ← →</div></div>
+          <div class="opt"><div><label>Curva Q/E</label><span class="hint">Piega un estremo all'indietro; colpendo col giusto timing il colpo è più forte. 2 cariche che si ricaricano da sole</span></div><div>Q / E</div></div>
           <p class="sub" style="margin-top:16px">I power-up si attivano appena li raccogli. Presa, spiaggia e hockey: tieni premuto Spazio vicino alla palla, rilascia per lanciare.</p>
         </div>
       </div>`));
@@ -1004,6 +1058,41 @@ export class UI {
     this._hookScreen();
   }
 
+  /**
+   * Statistiche locali: si aggiornano da sole durante le partite e restano
+   * salvate su questo computer.
+   */
+  showStats() {
+    this.screen = "stats";
+    const s = this.game.save.stats || {};
+    const rows = [
+      ["Partite giocate", s.partite ?? 0],
+      ["Vittorie", s.vinte ?? 0],
+      ["Punti fatti", s.puntiFatti ?? 0],
+      ["Punti subiti", s.puntiSubiti ?? 0],
+      ["Colpi totali", s.colpi ?? 0],
+      ["Scambio più lungo", s.rallyMax ?? 0],
+      ["Velocità massima", `${(s.velMax ?? 0).toFixed(1)}`],
+      ["Colpi in curva Q/E", s.curve ?? 0],
+      ["Colpi Schianto", s.schianti ?? 0]
+    ];
+    this.show(this.el(`
+      <div class="screen">
+        <button class="btn small ghost back" data-act="title">← Indietro</button>
+        <div class="panel options">
+          <h2 class="section">Statistiche</h2>
+          <p class="sub">I tuoi numeri su questo computer. Si salvano da soli alla fine di ogni partita.</p>
+          ${rows.map(([k, v]) => `
+            <div class="opt">
+              <div><label>${k}</label></div>
+              <div class="stat-val">${v}</div>
+            </div>`).join("")}
+          <button class="btn small ghost back" data-act="stats-reset" style="margin-top:14px">Azzera statistiche</button>
+        </div>
+      </div>`));
+    this._hookScreen();
+  }
+
   showMenu() { this.showTitle(); }
 
   toast(msg) {
@@ -1025,6 +1114,16 @@ export class UI {
     if (act === "opt") this.showOptions();
     if (act === "ctrl") this.showControls();
     if (act === "pwr") this.showPowers();
+    if (act === "stats") this.showStats();
+    if (act === "stats-reset") {
+      this.game.save.stats = {
+        partite: 0, vinte: 0, puntiFatti: 0, puntiSubiti: 0,
+        colpi: 0, rallyMax: 0, velMax: 0, curve: 0, schianti: 0
+      };
+      this.game.stats = this.game.save.stats;
+      this.game.persist();
+      this.showStats();
+    }
     if (act === "cpu") { this.triangle = false; this.showZones(true); }
     if (act === "pvp") {
       if (!isFirebaseConfigured()) return this.showFirebaseHelp();

@@ -46,8 +46,6 @@ export function makePaddle(color, hw, hd, hh, theme = {}) {
     buildAirHockey(art, mat, color);
   } else if (style === "baseball") {
     buildBaseball(art, mat);
-  } else if (style === "tennis") {
-    buildTennis(art, mat);
   } else {
     buildDefault(art, mat, color, theme, style);
   }
@@ -65,6 +63,11 @@ export function makePaddle(color, hw, hd, hh, theme = {}) {
   });
   g.userData.body = body;
   g.userData.mat = mat;
+  // Curva Q/E: piega morbida di un estremo, alla Pong: Next Level. I vertici
+  // di ogni mesh vengono spostati all'indietro (asse locale -X) con una curva
+  // liscia che lascia dritto il corpo e arriccia solo l'estremo piegato.
+  const bend = makeBendData(art);
+  g.userData.setBend = (L, R) => applyBend(bend, L, R);
   // I modelli tematici mantengono le proporzioni anche quando Allunga
   // aumenta la misura della hitbox lungo Z: la parte scenica può crescere in Y.
   g.userData.scaleHeightWithLength = style !== "neon";
@@ -85,13 +88,108 @@ function fitPaddleArt(art, body, hitLength) {
   }
 }
 
+// --- Curva Q/E (piega morbida degli estremi) --------------------------------
+// Percentuale di lunghezza, su ciascun estremo, che partecipa alla piega:
+// il corpo centrale resta perfettamente dritto.
+const BEND_REGION = 0.38;
+// Quanto si sposta all'indietro la punta, in frazione della lunghezza.
+const BEND_TIP = 0.3;
+
+/**
+ * Cattura per ogni mesh della racchetta: posizioni di base, coordinate in
+ * spazio-art e la matrice inversa per riportare lo spostamento in locale.
+ * Le geometrie vengono clonate per non deformare quelle condivise in cache.
+ */
+function makeBendData(art) {
+  art.updateMatrixWorld(true);
+  const invArt = art.matrixWorld.clone().invert();
+  const items = [];
+  const v = new THREE.Vector3();
+  art.traverse((o) => {
+    if (!o.isMesh || !o.geometry?.attributes?.position) return;
+    o.geometry = o.geometry.clone();
+    const pos = o.geometry.attributes.position;
+    const base = new Float32Array(pos.array);
+    o.updateMatrixWorld(true);
+    const m = o.matrixWorld.clone().premultiply(invArt);
+    const mInv = m.clone().invert();
+    const artPos = new Float32Array(base.length);
+    for (let i = 0; i < pos.count; i++) {
+      v.fromArray(base, i * 3).applyMatrix4(m);
+      v.toArray(artPos, i * 3);
+    }
+    items.push({ mesh: o, base, artPos, mInv });
+  });
+  // Estensione complessiva lungo Z in spazio-art (per normalizzare t).
+  let zMin = Infinity, zMax = -Infinity;
+  for (const it of items) {
+    for (let i = 0; i < it.artPos.length; i += 3) {
+      const z = it.artPos[i + 2];
+      if (z < zMin) zMin = z;
+      if (z > zMax) zMax = z;
+    }
+  }
+  return { items, zMin, zMax, lastL: -1, lastR: -1 };
+}
+
+/**
+ * Profilo della piega per un estremo: 0 sul corpo, cresce con uno smoothstep
+ * più un ricciolo extra proprio sulla punta. `end` = -1 estremo Q, +1 estremo E.
+ */
+function bendProfile(t, end, amount) {
+  // s=0 al confine interno della zona di piega, s=1 sulla punta (che si
+  // arriccia di più). Q piega t=-0.5, E piega t=+0.5; il corpo resta dritto.
+  const s = clamp01((end < 0 ? (-0.5 + BEND_REGION) - t : t - (0.5 - BEND_REGION)) / BEND_REGION);
+  if (s <= 0) return 0;
+  return amount * s * s * (3 - 2 * s) * (0.55 + 0.45 * s);
+}
+
+function clamp01(v) {
+  return v < 0 ? 0 : v > 1 ? 1 : v;
+}
+
+function applyBend(bend, L, R) {
+  if (L === bend.lastL && R === bend.lastR) return;
+  bend.lastL = L;
+  bend.lastR = R;
+  if (bend.items.length === 0) return;
+  const len = Math.max(0.001, bend.zMax - bend.zMin);
+  const mid = (bend.zMin + bend.zMax) / 2;
+  const aL = L * BEND_TIP, aR = R * BEND_TIP;
+  const v = new THREE.Vector3();
+  const d = new THREE.Vector3();
+  const normal = new THREE.Matrix3();
+  for (const it of bend.items) {
+    const pos = it.mesh.geometry.attributes.position;
+    normal.getNormalMatrix(it.mInv);
+    for (let i = 0; i < pos.count; i++) {
+      const z = it.artPos[i * 3 + 2];
+      const t = (z - mid) / len;
+      // All'indietro = -X locale (la racchetta guarda sempre l'avversario).
+      const dx = -(bendProfile(t, -1, aL) + bendProfile(t, 1, aR)) * len;
+      if (dx === 0) {
+        pos.array[i * 3] = it.base[i * 3];
+        pos.array[i * 3 + 1] = it.base[i * 3 + 1];
+        pos.array[i * 3 + 2] = it.base[i * 3 + 2];
+        continue;
+      }
+      d.set(dx, 0, 0).applyMatrix3(normal);
+      pos.array[i * 3] = it.base[i * 3] + d.x;
+      pos.array[i * 3 + 1] = it.base[i * 3 + 1] + d.y;
+      pos.array[i * 3 + 2] = it.base[i * 3 + 2] + d.z;
+    }
+    pos.needsUpdate = true;
+  }
+}
+
 function buildDefault(body, mat, color, theme, style) {
-  const block = new THREE.Mesh(geo("paddle", () => new THREE.BoxGeometry(1, 1, 1)), mat);
+  // Z segmentata: serve alla piega Q/E per curvare in modo morbido.
+  const block = new THREE.Mesh(geo("paddle", () => new THREE.BoxGeometry(1, 1, 1, 1, 1, 16)), mat);
   body.add(block);
   const edgeCol = style === "ice" ? 0xffffff : (style === "mono" ? 0xcccccc : 0xffffff);
   const edgeThickness = style === "ice" ? 0.22 : 0.14;
   const edge = new THREE.Mesh(
-    geo("paddleEdge-" + style, () => new THREE.BoxGeometry(1.1, edgeThickness, 1.04)),
+    geo("paddleEdge-" + style, () => new THREE.BoxGeometry(1.1, edgeThickness, 1.04, 1, 1, 16)),
     new THREE.MeshStandardMaterial({
       color: edgeCol,
       emissive: color,
@@ -105,58 +203,79 @@ function buildDefault(body, mat, color, theme, style) {
 }
 
 function buildBoot(body, leather) {
-  // Uno scarpone da calcio visto dall'alto: punta, tomaia, lacci e tacchetti
-  // restano dentro la lunghezza reale della zona di contatto (asse Z).
-  const soleMat = new THREE.MeshStandardMaterial({ color: 0x0d0b08, roughness: 0.92 });
-  const laceMat = new THREE.MeshStandardMaterial({ color: 0xf5f0e0, roughness: 0.65 });
-  const stripeMat = new THREE.MeshStandardMaterial({ color: 0xd82828, roughness: 0.55, emissive: 0x300000, emissiveIntensity: 0.15 });
-  const white = new THREE.MeshStandardMaterial({ color: 0xf0ede4, roughness: 0.6 });
+  // Scarpa da calcio vista dall'alto con proporzioni reali (lunga e stretta):
+  // occupa TUTTA la lunghezza della racchetta. Punta arrotondata, tomaia
+  // slanciata colorata, toe-cap bianca, lacci centrali, tripla striscia
+  // laterale, controtallone scuro con collarino e tacchetti sotto la suola.
+  const dark = new THREE.MeshStandardMaterial({ color: 0x171b20, roughness: 0.82 });
+  const soleMat = new THREE.MeshStandardMaterial({ color: 0x0c0e11, roughness: 0.95 });
+  const white = new THREE.MeshStandardMaterial({ color: 0xf2efe6, roughness: 0.55 });
+  const laceMat = new THREE.MeshStandardMaterial({ color: 0xf7f4ea, roughness: 0.6 });
+  const logoMat = new THREE.MeshStandardMaterial({ color: 0xffd23d, roughness: 0.4, emissive: 0x553800, emissiveIntensity: 0.25 });
 
-  const sole = new THREE.Mesh(new THREE.BoxGeometry(0.84, 0.14, 1.0), soleMat);
-  sole.position.y = -0.18;
-  const upper = new THREE.Mesh(new THREE.CapsuleGeometry(0.32, 0.42, 5, 12), leather);
+  // Suola: piastra scura più larga della tomaia, lunga quanto la scarpa.
+  const sole = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.05, 0.98), soleMat);
+  sole.position.y = -0.42;
+
+  // Tomaia: capsula lungo Z appiattita, dal tallone alla punta.
+  const upper = new THREE.Mesh(new THREE.CapsuleGeometry(0.125, 0.66, 6, 16), leather);
   upper.rotation.x = Math.PI / 2;
-  upper.scale.set(1.15, 1, 0.92);
-  upper.position.set(0, 0.08, 0.02);
-  const toe = new THREE.Mesh(new THREE.SphereGeometry(0.34, 14, 10), leather);
-  toe.scale.set(1.15, 0.7, 0.85);
-  toe.position.set(0, 0.0, 0.36);
-  const heel = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.38, 0.28), leather);
-  heel.position.set(0, 0.1, -0.32);
-  const toeCap = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.2, 0.16), white);
-  toeCap.position.set(0, 0.06, 0.48);
-  // Colletto alto: la racchetta deve leggere come uno scarpone anche di lato.
-  const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.38, 0.92, 14), leather);
-  collar.position.set(0, 0.65, -0.22);
-  const cuff = new THREE.Mesh(new THREE.TorusGeometry(0.31, 0.055, 7, 14), white);
-  cuff.position.set(0, 1.08, -0.22);
-  const tongue = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.26, 0.48), leather);
-  tongue.position.set(0, 0.58, 0.03);
+  upper.scale.set(0.92, 0.6, 1);
+  upper.position.set(0, 0.02, 0);
 
-  // Lacci trasversali sopra la linguetta.
-  for (let i = 0; i < 4; i++) {
-    const lace = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.035, 0.045), laceMat);
-    lace.position.set(0, 0.47 - i * 0.015, -0.12 + i * 0.1);
+  // Punta arrotondata.
+  const toe = new THREE.Mesh(new THREE.SphereGeometry(0.13, 14, 10), leather);
+  toe.scale.set(0.92, 0.5, 0.5);
+  toe.position.set(0, 0.02, 0.43);
+
+  // Toe-cap bianca sul primo terzo davanti.
+  const toeCap = new THREE.Mesh(new THREE.BoxGeometry(0.27, 0.1, 0.3), white);
+  toeCap.position.set(0, 0.1, 0.3);
+
+  // Controtallone scuro con collarino chiaro attorno alla caviglia.
+  const heel = new THREE.Mesh(new THREE.BoxGeometry(0.27, 0.16, 0.24), dark);
+  heel.position.set(0, 0.07, -0.39);
+  const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.14, 0.2, 12), leather);
+  collar.position.set(0, 0.12, -0.45);
+  const cuff = new THREE.Mesh(new THREE.TorusGeometry(0.11, 0.022, 6, 12), white);
+  cuff.rotation.x = Math.PI / 2;
+  cuff.position.set(0, 0.23, -0.45);
+
+  // Linguetta sotto i lacci.
+  const tongue = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.05, 0.34), leather);
+  tongue.position.set(0, 0.15, 0.03);
+
+  // Lacci trasversali, dal collo verso la punta.
+  for (let i = 0; i < 6; i++) {
+    const lace = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.02, 0.028), laceMat);
+    lace.position.set(0, 0.18, 0.08 + i * 0.05);
     body.add(lace);
   }
-  // Strisce laterali che seguono la tomaia.
+
+  // Tripla striscia laterale su entrambi i lati, che segue la tomaia.
   for (const side of [-1, 1]) {
     for (let i = 0; i < 3; i++) {
-      const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.2, 0.14), stripeMat);
-      stripe.position.set(side * 0.39, 0.12, -0.12 + i * 0.14);
-      stripe.rotation.y = side * 0.2;
+      const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.035, 0.4), white);
+      stripe.position.set(side * (0.085 + i * 0.03), 0.09, 0.05);
+      stripe.rotation.y = side * 0.14;
       body.add(stripe);
     }
+    // Logo dorato sul controtallone.
+    const logo = new THREE.Mesh(new THREE.CylinderGeometry(0.034, 0.034, 0.02, 10), logoMat);
+    logo.rotation.x = Math.PI / 2;
+    logo.position.set(side * 0.1, 0.12, -0.43);
+    body.add(logo);
   }
-  // Tacchetti, visibili sotto la suola senza allargare il contatto laterale.
-  for (let zi = 0; zi < 4; zi++) {
+
+  // Tacchetti: due file da cinque sotto la suola, a contatto col tavolo.
+  for (let zi = 0; zi < 5; zi++) {
     for (let xi = 0; xi < 2; xi++) {
-      const stud = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.065, 0.12, 8), soleMat);
-      stud.position.set(-0.22 + xi * 0.44, -0.3, -0.34 + zi * 0.22);
+      const stud = new THREE.Mesh(new THREE.ConeGeometry(0.034, 0.1, 7), soleMat);
+      stud.position.set(-0.09 + xi * 0.18, -0.5, -0.36 + zi * 0.18);
       body.add(stud);
     }
   }
-  body.add(sole, upper, toe, heel, toeCap, collar, cuff, tongue);
+  body.add(sole, upper, toe, toeCap, heel, collar, cuff, tongue);
 }
 
 function buildJungle(body, barkMat) {
@@ -350,38 +469,6 @@ function buildBaseball(body, _mat) {
   body.add(barrel, handle, knob, tape);
 }
 
-function buildTennis(body, _mat) {
-  // Racchetta da tennis stilizzata: telaio, corde e manico. La lunghezza del
-  // telaio segue Z e viene ricondotta alla hitbox dalla misura applicata in
-  // makePaddle; l'altezza del manico può invece sporgere in Y.
-  const frame = new THREE.MeshStandardMaterial({ color: 0x1b552f, metalness: 0.15, roughness: 0.48 });
-  const grip = new THREE.MeshStandardMaterial({ color: 0x8b4d2e, roughness: 0.86 });
-  const strings = new THREE.MeshBasicMaterial({ color: 0xe7f4d2, transparent: true, opacity: 0.78, side: THREE.DoubleSide });
-  const ball = new THREE.MeshStandardMaterial({ color: 0xc7f03d, roughness: 0.5, emissive: 0x536b12, emissiveIntensity: 0.12 });
-  const hoop = new THREE.Mesh(new THREE.TorusGeometry(0.36, 0.055, 8, 18), frame);
-  hoop.scale.set(0.78, 1, 1.18);
-  hoop.rotation.x = Math.PI / 2;
-  hoop.position.y = 0.12;
-  const net = new THREE.Mesh(new THREE.PlaneGeometry(0.55, 0.74), strings);
-  net.rotation.x = Math.PI / 2;
-  net.position.set(0, 0.12, 0);
-  const handle = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.18, 0.48), grip);
-  handle.position.set(0, -0.2, -0.43);
-  const butt = new THREE.Mesh(new THREE.SphereGeometry(0.1, 10, 8), grip);
-  butt.scale.set(1, 0.65, 1.1);
-  butt.position.set(0, -0.2, -0.66);
-  const tennisBall = new THREE.Mesh(new THREE.SphereGeometry(0.11, 12, 8), ball);
-  tennisBall.position.set(0.18, 0.38, 0.16);
-  // Seconda lettura in altezza: una racchetta da tennis riconoscibile anche
-  // dal profilo, non solo come un anello schiacciato sul tavolo.
-  const uprightHoop = new THREE.Mesh(new THREE.TorusGeometry(0.36, 0.055, 8, 18), frame);
-  uprightHoop.scale.set(0.78, 1.25, 1);
-  uprightHoop.position.set(0, 0.62, 0.02);
-  const uprightNet = new THREE.Mesh(new THREE.PlaneGeometry(0.55, 0.74), strings);
-  uprightNet.position.set(0, 0.62, 0.08);
-  body.add(hoop, net, handle, butt, tennisBall, uprightHoop, uprightNet);
-}
-
 function darken(hex, k) {
   const r = (hex >> 16) & 255, g = (hex >> 8) & 255, b = hex & 255;
   return (Math.floor(r * (1 - k)) << 16) | (Math.floor(g * (1 - k)) << 8) | Math.floor(b * (1 - k));
@@ -535,13 +622,6 @@ export function makeBall(color = 0xffffff, r = 0.22, theme = {}) {
       new THREE.MeshBasicMaterial({ color: 0xffb4d2, transparent: true, opacity: 0.98 }));
     halo.rotation.x = Math.PI / 2;
     deco.add(ice, facets, halo);
-  } else if (style === "tennis") {
-    const tennis = new THREE.Mesh(geo("ball-tennis", () => new THREE.SphereGeometry(0.92, 20, 14)),
-      new THREE.MeshStandardMaterial({ color: 0xc8f23d, emissive: 0x718d16, emissiveIntensity: 0.18, roughness: 0.52 }));
-    const seam = new THREE.Mesh(new THREE.TorusGeometry(0.72, 0.035, 6, 28),
-      new THREE.MeshBasicMaterial({ color: 0xf4ffd0, transparent: true, opacity: 0.9 }));
-    seam.rotation.set(0.7, 0.35, 0.2);
-    deco.add(tennis, seam);
   } else if (style === "airhockey") {
     const puck = new THREE.Mesh(new THREE.CylinderGeometry(0.78, 0.78, 0.22, 24),
       new THREE.MeshStandardMaterial({ color: 0xf5fbff, metalness: 0.3, roughness: 0.2, emissive: 0x8fdcff, emissiveIntensity: 0.28 }));
@@ -559,7 +639,7 @@ export function makeBall(color = 0xffffff, r = 0.22, theme = {}) {
   }
 
   // Se è un pattern di default non-sovrascritto, aggiungi i pentagoni da calcio.
-  if (style === "neon" || style === "mono" || style === "airhockey" || style === "ice" || style === "tennis") {
+  if (style === "neon" || style === "mono" || style === "airhockey" || style === "ice") {
     // nessun pattern, già fatto
   }
 
@@ -616,7 +696,7 @@ export function tickBallMesh(mesh, vx, vz, dt) {
 // ============================================================
 const surfaceTextures = new Map();
 function surfaceTexture(style) {
-  const styles = ["jungle", "boot", "airhockey", "baseball", "western", "sushi", "viking", "tennis"];
+  const styles = ["jungle", "boot", "airhockey", "baseball", "western", "sushi", "viking"];
   if (!styles.includes(style)) return null;
   if (surfaceTextures.has(style)) return surfaceTextures.get(style);
   const S = 256;
@@ -662,16 +742,6 @@ function surfaceTexture(style) {
       c.fillStyle = `rgba(255,255,255,${Math.random() * 0.04})`;
       c.fillRect(Math.random() * S, Math.random() * S, 1, 1);
     }
-  } else if (style === "tennis") {
-    c.fillStyle = "#b85c38"; c.fillRect(0, 0, S, S);
-    for (let i = 0; i < 1800; i++) {
-      c.fillStyle = `rgba(${90+Math.random()*30},${30+Math.random()*20},${10+Math.random()*10},0.32)`;
-      c.fillRect(Math.random() * S, Math.random() * S, 2, 2);
-    }
-    c.strokeStyle = "rgba(247,240,221,.8)"; c.lineWidth = 3;
-    c.strokeRect(24, 18, S - 48, S - 36);
-    c.beginPath(); c.moveTo(S / 2, 18); c.lineTo(S / 2, S - 18); c.stroke();
-    c.lineWidth = 1.5; c.beginPath(); c.moveTo(24, S / 2); c.lineTo(S - 24, S / 2); c.stroke();
   } else {
     c.fillStyle = style === "boot" ? "#a8c59d" : "#a3b68b";
     c.fillRect(0, 0, S, S);
@@ -714,7 +784,7 @@ function themedStandardMaterial(color, theme = {}, extra = {}) {
 
 function rimMaterial(lineColor, theme) {
   const style = theme.style || "neon";
-  const woodStyles = ["jungle", "viking", "western", "sushi", "tennis"];
+  const woodStyles = ["jungle", "viking", "western", "sushi"];
   return new THREE.MeshStandardMaterial({
     color: woodStyles.includes(style) ? 0x2a180a : (style === "boot" ? 0xe7e1d4 : (style === "ice" ? 0xffffff : 0x0a0c12)),
     metalness: (style === "neon" || style === "ice") ? 0.7 : 0,
@@ -752,13 +822,6 @@ export function makeTable(w, d, color, lineColor, opts = {}) {
   mid.rotation.x = -Math.PI/2; mid.position.y = 0.01; g.add(mid);
   const center = new THREE.Mesh(new THREE.RingGeometry(1.1, 1.18, 48), lineMat);
   center.rotation.x = -Math.PI/2; center.position.y = 0.012; g.add(center);
-  for (const s of [-1, 1]) {
-    const box = new THREE.Mesh(new THREE.PlaneGeometry(w*0.18, d*0.55), lineMat.clone());
-    box.material.opacity = 0.18;
-    box.rotation.x = -Math.PI/2;
-    box.position.set(s*w*0.38, 0.011, 0);
-    g.add(box);
-  }
   g.userData.top = top;
   return g;
 }
@@ -804,6 +867,46 @@ export function makeCircleTable(radius, color, lineColor, theme = {}) {
   const inner = new THREE.Mesh(new THREE.RingGeometry(radius*0.22, radius*0.24, 48),
     new THREE.MeshBasicMaterial({ color: lineColor, transparent: true, opacity: 0.55, side: THREE.DoubleSide }));
   inner.rotation.x = -Math.PI/2; inner.position.y = 0.01; g.add(inner);
+  return g;
+}
+
+/**
+ * Coltre di nebbia leggera (power-up Nebbia): nuvole piatte e soffici sulla
+ * metà campo X>0. Il gruppo viene specchiato per coprire l'altra metà.
+ * Copre "un po'": la palla e il tavolo restano visibili, solo velati.
+ */
+export function makeFogBank(w, d, color = 0xffffff) {
+  const g = new THREE.Group();
+  // Texture radiale morbida, riusata da tutte le nuvole.
+  const S = 128;
+  const cvs = document.createElement("canvas");
+  cvs.width = cvs.height = S;
+  const c = cvs.getContext("2d");
+  const grad = c.createRadialGradient(S / 2, S / 2, S * 0.04, S / 2, S / 2, S * 0.5);
+  grad.addColorStop(0, "rgba(255,255,255,0.9)");
+  grad.addColorStop(0.55, "rgba(255,255,255,0.38)");
+  grad.addColorStop(1, "rgba(255,255,255,0)");
+  c.fillStyle = grad;
+  c.fillRect(0, 0, S, S);
+  const tex = new THREE.CanvasTexture(cvs);
+  let seed = 7;
+  const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
+  for (let i = 0; i < 9; i++) {
+    const s = 2.6 + rnd() * 2.2;
+    const m = new THREE.Mesh(
+      new THREE.PlaneGeometry(s, s),
+      new THREE.MeshBasicMaterial({
+        map: tex, color, transparent: true, depthWrite: false,
+        opacity: 0.13 + rnd() * 0.13
+      })
+    );
+    m.rotation.x = -Math.PI / 2;
+    m.position.set(1.0 + rnd() * (w / 2 - 1.5), 1.0 + rnd() * 1.1, -d / 2 + 0.9 + rnd() * (d - 1.8));
+    m.userData.baseOp = m.material.opacity;
+    m.userData.drift = 0.4 + rnd() * 0.7;
+    m.userData.phase = rnd() * Math.PI * 2;
+    g.add(m);
+  }
   return g;
 }
 
@@ -1060,8 +1163,6 @@ export function impactParticles(scene, x, z, theme, color) {
     particles = makeBurst(scene, x, z, [0x4dc6ff, 0xf5fbff], { spark: true });
   } else if (style === "baseball") {
     particles = makeBurst(scene, x, z, [0xd84747, 0xf7f4e8, 0xc58a4a], { spark: true });
-  } else if (style === "tennis") {
-    particles = makeBurst(scene, x, z, [0xc8f23d, 0xf7f0dd], { spark: true });
   } else {
     particles = makeBurst(scene, x, z, [color, 0xffffff], { spark: true });
   }

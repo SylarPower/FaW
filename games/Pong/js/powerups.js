@@ -2,12 +2,15 @@ import { makePowerToken, POWER_PICKUP_RADIUS } from "./models.js";
 
 export const POWER_DEFS = {
   grab: { id: "grab", glyph: "✋", name: "Presa", desc: "Permette di trattenere e lanciare la palla", color: 0x3dffd1, hold: true },
-  whack: { id: "whack", glyph: "✸", name: "Schianto", desc: "I prossimi 3 rimbalzi accelerano la palla", color: 0xffc857, charges: 3 },
+  whack: { id: "whack", glyph: "✸", name: "Schianto", desc: "3 colpi potenziati: ognuno più veloce del precedente", color: 0xffc857, charges: 3 },
   stretch: { id: "stretch", glyph: "↔", name: "Allunga", desc: "Allunga ancora la racchetta; gli effetti si sommano", color: 0x8ee7ff },
   turbo: { id: "turbo", glyph: "≫", name: "Turbo", desc: "Aumenta temporaneamente la velocità di movimento", color: 0xff7a3d },
   spike: { id: "spike", glyph: "▲", name: "Spine", desc: "Alza le spine difensive", color: 0xff5a5a },
   invert: { id: "invert", glyph: "⇄", name: "Caos", desc: "Inverte temporaneamente i comandi avversari", color: 0xc77dff },
   barrier: { id: "barrier", glyph: "▤", name: "Barriera", desc: "Crea un muro temporaneo in porta", color: 0x9be7ff },
+  magnet: { id: "magnet", glyph: "◉", name: "Calamita", desc: "Per 6s la palla viene attratta verso la tua racchetta", color: 0xb48cff },
+  fog: { id: "fog", glyph: "☁", name: "Nebbia", desc: "Per 7s una coltre leggera copre il campo avversario", color: 0xcfd8e3 },
+  spin: { id: "spin", glyph: "〰", name: "Effetto", desc: "Il prossimo colpo parte con una fiondata laterale fortissima", color: 0x66e3b0, charges: 1 },
   fan: { id: "fan", glyph: "✺", name: "Ventilatore", desc: "Soffia il disco via da te", color: 0x7ad7ff },
   tilt: { id: "tilt", glyph: "◣", name: "Inclinazione", desc: "Inclina il tavolo", color: 0xffb347 },
   hill: { id: "hill", glyph: "⌒", name: "Collina", desc: "Crea o rafforza il dosso al centro", color: 0x86c06c },
@@ -110,14 +113,18 @@ export function applyPower(id, side, ctx) {
       break;
     case "whack":
       // Ogni raccolta aggiunge tre rimbalzi, condivisi tra tutte le racchette.
-      for (const p of pads) p.powerHit = (p.powerHit || 0) + 3;
+      // Una nuova raccolta fa ripartire la catena dal primo colpo.
+      for (const p of pads) {
+        p.powerHit = (p.powerHit || 0) + 3;
+        p.whackStep = 0;
+      }
       break;
     case "stretch":
       // Un timer per ogni raccolta: quando si raccolgono più Allunga insieme,
       // la racchetta cresce di più invece di sostituire il potere precedente.
       for (const p of pads) {
         if (!p.stretchTimers) p.stretchTimers = [];
-        p.stretchTimers.push(8);
+        p.stretchTimers.push(10);
         p.stretchStacks = p.stretchTimers.length;
       }
       break;
@@ -130,6 +137,17 @@ export function applyPower(id, side, ctx) {
     case "barrier":
       for (const p of pads) addTime(p, "barrierT", 6);
       ctx.features?.raiseBarrier?.(side, 6);
+      break;
+    case "magnet":
+      for (const p of pads) addTime(p, "magnetT", 6);
+      break;
+    case "fog":
+      // La coltre leggera copre la metà campo dell'avversario.
+      ctx.features?.fog?.(side);
+      break;
+    case "spin":
+      // Una carica per colpo: la prossima racchettata parte con la fiondata.
+      for (const p of pads) p.spinHit = (p.spinHit || 0) + 1;
       break;
     case "spike":
       ctx.features?.raiseSpikes?.(side);

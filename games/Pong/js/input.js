@@ -4,8 +4,10 @@ const just = new Set();
 const bind = {
   up: ["KeyW", "ArrowUp", "KeyZ"],
   down: ["KeyS", "ArrowDown"],
-  altup: ["KeyA", "KeyQ", "ArrowLeft"],
+  altup: ["KeyA", "ArrowLeft"],
   altdown: ["KeyD", "ArrowRight"],
+  curveL: ["KeyQ"],
+  curveR: ["KeyE"],
   power: ["Space"],
   pause: ["Escape", "KeyP"],
   confirm: ["Enter", "Space"]
@@ -34,6 +36,8 @@ export const input = {
   axisJustDown: false,
   axisJustAltUp: false,
   axisJustAltDown: false,
+  curveL: false,
+  curveR: false,
   power: false,
   powerHeld: false,
   pause: false,
@@ -57,6 +61,8 @@ export const input = {
     return {
       axis: this.axis,
       axis2: this.axis2,
+      curveL: this.curveL,
+      curveR: this.curveR,
       power: this.power,
       powerHeld: this.powerHeld
     };
@@ -71,6 +77,8 @@ export const input = {
     this.axisJustAltDown = this.axis2 === 0 && a2 > 0;
     this.axis = a;
     this.axis2 = a2;
+    this.curveL = any(bind.curveL);
+    this.curveR = any(bind.curveR);
     this.power = anyJust(bind.power);
     this.powerHeld = any(bind.power);
     this.pause = anyJust(bind.pause);
@@ -83,6 +91,8 @@ export const input = {
     this.pause = false;
     this.confirm = false;
     this.power = false;
+    this.curveL = false;
+    this.curveR = false;
     this.axisJustUp = false;
     this.axisJustDown = false;
     this.axisJustAltUp = false;
