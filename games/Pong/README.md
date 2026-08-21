@@ -38,12 +38,32 @@ con una fiondata laterale fortissima).
 
 Le racchette hanno tutte la **stessa lunghezza** (riferimento: Giungla); cambiano
 larghezza e altezza a seconda del tema, ma il bordo più avanzato verso il centro
-del campo è identico per tutte. Le forme tonde o larghe (mazza Air Hockey,
-scarpa da Calcio, botte Western) possono sporgere un po' **fuori dal campo
-esterno** restando agganciate al bordo interno della hitbox: forma corretta,
-zero spazio interno rubato. Nel tema **Colori** ogni tocco sulla racchetta fa
-uno splash di un colore casuale con una forma casuale, più la macchia che resta
-sul tavolo ad asciugarsi.
+del campo è identico per tutte. Il colpo si basa sempre sulla hitbox: nel tema
+**Calcio** la racchetta è un **piedistallo d'oro con le dimensioni esatte della
+hitbox** (una sorta di base per la coppa dei campioni) con sopra appoggiata una
+**scarpa da calcio** ben disegnata; nel tema **Air Hockey** è un **pezzo nero
+setolato con le dimensioni esatte della hitbox** con sopra appoggiato il
+**piattino da air hockey**, e la palla è il classico disco piatto nero o bianco.
+Nel tema **Colori** ogni tocco sulla racchetta fa uno splash di un colore
+casuale con una forma casuale: la racchetta **si macchia di quel colore e la
+macchia persiste** per tutta la partita (più una chiazza sul tavolo che si
+asciuga).
+
+Alcuni tavoli **impongono il loro tema grafico** (Pinguini → Ghiaccio, Calcio
+Stelle → Calcio, Festa in Spiaggia → Spiaggia, Hockey Puck → Air Hockey):
+nell'arena su misura la selezione del tema risulta disattivata e viene
+selezionato il tema corrispettivo.
+
+Nel **Tavolo Folle** la livella al centro spiega cosa sta succedendo: la
+freccia indica la direzione in cui scivolerà la palla e l'inclinazione dura
+qualche secondo prima che il tavolo torni piano (l'HUD mostra il tempo). In
+**Giungla** le buche sono trappole: caderci dentro regala il punto
+all'avversario (la buca centrale fa solo ripartire il servizio). In **Tronchi
+Rotanti** i tronchi restano fermi per design: si muovono solo col potere
+Rotazione, che ora ha una durata più leggibile e una corteccia striata che
+rende visibile il movimento. In **Hockey Puck** il disco parte nella direzione
+opposta a quella da cui arriva la palla, con una spinta proporzionale
+all'impatto.
 
 La palla non ha un tetto di velocità: ogni rimbalzo la accelera un po' meno del
 precedente, ma per sempre. La velocità si vede: scia più accesa e rossa, luce

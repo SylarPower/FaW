@@ -3,7 +3,7 @@ import { Paddle, clamp, rand, pick, makeTri } from "./physics.js";
 import { applyTheme } from "./themes.js";
 import {
   makeTable, makeCircleTable, makeTriangleTable, makePenguin, makeLog, makeHill,
-  makeBalloon, makePuck, makeBumper, makeGoalFrame, makeSpike,
+  makePuck, makeGoalFrame, makeSpike,
   makeSeal, makePolarBear, makeSpectators, makeFogBank
 } from "./models.js";
 
@@ -24,7 +24,7 @@ export const ARENAS = [
     id: "soccer", zone: "Arcade", zoneId: 1, name: "Calcio Stelle",
     tag: "Stadio",
     desc: "Attaccante e portiere. Segna nella porta, non sulla linea di fondo.",
-    scoreToWin: 10, paddles: 1, powerUps: ["whack", "stretch", "turbo", "fog"]
+    scoreToWin: 10, paddles: 1, powerUps: ["whack", "stretch", "turbo", "fog"], theme: "boot"
   },
   {
     id: "penguin", zone: "Artide", zoneId: 2, name: "Pinguini sul Ghiaccio",
@@ -51,16 +51,10 @@ export const ARENAS = [
     scoreToWin: 10, paddles: 1, powerUps: ["whack", "stretch", "spin"]
   },
   {
-    id: "clown", zone: "Show", zoneId: 4, name: "Circo dei Colori",
-    tag: "Abbinamento",
-    desc: "La palla ha un colore. Segna solo nella casella dello stesso colore.",
-    scoreToWin: 8, paddles: 1, powerUps: []
-  },
-  {
     id: "beach", zone: "Show", zoneId: 4, name: "Festa in Spiaggia",
     tag: "Presa infinita",
     desc: "Acqua lenta. Tieni premuto per afferrare e rilasciare la palla. Si gioca a 7.",
-    scoreToWin: 7, paddles: 1, powerUps: ["grab", "magnet"]
+    scoreToWin: 7, paddles: 1, powerUps: ["grab", "magnet"], theme: "spiaggia"
   },
   {
     id: "tilt", zone: "Show", zoneId: 4, name: "Tavolo Folle",
@@ -72,13 +66,7 @@ export const ARENAS = [
     id: "puck", zone: "Leggenda", zoneId: 5, name: "Hockey Puck",
     tag: "Disco",
     desc: "Afferra una palla e lanciala sul disco. Fai oltrepassare la linea avversaria.",
-    scoreToWin: 5, paddles: 1, powerUps: ["grab", "fan"]
-  },
-  {
-    id: "pinball", zone: "Leggenda", zoneId: 5, name: "Pongball Wizard",
-    tag: "Flipper",
-    desc: "Colpisci i pilastri accesi, poi le sbarre d'oro. Multiball incluso.",
-    scoreToWin: 3, paddles: 1, powerUps: ["whack"]
+    scoreToWin: 5, paddles: 1, powerUps: ["grab", "fan"], theme: "airhockey"
   },
   {
     id: "jungle", zone: "Leggenda", zoneId: 5, name: "Giungla",
@@ -98,6 +86,15 @@ export function arenaById(id) {
   return ARENAS.find((a) => a.id === id);
 }
 
+/**
+ * Tavoli che impongono un tema grafico specifico: quando uno di questi è
+ * selezionato nell'arena su misura, la scelta del tema viene disabilitata e
+ * il tema mostrato/attivo è quello qui indicato.
+ */
+export const ARENA_FORCED_THEME = Object.fromEntries(
+  ARENAS.filter((a) => a.theme).map((a) => [a.id, a.theme])
+);
+
 export const THEMES = {
   classic: { bg: 0x07080e, fog: 0x07080e, table: 0x10141c, line: 0x3dffd1, p1: 0x3dffd1, p2: 0xff3d7f, bloom: 0.42 },
   walled: { bg: 0x0a0b10, fog: 0x0a0b10, table: 0x141821, line: 0xffc857, p1: 0x3dffd1, p2: 0xff3d7f, bloom: 0.4 },
@@ -106,11 +103,9 @@ export const THEMES = {
   snowstorm: { bg: 0x0b1420, fog: 0x8aa, table: 0xd9eef8, line: 0x8ee7ff, p1: 0x8ee7ff, p2: 0xff3d7f, bloom: 0.5 },
   logs: { bg: 0x120c08, fog: 0x120c08, table: 0x3a2718, line: 0xd27d2c, p1: 0xffc857, p2: 0xff6a3d, hemi: 0xffe0c0, bloom: 0.34 },
   moles: { bg: 0x0c140c, fog: 0x0c140c, table: 0x2e7d3a, line: 0xf5f5f5, p1: 0x3dffd1, p2: 0xff3d7f, bloom: 0.3 },
-  clown: { bg: 0x140610, fog: 0x140610, table: 0x2a1020, line: 0xffc857, p1: 0xff4d8d, p2: 0x4d9fff, bloom: 0.5 },
   beach: { bg: 0x081820, fog: 0x081820, table: 0x1a8f9a, line: 0xffe08a, p1: 0xffe08a, p2: 0xff6aa8, hemi: 0xfff0c8, bloom: 0.4, exposure: 1.15 },
   tilt: { bg: 0x0c0c14, fog: 0x0c0c14, table: 0x1a2030, line: 0x7ad7ff, p1: 0x3dffd1, p2: 0xff3d7f, bloom: 0.44 },
   puck: { bg: 0x0a1018, fog: 0x0a1018, table: 0xcfdbe6, line: 0xff3d7f, p1: 0x3d7dff, p2: 0xff3d7f, bloom: 0.4 },
-  pinball: { bg: 0x080610, fog: 0x080610, table: 0x12081c, line: 0xff4dff, p1: 0x3dffd1, p2: 0xffc857, bloom: 0.62 },
   jungle: { bg: 0x071208, fog: 0x071208, table: 0x1c4a24, line: 0xffc857, p1: 0x9be36a, p2: 0xff7a3d, bloom: 0.36 },
   triangle: { bg: 0x08070f, fog: 0x08070f, table: 0x14101c, line: 0xffc857, p1: 0x3dffd1, p2: 0xff3d7f, bloom: 0.5 }
 };
@@ -176,7 +171,7 @@ export function buildArena(id, engine, world, sizeMul = 1, themeId = "neon") {
   } else {
     world.circle = false;
     world.w = w; world.d = id === "soccer" || id === "moles" ? 13 : 12;
-    world.openEnds = !["soccer", "moles", "walled", "logs", "clown", "jungle", "puck"].includes(id);
+    world.openEnds = !["soccer", "moles", "walled", "logs", "jungle", "puck"].includes(id);
     ctrl.table = engine.add(makeTable(world.w, world.d, theme.table, theme.line, { openEnds: true, theme }));
   }
 
@@ -202,16 +197,16 @@ export function buildArena(id, engine, world, sizeMul = 1, themeId = "neon") {
     }
   };
 
-  if (id === "classic" || id === "penguin" || id === "snowstorm" || id === "tilt" || id === "pinball") {
+  if (id === "classic" || id === "penguin" || id === "snowstorm" || id === "tilt") {
     makePads(1);
-  } else if (id === "logs" || id === "clown" || id === "jungle" || id === "puck") {
+  } else if (id === "logs" || id === "jungle" || id === "puck") {
     makePads(1);
   } else {
     makePads(def.paddles || 2);
   }
 
   world.icePaddles = (id === "penguin" || id === "snowstorm" || id === "puck") ? 1.2 : 0;
-  world.drag = id === "beach" ? 0.008 : 0;
+  world.drag = id === "beach" ? 0.004 : 0;
 
   setupGoals(id, world, engine, theme, ctrl);
   setupSpecial(id, world, engine, theme, ctrl);
@@ -407,7 +402,7 @@ function setupThemeDecor(theme, world, engine, ctrl) {
 
 function setupGoals(id, world, engine, theme, ctrl) {
   world.goals = [];
-  if (id === "classic" || id === "penguin" || id === "snowstorm" || id === "tilt" || id === "beach" || id === "pinball") {
+  if (id === "classic" || id === "penguin" || id === "snowstorm" || id === "tilt" || id === "beach") {
     world.goals.push(
       { side: "left", zMin: -99, zMax: 99, accept: () => true, open: true },
       { side: "right", zMin: -99, zMax: 99, accept: () => true, open: true }
@@ -457,34 +452,6 @@ function setupGoals(id, world, engine, theme, ctrl) {
       );
     }
     addEndWalls(world, engine, theme, null, true, gw);
-    return;
-  }
-  if (id === "clown") {
-    const colors = [
-      { id: "red", color: 0xff1a4a },
-      { id: "blue", color: 0x1a7aff },
-      { id: "gold", color: 0xffea2a }
-    ];
-    ctrl.colors = colors;
-    world.openEnds = false;
-    const slot = world.d / colors.length;
-    colors.forEach((c, i) => {
-      const z0 = -world.d / 2 + i * slot;
-      const z1 = z0 + slot;
-      for (const side of ["left", "right"]) {
-        world.goals.push({
-          side, zMin: z0 + 0.15, zMax: z1 - 0.15, colorId: c.id,
-          accept: (b) => !b.colorId || b.colorId === c.id, open: true
-        });
-        const m = new THREE.Mesh(
-          new THREE.BoxGeometry(0.3, 0.7, slot - 0.2),
-          new THREE.MeshStandardMaterial({ color: c.color, emissive: c.color, emissiveIntensity: 2.5 })
-        );
-        m.position.set(side === "left" ? -world.w / 2 - 0.05 : world.w / 2 + 0.05, 0.35, (z0 + z1) / 2);
-        engine.add(m);
-      }
-    });
-    addEndWalls(world, engine, theme, 0);
     return;
   }
   if (id === "puck") {
@@ -666,41 +633,46 @@ function setupSpecial(id, world, engine, theme, ctrl) {
     const mesh = makePuck();
     engine.add(mesh);
     ctrl.puck = { type: "puck", x: 0, z: 0, r: 0.72, vx: 0, vz: 0, mesh, restitution: 0.55, mass: 3 };
+    // Fisica del disco da air hockey: quando la palla lo colpisce, il disco
+    // parte nella direzione OPPOSTA a quella da cui arriva la palla, lungo la
+    // normale dell'impatto, con una spinta proporzionale alla velocità in
+    // arrivo (il grosso del lavoro è in physics.collideBallCircle, che chiama
+    // onHit prima di far rimbalzare la palla).
+    ctrl.puck.onHit = (b, nx, nz, inVx, inVz) => {
+      // n = normale palla→ostacolo; la palla spinge se arriva contro il disco
+      // (vn < 0), altrimenti lo ha solo sfiorato.
+      const vn = inVx * nx + inVz * nz;
+      if (vn >= 0) return;
+      const push = -vn * 0.62;
+      ctrl.puck.vx += -nx * push;
+      ctrl.puck.vz += -nz * push;
+      const os = Math.hypot(ctrl.puck.vx, ctrl.puck.vz);
+      const maxPuck = 16;
+      if (os > maxPuck) {
+        ctrl.puck.vx *= maxPuck / os;
+        ctrl.puck.vz *= maxPuck / os;
+      }
+    };
     world.obstacles.push(ctrl.puck);
-  }
-  if (id === "pinball") {
-    ctrl.pillars = [];
-    const pts = [[-2.2, 2.4], [2.2, 2.4], [-2.2, -2.4], [2.2, -2.4]];
-    pts.forEach(([x, z], i) => {
-      const mesh = makeBumper([0xff4d8d, 0x3dffd1, 0xffc857, 0x7ad7ff][i]);
-      mesh.position.set(x, 0, z);
-      engine.add(mesh);
-      const p = { type: "bumper", x, z, r: 0.48, mesh, hp: 3, glow: i === 0, restitution: 1.35 };
-      world.obstacles.push(p);
-      ctrl.pillars.push(p);
-    });
-    ctrl.activePillar = 0;
-    setPillarGlow(ctrl);
-    ctrl.gold = { x: 0, z: 0, r: 0.55, ready: false, mesh: null };
-    const gm = new THREE.Mesh(
-      new THREE.BoxGeometry(0.9, 0.35, 0.35),
-      new THREE.MeshStandardMaterial({ color: 0xffc857, metalness: 0.85, roughness: 0.2, emissive: 0xffc857, emissiveIntensity: 0.6 })
-    );
-    gm.position.set(0, 0.25, 0);
-    gm.visible = false;
-    engine.add(gm);
-    ctrl.gold.mesh = gm;
   }
   if (id === "jungle") {
     const holes = [[-3, 2.5], [3, -2.5], [0, 0], [-4.5, -2], [4.5, 2], [1.8, 3.4], [-1.8, -3.4]];
     for (const [x, z] of holes) {
       const m = new THREE.Mesh(
-        new THREE.CircleGeometry(0.5, 16),
-        new THREE.MeshBasicMaterial({ color: 0x051005 })
+        new THREE.CircleGeometry(0.5, 20),
+        new THREE.MeshBasicMaterial({ color: 0x020903 })
       );
       m.rotation.x = -Math.PI / 2; m.position.set(x, 0.02, z);
       engine.add(m);
-      world.holes.push({ x, z, r: 0.46, deadly: true });
+      // Bordo di terra attorno alla buca: si capisce subito che è una trappola.
+      const rim = new THREE.Mesh(
+        new THREE.RingGeometry(0.42, 0.58, 24),
+        new THREE.MeshStandardMaterial({ color: 0x3c2a16, roughness: 1 })
+      );
+      rim.rotation.x = -Math.PI / 2;
+      rim.position.set(x, 0.015, z);
+      engine.add(rim);
+      world.holes.push({ x, z, r: 0.5, deadly: true });
     }
     ctrl.spikes = { left: [], right: [] };
     for (const side of ["left", "right"]) {
@@ -717,24 +689,73 @@ function setupSpecial(id, world, engine, theme, ctrl) {
   if (id === "tilt") {
     ctrl.tilt = { x: 0, z: 0 };
     ctrl.hillMesh = null;
-    // Livella a bolla: un cerchio trasparente sul tavolo con una bolla
-    // che si sposta in base all'inclinazione.
-    const levelRing = new THREE.Mesh(
-      new THREE.RingGeometry(0.7, 0.85, 32),
-      new THREE.MeshBasicMaterial({ color: 0x7ad7ff, transparent: true, opacity: 0.2, depthWrite: false, side: THREE.DoubleSide })
-    );
+    ctrl.tiltT = 0;
+    // Livella a bolla al centro del tavolo: anello, croce di riferimento,
+    // tacca luminosa per lato, bolla e freccia che indica la direzione in
+    // cui la palla scivolerà (la discesa). Si anima con l'inclinazione.
+    const ringMat = new THREE.MeshBasicMaterial({ color: 0x7ad7ff, transparent: true, opacity: 0.35, depthWrite: false, side: THREE.DoubleSide });
+    const levelRing = new THREE.Mesh(new THREE.RingGeometry(0.62, 0.72, 40), ringMat);
     levelRing.rotation.x = -Math.PI / 2;
-    levelRing.position.set(0, 0.02, 0);
+    levelRing.position.set(0, 0.022, 0);
     engine.add(levelRing);
     ctrl._levelRing = levelRing;
+    ctrl._levelRingMat = ringMat;
+
+    // Croce di riferimento (nord-sud / est-ovest) e tacche luminose.
+    const crossMat = new THREE.MeshBasicMaterial({ color: 0x7ad7ff, transparent: true, opacity: 0.28, depthWrite: false });
+    for (const [len, w, rot] of [[0.56, 0.02, 0], [0.56, 0.02, Math.PI / 2]]) {
+      const bar = new THREE.Mesh(new THREE.PlaneGeometry(len, w), crossMat);
+      bar.rotation.x = -Math.PI / 2;
+      bar.rotation.z = rot;
+      bar.position.set(0, 0.023, 0);
+      engine.add(bar);
+    }
+    for (let i = 0; i < 4; i++) {
+      const tick = new THREE.Mesh(new THREE.PlaneGeometry(0.05, 0.1), crossMat);
+      tick.rotation.x = -Math.PI / 2;
+      const a = i * Math.PI / 2;
+      tick.position.set(Math.cos(a) * 0.67, 0.023, Math.sin(a) * 0.67);
+      engine.add(tick);
+    }
+
+    // Bolla: si sposta in base alla gravità (opposta alla discesa).
     const bubble = new THREE.Mesh(
-      new THREE.CircleGeometry(0.15, 16),
-      new THREE.MeshBasicMaterial({ color: 0x7ad7ff, transparent: true, opacity: 0.7, depthWrite: false })
+      new THREE.CircleGeometry(0.13, 16),
+      new THREE.MeshBasicMaterial({ color: 0x9be7ff, transparent: true, opacity: 0.25, depthWrite: false })
     );
     bubble.rotation.x = -Math.PI / 2;
-    bubble.position.set(0, 0.025, 0);
+    bubble.position.set(0, 0.026, 0);
     engine.add(bubble);
     ctrl._levelBubble = bubble;
+
+    // Freccia di discesa: punta dove scivolerà la palla quando il tavolo è
+    // inclinato. Visibile solo con inclinazione attiva.
+    const arrow = new THREE.Group();
+    const shaft = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.34, 0.075),
+      new THREE.MeshBasicMaterial({ color: 0xffb347, transparent: true, opacity: 0, depthWrite: false })
+    );
+    shaft.rotation.x = -Math.PI / 2;
+    shaft.position.set(0.17, 0.03, 0);
+    const head = new THREE.Mesh(
+      new THREE.ShapeGeometry((() => {
+        const s = new THREE.Shape();
+        s.moveTo(0.5, 0);
+        s.lineTo(0.28, 0.13);
+        s.lineTo(0.28, -0.13);
+        s.closePath();
+        return s;
+      })()),
+      new THREE.MeshBasicMaterial({ color: 0xffb347, transparent: true, opacity: 0, depthWrite: false })
+    );
+    head.rotation.x = -Math.PI / 2;
+    head.position.set(0.03, 0.03, 0);
+    arrow.add(shaft, head);
+    arrow.position.y = 0.03;
+    engine.add(arrow);
+    ctrl._levelArrow = arrow;
+    ctrl._levelArrowMat = shaft.material;
+    ctrl._levelArrowHeadMat = head.material;
   }
 
   ctrl.features = {
@@ -743,9 +764,12 @@ function setupSpecial(id, world, engine, theme, ctrl) {
       for (const l of ctrl.logs || []) l.omega = (l.omega || 0) + 6 * dir;
     },
     tilt(side) {
+      // L'inclinazione dura qualche secondo, poi il tavolo torna piano:
+      // così l'effetto è leggibile e ha un inizio e una fine chiari.
       const dir = side === "left" ? 1 : -1;
+      ctrl.tiltT = 8;
+      ctrl.tiltWant = dir * 0.32;
       world.gravityX = (world.gravityX || 0) + 6 * dir;
-      ctrl.tiltWant = Math.max(-0.32, Math.min(0.32, (ctrl.tiltWant || 0) + dir * 0.12));
     },
     makeHill() {
       world.gravityX = 0;
@@ -851,18 +875,6 @@ function setupSpecial(id, world, engine, theme, ctrl) {
   };
 }
 
-function setPillarGlow(ctrl) {
-  ctrl.pillars.forEach((p, i) => {
-    p.glow = i === ctrl.activePillar && p.hp > 0;
-    if (p.mesh?.userData.mat) {
-      p.mesh.userData.mat.emissiveIntensity = p.glow ? 2.5 : 0.15;
-      if (p.glow) {
-        p.mesh.scale.setScalar(1.15 + Math.sin(performance.now() * 0.005) * 0.05);
-      }
-    }
-  });
-}
-
 function raiseSpikesVisual(ctrl, side, world, up) {
   if (!ctrl.spikes) return;
   ctrl.spikeUp[side] = up;
@@ -919,9 +931,12 @@ export function updateArena(ctrl, world, dt, engine, game) {
 
   if (ctrl.logs) {
     for (const l of ctrl.logs) {
-      // Tronchi fermi: non ruotano automaticamente, solo il potere Rotazione li muove
+      // Tronchi fermi per design: non ruotano da soli. Solo il potere
+      // Rotazione li mette in moto, e la rotazione dura un po' prima di
+      // fermarsi (la corteccia striata rende visibile il movimento).
       l.mesh.rotation.x += l.omega * dt;
-      l.omega *= Math.pow(0.08, dt);
+      l.omega *= Math.pow(0.3, dt);
+      if (Math.abs(l.omega) < 0.05) l.omega = 0;
     }
   }
 
@@ -948,8 +963,10 @@ export function updateArena(ctrl, world, dt, engine, game) {
 
   if (ctrl.puck) {
     const p = ctrl.puck;
-    p.vx *= Math.pow(0.92, dt);
-    p.vz *= Math.pow(0.92, dt);
+    p.vx *= Math.pow(0.94, dt);
+    p.vz *= Math.pow(0.94, dt);
+    const os = Math.hypot(p.vx, p.vz);
+    if (os < 0.15) { p.vx = 0; p.vz = 0; }
     p.x += p.vx * dt;
     p.z += p.vz * dt;
     const hx = world.w / 2 - p.r - 0.2, hz = world.d / 2 - p.r;
@@ -969,6 +986,15 @@ export function updateArena(ctrl, world, dt, engine, game) {
   }
 
   if (ctrl.table && id === "tilt") {
+    // L'inclinazione dura `tiltT` secondi, poi il tavolo torna piano.
+    if (ctrl.tiltT > 0) {
+      ctrl.tiltT -= dt;
+      if (ctrl.tiltT <= 0) {
+        ctrl.tiltT = 0;
+        ctrl.tiltWant = 0;
+        world.gravityX = 0;
+      }
+    }
     const want = ctrl.tiltWant || 0;
     ctrl.tilt.x = lerp(ctrl.tilt.x, want, 1 - Math.pow(0.1, dt));
     ctrl.table.rotation.z = -ctrl.tilt.x;
@@ -993,16 +1019,29 @@ export function updateArena(ctrl, world, dt, engine, game) {
       m.rotation.z = ctrl.tilt.x * 0.5;
       m.position.y = 0.015 + absTilt * 0.06 * Math.sin(phase + performance.now() * 0.003);
     });
-    // Bolla della livella: si sposta nella direzione della gravità
+    // Livella a bolla: la bolla sale dal lato opposto alla discesa, la
+    // freccia punta verso la discesa (dove scivolerà la palla). La freccia
+    // è visibile solo quando il tavolo è davvero inclinato.
+    const gx = world.gravityX || 0;
+    const gz = world.gravityZ || 0;
+    const gmag = Math.hypot(gx, gz);
     if (ctrl._levelBubble) {
-      const bx = ctrl.tilt.x * 2;
-      const bz = (ctrl.tilt.z || 0) * 2;
+      const bx = -gx * 0.016;
+      const bz = -gz * 0.016;
       ctrl._levelBubble.position.x = lerp(ctrl._levelBubble.position.x, bx, 1 - Math.pow(0.08, dt));
       ctrl._levelBubble.position.z = lerp(ctrl._levelBubble.position.z, bz, 1 - Math.pow(0.08, dt));
-      ctrl._levelBubble.material.opacity = 0.15 + absTilt * 1.5;
-      if (ctrl._levelRing) {
-        ctrl._levelRing.material.opacity = 0.1 + absTilt * 0.5;
-      }
+      ctrl._levelBubble.material.opacity = 0.2 + Math.min(0.6, gmag / 9 * 0.7);
+    }
+    if (ctrl._levelArrow) {
+      const on = gmag > 1.2;
+      const targetOp = on ? Math.min(0.9, 0.35 + gmag / 9) : 0;
+      ctrl._levelArrowMat.opacity = lerp(ctrl._levelArrowMat.opacity, targetOp, 1 - Math.pow(0.12, dt));
+      ctrl._levelArrowHeadMat.opacity = ctrl._levelArrowMat.opacity;
+      ctrl._levelArrow.rotation.z = Math.atan2(gz, gx);
+      ctrl._levelArrow.scale.setScalar(on ? Math.min(1.3, 0.75 + gmag / 9) : 0.7);
+    }
+    if (ctrl._levelRing && ctrl._levelRingMat) {
+      ctrl._levelRingMat.opacity = 0.2 + Math.min(0.45, gmag / 9 * 0.5);
     }
     if (ctrl.dip) {
       for (const b of world.balls) {
@@ -1060,10 +1099,6 @@ export function updateArena(ctrl, world, dt, engine, game) {
     }
   }
 
-  if (ctrl.gold?.ready) {
-    ctrl.gold.mesh.rotation.y += dt * 2;
-    ctrl.gold.mesh.position.y = 0.28 + Math.sin(performance.now() * 0.004) * 0.08;
-  }
 }
 
 export function handleArenaEvent(ctrl, ev, game, world, engine) {
@@ -1075,40 +1110,37 @@ export function handleArenaEvent(ctrl, ev, game, world, engine) {
     }
   }
   if (ev.type === "obstacle" && ev.obs?.type === "puck") {
-    ev.obs.vx += ev.ball.vx * 0.45;
-    ev.obs.vz += ev.ball.vz * 0.45;
-    // Un piccolo effetto: la palla perde un po' della sua energia
-    ev.ball.vx *= 0.6;
-    ev.ball.vz *= 0.6;
-  }
-  if (ev.type === "obstacle" && ev.obs?.type === "bumper") {
-    const p = ev.obs;
-    if (p.glow && p.hp > 0) {
-      p.hp--;
-      p.mesh.scale.setScalar(0.85 + p.hp * 0.05);
-      if (p.hp <= 0) {
-        p.mesh.visible = false;
-        world.obstacles = world.obstacles.filter((o) => o !== p);
-        ctrl.activePillar = ctrl.pillars.findIndex((x) => x.hp > 0);
-        if (ctrl.activePillar < 0) {
-          ctrl.gold.ready = true;
-          ctrl.gold.mesh.visible = true;
-          world.obstacles.push({ type: "bumper", x: 0, z: 0, r: 0.5, gold: true, restitution: 0.2, mesh: ctrl.gold.mesh });
-        } else setPillarGlow(ctrl);
-      }
-    }
-    if (p.gold) {
-      game.scorePoint(ev.ball.lastHit || "left", { keepBall: true });
-      ctrl.gold.mesh.scale.setScalar(1.2);
-      setTimeout(() => ctrl.gold.mesh.scale.setScalar(1), 120);
-    }
+    // L'impulso vero al disco lo dà physics.collideBallCircle tramite
+    // onHit (direzione opposta a quella d'arrivo della palla). Qui solo
+    // feedback: scintille e un po' di energia tolta alla palla.
+    game.engine.kick(0.1);
+    game.particles.spark(ev.obs.x, 0.15, ev.obs.z, 2, 0x4dc6ff);
+    ev.ball.vx *= 0.72;
+    ev.ball.vz *= 0.72;
   }
   if (ev.type === "hole") {
     const h = ev.hole;
     if (h.deadly) {
+      // Giungla: la palla viene inghiottita dalla buca. Le buche sono
+      // trappole della propria metà campo: caderci dentro regala il punto
+      // all'avversario (la buca centrale, neutra, fa solo ripartire il
+      // servizio). Feedback pieno: risucchio, scossa e messaggio.
       ev.ball.alive = false;
-      game.particles.burst(ev.ball.x, 0.2, ev.ball.z, 0x1a3a1a, 10, 2);
-      if (world.balls.filter((b) => b.alive).length === 0) game.serveSoon();
+      game.engine.kick(0.45);
+      game.particles.burst(h.x, 0.3, h.z, 0x0c1f0c, 16, 4);
+      game.particles.burst(h.x, 0.45, h.z, 0x8fcf58, 10, 5);
+      suckHoleVisual(engine, h);
+      const scorer = h.x < -0.8 ? "right" : h.x > 0.8 ? "left" : null;
+      if (scorer) {
+        game.showMsg(
+          scorer === game.localSide ? "BUCA! PUNTO TUO" : "BUCA! PUNTO AVVERSARIO",
+          0.9
+        );
+        game.scorePoint(scorer);
+      } else {
+        game.showMsg("BUCA! NESSUN PUNTO", 0.9);
+        game.serveSoon();
+      }
     } else if (ctrl.holes) {
       // Colline delle talpe: la palla sparisce nella buca e viene sputata
       // fuori da un'altra, con una spinta visibile e un piccolo botto di
@@ -1130,15 +1162,6 @@ export function handleArenaEvent(ctrl, ev, game, world, engine) {
       pulseHole(dest.mesh);
     }
   }
-  if (ev.type === "score" && ctrl.id === "clown") {
-    if (ev.goal && ev.ball.colorId && ev.goal.colorId !== ev.ball.colorId) {
-      ev.ball.alive = true;
-      const hx = world.w / 2 - ev.ball.r - 0.05;
-      if (ev.side === "right") { ev.ball.x = hx; ev.ball.vx = -Math.abs(ev.ball.vx); }
-      else { ev.ball.x = -hx; ev.ball.vx = Math.abs(ev.ball.vx); }
-      return true;
-    }
-  }
   if (ev.type === "score" && ctrl.id === "jungle" && ev.goal) {
     const scorer = ev.side === "left" ? "right" : "left";
     ctrl.scoredGoals[scorer].add(ev.goal.gid);
@@ -1152,7 +1175,7 @@ export function handleArenaEvent(ctrl, ev, game, world, engine) {
       return true;
     }
   }
-  if (ev.type === "score" && (ctrl.id === "puck" || ctrl.id === "pinball")) {
+  if (ev.type === "score" && ctrl.id === "puck") {
     return true;
   }
 }
@@ -1176,12 +1199,22 @@ function pulseHole(mesh) {
 
 function lerp(a, b, t) { return a + (b - a) * t; }
 
-export function nextBallColor(ctrl) {
-  if (!ctrl.colors) return { color: 0xffffff, colorId: null };
-  const c = pick(ctrl.colors);
-  return { color: c.color, colorId: c.id };
-}
-
-export function puckMode(id) {
-  return id === "puck";
+/** Risucchio visivo della buca: un anello scuro che si richiude su di essa. */
+function suckHoleVisual(engine, h) {
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(0.55, 0.72, 32),
+    new THREE.MeshBasicMaterial({ color: 0x04120a, transparent: true, opacity: 0.85, depthWrite: false, side: THREE.DoubleSide })
+  );
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.set(h.x, 0.03, h.z);
+  engine.add(ring);
+  const t0 = performance.now();
+  const tick = () => {
+    const t = Math.min(1, (performance.now() - t0) / 420);
+    ring.scale.setScalar(Math.max(0.05, 1 - t));
+    ring.material.opacity = 0.85 * (1 - t);
+    if (t < 1) requestAnimationFrame(tick);
+    else engine.arenaRoot.remove(ring);
+  };
+  tick();
 }

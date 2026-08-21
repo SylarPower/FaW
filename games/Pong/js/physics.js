@@ -311,7 +311,13 @@ export class World {
     const spd = b.speed();
     // Niente tetto massimo: la velocità cresce sempre, ma i rimbalzi la
     // aumentano sempre meno (vedi collideBallPaddle).
-    if (spd < 3 && spd > 0 && !this.drag) b.setSpeed(Math.max(b.minSpeed * 0.7, spd));
+    // Velocità minima: senza questa rete la palla può fermarsi a metà campo.
+    // In spiaggia l'acqua la rallenta (drag), quindi la soglia è più alta
+    // e vale anche lì: la palla resta lenta ma arriva sempre all'avversario.
+    const floor = this.drag > 0 ? 5.2 : 3;
+    if (spd > 0 && spd < floor) {
+      b.setSpeed(this.drag > 0 ? 5.2 : Math.max(b.minSpeed * 0.7, spd));
+    }
 
     b.x += b.vx * dt;
     b.z += b.vz * dt;
@@ -338,12 +344,22 @@ export class World {
     }
 
     for (const h of this.holes) {
-      const dx = b.x - h.x, dz = b.z - h.z;
-      if (dx * dx + dz * dz < (h.r - b.r * 0.2) ** 2) {
-        // Una sola volta per ingresso: il gestore teletrasporta la palla al
-        // centro di UN'ALTRA buca, quindi senza ricarica verrebbe risucchiata
-        // all'infinito rimbalzando da una buca all'altra.
-        if (b.holeCd > 0) continue;
+      // Una sola volta per ingresso: il gestore teletrasporta la palla al
+      // centro di UN'ALTRA buca (o la inghiotte, in giungla), quindi senza
+      // ricarica verrebbe risucchiata all'infinito.
+      if (b.holeCd > 0) continue;
+      // Rilevamento continuo sul segmento percorso in questo sotto-step:
+      // a velocità alta la palla non "salta" sopra la buca senza entrare.
+      const prevX = b.x - b.vx * dt;
+      const prevZ = b.z - b.vz * dt;
+      const sx = b.x - prevX, sz = b.z - prevZ;
+      const len2 = sx * sx + sz * sz;
+      let t = len2 > 1e-9 ? ((h.x - prevX) * sx + (h.z - prevZ) * sz) / len2 : 0;
+      t = t < 0 ? 0 : t > 1 ? 1 : t;
+      const cx = prevX + sx * t, cz = prevZ + sz * t;
+      const dx = cx - h.x, dz = cz - h.z;
+      const cap = h.r + b.r * 0.5;
+      if (dx * dx + dz * dz < cap * cap) {
         b.holeCd = 0.7;
         this.emit("hole", { ball: b, hole: h });
       }
@@ -588,6 +604,10 @@ export class World {
     if (d2 > rr * rr || d2 === 0) return false;
     const dist = Math.sqrt(d2);
     const nx = dx / dist, nz = dz / dist;
+    // Velocità della palla PRIMA del rimbalzo: serve a chi reagisce
+    // all'impatto (es. il disco da air hockey) per calcolare la spinta
+    // nella direzione corretta (opposta a quella d'arrivo della palla).
+    const inVx = b.vx, inVz = b.vz;
     const overlap = rr - dist;
     b.x += nx * overlap;
     b.z += nz * overlap;
@@ -603,6 +623,7 @@ export class World {
       b.vx += -nz * o.omega * 0.4;
       b.vz += nx * o.omega * 0.4;
     }
+    if (o.onHit) o.onHit(b, nx, nz, inVx, inVz);
     return true;
   }
 

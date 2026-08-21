@@ -5,7 +5,7 @@ import { Particles, BallTrail } from "./particles.js";
 import { input } from "./input.js";
 import { updateAI, SKILL } from "./ai.js";
 import { PowerUpManager, applyPower, POWER_DEFS } from "./powerups.js";
-import { ARENAS, buildArena, updateArena, handleArenaEvent, nextBallColor, arenaById } from "./arenas.js";
+import { ARENAS, buildArena, updateArena, handleArenaEvent, arenaById } from "./arenas.js";
 import { makePaddle, makeBall, impactParticles, updateBurst, makeGoalCelebration, cheerSpectators } from "./models.js";
 import { loadSave, writeSave, SIZE_MUL, SPEED_MUL } from "./save.js";
 import { applyThemeToUI } from "./themes.js";
@@ -120,15 +120,13 @@ export class Game {
     this._bindPowerPickups();
     const options = { ...this.save.options, ...(this.matchOptions || {}) };
     const sizeMul = SIZE_MUL[options.paddleSize] || 1;
-    // Forza il tema per arene specifiche
-    let themeId = options.theme;
-    if (id === "penguin") themeId = "aurora";
-    if (id === "beach") themeId = "spiaggia";
-    if (id === "soccer") themeId = "boot";
-    if (id === "puck") themeId = "airhockey";
+    // Alcuni tavoli impongono il loro tema grafico (il tema scelto in
+    // Opzioni viene ignorato solo per questi, e nell'arena su misura la
+    // selezione del tema risulta disattivata).
+    const def = arenaById(id);
+    const themeId = def?.theme || options.theme;
     this.ctrl = buildArena(id, this.engine, this.world, sizeMul, themeId);
     this.triangle = !!this.world.triangle;
-    const def = arenaById(id);
     // Pool di poteri: arena personalizzata detta il suo, altrimenti quello
     // predefinito dell'arena.
     let pool;
@@ -304,6 +302,7 @@ export class Game {
     }
     // Tavolo folle: inclinazione, collina e conca da power-up.
     if (c.tiltWant) c.tiltWant = 0;
+    c.tiltT = 0;
     this.world.gravityX = 0;
     this.world.gravityZ = 0;
     if (c.centerHill) {
@@ -363,8 +362,20 @@ export class Game {
     this.spawnBall({ dir, center: true });
   }
 
+  /**
+   * Colore della palla alla nascita. Nel tema Air Hockey la palla è il
+   * classico disco piatto nero o bianco (a caso a ogni servizio).
+   */
+  ballSpawnInfo() {
+    if (this.ctrl?.theme?.style === "airhockey") {
+      const dark = Math.random() < 0.5;
+      return { color: dark ? 0x14161a : 0xf2f4f7, colorId: null };
+    }
+    return { color: 0xffffff, colorId: null };
+  }
+
   spawnBall({ dir = 1, from = null, color, colorId } = {}) {
-    const info = colorId ? { color, colorId } : nextBallColor(this.ctrl);
+    const info = colorId ? { color, colorId } : this.ballSpawnInfo();
     const b = new Ball(0.22);
     b.minSpeed = 8 * this.speedMul;
     b.color = info.color;
@@ -417,6 +428,9 @@ export class Game {
       if (sp > 0.1 && deco.userData.directional) {
         // Il muso dell'ascia e la punta della pallottola seguono la traiettoria.
         deco.rotation.y = -Math.atan2(b.vz, b.vx);
+      } else if (sp > 0.1 && deco.userData.flatSpin) {
+        // Il disco da air hockey scivola ruotando su sé stesso.
+        deco.rotation.y -= sp * dt * 2.0;
       } else if (sp > 0.1) {
         const axis = new THREE.Vector3(-b.vz / sp, 0, b.vx / sp);
         deco.rotateOnWorldAxis(axis, sp * dt * 0.9);

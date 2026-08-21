@@ -203,19 +203,34 @@ function buildDefault(body, mat, color, theme, style) {
 }
 
 function buildBoot(body, leather, hw, hd) {
-  // CALCIO: blocco d'oro delle dimensioni corrette della racchetta,
-  // con sopra appoggiata una scarpa da calcio ben disegnata e distinguibile.
+  // CALCIO — il colpo si basa su un piedistallo d'oro con le dimensioni
+  // esatte della hitbox della racchetta (una sorta di base per la coppa
+  // dei campioni). Sopra è appoggiata una scarpa da calcio ben disegnata
+  // e distinguibile, in bella mostra come un trofeo.
   const goldMat = new THREE.MeshStandardMaterial({
-    color: 0xffd700, metalness: 0.85, roughness: 0.15,
-    emissive: 0xffa500, emissiveIntensity: 0.45
+    color: 0xffd700, metalness: 0.92, roughness: 0.16,
+    emissive: 0x7a4c00, emissiveIntensity: 0.55
+  });
+  const goldDark = new THREE.MeshStandardMaterial({
+    color: 0xd4a017, metalness: 0.92, roughness: 0.24,
+    emissive: 0x5a3a00, emissiveIntensity: 0.5
   });
   const dark = new THREE.MeshStandardMaterial({ color: 0x171b20, roughness: 0.82 });
   const soletMat = new THREE.MeshStandardMaterial({ color: 0x0c0e11, roughness: 0.9 });
   const white = new THREE.MeshStandardMaterial({ color: 0xf2efe6, roughness: 0.55 });
-  const laceMat = new THREE.MeshStandardMaterial({ color: 0xf7f4ea, roughness:0.6 });
+  const laceMat = new THREE.MeshStandardMaterial({ color: 0xf7f4ea, roughness: 0.6 });
   const studMat = new THREE.MeshStandardMaterial({ color: 0xd8dce2, metalness: 0.6, roughness: 0.35 });
 
-  // --- profilo della scarpa (x = lunghezza, y = altezza) ---
+  // --- piedistallo d'oro: due gradini + lastra, misura esatta della hitbox ---
+  const tier1 = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.2, 0.92), goldDark);
+  tier1.position.y = -0.4;
+  const tier2 = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.16, 0.98), goldMat);
+  tier2.position.y = -0.22;
+  const plate = new THREE.Mesh(new THREE.BoxGeometry(1.04, 0.06, 1.0), goldMat);
+  plate.position.y = -0.11;
+  body.add(tier1, tier2, plate);
+
+  // --- scarpa: profilo laterale (x = lunghezza, y = altezza) ---
   const prof = new THREE.Shape();
   prof.moveTo(-0.46, -0.38);                              // tallone, fondo
   prof.quadraticCurveTo(-0.52, -0.06, -0.43, 0.14);       // curva del tallone
@@ -228,72 +243,75 @@ function buildBoot(body, leather, hw, hd) {
   prof.quadraticCurveTo(0.48, -0.28, 0.42, -0.38);        // punta che scende
   prof.closePath();                                       // fondo della suola
 
-  // Spessore reale della scarpa (in unità mondo): ~38% della lunghezza.
-  // Il bordo interno resta a +hw, il resto esce dal campo esterno.
-  const thickness = Math.min(2 * hd * 0.40, 2 * hw * 1.35);
-  const d = thickness / (2 * hw); // spessore in coordinate art
-  const inner = 0.5;              // faccia verso il centro campo (art)
-  const BEV = 0.035;              // smusso dell'estrusione
+  // La scarpa è grande quanto la lastra d'oro (è un trofeo, non la scarpa
+  // vera di un giocatore): lunghezza ~94% della hitbox, larghezza ~92%.
+  const shoe = new THREE.Group();
+  const S = 0.94;              // scala del profilo (lunghezza art)
+  const depth = 0.92;          // larghezza art della scarpa (riempie la lastra)
+  const BEV = 0.03;            // smusso dell'estrusione
   const upper = new THREE.Mesh(
     new THREE.ExtrudeGeometry(prof, {
-      depth: d,
+      depth,
       bevelEnabled: true, bevelThickness: BEV, bevelSize: BEV, bevelSegments: 2
     }),
     leather
   );
   // Il profilo vive nel piano XY: lo giriamo perché la lunghezza stia lungo
-  // Z (la linea di porta) e lo spessore lungo X. Smusso compreso, la faccia
-  // interna della scarpa tocca esattamente il bordo della hitbox.
+  // Z (la linea di porta) e lo spessore lungo X. La faccia interna del
+  // profilo (z=0) cade al centro della lastra: la scarpa resta dentro il
+  // piedistallo.
   upper.rotation.y = -Math.PI / 2;
-  upper.position.x = inner - BEV;
-  // Tutto ciò che avvolge la scarpa (suola, filetto, tallone) parte dalla
-  // stessa faccia interna e cresce solo verso l'esterno.
-  const cxOuter = (w) => (inner - 0.02) - w / 2;
+  upper.position.x = depth / 2;
+  shoe.add(upper);
+
+  const cx = 0; // centro spessore della scarpa (art): tutto centrato sulla lastra
+  const profMin = -0.38 * S;
 
   // Suola: leggermente più larga e sporgente sotto la tomaia.
-  const sole = new THREE.Mesh(
-    new THREE.BoxGeometry(d + 0.09, 0.09, 0.90),
-    soletMat
-  );
-  sole.position.set(cxOuter(d + 0.09), -0.40, 0.0);
+  const sole = new THREE.Mesh(new THREE.BoxGeometry(depth + 0.04, 0.08, 0.9 * S), soletMat);
+  sole.position.set(cx, profMin + 0.04, 0.0);
+  shoe.add(sole);
 
   // Filetto bianco della suola (midsole) visibile di lato.
-  const midsole = new THREE.Mesh(new THREE.BoxGeometry(d + 0.11, 0.045, 0.88), white);
-  midsole.position.set(cxOuter(d + 0.11), -0.345, 0.0);
+  const midsole = new THREE.Mesh(new THREE.BoxGeometry(depth + 0.06, 0.045, 0.87 * S), white);
+  midsole.position.set(cx, profMin + 0.09, 0.0);
+  shoe.add(midsole);
 
   // Controtallone scuro sul retro.
-  const heel = new THREE.Mesh(new THREE.BoxGeometry(d + 0.03, 0.26, 0.10), dark);
-  heel.position.set(cxOuter(d + 0.03), -0.16, -0.42);
+  const heel = new THREE.Mesh(new THREE.BoxGeometry(depth + 0.02, 0.26 * S, 0.1), dark);
+  heel.position.set(cx, -0.16 * S, -0.42 * S);
+  shoe.add(heel);
 
   // Collarino bianco attorno alla caviglia.
-  const collar = new THREE.Mesh(new THREE.TorusGeometry(0.10, 0.035, 8, 16), white);
+  const collar = new THREE.Mesh(new THREE.TorusGeometry(0.13, 0.045, 8, 16), white);
   collar.rotation.x = Math.PI / 2;
-  collar.scale.set(1.5, 1, 1.1);
-  collar.position.set(0.5 - d / 2 - BEV, 0.48, -0.08);
+  collar.scale.set(1.15, 1, 1.05);
+  collar.position.set(cx, 0.46 * S, -0.08 * S);
+  shoe.add(collar);
 
   // Linguetta che spunta davanti al collo.
-  const tongue = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.03, 0.16), white);
+  const tongue = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.035, 0.16), white);
   tongue.rotation.x = 0.85;
-  tongue.position.set(0.5 - d / 2 - BEV, 0.42, 0.11);
+  tongue.position.set(cx, 0.4 * S, 0.11 * S);
+  shoe.add(tongue);
 
   // Lacci che scendono lungo la tomaia, seguendo la pendenza.
-  const cx = 0.5 - d / 2 - BEV; // centro spessore della scarpa
   for (let i = 0; i < 5; i++) {
     const t = i / 4;
-    const lace = new THREE.Mesh(new THREE.BoxGeometry(d - 0.02, 0.035, 0.055), laceMat);
-    lace.position.set(cx, 0.38 - t * 0.24, 0.11 + t * 0.19);
+    const lace = new THREE.Mesh(new THREE.BoxGeometry(depth - 0.04, 0.035, 0.06), laceMat);
+    lace.position.set(cx, (0.36 - t * 0.24) * S, (0.11 + t * 0.19) * S);
     lace.rotation.x = 0.68;
-    body.add(lace);
+    shoe.add(lace);
   }
 
   // Triple strisce laterali classiche, sulle due facce della scarpa.
-  const faces = [0.5, 0.5 - d - 2 * BEV];
-  for (const xFace of faces) {
+  for (const s of [-1, 1]) {
+    const xFace = cx + s * (depth / 2 + BEV + 0.012);
     for (let i = 0; i < 3; i++) {
-      const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.024, 0.34, 0.05), white);
-      stripe.position.set(xFace, -0.02, -0.02 + i * 0.075);
+      const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.024, 0.34 * S, 0.05), white);
+      stripe.position.set(xFace, -0.02 * S, (-0.02 + i * 0.075) * S);
       stripe.rotation.x = -0.18;
-      body.add(stripe);
+      shoe.add(stripe);
     }
   }
 
@@ -301,15 +319,17 @@ function buildBoot(body, leather, hw, hd) {
   const studZ = [[-0.34, 2], [-0.22, 2], [0.14, 3], [0.28, 3], [0.40, 3]];
   for (const [z, n] of studZ) {
     for (let i = 0; i < n; i++) {
-      const x = cx + (i - (n - 1) / 2) * (d / Math.max(1, n - 0.4));
-      const stud = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.10, 7), studMat);
+      const x = cx + (i - (n - 1) / 2) * (depth / Math.max(1, n + 0.4));
+      const stud = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.1, 7), studMat);
       stud.rotation.x = Math.PI;
-      stud.position.set(x, -0.44, z);
-      body.add(stud);
+      stud.position.set(x, profMin - 0.03, z * S);
+      shoe.add(stud);
     }
   }
 
-  body.add(upper, sole, midsole, heel, collar, tongue);
+  // La scarpa poggia sulla lastra: suola a filo della sua faccia superiore.
+  shoe.position.y = -0.08 - profMin;
+  body.add(shoe);
 }
 
 function buildJungle(body, barkMat) {
@@ -443,49 +463,80 @@ function starGeometry(outer, inner, depth) {
 }
 
 function buildAirHockey(body, _mat, color, hw, hd) {
-  // MAZZA da air hockey con la base perfettamente TONDA in coordinate mondo.
-  // La hitbox della racchetta resta il solito rettangolo: il bordo della
-  // mazza verso il centro campo coincide con il bordo interno della hitbox,
-  // mentre la pancia tonda esce un po' dal campo esterno. Così la mazza ha
-  // la forma giusta senza rubare spazio interno.
-  const baseMat = new THREE.MeshStandardMaterial({ color: color || 0x5fd8ff, metalness: 0.45, roughness: 0.25, emissive: color || 0x5fd8ff, emissiveIntensity: 0.18 });
-  const dark = new THREE.MeshStandardMaterial({ color: 0x162b42, metalness: 0.35, roughness: 0.32 });
+  // AIR HOCKEY — il colpo si basa sul pezzo nero setolato, che ha le
+  // dimensioni esatte della hitbox della racchetta. Sopra le setole è
+  // appoggiato il piattino da air hockey, ben disegnato e distinguibile.
+  const black = new THREE.MeshStandardMaterial({ color: 0x121417, roughness: 0.92, metalness: 0.06 });
+  const bristleMat = new THREE.MeshStandardMaterial({ color: 0x262a30, roughness: 1 });
 
-  // Raggio mondo della mazza: copre quasi tutta la lunghezza di hitbox.
-  const R = hd * 0.94;
-  // Fattori per disegnare un cerchio rotondo: in art X e Z scalano diverso.
-  const kx = R / (2 * hw);        // raggio art lungo X
-  const kz = R / (2 * hd);        // raggio art lungo Z
-  const SZ = kz / kx;             // schiaccia i cerchi lungo Z
-  const CX = 0.5 - kx * 1.04;     // bordo interno (base svasata) sulla hitbox
+  // Blocco nero: misura esatta della racchetta (larghezza e lunghezza).
+  const base = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.16, 0.98), black);
+  base.position.y = -0.42;
+  body.add(base);
 
-  // Y0: la base tocca il tavolo invece di galleggiare.
-  const Y0 = -0.31;
+  // Setole fitte sulla faccia superiore del blocco.
+  const bristleCount = 9 * 9;
+  const bristles = new THREE.InstancedMesh(
+    new THREE.CylinderGeometry(0.02, 0.022, 0.14, 5),
+    bristleMat,
+    bristleCount
+  );
+  const dummy = new THREE.Object3D();
+  let bi = 0;
+  for (let ix = 0; ix < 9; ix++) {
+    for (let iz = 0; iz < 9; iz++) {
+      dummy.position.set(-0.4 + ix * 0.1, -0.27, -0.42 + iz * 0.105);
+      dummy.rotation.set(((ix % 3) - 1) * 0.07, 0, ((iz % 3) - 1) * 0.07);
+      dummy.updateMatrix();
+      bristles.setMatrixAt(bi++, dummy.matrix);
+    }
+  }
+  bristles.instanceMatrix.needsUpdate = true;
+  body.add(bristles);
+
+  // Piattino/mazza: disco largo con ghiera, manico tozzo e pomello.
+  // In art X e Z le unità valgono diverso (hw vs hd): i cerchi vengono
+  // schiacciati lungo Z per restare perfettamente tondi in coordinate mondo.
+  const malletCol = color || 0x4dc6ff;
+  const discMat = new THREE.MeshStandardMaterial({
+    color: malletCol, metalness: 0.4, roughness: 0.28,
+    emissive: malletCol, emissiveIntensity: 0.16
+  });
+  const handleMat = new THREE.MeshStandardMaterial({ color: 0x1a2733, metalness: 0.4, roughness: 0.35 });
+
+  // Raggio mondo del piattino: circa il 62% della lunghezza della racchetta,
+  // così il blocco setolato resta ben visibile tutto intorno.
+  const R = hd * 0.62;
+  const kx = R / (2 * hw);     // raggio art lungo X
+  const kz = R / (2 * hd);     // raggio art lungo Z
+  const SZ = kz / kx;          // schiaccia i cerchi lungo Z
+  const Y0 = -0.2;             // il disco affonda un filo nelle setole
+
   const round = (rTop, rBot, h, y, mat) => {
     const m = new THREE.Mesh(new THREE.CylinderGeometry(rTop * kx, rBot * kx, h, 26), mat);
     m.scale.z = SZ;
-    m.position.set(CX, y + Y0, 0);
+    m.position.set(0, y + Y0, 0);
     body.add(m);
     return m;
   };
 
-  // Base bassa e larga, leggermente svasata.
-  round(1.0, 1.05, 0.18, -0.06, baseMat);
-  // Ghiera scura a filo della base.
-  const rim = new THREE.Mesh(new THREE.TorusGeometry(kx * 0.97, 0.05, 8, 26), dark);
+  // Disco: basso, largo, leggermente svasato sul bordo inferiore.
+  round(1.0, 1.06, 0.16, 0.08, discMat);
+  // Ghiera scura a filo del disco.
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(kx * 0.98, 0.05, 8, 26), handleMat);
   rim.scale.y = SZ;
   rim.rotation.x = Math.PI / 2;
-  rim.position.set(CX, 0.04 + Y0, 0);
+  rim.position.set(0, Y0 + 0.005, 0);
   body.add(rim);
-  // Manico tozzo e pomello.
-  round(0.36, 0.42, 0.52, 0.38, dark);
-  round(0.46, 0.46, 0.10, 0.68, baseMat);
-  // Anello luminoso sul pomello.
-  const ring = new THREE.Mesh(new THREE.TorusGeometry(kx * 0.44, 0.03, 8, 22),
-    new THREE.MeshBasicMaterial({ color: color || 0x5fd8ff }));
+  // Manico tozzo che sale dal disco.
+  round(0.34, 0.4, 0.34, 0.33, handleMat);
+  // Pomello superiore, con anello luminoso.
+  round(0.44, 0.44, 0.09, 0.53, discMat);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(kx * 0.42, 0.03, 8, 22),
+    new THREE.MeshBasicMaterial({ color: malletCol }));
   ring.scale.y = SZ;
   ring.rotation.x = Math.PI / 2;
-  ring.position.set(CX, 0.72 + Y0, 0);
+  ring.position.set(0, Y0 + 0.58, 0);
   body.add(ring);
 }
 
@@ -520,7 +571,8 @@ function darken(hex, k) {
 export function makeBall(color = 0xffffff, r = 0.22, theme = {}) {
   const style = theme.style || "neon";
   const styleData = theme.ball || null;
-  // Se la chiamata impone un colore (es. clown multiball) quel colore prevale.
+  // Se la chiamata impone un colore (es. disco air hockey nero/bianco)
+  // quel colore prevale sul tema.
   const forcedColor = (color !== 0xffffff);
   const finalColor = forcedColor ? color : (styleData?.color ?? color);
   const finalEmissive = forcedColor ? color : (styleData?.emissive ?? color);
@@ -693,12 +745,26 @@ export function makeBall(color = 0xffffff, r = 0.22, theme = {}) {
     halo.rotation.x = Math.PI / 2;
     deco.add(ice, facets, halo);
   } else if (style === "airhockey") {
-    const puck = new THREE.Mesh(new THREE.CylinderGeometry(0.78, 0.78, 0.22, 24),
-      new THREE.MeshStandardMaterial({ color: 0xf5fbff, metalness: 0.3, roughness: 0.2, emissive: 0x8fdcff, emissiveIntensity: 0.28 }));
-    const puckEdge = new THREE.Mesh(new THREE.TorusGeometry(0.74, 0.055, 8, 24),
-      new THREE.MeshBasicMaterial({ color: 0x4dc6ff }));
+    // Classico disco piatto da air hockey, nero o bianco: corpo basso e
+    // largo, bordo arrotondato e ghiera di contrasto sulla faccia superiore.
+    const darkDisc = ((finalColor >> 16) & 255) * 0.2126 +
+      ((finalColor >> 8) & 255) * 0.7152 +
+      (finalColor & 255) * 0.0722 < 128;
+    const rimCol = darkDisc ? 0x8fa3b8 : 0xc8283c;
+    const discMat = new THREE.MeshStandardMaterial({
+      color: finalColor, metalness: 0.3, roughness: 0.32,
+      emissive: 0x000000, emissiveIntensity: 0
+    });
+    const puck = new THREE.Mesh(new THREE.CylinderGeometry(0.84, 0.88, 0.14, 28), discMat);
+    const puckEdge = new THREE.Mesh(new THREE.TorusGeometry(0.86, 0.05, 8, 28),
+      new THREE.MeshStandardMaterial({ color: rimCol, metalness: 0.45, roughness: 0.3 }));
     puckEdge.rotation.x = Math.PI / 2;
-    deco.add(puck, puckEdge);
+    const topRing = new THREE.Mesh(new THREE.RingGeometry(0.36, 0.46, 24),
+      new THREE.MeshBasicMaterial({ color: rimCol, transparent: true, opacity: 0.55 }));
+    topRing.rotation.x = -Math.PI / 2;
+    topRing.position.y = 0.075;
+    deco.add(puck, puckEdge, topRing);
+    deco.userData.flatSpin = true;
   } else if (style === "colori") {
     const ink = new THREE.Mesh(geo("ball-mono", () => new THREE.SphereGeometry(0.9, 18, 12)),
       new THREE.MeshStandardMaterial({ color: 0xf5f1e8, roughness: 0.4 }));
@@ -1356,23 +1422,55 @@ function makeColorSplash(scene, x, z, paddle) {
     splat(x + Math.cos(a) * d, z + Math.sin(a) * d, 0.07 + Math.random() * 0.1);
   }
 
-  // Macchia sulla racchetta: un cerchietto colorato sulla faccia anteriore.
+  // Macchie sulla racchetta: il colore che esplode macchia la racchetta e
+  // la macchia PERSISTE per tutta la partita. Un cerchio irregolare sulla
+  // faccia anteriore (e a volte su quella posteriore), più il corpo che si
+  // tinge un po' a ogni tocco.
   if (paddle && paddle.mesh) {
     const body = paddle.mesh.userData?.body;
     if (body) {
-      const stainR = 0.08 + Math.random() * 0.06;
-      const stainGeo = new THREE.CircleGeometry(stainR, 12);
-      const stainMat = new THREE.MeshBasicMaterial({
-        color, transparent: true, opacity: 0.85, depthWrite: false
-      });
-      const stain = new THREE.Mesh(stainGeo, stainMat);
-      stain.rotation.y = Math.PI / 2;
-      stain.position.set(0.52, (Math.random() - 0.5) * 0.4, (Math.random() - 0.5) * 0.5);
-      body.add(stain);
-      items.push({
-        mesh: stain, static: true, spread: false, onPaddle: true,
-        life: 3.0 + Math.random() * 1.0, age: 0
-      });
+      // Il colore della racchetta assorbe piano piano quello dello splash.
+      const pm = paddle.mesh.userData?.mat;
+      if (pm) pm.color.lerp(new THREE.Color(color), 0.1);
+
+      if (!body.userData.stains) body.userData.stains = [];
+      const faces = [1, Math.random() < 0.4 ? -1 : 1];
+      for (const dir of faces) {
+        // Forma irregolare come le chiazze sul tavolo.
+        const stainR = 0.09 + Math.random() * 0.07;
+        const stainGeo = new THREE.CircleGeometry(stainR, 12);
+        const pos = stainGeo.attributes.position;
+        let firstK = 0.6 + Math.random() * 0.7;
+        for (let i = 1; i < pos.count; i++) {
+          const k = i === pos.count - 1 ? firstK : 0.6 + Math.random() * 0.7;
+          if (i === 1) firstK = k;
+          pos.setXYZ(i, pos.getX(i) * k, pos.getY(i) * k, 0);
+        }
+        stainGeo.computeVertexNormals();
+        const stainMat = new THREE.MeshBasicMaterial({
+          color, transparent: true, opacity: 0.92, depthWrite: false
+        });
+        const stain = new THREE.Mesh(stainGeo, stainMat);
+        stain.rotation.y = dir > 0 ? Math.PI / 2 : -Math.PI / 2;
+        stain.rotation.z = Math.random() * Math.PI * 2;
+        stain.position.set(
+          dir * 0.515,
+          (Math.random() - 0.5) * 0.42,
+          (Math.random() - 0.5) * 0.86
+        );
+        body.add(stain);
+        body.userData.stains.push(stain);
+        // Niente items: le macchie sulla racchetta sono permanenti, non
+        // hanno bisogno di updateBurst (e non devono accumularsi in coda).
+      }
+      // Tetto alle macchie accumulate: via le più vecchie, ma la racchetta
+      // resta comunque visibilmente sporca.
+      while (body.userData.stains.length > 24) {
+        const old = body.userData.stains.shift();
+        if (old.parent) old.parent.remove(old);
+        old.geometry.dispose();
+        old.material.dispose();
+      }
     }
   }
 
@@ -1385,6 +1483,13 @@ export function updateBurst(items, dt, scene) {
     const p = items[i];
     p.age += dt;
     if (p.static) {
+      // Macchie permanenti sulla racchetta (tema Colori): restano per
+      // tutta la partita, senza sfumare.
+      if (p.life === Infinity) {
+        p.mesh.material.opacity = 0.92;
+        p.mesh.scale.setScalar(1);
+        continue;
+      }
       // Macchia di colore: non si muove, si allarga un po' e sfuma.
       const t = 1 - p.age / p.life;
       p.mesh.material.opacity = Math.max(0, t * t * 0.92);
@@ -1456,6 +1561,21 @@ export function makeLog(len=3.2, r=0.28) {
   mesh.rotation.z = Math.PI/2; mesh.castShadow = true; g.add(mesh);
   const ring = new THREE.Mesh(new THREE.TorusGeometry(r+0.01, 0.04, 8, 16), new THREE.MeshStandardMaterial({ color: 0x2a160c, roughness: 0.8 }));
   ring.rotation.y = Math.PI/2; g.add(ring);
+  // Corteccia striata: righe scure lungo il tronco, su lati diversi della
+  // circonferenza, così quando il potere Rotazione lo mette in moto si vede
+  // chiaramente girare.
+  const bark = new THREE.MeshStandardMaterial({ color: 0x2f1608, roughness: 1 });
+  const ridgePos = [
+    [0.02, r + 0.012, 0, 0.78],
+    [0, 0, r + 0.012, 0.5],
+    [-0.02, -(r + 0.012), 0, 0.62],
+    [0, 0, -(r + 0.012), 0.44]
+  ];
+  for (const [x, y, z, lenMul] of ridgePos) {
+    const stripe = new THREE.Mesh(new THREE.BoxGeometry(len * lenMul, 0.035, 0.035), bark);
+    stripe.position.set(x, y, z);
+    g.add(stripe);
+  }
   return g;
 }
 export function makeHill(r=0.7, h=0.45) {
@@ -1474,12 +1594,6 @@ export function makePuck() {
   const m = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 0.18, 32),
     new THREE.MeshStandardMaterial({ color: 0x1a1c22, metalness: 0.6, roughness: 0.3, emissive: 0x111, emissiveIntensity: 0.2 }));
   m.position.y = 0.1; m.castShadow = true; return m;
-}
-export function makeBumper(color=0xff4d8d) {
-  const g = new THREE.Group();
-  const m = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.48, 0.55, 16),
-    new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.4, metalness: 0.4, roughness: 0.3 }));
-  m.position.y = 0.28; m.castShadow = true; g.add(m); g.userData.mat = m.material; return g;
 }
 export function makeGoalFrame(width, height, color) {
   const g = new THREE.Group();

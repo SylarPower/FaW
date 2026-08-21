@@ -1,4 +1,4 @@
-import { ARENAS, arenaById } from "./arenas.js";
+import { ARENAS, arenaById, ARENA_FORCED_THEME } from "./arenas.js";
 import { POWER_DEFS } from "./powerups.js";
 import { net, isFirebaseConfigured, codeFromSeed } from "./net.js";
 import { PNAME, TRI_SIDES, DUEL_SIDES } from "./players.js";
@@ -380,6 +380,11 @@ export class UI {
     }
     const c = this._custom;
 
+    // Tavoli che impongono un tema: la scelta del tema è disabilitata e
+    // viene selezionato il tema corrispettivo.
+    const forcedTheme = ARENA_FORCED_THEME[c.base];
+    if (forcedTheme && c.theme !== forcedTheme) c.theme = forcedTheme;
+
     // Il pannello segue il tema scelto per la partita (si torna al tema
     // globale quando si esce dalla schermata).
     applyThemeToUI(c.theme);
@@ -443,12 +448,16 @@ export class UI {
             ])}</div>
           </div>
           <div class="opt">
-            <div><label>Tema grafica</label></div>
+            <div><label>Tema grafica</label>${forcedTheme
+              ? `<span class="hint">Questo tavolo usa sempre il tema <strong>${themeById(forcedTheme).name}</strong></span>`
+              : ""}</div>
             <div class="seg th-seg">${THEME_IDS.map((id) => {
               const t = themeById(id);
               const dots = t.swatch.map((col) =>
                 `<i style="background:#${col.toString(16).padStart(6, "0")}"></i>`).join("");
-              return `<button data-cst="theme" data-val="${id}" class="${c.theme === id ? "on" : ""}"><span class="th-dots">${dots}</span>${t.name}</button>`;
+              const off = forcedTheme && id !== forcedTheme;
+              const on = c.theme === id || (forcedTheme && id === forcedTheme);
+              return `<button data-cst="theme" data-val="${id}" class="${on ? "on" : ""}" ${off ? "disabled" : ""}><span class="th-dots">${dots}</span>${t.name}</button>`;
             }).join("")}</div>
           </div>
           ${vsCPU ? `
@@ -482,11 +491,18 @@ export class UI {
         let v = b.dataset.val;
         if (k === "target") v = Number.parseInt(v, 10);
         this._custom[k] = v;
-        if (k === "theme") {
-          // Il tema si vede subito: pannello e demo sullo sfondo cambiano.
-          applyThemeToUI(v);
+        // I tavoli con tema imposto agganciano la selezione del tema al loro.
+        if (k === "base") {
+          const forced = ARENA_FORCED_THEME[v];
+          if (forced) this._custom.theme = forced;
           this._applyCustomPreview();
-        } else if (k === "base" || k === "paddleSize") this._applyCustomPreview();
+        } else if (k === "theme") {
+          if (!ARENA_FORCED_THEME[this._custom.base]) {
+            // Il tema si vede subito: pannello e demo sullo sfondo cambiano.
+            applyThemeToUI(v);
+            this._applyCustomPreview();
+          }
+        } else if (k === "paddleSize") this._applyCustomPreview();
         this.showCustom();
       });
     });
@@ -904,6 +920,24 @@ export class UI {
     if (timers("barrierT")) tags.push(`<div class="slot active">▤ Barriera ${timers("barrierT")}s</div>`);
     if (timers("invert")) tags.push(`<div class="slot active">⇄ Caos ${timers("invert")}s</div>`);
     if (timers("burn")) tags.push(`<div class="slot active">☠ Bruciatura ${timers("burn")}s</div>`);
+
+    // Stato dell'arena (Tavolo Folle e Hockey Puck): spiega cosa sta
+    // succedendo sul campo quando non è un semplice effetto a tempo.
+    const c = game.ctrl;
+    if (c?.tiltT > 0) {
+      const dirTxt = (c.tilt.x || 0) > 0.04 ? "la palla scivola ⟶" : (c.tilt.x || 0) < -0.04 ? "la palla scivola ⟵" : "tavolo piatto";
+      tags.push(`<div class="slot active" title="Il tavolo è inclinato: la palla scivola verso il lato basso. La livella al centro indica la pendenza.">◣ Inclinazione ${Math.ceil(c.tiltT)}s · ${dirTxt}</div>`);
+    }
+    if (c?.centerHill) {
+      tags.push(`<div class="slot active" title="Un dosso al centro devia la palla">⌒ Collina ×${c.hillStacks || 1}</div>`);
+    }
+    if (c?.dip) {
+      tags.push(`<div class="slot active" title="Una conca al centro attira la palla">⌄ Conca ×${c.dipStacks || 1}</div>`);
+    }
+    if (c?.puck) {
+      const ps = Math.hypot(c.puck.vx || 0, c.puck.vz || 0);
+      tags.push(`<div class="slot${ps > 0.4 ? " active" : ""}" title="Il disco da air hockey: colpiscilo con la palla per farlo scivolare oltre la linea avversaria">⏺ Disco ${ps.toFixed(1)}</div>`);
+    }
     if (!tags.length) tags.push(`<div class="slot">—</div>`);
     el.innerHTML = tags.join("");
   }
