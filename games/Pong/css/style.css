@@ -424,8 +424,124 @@ h2.section {
 button.card.active,
 .seg button.active,
 [data-opt].active,
-.pw-pick.active {
+.pw-pick.active,
+.pw-pack.active,
+.modal-trigger.active,
+.th-grid button.active,
+.modal-close.active {
   transform: translateY(-2px);
   border-color: var(--mint) !important;
   box-shadow: 0 0 0 2px var(--mint-dim), 0 10px 40px rgba(61,255,209,.28) !important;
 }
+
+/* ===================================================================== *
+ *  MODAL per "Arena su misura": tema grafica e power-up
+ * ===================================================================== */
+
+/* #ui ha pointer-events:none (solo .screen lo riattiva): l'overlay deve
+   riattivarlo da solo, altrimenti i click lo attraversano. */
+.modal-overlay {
+  position: absolute; inset: 0; z-index: 20; pointer-events: auto;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(4, 6, 12, 0.72);
+  backdrop-filter: blur(8px);
+  animation: fadeIn 0.2s var(--ease);
+}
+
+.modal {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 28px 24px 24px;
+  max-width: 640px;
+  width: min(640px, calc(100% - 40px));
+  max-height: min(80vh, 680px);
+  overflow-y: auto;
+  box-shadow: var(--shadow);
+  position: relative;
+  animation: slideUp 0.25s var(--ease);
+}
+.modal-wide { max-width: 800px; width: min(800px, calc(100% - 40px)); }
+
+.modal-title {
+  font-family: "Tektur", sans-serif;
+  font-size: 20px; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--gold);
+  text-align: center; margin-bottom: 20px;
+}
+
+.modal-close {
+  position: absolute; top: 12px; right: 12px;
+  width: 30px; height: 30px; border-radius: 50%;
+  border: 1px solid var(--line); background: transparent;
+  color: var(--muted); font-size: 16px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: 0.15s var(--ease);
+}
+.modal-close:hover { border-color: var(--pink); color: var(--pink); }
+
+.modal-section-label {
+  display: block; font-weight: 600; font-size: 13px;
+  margin-bottom: 10px; color: var(--text);
+}
+
+.modal-sep {
+  text-align: center; color: var(--muted);
+  font-size: 10px; letter-spacing: 0.15em;
+  text-transform: uppercase; margin: 18px 0;
+  position: relative;
+}
+.modal-sep::before, .modal-sep::after {
+  content: ""; position: absolute; top: 50%;
+  width: calc(50% - 96px); height: 1px; background: var(--line);
+}
+.modal-sep::before { left: 0; }
+.modal-sep::after { right: 0; }
+
+/* Nel modal l'unico scroller è il pannello: le griglie si estendono. */
+.modal .pw-packs,
+.modal .pw-picks { max-height: none; overflow: visible; padding-right: 0; }
+
+/* Griglia temi nel modal */
+.th-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+}
+.th-grid button {
+  display: flex; align-items: center; gap: 6px;
+  border: 1px solid var(--line); background: rgba(255,255,255,0.03);
+  color: var(--muted); padding: 10px 12px; border-radius: 8px;
+  cursor: pointer; font-family: inherit; font-size: 12px;
+  letter-spacing: 0.06em; font-weight: 600;
+  transition: 0.15s var(--ease);
+}
+.th-grid button:hover { border-color: var(--gold); color: var(--text); }
+.th-grid button.on { border-color: var(--gold); background: rgba(255,200,87,0.12); color: var(--gold); }
+
+/* Bottone trigger nella schermata principale */
+.modal-trigger {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 16px; border-radius: 10px;
+  border: 1px solid var(--line); background: rgba(255,255,255,0.03);
+  cursor: pointer; width: 100%; max-width: 420px; margin: 6px auto;
+  color: var(--text); font-family: inherit; font-size: 13px;
+  transition: 0.15s var(--ease);
+}
+.modal-trigger:hover { border-color: var(--gold); background: rgba(255,200,87,0.06); }
+.modal-trigger .trigger-label {
+  color: var(--muted); font-size: 10px; text-transform: uppercase;
+  letter-spacing: 0.14em; font-weight: 600; min-width: 80px;
+}
+.modal-trigger .trigger-value { font-weight: 600; display: flex; align-items: center; gap: 6px; }
+.modal-trigger .trigger-arrow { margin-left: auto; color: var(--muted); font-size: 18px; }
+
+@media (max-width: 720px) {
+  .modal { width: calc(100% - 24px); padding: 24px 16px 18px; }
+  .modal-wide { width: calc(100% - 24px); }
+  .modal-sep::before, .modal-sep::after { width: calc(50% - 78px); }
+  .th-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
+}
+
+/* Arena su misura: anche compatta, su schermi bassi il pannello deve poter
+   scorrere invece di tagliare i bottoni finali. */
+.screen .panel:has(.modal-trigger) { max-height: min(86vh, 900px); overflow-y: auto; }

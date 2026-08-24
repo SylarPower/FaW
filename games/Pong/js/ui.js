@@ -23,6 +23,8 @@ class MenuNav {
     if (data.opt) return `opt:${data.opt}:${data.val || ""}`;
     if (data.cst) return `cst:${data.cst}:${data.val || ""}`;
     if (data.power) return `power:${data.power}`;
+    if (data.pack) return `pack:${data.pack}`;
+    if (data.modalTheme) return `mtheme:${data.modalTheme}`;
     if (data.act) return `act:${data.act}`;
     return el.textContent.trim();
   }
@@ -32,13 +34,20 @@ class MenuNav {
     this.root = root;
     this.onBack = onBack || null;
     // Tutti gli elementi interattivi del menu che vogliamo selezionare.
+    // (I selettori ".modal-*", ".pw-pack" e "[data-modal-theme]" servono ai
+    //  modal di "Arena su misura": tema grafica e power-up.)
     this.items = Array.from(root.querySelectorAll(
-      ".btn, button.card, .pw-pick, [data-cst], [data-opt], [data-power], button.pw-pick"
+      ".btn, button.card, .pw-pick, .pw-pack, .modal-trigger, .modal-close, " +
+      "[data-cst], [data-opt], [data-power], [data-modal-theme], button.pw-pick"
     )).filter((b) => !b.disabled);
     const restored = previousKey ? this.items.findIndex((b) => this.itemKey(b) === previousKey) : -1;
     this.index = restored >= 0 ? restored : 0;
     this.items.forEach((item, i) => {
       item.addEventListener("click", () => {
+        // Se nel frattempo lo schermo (o un modal) e' stato ridisegnato, questo
+        // elemento appartiene a una lista vecchia: il click va ignorato, cosi'
+        // non sposta la selezione gia' riposizionata dal nuovo attach().
+        if (this.items[i] !== item) return;
         this.index = i;
         this.focus();
       });
@@ -142,6 +151,8 @@ export class UI {
     this.online = false;
     this.triangle = false;
     this.nav = new MenuNav(this);
+    this._modalOpen = null;   // "theme" | "powerup" | null
+    this._modalReturnAct = null;
     this._previewArena = null;
     this._previewSize = null;
     this._previewBall = null;
@@ -417,9 +428,14 @@ export class UI {
   /**
    * Arena personalizzata contro CPU o online. Mostra subito in sfondo il tavolo
    * e la dimensione racchetta scelti, ricaricando la demo in tempo reale.
+   * Tema grafica e power-up non sono piu' inline: si aprono in due modal
+   * (renderThemeModal / renderPowerModal) dai relativi trigger, cosi' la
+   * schermata resta compatta.
    */
   showCustom() {
     this.screen = "custom";
+    // Il re-render sostituisce tutto il contenuto: nessun modal puo' restare aperto.
+    this._modalOpen = null;
     const vsCPU = this.vsCPU;
     if (!this._custom) {
       const opts = this.game?.save?.options || {};
@@ -448,18 +464,6 @@ export class UI {
       `<button data-cst="base" data-val="${a.id}" class="${c.base === a.id ? "on" : ""}">${a.name}</button>`).join("");
     const seg = (key, vals) => vals.map((v) =>
       `<button data-cst="${key}" data-val="${v.id}" class="${String(c[key]) === String(v.id) ? "on" : ""}">${v.label}</button>`).join("");
-
-    const powerCards = Object.keys(POWER_DEFS).map((id) => {
-      const p = POWER_DEFS[id];
-      const on = c.powers.includes(id);
-      const hex = "#" + p.color.toString(16).padStart(6, "0");
-      return `
-        <button class="pw-pick ${on ? "on" : ""}" data-power="${id}">
-          <span class="pw-dot" style="background:${hex};box-shadow:0 0 10px ${hex}"></span>
-          <span class="pw-pick-name"><span class="pw-glyph" style="color:${hex}">${p.glyph || ""}</span> ${p.name}</span>
-          <span class="pw-pick-desc">${p.desc}</span>
-        </button>`;
-    }).join("");
 
     this.show(this.el(`
       <div class="screen">
@@ -497,15 +501,11 @@ export class UI {
               { id: "medium", label: "Grande" }, { id: "large", label: "Maxi" }
             ])}</div>
           </div>
-          <div class="opt">
-            <div><label>Tema grafica</label></div>
-            <div class="seg th-seg">${THEME_IDS.map((id) => {
-              const t = themeById(id);
-              const dots = t.swatch.map((col) =>
-                `<i style="background:#${col.toString(16).padStart(6, "0")}"></i>`).join("");
-              return `<button data-cst="theme" data-val="${id}" class="${c.theme === id ? "on" : ""}"><span class="th-dots">${dots}</span>${t.name}</button>`;
-            }).join("")}</div>
-          </div>
+          <button class="modal-trigger" data-act="open-theme-modal">
+            <span class="trigger-label">Tema grafica</span>
+            <span class="trigger-value">${this._themeTriggerValue(c.theme)}</span>
+            <span class="trigger-arrow">›</span>
+          </button>
           ${vsCPU ? `
           <div class="opt">
             <div><label>Difficoltà CPU</label></div>
@@ -515,48 +515,15 @@ export class UI {
             ])}</div>
           </div>` : ""}
 
-          <div style="margin-top:18px">
-            <label style="font-weight:600">⚡ Pacchetti power-up</label>
-            <span class="hint" style="display:block;margin:3px 0 10px">Scegli un pacchetto predefinito, oppure personalizza sotto.</span>
-            <div class="pw-packs">${(() => {
-              // Controlla se la selezione corrente corrisponde a un pacchetto
-              const currentSorted = c.powers.slice().sort().join(",");
-              const matchedPack = POWER_PACKS.find(pk => pk.powers.slice().sort().join(",") === currentSorted);
-              const hasCustom = !matchedPack && c.powers.length > 0;
-              let html = "";
-              // Pacchetto "Personalizzato" se la selezione non corrisponde a nessun pacchetto
-              if (hasCustom) {
-                const count = c.powers.length;
-                html += `<button class="pw-pack on custom" data-pack="__custom__">
-                  <span class="pw-pack-name">✎ Personalizzato</span>
-                  <span class="pw-pack-desc">${count} power-up selezionat${count === 1 ? "o" : "i"} manualmente</span>
-                  <span class="pw-pack-items">${c.powers.map(id => POWER_DEFS[id] ? POWER_DEFS[id].glyph : "?").join(" ")}</span>
-                </button>`;
-              }
-              // Pacchetti predefiniti
-              html += POWER_PACKS.map((pk) => {
-                const isActive = matchedPack && matchedPack.id === pk.id;
-                return `<button class="pw-pack ${isActive ? "on" : ""}" data-pack="${pk.id}">
-                  <span class="pw-pack-name">${pk.name}</span>
-                  <span class="pw-pack-desc">${pk.desc}</span>
-                  <span class="pw-pack-items">${pk.powers.map(id => POWER_DEFS[id] ? POWER_DEFS[id].glyph + " " + POWER_DEFS[id].name : id).join(" · ")}</span>
-                </button>`;
-              }).join("");
-              return html;
-            })()}</div>
-          </div>
-
-          <div style="margin-top:18px">
-            <label style="font-weight:600">Power-up individuali</label>
-            <span class="hint" style="display:block;margin:3px 0 10px">Tocca per attivarli o spegnerli. Nessuno selezionato = partita pulita.</span>
-            <div class="pw-picks">${powerCards}</div>
-          </div>
+          <button class="modal-trigger" data-act="open-power-modal">
+            <span class="trigger-label">Power-up</span>
+            <span class="trigger-value">${this._powerTriggerValue()}</span>
+            <span class="trigger-arrow">›</span>
+          </button>
 
           <div class="row" style="margin-top:20px">
             <button class="btn" id="cstGo">${vsCPU ? "Gioca contro CPU" : "Crea stanza"}</button>
             <button class="btn ghost" id="cstPeek">👁 Vedi anteprima — tieni premuto</button>
-            <button class="btn small ghost" id="cstNone">Nessun potere</button>
-            <button class="btn small ghost" id="cstAll">Tutti</button>
           </div>
         </div>
       </div>`));
@@ -568,34 +535,14 @@ export class UI {
         let v = b.dataset.val;
         if (k === "target") v = Number.parseInt(v, 10);
         this._custom[k] = v;
-        if (k === "theme") {
-          // Il tema si vede subito: pannello e demo sullo sfondo cambiano.
-          applyThemeToUI(v);
-          this._applyCustomPreview();
-        } else if (k === "base" || k === "paddleSize") this._applyCustomPreview();
+        // Tavolo e racchette si vedono subito nella demo sullo sfondo.
+        // (Il tema non e' piu' qui: si cambia nel modal "Tema grafica".)
+        if (k === "base" || k === "paddleSize") this._applyCustomPreview();
         this.showCustom();
       });
     });
-    this.root.querySelectorAll("[data-power]").forEach((b) => {
-      b.addEventListener("click", () => {
-        const id = b.dataset.power;
-        const i = this._custom.powers.indexOf(id);
-        if (i >= 0) this._custom.powers.splice(i, 1);
-        else this._custom.powers.push(id);
-        this.showCustom();
-      });
-    });
-    this.root.querySelectorAll("[data-pack]").forEach((b) => {
-      b.addEventListener("click", () => {
-        const pack = POWER_PACKS.find((p) => p.id === b.dataset.pack);
-        if (pack) {
-          this._custom.powers = pack.powers.slice();
-          this.showCustom();
-        }
-      });
-    });
-    this.root.querySelector("#cstNone").onclick = () => { this._custom.powers = []; this.showCustom(); };
-    this.root.querySelector("#cstAll").onclick = () => { this._custom.powers = Object.keys(POWER_DEFS); this.showCustom(); };
+    // Tema e power-up non hanno piu' controlli inline: si aprono nei modal
+    // (vedi renderThemeModal / renderPowerModal sotto).
     // Anteprima: finché il pulsante resta premuto la modale diventa
     // quasi trasparente e si vede il tavolo che scorre sullo sfondo.
     // Con la pointer capture il rilascio arriva sempre al pulsante, anche
@@ -655,6 +602,221 @@ export class UI {
         }
       });
     };
+  }
+
+  /* ------------------------------------------------------------------ *
+   *  MODAL "Arena su misura": tema grafica e power-up
+   * ------------------------------------------------------------------ */
+
+  /** Pallini colorati di anteprima di un tema. */
+  _themeDots(themeId) {
+    return themeById(themeId).swatch.map((col) =>
+      `<i style="background:#${col.toString(16).padStart(6, "0")}"></i>`).join("");
+  }
+
+  /** Contenuto del trigger "Tema grafica" nella schermata principale. */
+  _themeTriggerValue(themeId) {
+    return `<span class="th-dots">${this._themeDots(themeId)}</span> ${themeById(themeId).name}`;
+  }
+
+  /** Pacchetto predefinito che corrisponde alla selezione corrente (o null). */
+  _matchedPack() {
+    const currentSorted = this._custom.powers.slice().sort().join(",");
+    return POWER_PACKS.find((pk) => pk.powers.slice().sort().join(",") === currentSorted) || null;
+  }
+
+  /** Testo del trigger "Power-up": nome pacchetto / personalizzato / nessuno. */
+  _powerTriggerValue() {
+    const c = this._custom;
+    const matchedPack = this._matchedPack();
+    if (matchedPack) return matchedPack.name;
+    if (c.powers.length > 0) return `✎ Personalizzato · ${c.powers.length}`;
+    return "Nessuno";
+  }
+
+  /**
+   * Aggancia la navigazione da tastiera al modal appena aperto: W/S muovono,
+   * Spazio conferma ed Esc chiude il modal (non esce dalla schermata).
+   */
+  _hookModalNav(overlay) {
+    this.nav.attach(overlay, { onBack: () => this.closeModal() });
+    // Parte dalla voce gia' attiva, se ce n'e' una.
+    const on = overlay.querySelector(".on");
+    const i = on ? this.nav.items.indexOf(on) : -1;
+    if (i >= 0) {
+      this.nav.index = i;
+      this.nav.focus();
+    }
+  }
+
+  /** Modal con la griglia dei temi: scegliere un tema chiude il modal. */
+  renderThemeModal() {
+    document.querySelector(".modal-overlay")?.remove();
+
+    const c = this._custom;
+    const overlay = this.el(`
+      <div class="modal-overlay">
+        <div class="modal">
+          <button class="modal-close" data-act="close-modal">✕</button>
+          <h3 class="modal-title">Tema grafica</h3>
+          <div class="th-grid">
+            ${THEME_IDS.map((id) => {
+              const t = themeById(id);
+              return `<button data-modal-theme="${id}" class="${c.theme === id ? "on" : ""}">
+                <span class="th-dots">${this._themeDots(id)}</span>${t.name}
+              </button>`;
+            }).join("")}
+          </div>
+        </div>
+      </div>`);
+
+    this.root.appendChild(overlay);
+
+    // Click su un tema: si applica subito (pannello + demo) e si chiude.
+    overlay.querySelectorAll("[data-modal-theme]").forEach((b) => {
+      b.addEventListener("click", () => {
+        c.theme = b.dataset.modalTheme;
+        applyThemeToUI(c.theme);
+        this._applyCustomPreview();
+        this.closeModal();
+        this.updateModalTriggers();
+      });
+    });
+
+    overlay.querySelector("[data-act=close-modal]").onclick = () => this.closeModal();
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) this.closeModal();
+    });
+    this._hookModalNav(overlay);
+  }
+
+  /** Modal power-up: pacchetti predefiniti sopra, singoli sotto. */
+  renderPowerModal() {
+    document.querySelector(".modal-overlay")?.remove();
+
+    const c = this._custom;
+    const matchedPack = this._matchedPack();
+
+    const packCards = POWER_PACKS.map((pk) => {
+      const isActive = matchedPack && matchedPack.id === pk.id;
+      return `<button class="pw-pack ${isActive ? "on" : ""}" data-pack="${pk.id}">
+        <span class="pw-pack-name">${pk.name}</span>
+        <span class="pw-pack-desc">${pk.desc}</span>
+        <span class="pw-pack-items">${pk.powers.map((id) => POWER_DEFS[id] ? POWER_DEFS[id].glyph + " " + POWER_DEFS[id].name : id).join(" · ")}</span>
+      </button>`;
+    }).join("");
+
+    const powerCards = Object.keys(POWER_DEFS).map((id) => {
+      const p = POWER_DEFS[id];
+      const on = c.powers.includes(id);
+      const hex = "#" + p.color.toString(16).padStart(6, "0");
+      return `
+        <button class="pw-pick ${on ? "on" : ""}" data-power="${id}">
+          <span class="pw-dot" style="background:${hex};box-shadow:0 0 10px ${hex}"></span>
+          <span class="pw-pick-name"><span class="pw-glyph" style="color:${hex}">${p.glyph || ""}</span> ${p.name}</span>
+          <span class="pw-pick-desc">${p.desc}</span>
+        </button>`;
+    }).join("");
+
+    const overlay = this.el(`
+      <div class="modal-overlay">
+        <div class="modal modal-wide">
+          <button class="modal-close" data-act="close-modal">✕</button>
+          <h3 class="modal-title">Power-up</h3>
+
+          <label class="modal-section-label">⚡ Pacchetti</label>
+          <div class="pw-packs">${packCards}</div>
+
+          <div class="modal-sep">oppure scegli singolarmente</div>
+
+          <label class="modal-section-label">Power-up individuali</label>
+          <div class="pw-picks">${powerCards}</div>
+
+          <div class="row" style="margin-top:16px">
+            <button class="btn small ghost" id="modalCstNone">Nessun potere</button>
+            <button class="btn small ghost" id="modalCstAll">Tutti</button>
+          </div>
+        </div>
+      </div>`);
+
+    this.root.appendChild(overlay);
+
+    // Pacchetti: sostituiscono tutta la selezione.
+    overlay.querySelectorAll("[data-pack]").forEach((b) => {
+      b.addEventListener("click", () => {
+        const pack = POWER_PACKS.find((p) => p.id === b.dataset.pack);
+        if (pack) {
+          c.powers = pack.powers.slice();
+          this.refreshPowerModal();
+          this.updateModalTriggers();
+        }
+      });
+    });
+
+    // Singoli: attivano/disattivano senza chiudere il modal.
+    overlay.querySelectorAll("[data-power]").forEach((b) => {
+      b.addEventListener("click", () => {
+        const id = b.dataset.power;
+        const i = c.powers.indexOf(id);
+        if (i >= 0) c.powers.splice(i, 1);
+        else c.powers.push(id);
+        this.refreshPowerModal();
+        this.updateModalTriggers();
+      });
+    });
+
+    overlay.querySelector("#modalCstNone").onclick = () => {
+      c.powers = [];
+      this.refreshPowerModal();
+      this.updateModalTriggers();
+    };
+    overlay.querySelector("#modalCstAll").onclick = () => {
+      c.powers = Object.keys(POWER_DEFS);
+      this.refreshPowerModal();
+      this.updateModalTriggers();
+    };
+
+    overlay.querySelector("[data-act=close-modal]").onclick = () => this.closeModal();
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) this.closeModal();
+    });
+    this._hookModalNav(overlay);
+  }
+
+  /**
+   * Ridisegna il modal power-up dopo una scelta, tenendolo aperto.
+   * Il re-render e' istantaneo e la navigazione resta sulla stessa voce
+   * (MenuNav.attach recupera l'indice dalla chiave dell'elemento).
+   */
+  refreshPowerModal() {
+    this.renderPowerModal();
+  }
+
+  /** Chiude il modal aperto e restituisce la navigazione alla schermata. */
+  closeModal() {
+    this._modalOpen = null;
+    const returnAct = this._modalReturnAct;
+    this._modalReturnAct = null;
+    document.querySelector(".modal-overlay")?.remove();
+    if (this.screen !== "custom") return;
+    // Riaggancia la navigazione sulla schermata sottostante. Niente hook():
+    // i listener [data-act] della schermata sono gia' al loro posto.
+    this.nav.attach(this.root, {});
+    const trigger = returnAct ? this.root.querySelector(`[data-act="${returnAct}"]`) : null;
+    const i = trigger ? this.nav.items.indexOf(trigger) : -1;
+    if (i >= 0) {
+      this.nav.index = i;
+      this.nav.focus();
+    }
+  }
+
+  /** Allinea i due trigger della schermata principale allo stato corrente. */
+  updateModalTriggers() {
+    const themeTrigger = this.root.querySelector('[data-act="open-theme-modal"] .trigger-value');
+    if (themeTrigger) themeTrigger.innerHTML = this._themeTriggerValue(this._custom.theme);
+
+    const powerTrigger = this.root.querySelector('[data-act="open-power-modal"] .trigger-value');
+    if (powerTrigger) powerTrigger.textContent = this._powerTriggerValue();
   }
 
   _applyCustomPreview() {
@@ -1286,6 +1448,18 @@ export class UI {
     }
     if (act === "pvp-create") this.showZones(false);
     if (act === "custom") this.showCustom();
+    // Modal di "Arena su misura"
+    if (act === "open-theme-modal") {
+      this._modalOpen = "theme";
+      this._modalReturnAct = act;
+      this.renderThemeModal();
+    }
+    if (act === "open-power-modal") {
+      this._modalOpen = "powerup";
+      this._modalReturnAct = act;
+      this.renderPowerModal();
+    }
+    if (act === "close-modal") this.closeModal();
     if (act === "tri-cpu") {
       this.game.beginMatch("triangle", { vsCPU: true, triangle: true });
     }
