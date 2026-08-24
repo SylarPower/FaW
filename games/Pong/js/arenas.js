@@ -396,6 +396,82 @@ function setupThemeDecor(theme, world, engine, ctrl) {
     addFence(0, hz + 0.6, hx * 2);
   }
 
+  if (style === "spiaggia") {
+    // ONDE DEL MARE come sfondo: tre strati di onde che si muovono dolcemente.
+    // Posizionati oltre i bordi del tavolo (sopra e sotto, ±Z).
+    const waterMat1 = new THREE.MeshStandardMaterial({
+      color: 0x1a8f9a, metalness: 0.15, roughness: 0.35,
+      transparent: true, opacity: 0.75, emissive: 0x0a5060, emissiveIntensity: 0.1
+    });
+    const waterMat2 = new THREE.MeshStandardMaterial({
+      color: 0x2aaabb, metalness: 0.1, roughness: 0.4,
+      transparent: true, opacity: 0.55, emissive: 0x0a6070, emissiveIntensity: 0.08
+    });
+    const waterMat3 = new THREE.MeshStandardMaterial({
+      color: 0x3dc8dd, metalness: 0.08, roughness: 0.45,
+      transparent: true, opacity: 0.35, emissive: 0x107080, emissiveIntensity: 0.05
+    });
+    const waveMats = [waterMat1, waterMat2, waterMat3];
+    const waveOffset = [0, 1.2, 2.4];
+    for (const side of [-1, 1]) {
+      for (let layer = 0; layer < 3; layer++) {
+        const waveW = hx * 2.6;
+        const waveD = 1.4 + layer * 0.8;
+        // Geometria ondulata: sinusoidale per dare l'effetto onda.
+        const geo = new THREE.PlaneGeometry(waveW, waveD, 24, 4);
+        const posAttr = geo.attributes.position;
+        for (let i = 0; i < posAttr.count; i++) {
+          const x = posAttr.getX(i);
+          const y = posAttr.getY(i);
+          const wave = Math.sin(x * 1.8 + waveOffset[layer]) * 0.12 +
+                       Math.sin(x * 3.2 + layer) * 0.06;
+          posAttr.setZ(i, wave);
+        }
+        geo.computeVertexNormals();
+        const wave = new THREE.Mesh(geo, waveMats[layer]);
+        wave.rotation.x = -Math.PI / 2;
+        wave.position.set(0, -0.15 - layer * 0.05, side * (hz + 1.0 + layer * 1.2));
+        wave.userData.waveLayer = layer;
+        wave.userData.waveSide = side;
+        wave.userData.waveOffset = waveOffset[layer];
+        engine.add(wave);
+        // Salva le onde per animarle in updateArena.
+        if (!ctrl.waves) ctrl.waves = [];
+        ctrl.waves.push(wave);
+      }
+    }
+    // Schiuma bianca sulla riva (tra sabbia e acqua).
+    const foamMat = new THREE.MeshBasicMaterial({
+      color: 0xffffff, transparent: true, opacity: 0.35, depthWrite: false
+    });
+    for (const side of [-1, 1]) {
+      const foam = new THREE.Mesh(new THREE.PlaneGeometry(hx * 2.4, 0.5, 20, 1), foamMat);
+      foam.rotation.x = -Math.PI / 2;
+      foam.position.set(0, 0.005, side * (hz + 0.85));
+      engine.add(foam);
+      if (!ctrl.foams) ctrl.foams = [];
+      ctrl.foams.push(foam);
+    }
+    // Ombrelloni ai 4 angoli (decorazione scenica).
+    for (const [x, z] of [[-hx - 1.6, -hz - 1.2], [hx + 1.6, -hz - 1.2], [-hx - 1.6, hz + 1.2], [hx + 1.6, hz + 1.2]]) {
+      const pole = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.03, 0.03, 2.2, 6),
+        new THREE.MeshStandardMaterial({ color: 0x8b6b4a, roughness: 0.85 })
+      );
+      pole.position.set(x, 1.1, z);
+      engine.add(pole);
+      const umbrellaColors = [0xff6a3d, 0x4dc9f0, 0xffe08a, 0xff6aa8];
+      const col = umbrellaColors[Math.floor(Math.random() * 4)];
+      const canopy = new THREE.Mesh(
+        new THREE.ConeGeometry(0.7, 0.3, 12, 1, true),
+        new THREE.MeshStandardMaterial({ color: col, roughness: 0.7, side: THREE.DoubleSide })
+      );
+      canopy.position.set(x, 2.3, z);
+      canopy.rotation.x = Math.PI;
+      engine.add(canopy);
+    }
+  }
+
   // Spettatori a tema attorno al tavolo.
   const spectatorKind = theme.spectators || null;
   if (spectatorKind) {
@@ -1057,6 +1133,42 @@ export function updateArena(ctrl, world, dt, engine, game) {
         if (b.mesh) engine.arenaRoot.remove(b.mesh);
         delete ctrl.barrier[side];
       }
+    }
+  }
+
+  // ANIMAZIONE ONDE del tema SPIAGGIA (leggera: solo ogni 3 frame).
+  if (ctrl.waves) {
+    ctrl._waveFrame = (ctrl._waveFrame || 0) + 1;
+    if (ctrl._waveFrame >= 3) {
+      ctrl._waveFrame = 0;
+      const t = performance.now() * 0.001;
+      for (const wave of ctrl.waves) {
+        const posAttr = wave.geometry.attributes.position;
+        const layer = wave.userData.waveLayer;
+        const offset = wave.userData.waveOffset;
+        for (let i = 0; i < posAttr.count; i++) {
+          const x = posAttr.getX(i);
+          const w = Math.sin(x * 1.8 + t * 1.2 + offset) * 0.12 +
+                    Math.sin(x * 3.2 + t * 0.8 + layer) * 0.06 +
+                    Math.sin(x * 0.6 + t * 0.4) * 0.08;
+          posAttr.setZ(i, w);
+        }
+        posAttr.needsUpdate = true;
+      }
+      // computeVertexNormals solo ogni 6 frame (più leggero)
+      if (ctrl._waveFrame % 6 === 0) {
+        for (const wave of ctrl.waves) {
+          wave.geometry.computeVertexNormals();
+        }
+      }
+    }
+  }
+  // Schiuma: pulsazione leggera.
+  if (ctrl.foams) {
+    const t = performance.now() * 0.001;
+    for (const foam of ctrl.foams) {
+      foam.material.opacity = 0.25 + Math.sin(t * 1.5) * 0.1;
+      foam.position.y = 0.005 + Math.sin(t * 0.8) * 0.01;
     }
   }
 

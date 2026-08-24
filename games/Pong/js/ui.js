@@ -78,6 +78,61 @@ class MenuNav {
   }
 }
 
+/**
+ * Pacchetti predefiniti di power-up per la partita personalizzata.
+ * Ogni pacchetto è un set tematico bilanciato (o sbilanciato apposta :D).
+ */
+export const POWER_PACKS = [
+  {
+    id: "classic",
+    name: "Classico",
+    desc: "Il set originale di Pong. Equilibrato e familiare.",
+    powers: ["whack", "stretch", "turbo", "magnet"]
+  },
+  {
+    id: "aggressivo",
+    name: "Aggressivo",
+    desc: "Colpi devastanti e velocità. Offensiva pura.",
+    powers: ["whack", "spin", "turbo"]
+  },
+  {
+    id: "fortezza",
+    name: "Fortezza",
+    desc: "Difesa impenetrabile. Muri, calamita e spazio.",
+    powers: ["barrier", "stretch", "magnet", "grab"]
+  },
+  {
+    id: "caos",
+    name: "Caos Totale",
+    desc: "Disordine puro. Inversioni, nebbia e teschi.",
+    powers: ["invert", "fog", "tilt", "skull"]
+  },
+  {
+    id: "tattico",
+    name: "Tattico",
+    desc: "Controllo del campo. Attrai, afferra, inclina.",
+    powers: ["magnet", "grab", "fan", "hill"]
+  },
+  {
+    id: "vortice",
+    name: "Vortice",
+    desc: "Rotazioni, vento e disorientamento.",
+    powers: ["spinlog", "fan", "tilt", "spin"]
+  },
+  {
+    id: "arena",
+    name: "Arena Gladiatori",
+    desc: "Orso, foca, spine. Sopravvivenza!",
+    powers: ["bear", "seal", "spike", "whack"]
+  },
+  {
+    id: "party",
+    name: "Festa!",
+    desc: "Tutto un po', niente troppo. Divertimento assicurato.",
+    powers: ["whack", "stretch", "turbo", "grab", "magnet", "spin"]
+  }
+];
+
 export class UI {
   constructor(root) {
     this.root = root;
@@ -461,7 +516,38 @@ export class UI {
           </div>` : ""}
 
           <div style="margin-top:18px">
-            <label style="font-weight:600">Power-up in campo</label>
+            <label style="font-weight:600">⚡ Pacchetti power-up</label>
+            <span class="hint" style="display:block;margin:3px 0 10px">Scegli un pacchetto predefinito, oppure personalizza sotto.</span>
+            <div class="pw-packs">${(() => {
+              // Controlla se la selezione corrente corrisponde a un pacchetto
+              const currentSorted = c.powers.slice().sort().join(",");
+              const matchedPack = POWER_PACKS.find(pk => pk.powers.slice().sort().join(",") === currentSorted);
+              const hasCustom = !matchedPack && c.powers.length > 0;
+              let html = "";
+              // Pacchetto "Personalizzato" se la selezione non corrisponde a nessun pacchetto
+              if (hasCustom) {
+                const count = c.powers.length;
+                html += `<button class="pw-pack on custom" data-pack="__custom__">
+                  <span class="pw-pack-name">✎ Personalizzato</span>
+                  <span class="pw-pack-desc">${count} power-up selezionat${count === 1 ? "o" : "i"} manualmente</span>
+                  <span class="pw-pack-items">${c.powers.map(id => POWER_DEFS[id] ? POWER_DEFS[id].glyph : "?").join(" ")}</span>
+                </button>`;
+              }
+              // Pacchetti predefiniti
+              html += POWER_PACKS.map((pk) => {
+                const isActive = matchedPack && matchedPack.id === pk.id;
+                return `<button class="pw-pack ${isActive ? "on" : ""}" data-pack="${pk.id}">
+                  <span class="pw-pack-name">${pk.name}</span>
+                  <span class="pw-pack-desc">${pk.desc}</span>
+                  <span class="pw-pack-items">${pk.powers.map(id => POWER_DEFS[id] ? POWER_DEFS[id].glyph + " " + POWER_DEFS[id].name : id).join(" · ")}</span>
+                </button>`;
+              }).join("");
+              return html;
+            })()}</div>
+          </div>
+
+          <div style="margin-top:18px">
+            <label style="font-weight:600">Power-up individuali</label>
             <span class="hint" style="display:block;margin:3px 0 10px">Tocca per attivarli o spegnerli. Nessuno selezionato = partita pulita.</span>
             <div class="pw-picks">${powerCards}</div>
           </div>
@@ -497,6 +583,15 @@ export class UI {
         if (i >= 0) this._custom.powers.splice(i, 1);
         else this._custom.powers.push(id);
         this.showCustom();
+      });
+    });
+    this.root.querySelectorAll("[data-pack]").forEach((b) => {
+      b.addEventListener("click", () => {
+        const pack = POWER_PACKS.find((p) => p.id === b.dataset.pack);
+        if (pack) {
+          this._custom.powers = pack.powers.slice();
+          this.showCustom();
+        }
       });
     });
     this.root.querySelector("#cstNone").onclick = () => { this._custom.powers = []; this.showCustom(); };
@@ -565,6 +660,10 @@ export class UI {
   _applyCustomPreview() {
     if (!this._custom || !this.game) return;
     const c = this._custom;
+    const themeOnly = this._previewTheme !== c.theme &&
+      this._previewArena === c.base &&
+      this._previewSize === c.paddleSize &&
+      this._previewBall === c.ballSpeed;
     const changed =
       this._previewArena !== c.base ||
       this._previewSize !== c.paddleSize ||
@@ -581,7 +680,13 @@ export class UI {
     this.game.customTarget = null;
     this.game.demo = true;
     this.game.loadArena(c.base, { demo: true });
-    this.game.serve(1);
+    // Se è cambiato solo il tema, non resettare la racchetta al centro
+    // (transizione più fluida: la racchetta resta dove si trova visivamente).
+    if (themeOnly) {
+      this.game.serve(Math.random() < 0.5 ? 1 : -1);
+    } else {
+      this.game.serve(1);
+    }
   }
 
   _clearCustomPreview() {

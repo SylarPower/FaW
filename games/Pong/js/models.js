@@ -203,113 +203,167 @@ function buildDefault(body, mat, color, theme, style) {
 }
 
 function buildBoot(body, leather, hw, hd) {
-  // CALCIO: blocco d'oro delle dimensioni corrette della racchetta,
-  // con sopra appoggiata una scarpa da calcio ben disegnata e distinguibile.
-  const goldMat = new THREE.MeshStandardMaterial({
-    color: 0xffd700, metalness: 0.85, roughness: 0.15,
-    emissive: 0xffa500, emissiveIntensity: 0.45
-  });
+  // CALCIO: blocco della lunghezza corretta della racchetta,
+  // con sopra appoggiata una scarpa da calcio IPERFEDELE.
   const dark = new THREE.MeshStandardMaterial({ color: 0x171b20, roughness: 0.82 });
   const soletMat = new THREE.MeshStandardMaterial({ color: 0x0c0e11, roughness: 0.9 });
   const white = new THREE.MeshStandardMaterial({ color: 0xf2efe6, roughness: 0.55 });
   const laceMat = new THREE.MeshStandardMaterial({ color: 0xf7f4ea, roughness:0.6 });
   const studMat = new THREE.MeshStandardMaterial({ color: 0xd8dce2, metalness: 0.6, roughness: 0.35 });
+  const innerSockMat = new THREE.MeshStandardMaterial({ color: 0x222630, roughness: 0.7 });
 
-  // --- profilo della scarpa (x = lunghezza, y = altezza) ---
+  // BLOCCO BASE della lunghezza corretta (hitbox): la scarpa siede sopra.
+  // Il blocco ha la stessa lunghezza della hitbox (2*hd) così l'utente
+  // capisce la dimensione reale della racchetta.
+  const blockW = Math.min(2 * hd * 0.40, 2 * hw * 1.35);
+  const d = blockW / (2 * hw); // spessore in coordinate art
+  const blockMat = new THREE.MeshStandardMaterial({
+    color: 0xffd700, metalness: 0.85, roughness: 0.15,
+    emissive: 0xffa500, emissiveIntensity: 0.35,
+    transparent: true, opacity: 0.7
+  });
+  const block = new THREE.Mesh(
+    new THREE.BoxGeometry(d, 0.16, 1.0),
+    blockMat
+  );
+  block.position.set(0.5 - d / 2, -0.40, 0);
+  body.add(block);
+
+  // --- profilo IPERFEDELE della scarpa da calcio ---
+  // Una scarpa moderna (tipo Nike Mercurial / Adidas Predator):
+  // punta bassa e affusolata, collo alto con calzino integrato,
+  // suola sottile con tacchetti.
   const prof = new THREE.Shape();
-  prof.moveTo(-0.46, -0.38);                              // tallone, fondo
-  prof.quadraticCurveTo(-0.52, -0.06, -0.43, 0.14);       // curva del tallone
-  prof.quadraticCurveTo(-0.41, 0.22, -0.33, 0.30);        // controtallone
-  prof.quadraticCurveTo(-0.26, 0.40, -0.16, 0.46);        // risale al collo
-  prof.lineTo(-0.04, 0.48);                               // cima del collo
-  prof.quadraticCurveTo(0.08, 0.46, 0.13, 0.36);          // davanti alla caviglia
-  prof.quadraticCurveTo(0.23, 0.22, 0.34, 0.10);          // tomaia verso il piede
-  prof.quadraticCurveTo(0.44, 0.02, 0.46, -0.12);         // cappuccio della punta
-  prof.quadraticCurveTo(0.48, -0.28, 0.42, -0.38);        // punta che scende
-  prof.closePath();                                       // fondo della suola
+  // Partiamo dalla suola (fondo piatto), andiamo verso la punta:
+  prof.moveTo(-0.48, -0.40);                              // tallone, fondo suola
+  prof.lineTo(-0.48, -0.36);                              // spigolo tallone
+  prof.quadraticCurveTo(-0.52, -0.10, -0.44, 0.10);       // curva tallone (Achille)
+  prof.quadraticCurveTo(-0.40, 0.22, -0.32, 0.30);        // controtallone
+  prof.quadraticCurveTo(-0.22, 0.42, -0.10, 0.48);        // sale al collo (calzino)
+  prof.quadraticCurveTo(-0.02, 0.52, 0.06, 0.50);         // cima del calzino
+  prof.quadraticCurveTo(0.14, 0.46, 0.18, 0.38);          // scende dalla caviglia
+  prof.quadraticCurveTo(0.26, 0.26, 0.34, 0.14);          // collo del piede
+  prof.quadraticCurveTo(0.40, 0.06, 0.46, -0.04);         // inizio punta
+  prof.quadraticCurveTo(0.50, -0.14, 0.48, -0.24);        // curva della punta
+  prof.quadraticCurveTo(0.46, -0.34, 0.42, -0.38);        // punta che scende
+  prof.lineTo(-0.48, -0.38);                              // fondo suola piatto
+  prof.closePath();
 
-  // Spessore reale della scarpa (in unità mondo): ~38% della lunghezza.
-  // Il bordo interno resta a +hw, il resto esce dal campo esterno.
-  const thickness = Math.min(2 * hd * 0.40, 2 * hw * 1.35);
-  const d = thickness / (2 * hw); // spessore in coordinate art
   const inner = 0.5;              // faccia verso il centro campo (art)
-  const BEV = 0.035;              // smusso dell'estrusione
+  const BEV = 0.03;               // smusso dell'estrusione
   const upper = new THREE.Mesh(
     new THREE.ExtrudeGeometry(prof, {
       depth: d,
-      bevelEnabled: true, bevelThickness: BEV, bevelSize: BEV, bevelSegments: 2
+      bevelEnabled: true, bevelThickness: BEV, bevelSize: BEV, bevelSegments: 3
     }),
     leather
   );
   // Il profilo vive nel piano XY: lo giriamo perché la lunghezza stia lungo
-  // Z (la linea di porta) e lo spessore lungo X. Smusso compreso, la faccia
-  // interna della scarpa tocca esattamente il bordo della hitbox.
+  // Z (la linea di porta) e lo spessore lungo X.
   upper.rotation.y = -Math.PI / 2;
   upper.position.x = inner - BEV;
-  // Tutto ciò che avvolge la scarpa (suola, filetto, tallone) parte dalla
-  // stessa faccia interna e cresce solo verso l'esterno.
+
   const cxOuter = (w) => (inner - 0.02) - w / 2;
 
-  // Suola: leggermente più larga e sporgente sotto la tomaia.
+  // SUOLA: sottile, rigida, tipo carbon-fiber plate.
   const sole = new THREE.Mesh(
-    new THREE.BoxGeometry(d + 0.09, 0.09, 0.90),
+    new THREE.BoxGeometry(d + 0.07, 0.06, 0.92),
     soletMat
   );
-  sole.position.set(cxOuter(d + 0.09), -0.40, 0.0);
+  sole.position.set(cxOuter(d + 0.07), -0.40, 0.0);
 
-  // Filetto bianco della suola (midsole) visibile di lato.
-  const midsole = new THREE.Mesh(new THREE.BoxGeometry(d + 0.11, 0.045, 0.88), white);
-  midsole.position.set(cxOuter(d + 0.11), -0.345, 0.0);
+  // MIDSOLE: strato bianco/grigio tra suola e tomaia.
+  const midsole = new THREE.Mesh(new THREE.BoxGeometry(d + 0.09, 0.035, 0.90), white);
+  midsole.position.set(cxOuter(d + 0.09), -0.365, 0.0);
 
-  // Controtallone scuro sul retro.
-  const heel = new THREE.Mesh(new THREE.BoxGeometry(d + 0.03, 0.26, 0.10), dark);
-  heel.position.set(cxOuter(d + 0.03), -0.16, -0.42);
+  // CONTROTALLONE: rinforzo posteriore.
+  const heel = new THREE.Mesh(new THREE.BoxGeometry(d + 0.02, 0.22, 0.08), dark);
+  heel.position.set(cxOuter(d + 0.02), -0.18, -0.44);
 
-  // Collarino bianco attorno alla caviglia.
-  const collar = new THREE.Mesh(new THREE.TorusGeometry(0.10, 0.035, 8, 16), white);
-  collar.rotation.x = Math.PI / 2;
-  collar.scale.set(1.5, 1, 1.1);
-  collar.position.set(0.5 - d / 2 - BEV, 0.48, -0.08);
+  // COLLARINO / CALZINO: tubo alto integrato (tipo calzino Mercurial).
+  const collar = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.11, 0.10, 0.22, 12, 1, true),
+    innerSockMat
+  );
+  collar.position.set(0.5 - d / 2 - BEV, 0.50, -0.06);
 
-  // Linguetta che spunta davanti al collo.
-  const tongue = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.03, 0.16), white);
-  tongue.rotation.x = 0.85;
-  tongue.position.set(0.5 - d / 2 - BEV, 0.42, 0.11);
+  // LINGUETTA: sotto i lacci, spunta dal collo.
+  const tongue = new THREE.Mesh(new THREE.BoxGeometry(d * 0.8, 0.025, 0.14), leather);
+  tongue.rotation.x = 0.75;
+  tongue.position.set(0.5 - d / 2 - BEV, 0.44, 0.10);
+  body.add(tongue);
 
-  // Lacci che scendono lungo la tomaia, seguendo la pendenza.
-  const cx = 0.5 - d / 2 - BEV; // centro spessore della scarpa
-  for (let i = 0; i < 5; i++) {
-    const t = i / 4;
-    const lace = new THREE.Mesh(new THREE.BoxGeometry(d - 0.02, 0.035, 0.055), laceMat);
-    lace.position.set(cx, 0.38 - t * 0.24, 0.11 + t * 0.19);
-    lace.rotation.x = 0.68;
+  // LACCI: sottili, allineati lungo la tomaia.
+  const cx = 0.5 - d / 2 - BEV;
+  for (let i = 0; i < 6; i++) {
+    const t = i / 5;
+    const lace = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, d * 0.7, 5), laceMat);
+    lace.rotation.z = Math.PI / 2;
+    lace.position.set(cx, 0.40 - t * 0.26, 0.08 + t * 0.22);
     body.add(lace);
   }
 
-  // Triple strisce laterali classiche, sulle due facce della scarpa.
-  const faces = [0.5, 0.5 - d - 2 * BEV];
+  // TRIPPLE STRISCE laterali (tipo Adidas) sulle due facce.
+  const faces = [0.5 - BEV, 0.5 - d - BEV];
   for (const xFace of faces) {
     for (let i = 0; i < 3; i++) {
-      const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.024, 0.34, 0.05), white);
-      stripe.position.set(xFace, -0.02, -0.02 + i * 0.075);
-      stripe.rotation.x = -0.18;
+      const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.30, 0.04), white);
+      stripe.position.set(xFace, -0.04, -0.06 + i * 0.08);
+      stripe.rotation.x = -0.15;
       body.add(stripe);
     }
   }
 
-  // Tacchetti: due al tallone, tre sull'avampiede.
-  const studZ = [[-0.34, 2], [-0.22, 2], [0.14, 3], [0.28, 3], [0.40, 3]];
-  for (const [z, n] of studZ) {
+  // LOGO / swoosh laterale: forma curva sottile (tipo Nike swoosh semplificato).
+  for (const xFace of faces) {
+    const swoosh = new THREE.Mesh(
+      new THREE.TorusGeometry(0.16, 0.012, 4, 12, Math.PI * 0.7),
+      new THREE.MeshStandardMaterial({ color: 0xffd700, metalness: 0.7, roughness: 0.3, emissive: 0xffa500, emissiveIntensity: 0.3 })
+    );
+    swoosh.rotation.set(0, Math.PI / 2, -0.3);
+    swoosh.scale.set(1, 0.8, 1);
+    swoosh.position.set(xFace + (xFace > 0.25 ? -0.01 : 0.01), 0.02, 0.05);
+    body.add(swoosh);
+  }
+
+  // TACCHETTI (studs): disposizione realistica.
+  // 2 al tallone, 2 sotto l'arco, 4 all'avampiede.
+  const studPositions = [
+    // Tallone
+    { z: -0.36, n: 2 },
+    { z: -0.22, n: 2 },
+    // Arco
+    { z: -0.06, n: 2 },
+    // Avampiede
+    { z: 0.14, n: 3 },
+    { z: 0.28, n: 3 },
+    { z: 0.40, n: 2 },
+  ];
+  for (const { z, n } of studPositions) {
     for (let i = 0; i < n; i++) {
-      const x = cx + (i - (n - 1) / 2) * (d / Math.max(1, n - 0.4));
-      const stud = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.10, 7), studMat);
-      stud.rotation.x = Math.PI;
+      const x = cx + (i - (n - 1) / 2) * (d / Math.max(1, n - 0.3));
+      // Tacchetto conico con base piatta (tipo bladed stud).
+      const stud = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.045, 0.09, 6), studMat);
       stud.position.set(x, -0.44, z);
       body.add(stud);
     }
   }
 
-  body.add(upper, sole, midsole, heel, collar, tongue);
+  // PUNTA della scarpa: zona di contatto con la palla, leggermente
+  // rinforzata (toe cap).
+  const toeCapColor = leather.color ? leather.color.getHex() : 0x2a2a2a;
+  const toeCap = new THREE.Mesh(
+    new THREE.SphereGeometry(0.08, 8, 6),
+    new THREE.MeshStandardMaterial({
+      color: toeCapColor,
+      roughness: 0.5, metalness: 0.1
+    })
+  );
+  toeCap.scale.set(d * 2, 1.2, 1.4);
+  toeCap.position.set(0.5 - d / 2, -0.24, 0.44);
+  body.add(toeCap);
+
+  body.add(upper, sole, midsole, heel, collar);
 }
 
 function buildJungle(body, barkMat) {
@@ -469,7 +523,25 @@ function buildAirHockey(body, _mat, color, hw, hd) {
     return m;
   };
 
-  // Base bassa e larga, leggermente svasata.
+  // BLOCCO BASE della lunghezza corretta (hitbox): il piattino siede sopra.
+  // Il blocco ha la stessa lunghezza della hitbox (2*hd) e la stessa
+  // larghezza (2*hw), così l'utente capisce immediatamente la dimensione
+  // della sua racchetta.
+  const blockArtW = kx * 1.0;   // larghezza in art (coincide con la hitbox)
+  const blockArtZ = 1.0;        // lunghezza in art (= 2*hd in coordinate art)
+  const blockMat = new THREE.MeshStandardMaterial({
+    color: color || 0x5fd8ff, metalness: 0.3, roughness: 0.4,
+    emissive: color || 0x5fd8ff, emissiveIntensity: 0.08,
+    transparent: true, opacity: 0.55
+  });
+  const block = new THREE.Mesh(
+    new THREE.BoxGeometry(blockArtW, 0.18, blockArtZ),
+    blockMat
+  );
+  block.position.set(0.5 - blockArtW / 2, -0.06 + Y0, 0);
+  body.add(block);
+
+  // Base bassa e larga, leggermente svasata. Seduta sul blocco.
   round(1.0, 1.05, 0.18, -0.06, baseMat);
   // Ghiera scura a filo della base.
   const rim = new THREE.Mesh(new THREE.TorusGeometry(kx * 0.97, 0.05, 8, 26), dark);
@@ -824,10 +896,43 @@ function surfaceTexture(style) {
       c.fillRect(Math.random() * S, Math.random() * S, 1, 1);
     }
   } else if (style === "spiaggia") {
+    // SPIAGGIA: base sabbia chiara + granulosità fine (tanti granelli).
     c.fillStyle = "#d4a76b"; c.fillRect(0, 0, S, S);
-    for (let y = 0; y < S; y += 4) {
-      c.fillStyle = `rgba(200,160,100,${0.02 + Math.random() * 0.06})`;
-      c.fillRect(0, y, S, 2);
+    // Strato di variazione di colore di fondo (chiaro/scura come dune).
+    for (let y = 0; y < S; y += 3) {
+      const lum = 180 + Math.random() * 40;
+      c.fillStyle = `rgba(${lum},${lum * 0.78},${lum * 0.52},${0.04 + Math.random() * 0.06})`;
+      c.fillRect(0, y, S, 2 + Math.random() * 2);
+    }
+    // Granelli di sabbia (tantissimi, piccoli, con colore variabile).
+    let seed = 17;
+    const sandRnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
+    for (let i = 0; i < 3000; i++) {
+      const x = sandRnd() * S;
+      const y = sandRnd() * S;
+      const r = 140 + sandRnd() * 80;
+      const g = r * 0.75 + sandRnd() * 20;
+      const b = g * 0.55 + sandRnd() * 15;
+      const alpha = 0.2 + sandRnd() * 0.4;
+      const size = 0.5 + sandRnd() * 1.5;
+      c.fillStyle = `rgba(${r|0},${g|0},${b|0},${alpha})`;
+      c.fillRect(x, y, size, size);
+    }
+    // Conchigliette sparse (piccoli dettagli biancastri).
+    for (let i = 0; i < 8; i++) {
+      const x = sandRnd() * S;
+      const y = sandRnd() * S;
+      c.fillStyle = `rgba(255,248,230,${0.3 + sandRnd() * 0.3})`;
+      c.beginPath();
+      c.arc(x, y, 1.5 + sandRnd() * 2, 0, Math.PI * 2);
+      c.fill();
+    }
+    // Piccole ombre di granelli (profondità).
+    for (let i = 0; i < 500; i++) {
+      const x = sandRnd() * S;
+      const y = sandRnd() * S;
+      c.fillStyle = `rgba(80,60,40,${0.08 + sandRnd() * 0.12})`;
+      c.fillRect(x, y, 0.8, 0.8);
     }
   } else {
     c.fillStyle = style === "boot" ? "#a8c59d" : "#a3b68b";
@@ -1357,21 +1462,31 @@ function makeColorSplash(scene, x, z, paddle) {
   }
 
   // Macchia sulla racchetta: un cerchietto colorato sulla faccia anteriore.
+  // PERSISTENTE: la macchia resta per sempre, la racchetta si colora di macchie.
   if (paddle && paddle.mesh) {
     const body = paddle.mesh.userData?.body;
     if (body) {
-      const stainR = 0.08 + Math.random() * 0.06;
+      const stainR = 0.08 + Math.random() * 0.08;
       const stainGeo = new THREE.CircleGeometry(stainR, 12);
+      // Varia un po' la forma per renderla più organica
+      const pos = stainGeo.attributes.position;
+      for (let i = 1; i < pos.count - 1; i++) {
+        const kx = 0.7 + Math.random() * 0.6;
+        pos.setX(i, pos.getX(i) * kx);
+        pos.setY(i, pos.getY(i) * (0.7 + Math.random() * 0.6));
+      }
+      stainGeo.computeVertexNormals();
       const stainMat = new THREE.MeshBasicMaterial({
-        color, transparent: true, opacity: 0.85, depthWrite: false
+        color, transparent: true, opacity: 0.88, depthWrite: false
       });
       const stain = new THREE.Mesh(stainGeo, stainMat);
       stain.rotation.y = Math.PI / 2;
-      stain.position.set(0.52, (Math.random() - 0.5) * 0.4, (Math.random() - 0.5) * 0.5);
+      stain.position.set(0.52, (Math.random() - 0.5) * 0.5, (Math.random() - 0.5) * 0.6);
       body.add(stain);
+      // life: Infinity = non svanisce mai
       items.push({
         mesh: stain, static: true, spread: false, onPaddle: true,
-        life: 3.0 + Math.random() * 1.0, age: 0
+        life: Infinity, age: 0
       });
     }
   }

@@ -315,6 +315,27 @@ h2.section {
 .pw-pick.on { border-color: var(--mint); background: var(--mint-dim); }
 .pw-pick:not(.on) { opacity: 0.5; }
 
+/* Pacchetti power-up predefiniti */
+.pw-packs {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px;
+  max-height: 260px; overflow: auto; padding-right: 6px;
+}
+.pw-pack {
+  display: flex; flex-direction: column; gap: 3px; text-align: left;
+  cursor: pointer; padding: 10px 12px; border-radius: 10px;
+  border: 1px solid var(--line); background: rgba(255,255,255,0.03);
+  color: var(--muted); font-family: inherit; transition: 0.15s var(--ease);
+}
+.pw-pack:hover { border-color: var(--gold); background: rgba(255,200,87,0.08); }
+.pw-pack.on { border-color: var(--gold); background: rgba(255,200,87,0.15); }
+.pw-pack:not(.on) { opacity: 0.65; }
+.pw-pack-name { font-weight: 700; font-size: 13px; color: var(--gold); }
+.pw-pack-desc { font-size: 10.5px; line-height: 1.35; color: var(--muted); }
+.pw-pack-items { font-size: 10px; line-height: 1.35; color: var(--text); opacity: 0.7; margin-top: 2px; }
+.pw-pack.custom { border-color: var(--mint); background: rgba(61,255,209,0.08); }
+.pw-pack.custom .pw-pack-name { color: var(--mint); }
+.pw-pack.custom[data-pack="__custom__"] { cursor: default; }
+
 /* Schermata Poteri */
 .pw-grid {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px;
