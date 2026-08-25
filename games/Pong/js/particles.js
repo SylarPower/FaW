@@ -2,59 +2,37 @@ import * as THREE from "three";
 
 export class Particles {
   constructor(scene) {
-    this.scene = scene;
-    this.items = [];
-    this.trails = [];
+    this.scene = scene; this.items = []; this.pool = []; this.trails = [];
+    this.geo = new THREE.SphereGeometry(1, 6, 6);
   }
-
-  burst(x, y, z, color, n = 18, speed = 4) {
-    const c = new THREE.Color(color);
-    for (let i = 0; i < n; i++) {
-      const m = new THREE.Mesh(
-        new THREE.SphereGeometry(0.04 + Math.random() * 0.05, 6, 6),
-        new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 1 })
-      );
-      m.position.set(x, y, z);
-      const v = new THREE.Vector3(
-        (Math.random() - 0.5) * speed,
-        Math.random() * speed * 0.8,
-        (Math.random() - 0.5) * speed
-      );
-      this.scene.add(m);
-      this.items.push({ mesh: m, v, life: 0.45 + Math.random() * 0.35, age: 0 });
+  _spawn(x, y, z, color, speed) {
+    let it = this.pool.pop();
+    if (!it) {
+      const mesh = new THREE.Mesh(this.geo, new THREE.MeshBasicMaterial({ transparent: true }));
+      this.scene.add(mesh);
+      it = { mesh, v: new THREE.Vector3(), base: 1 };
     }
+    it.mesh.visible = true; it.mesh.material.color.set(color); it.mesh.material.opacity = 1;
+    it.mesh.position.set(x, y, z);
+    it.base = 0.04 + Math.random() * 0.05; it.mesh.scale.setScalar(it.base);
+    it.v.set((Math.random() - 0.5) * speed, Math.random() * speed * 0.8, (Math.random() - 0.5) * speed);
+    it.life = 0.45 + Math.random() * 0.35; it.age = 0;
+    this.items.push(it);
   }
-
-  spark(x, y, z, dir, color) {
-    this.burst(x, y, z, color, 10, 3.5);
-  }
-
+  burst(x, y, z, color, n = 18, speed = 4) { for (let i = 0; i < n; i++) this._spawn(x, y, z, color, speed); }
+  spark(x, y, z, dir, color) { this.burst(x, y, z, color, 10, 3.5); }
   update(dt) {
     for (let i = this.items.length - 1; i >= 0; i--) {
       const p = this.items[i];
-      p.age += dt;
-      p.v.y -= 8 * dt;
-      p.mesh.position.addScaledVector(p.v, dt);
+      p.age += dt; p.v.y -= 8 * dt; p.mesh.position.addScaledVector(p.v, dt);
       const t = 1 - p.age / p.life;
       p.mesh.material.opacity = Math.max(0, t);
-      p.mesh.scale.setScalar(Math.max(0.01, t));
-      if (p.age >= p.life) {
-        this.scene.remove(p.mesh);
-        p.mesh.geometry.dispose();
-        p.mesh.material.dispose();
-        this.items.splice(i, 1);
-      }
+      p.mesh.scale.setScalar(Math.max(0.001, p.base * t));
+      if (p.age >= p.life) { p.mesh.visible = false; this.pool.push(p); this.items.splice(i, 1); }
     }
   }
-
-  clear() {
-    for (const p of this.items) {
-      this.scene.remove(p.mesh);
-      p.mesh.geometry.dispose();
-      p.mesh.material.dispose();
-    }
-    this.items.length = 0;
-  }
+  clear() { for (const p of this.items) { p.mesh.visible = false; this.pool.push(p); } this.items.length = 0; }
+  dispose() { this.clear(); for (const p of this.pool) { this.scene.remove(p.mesh); p.mesh.material.dispose(); } this.pool.length = 0; this.geo.dispose(); }
 }
 
 export class BallTrail {

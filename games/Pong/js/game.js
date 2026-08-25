@@ -663,7 +663,7 @@ export class Game {
   drivePaddles(dt) {
     // La difficoltà può essere quella salvata o quella della partita su
     // misura (che vale solo per il match in corso).
-    const skill = SKILL[this.matchOptions?.difficulty ?? this.save.options.difficulty] || 0.68;
+    const skill = SKILL[this.matchOptions?.difficulty ?? this.save.options.difficulty] ?? 0.50;
     const sides = this.triangle ? TRI_SIDES : DUEL_SIDES;
 
     for (const p of this.world.paddles) {
