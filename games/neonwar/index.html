@@ -303,6 +303,10 @@
 			document.addEventListener('visibilitychange', () => {
 			    if (document.hidden && gameActive) pauseGame();
 			});
+
+			window.addEventListener('blur', () => {
+			    if (gameActive) pauseGame();
+			});
 			
 			window.addEventListener('keydown', e => {
 			    if (e.code === 'Escape' && gameActive) {

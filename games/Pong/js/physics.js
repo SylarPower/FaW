@@ -120,6 +120,8 @@ export class Paddle {
     this.curveR = 0;      // E: estremo z=+0.5 piegato all'indietro (0..1)
     this.curveTargetL = 0;
     this.curveTargetR = 0;
+    this.curveVelL = 0;   // Velocità della molla di piega Q (effetto elastico)
+    this.curveVelR = 0;   // Velocità della molla di piega E
     this.curveLockL = false;
     this.curveLockR = false;
     this.curveCharges = 2;// La curva Q/E ha 2 cariche che si ricaricano nel tempo.
@@ -210,12 +212,16 @@ export class World {
     const stretchFactor = Math.min(4.2, 1 + (p.stretchStacks || 0) * 0.7);
     const targetHd = p.baseHd * stretchFactor;
     p.hd = lerp(p.hd, targetHd, 1 - Math.pow(0.001, dt));
-    // Curva Q/E: la racchetta si piega in fretta e torna elastica un po' più
-    // lentamente. Il lock (dopo un colpo in curva) viene tolto da game.js
-    // quando il tasto viene rilasciato.
-    const curveRise = 16, curveFall = 9;
-    p.curveL += clamp(p.curveTargetL - p.curveL, -curveFall * dt, curveRise * dt);
-    p.curveR += clamp(p.curveTargetR - p.curveR, -curveFall * dt, curveRise * dt);
+    // Curva Q/E: la piega è guidata da una molla smorzata — la racchetta
+    // scatta in fretta verso la piega, la supera di slancio (overshoot) e si
+    // assesta ondeggiando; al rilascio torna dritta con un piccolo colpo di
+    // frusta in avanti. Il lock (dopo un colpo in curva) viene tolto da
+    // game.js quando il tasto viene rilasciato.
+    const springK = 150, springLoss = Math.exp(-12 * dt);
+    p.curveVelL = (p.curveVelL + (p.curveTargetL - p.curveL) * springK * dt) * springLoss;
+    p.curveL += p.curveVelL * dt;
+    p.curveVelR = (p.curveVelR + (p.curveTargetR - p.curveR) * springK * dt) * springLoss;
+    p.curveR += p.curveVelR * dt;
     // 2 cariche di curva: si ricaricano una alla volta.
     if (p.curveCharges < 2) {
       p.curveCd -= dt;
@@ -520,12 +526,16 @@ export class World {
       p.curveCharges--;
       p.curveCd = CURVE_RECHARGE;
       p.curveL = 0; p.curveTargetL = 0; p.curveLockL = true;
+      // Il colpo scarica la molla: la punta sferza in avanti e rientra elastica.
+      p.curveVelL = -8;
       this.emit("curvehit", { ball: b, paddle: p, end: "q", charges: p.curveCharges });
     } else if (relQ > 0.55 && p.curveR > needBend && p.curveCharges > 0) {
       curveHit = true;
       p.curveCharges--;
       p.curveCd = CURVE_RECHARGE;
       p.curveR = 0; p.curveTargetR = 0; p.curveLockR = true;
+      // Il colpo scarica la molla: la punta sferza in avanti e rientra elastica.
+      p.curveVelR = -8;
       this.emit("curvehit", { ball: b, paddle: p, end: "e", charges: p.curveCharges });
     }
     if (curveHit) b.vz += rel * 4.5; // fiondata extra verso il punto di contatto

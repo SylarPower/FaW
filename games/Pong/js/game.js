@@ -48,7 +48,22 @@ export class Game {
     this._fxSeen = 0;
     this._bindLoop();
     this._bindNet();
+    this._bindAutoPause();
     this.startDemo();
+  }
+
+  _bindAutoPause() {
+    // Cambio scheda o finestra che perde il focus: la partita si mette in
+    // pausa da sola. Vale solo per le partite vere (non la demo del titolo) e
+    // solo per chi guida la simulazione — online l'ospite non può fermare la
+    // sim, come già avviene per il tasto Esc.
+    const autoPause = () => {
+      if (!this.demo && this.state === "play" && this.isHost()) this.pause();
+    };
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) autoPause();
+    });
+    window.addEventListener("blur", autoPause);
   }
 
   _bindLoop() {
@@ -335,6 +350,8 @@ export class Game {
       p.curveR = 0;
       p.curveTargetL = 0;
       p.curveTargetR = 0;
+      p.curveVelL = 0;
+      p.curveVelR = 0;
       p.curveLockL = false;
       p.curveLockR = false;
       if (p.edge) {
