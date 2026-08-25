@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 
 const geoCache = new Map();
 function geo(key, fn) {
@@ -202,168 +203,199 @@ function buildDefault(body, mat, color, theme, style) {
   body.add(edge);
 }
 
+function spline(points) {
+  const P = points;
+  return (t) => {
+    let i = 0;
+    while (i < P.length - 2 && t > P[i + 1][0]) i++;
+    const p0 = P[Math.max(0, i - 1)], p1 = P[i], p2 = P[i + 1], p3 = P[Math.min(P.length - 1, i + 2)];
+    const span = (p2[0] - p1[0]) || 1e-6;
+    let u = (t - p1[0]) / span; u = u < 0 ? 0 : u > 1 ? 1 : u;
+    const u2 = u * u, u3 = u2 * u;
+    return 0.5 * (2 * p1[1] + (-p0[1] + p2[1]) * u +
+      (2 * p0[1] - 5 * p1[1] + 4 * p2[1] - p3[1]) * u2 +
+      (-p0[1] + 3 * p1[1] - 3 * p2[1] + p3[1]) * u3);
+  };
+}
+function loft(stations, { capStart = false, capEnd = false, K = 20 } = {}) {
+  const pos = [], idx = [];
+  const pt = (st, k) => {
+    const th = (k / K) * Math.PI * 2, c = Math.cos(th), s = Math.sin(th);
+    const e = 2 / (st.n || 2.9);
+    const sx = Math.sign(c) * Math.pow(Math.abs(c), e);
+    const sy = Math.sign(s) * Math.pow(Math.abs(s), e);
+    const ry = s >= 0 ? st.ryTop : st.ryBot;
+    return [st.cx + st.rx * sx, st.cy + ry * sy, st.z];
+  };
+  for (const st of stations) for (let k = 0; k < K; k++) pos.push(...pt(st, k));
+  for (let i = 0; i < stations.length - 1; i++)
+    for (let k = 0; k < K; k++) {
+      const k2 = (k + 1) % K;
+      const a = i * K + k, b = i * K + k2, c = (i + 1) * K + k2, d = (i + 1) * K + k;
+      idx.push(a, b, c, a, c, d);
+    }
+  const cap = (i, dir) => {
+    const st = stations[i], base = pos.length / 3;
+    pos.push(st.cx, st.cy, st.z);
+    for (let k = 0; k < K; k++) pos.push(...pt(st, k));
+    for (let k = 0; k < K; k++) {
+      const k2 = (k + 1) % K;
+      if (dir > 0) idx.push(base, base + 1 + k, base + 1 + k2);
+      else idx.push(base, base + 1 + k2, base + 1 + k);
+    }
+  };
+  if (capStart) cap(0, -1);
+  if (capEnd) cap(stations.length - 1, +1);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  g.setIndex(idx); g.computeVertexNormals();
+  return g;
+}
+function sideRibbon({ side, t0, t1, seg = 22, yBot, yTop, cx, halfW, soleY, topY, lift = 0.008, z0 = -0.5, zLen = 1 }) {
+  const pos = [], idx = [], n = 2.9;
+  for (let i = 0; i <= seg; i++) {
+    const t = t0 + (t1 - t0) * (i / seg), hw = halfW(t), bot = yBot(t), top = yTop(t);
+    for (let v = 0; v <= 1; v++) {
+      const y = bot + (top - bot) * v, cy = (topY(t) + soleY(t)) / 2;
+      const ry = y >= cy ? topY(t) - cy : cy - soleY(t);
+      const s = ry > 1e-5 ? Math.min(1, Math.abs(y - cy) / ry) : 1;
+      const surf = hw * Math.pow(Math.max(0, 1 - Math.pow(s, n)), 1 / n);
+      pos.push(cx + side * (surf + lift), y, z0 + t * zLen);
+    }
+  }
+  for (let i = 0; i < seg; i++) { const a = i*2, b = i*2+1, c = i*2+3, d = i*2+2; idx.push(a,b,c,a,c,d); }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  g.setIndex(idx); g.computeVertexNormals();
+  return g;
+}
 function buildBoot(body, leather, hw, hd) {
-  // CALCIO: blocco della lunghezza corretta della racchetta,
-  // con sopra appoggiata una scarpa da calcio IPERFEDELE.
-  const dark = new THREE.MeshStandardMaterial({ color: 0x171b20, roughness: 0.82 });
-  const soletMat = new THREE.MeshStandardMaterial({ color: 0x0c0e11, roughness: 0.9 });
-  const white = new THREE.MeshStandardMaterial({ color: 0xf2efe6, roughness: 0.55 });
-  const laceMat = new THREE.MeshStandardMaterial({ color: 0xf7f4ea, roughness:0.6 });
-  const studMat = new THREE.MeshStandardMaterial({ color: 0xd8dce2, metalness: 0.6, roughness: 0.35 });
-  const innerSockMat = new THREE.MeshStandardMaterial({ color: 0x222630, roughness: 0.7 });
-
-  // BLOCCO BASE della lunghezza corretta (hitbox): la scarpa siede sopra.
-  // Il blocco ha la stessa lunghezza della hitbox (2*hd) così l'utente
-  // capisce la dimensione reale della racchetta.
   const blockW = Math.min(2 * hd * 0.40, 2 * hw * 1.35);
-  const d = blockW / (2 * hw); // spessore in coordinate art
-  const blockMat = new THREE.MeshStandardMaterial({
-    color: 0xffd700, metalness: 0.85, roughness: 0.15,
-    emissive: 0xffa500, emissiveIntensity: 0.35,
-    transparent: true, opacity: 0.7
-  });
-  const block = new THREE.Mesh(
-    new THREE.BoxGeometry(d, 0.16, 1.0),
-    blockMat
-  );
-  block.position.set(0.5 - d / 2, -0.40, 0);
-  body.add(block);
-
-  // --- profilo IPERFEDELE della scarpa da calcio ---
-  // Una scarpa moderna (tipo Nike Mercurial / Adidas Predator):
-  // punta bassa e affusolata, collo alto con calzino integrato,
-  // suola sottile con tacchetti.
-  const prof = new THREE.Shape();
-  // Partiamo dalla suola (fondo piatto), andiamo verso la punta:
-  prof.moveTo(-0.48, -0.40);                              // tallone, fondo suola
-  prof.lineTo(-0.48, -0.36);                              // spigolo tallone
-  prof.quadraticCurveTo(-0.52, -0.10, -0.44, 0.10);       // curva tallone (Achille)
-  prof.quadraticCurveTo(-0.40, 0.22, -0.32, 0.30);        // controtallone
-  prof.quadraticCurveTo(-0.22, 0.42, -0.10, 0.48);        // sale al collo (calzino)
-  prof.quadraticCurveTo(-0.02, 0.52, 0.06, 0.50);         // cima del calzino
-  prof.quadraticCurveTo(0.14, 0.46, 0.18, 0.38);          // scende dalla caviglia
-  prof.quadraticCurveTo(0.26, 0.26, 0.34, 0.14);          // collo del piede
-  prof.quadraticCurveTo(0.40, 0.06, 0.46, -0.04);         // inizio punta
-  prof.quadraticCurveTo(0.50, -0.14, 0.48, -0.24);        // curva della punta
-  prof.quadraticCurveTo(0.46, -0.34, 0.42, -0.38);        // punta che scende
-  prof.lineTo(-0.48, -0.38);                              // fondo suola piatto
-  prof.closePath();
-
-  const inner = 0.5;              // faccia verso il centro campo (art)
-  const BEV = 0.03;               // smusso dell'estrusione
-  const upper = new THREE.Mesh(
-    new THREE.ExtrudeGeometry(prof, {
-      depth: d,
-      bevelEnabled: true, bevelThickness: BEV, bevelSize: BEV, bevelSegments: 3
-    }),
-    leather
-  );
-  // Il profilo vive nel piano XY: lo giriamo perché la lunghezza stia lungo
-  // Z (la linea di porta) e lo spessore lungo X.
-  upper.rotation.y = -Math.PI / 2;
-  upper.position.x = inner - BEV;
-
-  const cxOuter = (w) => (inner - 0.02) - w / 2;
-
-  // SUOLA: sottile, rigida, tipo carbon-fiber plate.
-  const sole = new THREE.Mesh(
-    new THREE.BoxGeometry(d + 0.07, 0.06, 0.92),
-    soletMat
-  );
-  sole.position.set(cxOuter(d + 0.07), -0.40, 0.0);
-
-  // MIDSOLE: strato bianco/grigio tra suola e tomaia.
-  const midsole = new THREE.Mesh(new THREE.BoxGeometry(d + 0.09, 0.035, 0.90), white);
-  midsole.position.set(cxOuter(d + 0.09), -0.365, 0.0);
-
-  // CONTROTALLONE: rinforzo posteriore.
-  const heel = new THREE.Mesh(new THREE.BoxGeometry(d + 0.02, 0.22, 0.08), dark);
-  heel.position.set(cxOuter(d + 0.02), -0.18, -0.44);
-
-  // COLLARINO / CALZINO: tubo alto integrato (tipo calzino Mercurial).
-  const collar = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.11, 0.10, 0.22, 12, 1, true),
-    innerSockMat
-  );
-  collar.position.set(0.5 - d / 2 - BEV, 0.50, -0.06);
-
-  // LINGUETTA: sotto i lacci, spunta dal collo.
-  const tongue = new THREE.Mesh(new THREE.BoxGeometry(d * 0.8, 0.025, 0.14), leather);
-  tongue.rotation.x = 0.75;
-  tongue.position.set(0.5 - d / 2 - BEV, 0.44, 0.10);
-  body.add(tongue);
-
-  // LACCI: sottili, allineati lungo la tomaia.
-  const cx = 0.5 - d / 2 - BEV;
-  for (let i = 0; i < 6; i++) {
-    const t = i / 5;
-    const lace = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, d * 0.7, 5), laceMat);
-    lace.rotation.z = Math.PI / 2;
-    lace.position.set(cx, 0.40 - t * 0.26, 0.08 + t * 0.22);
-    body.add(lace);
+  const d = blockW / (2 * hw);
+  const INNER = 0.5, cx = INNER - d / 2;
+  const widthN = spline([[0,.50],[.06,.60],[.18,.56],[.30,.56],[.46,.66],[.62,.80],[.76,.86],[.88,.78],[.96,.55],[1,.16]]);
+  const _sole = spline([[0,-.345],[.10,-.415],[.55,-.440],[.80,-.408],[.92,-.335],[1,-.265]]);
+  const _top  = spline([[0,.300],[.05,.575],[.10,.690],[.17,.712],[.25,.600],[.33,.405],[.44,.250],[.58,.150],[.74,.055],[.88,-.045],[1,-.115]]);
+  const LIFT = 0.16;                      // la scarpa poggia sul piedistallo
+  const soleY = (t) => _sole(t) + LIFT;
+  const topY  = (t) => _top(t) + LIFT;
+  // La scarpa NON riempie il blocco: resta sotto ~2/3 della larghezza del
+  // piedistallo, così il plinto largo comunica l'ampiezza della racchetta e
+  // la scarpa sopra mantiene un profilo affusolato e reale.
+  const halfW = (t) => Math.max(0.012, widthN(t) * (d / 2) * 0.70);
+  // PIEDISTALLO: plinto largo quanto il blocco/hitbox, appena sagomato.
+  const plinthW = (t) => (d / 2) * (0.92 + 0.08 * widthN(t));
+  // La scarpa NON copre tutta la lunghezza del piedistallo: sta al centro,
+  // come un vero scarpino su un plinto da esposizione. Il plinto (lungo
+  // quanto la hitbox) comunica la lunghezza reale della racchetta.
+  const BZ0 = 0.20, BL = 0.60;            // la scarpa occupa il 60% centrale
+  const zAt = (t) => -0.5 + BZ0 + t * BL; // z art della scarpa sul plinto
+  const stations = (t0, t1, count, opts = {}) => {
+    const out = [], { wScale = 1, lift = 0, drop = 0, n = 2.9 } = opts;
+    for (let i = 0; i < count; i++) {
+      const t = t0 + (t1 - t0) * (i / (count - 1));
+      const rx = halfW(t) * wScale, bot = soleY(t) + lift, top = topY(t) - drop, cy = (top + bot) / 2;
+      out.push({ z: zAt(t), cx, cy, rx, ryTop: Math.max(.004, top - cy), ryBot: Math.max(.004, cy - bot), n });
+    }
+    return out;
+  };
+  const upper = leather.clone();
+  upper.metalness = 0.28; upper.roughness = 0.42;
+  upper.emissiveIntensity = (leather.emissiveIntensity ?? 0.2) * 0.5;
+  const shade = upper.color.clone().multiplyScalar(0.16);
+  const overlayMat = new THREE.MeshStandardMaterial({ color: shade, roughness: 0.5, metalness: 0.3 });
+  const rubber = new THREE.MeshStandardMaterial({ color: 0x0b0d11, roughness: 0.95 });
+  const foam = new THREE.MeshStandardMaterial({ color: 0xf3f0e7, roughness: 0.62 });
+  const sock = new THREE.MeshStandardMaterial({ color: 0x14161c, roughness: 0.85, side: THREE.DoubleSide });
+  const studMat = new THREE.MeshStandardMaterial({ color: 0x31363e, metalness: 0.9, roughness: 0.32 });
+  const volt = new THREE.MeshStandardMaterial({ color: 0xc8f22b, metalness: 0.35, roughness: 0.3, emissive: 0x9dc400, emissiveIntensity: 0.5, side: THREE.DoubleSide });
+  const laceMat = new THREE.MeshStandardMaterial({ color: 0xf7f4ea, roughness: 0.72 });
+  // PIEDISTALLO: plinto scuro che tocca il tavolo + fascia volt sul bordo.
+  const pedBot = -0.50, pedTop = -0.34, ped = [];
+  for (let i = 0; i < 12; i++) {
+    const t = i / 11, rx = plinthW(t), cy = (pedTop + pedBot) / 2;
+    ped.push({ z: -0.5 + t, cx, cy, rx, ryTop: pedTop - cy, ryBot: cy - pedBot, n: 2.0 });
   }
-
-  // TRIPPLE STRISCE laterali (tipo Adidas) sulle due facce.
-  const faces = [0.5 - BEV, 0.5 - d - BEV];
-  for (const xFace of faces) {
-    for (let i = 0; i < 3; i++) {
-      const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.30, 0.04), white);
-      stripe.position.set(xFace, -0.04, -0.06 + i * 0.08);
-      stripe.rotation.x = -0.15;
-      body.add(stripe);
+  body.add(new THREE.Mesh(loft(ped, { capStart: true, capEnd: true }),
+    new THREE.MeshStandardMaterial({ color: 0x101318, roughness: 0.6, metalness: 0.3 })));
+  const band = [];
+  for (let i = 0; i < 12; i++) {
+    const t = i / 11, rx = plinthW(t) + 0.004;
+    band.push({ z: -0.5 + t, cx, cy: pedTop, rx, ryTop: 0.02, ryBot: 0.02, n: 2.0 });
+  }
+  body.add(new THREE.Mesh(loft(band, { capStart: true, capEnd: true }), volt));
+  // TOMAIA + rinforzi + suola/intersuola.
+  body.add(new THREE.Mesh(loft(stations(0, 1, 30, { lift: 0.03 }), { capStart: true, capEnd: true }), upper));
+  body.add(new THREE.Mesh(loft(stations(0.795, 1.0, 9, { wScale: 1.0, lift: 0.028, drop: -0.004 }), { capStart: true, capEnd: true }), overlayMat));
+  body.add(new THREE.Mesh(loft(stations(0, 0.235, 10, { wScale: 1.005, lift: 0.028 }), { capStart: true, capEnd: true }), overlayMat));
+  body.add(new THREE.Mesh(loft(stations(0.015, 0.995, 26, { wScale: 1.02, lift: -0.088, drop: 0.052 }), { capStart: true, capEnd: true }), rubber));
+  body.add(new THREE.Mesh(loft(stations(0.03, 0.99, 24, { wScale: 1.0, lift: -0.022, drop: 0.078 }), { capStart: true, capEnd: true }), foam));
+  // TACCHETTI (fusi in una mesh).
+  const studs = [];
+  for (const row of [
+    { t: 0.075, spread: 0.50, r: 1.00 }, { t: 0.185, spread: 0.52, r: 0.95 },
+    { t: 0.545, spread: 0.58, r: 0.90 }, { t: 0.675, spread: 0.62, r: 0.85 },
+    { t: 0.800, spread: 0.60, r: 0.80 }, { t: 0.905, spread: 0.48, r: 0.72 }]) {
+    for (const s of [-1, 1]) {
+      const g = new THREE.CylinderGeometry(0.026 * row.r, 0.044 * row.r, 0.115, 6);
+      g.translate(cx + s * halfW(row.t) * row.spread, soleY(row.t) - 0.088 - 0.055, zAt(row.t));
+      studs.push(g);
     }
   }
-
-  // LOGO / swoosh laterale: forma curva sottile (tipo Nike swoosh semplificato).
-  for (const xFace of faces) {
-    const swoosh = new THREE.Mesh(
-      new THREE.TorusGeometry(0.16, 0.012, 4, 12, Math.PI * 0.7),
-      new THREE.MeshStandardMaterial({ color: 0xffd700, metalness: 0.7, roughness: 0.3, emissive: 0xffa500, emissiveIntensity: 0.3 })
-    );
-    swoosh.rotation.set(0, Math.PI / 2, -0.3);
-    swoosh.scale.set(1, 0.8, 1);
-    swoosh.position.set(xFace + (xFace > 0.25 ? -0.01 : 0.01), 0.02, 0.05);
-    body.add(swoosh);
+  body.add(new THREE.Mesh(mergeGeometries(studs, false), studMat)); studs.forEach((g) => g.dispose());
+  // CALZINO con foro + bordo volt.
+  const collarT = 0.155, collarY = topY(collarT) - 0.02;
+  const collarRX = halfW(collarT) * 0.80, collarRZ = 0.145;
+  const collar = new THREE.Mesh(new THREE.CylinderGeometry(1.06, 0.92, 0.30, 22, 1, true), sock);
+  collar.scale.set(collarRX, 1, collarRZ);
+  collar.position.set(cx, collarY + 0.06, zAt(collarT) + 0.012); collar.rotation.x = -0.12;
+  body.add(collar);
+  const hole = new THREE.Mesh(new THREE.CircleGeometry(1, 22), new THREE.MeshStandardMaterial({ color: 0x07090c, roughness: 1 }));
+  hole.scale.set(collarRX * 0.93, collarRZ * 0.93, 1);
+  hole.rotation.x = -Math.PI / 2 - 0.12; hole.position.set(cx, collarY + 0.155, zAt(collarT) + 0.030);
+  body.add(hole);
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(1, 0.055, 6, 24), volt);
+  rim.scale.set(collarRX * 0.99, collarRZ * 0.99, 1);
+  rim.rotation.x = Math.PI / 2 + 0.12; rim.position.set(cx, collarY + 0.20, zAt(collarT) + 0.012);
+  body.add(rim);
+  // LINGUETTA.
+  body.add(new THREE.Mesh(loft(stations(0.235, 0.505, 9, { wScale: 0.44, lift: -0.055, drop: 0.0 }), { capStart: true, capEnd: true }),
+    new THREE.MeshStandardMaterial({ color: 0x20242e, roughness: 0.8 })));
+  // LACCI incrociati (fusi).
+  const laces = [];
+  for (let i = 0; i < 5; i++) {
+    const t = 0.265 + i * 0.052, dirSign = i % 2 === 0 ? 1 : -1;
+    const half = halfW(t) * 0.50, y = topY(t) - 0.012, z0 = zAt(t);
+    const len = Math.hypot(half * 2, 0.075);
+    const g = new THREE.CylinderGeometry(0.019, 0.019, len, 6);
+    g.rotateZ(Math.PI / 2); g.rotateY(-dirSign * Math.atan2(0.075, half * 2));
+    g.translate(cx, y, z0 + 0.0375);
+    laces.push(g);
   }
-
-  // TACCHETTI (studs): disposizione realistica.
-  // 2 al tallone, 2 sotto l'arco, 4 all'avampiede.
-  const studPositions = [
-    // Tallone
-    { z: -0.36, n: 2 },
-    { z: -0.22, n: 2 },
-    // Arco
-    { z: -0.06, n: 2 },
-    // Avampiede
-    { z: 0.14, n: 3 },
-    { z: 0.28, n: 3 },
-    { z: 0.40, n: 2 },
-  ];
-  for (const { z, n } of studPositions) {
-    for (let i = 0; i < n; i++) {
-      const x = cx + (i - (n - 1) / 2) * (d / Math.max(1, n - 0.3));
-      // Tacchetto conico con base piatta (tipo bladed stud).
-      const stud = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.045, 0.09, 6), studMat);
-      stud.position.set(x, -0.44, z);
-      body.add(stud);
-    }
+  body.add(new THREE.Mesh(mergeGeometries(laces, false), laceMat)); laces.forEach((g) => g.dispose());
+  // TRE STRISCIE per lato (decal aderenti).
+  const stripes = [];
+  for (const side of [-1, 1]) for (let i = 0; i < 3; i++) {
+    const off = (i - 1) * 0.085;
+    stripes.push(sideRibbon({ side, t0: 0.30 + off, t1: 0.66 + off, seg: 16,
+      yBot: (t) => soleY(t) + 0.10 + i * 0.012, yTop: (t) => topY(t) - 0.055 - i * 0.030,
+      cx, halfW, soleY, topY, z0: zAt(0), zLen: BL }));
   }
-
-  // PUNTA della scarpa: zona di contatto con la palla, leggermente
-  // rinforzata (toe cap).
-  const toeCapColor = leather.color ? leather.color.getHex() : 0x2a2a2a;
-  const toeCap = new THREE.Mesh(
-    new THREE.SphereGeometry(0.08, 8, 6),
-    new THREE.MeshStandardMaterial({
-      color: toeCapColor,
-      roughness: 0.5, metalness: 0.1
-    })
-  );
-  toeCap.scale.set(d * 2, 1.2, 1.4);
-  toeCap.position.set(0.5 - d / 2, -0.24, 0.44);
-  body.add(toeCap);
-
-  body.add(upper, sole, midsole, heel, collar);
+  body.add(new THREE.Mesh(mergeGeometries(stripes, false), foam)); stripes.forEach((g) => g.dispose());
+  // SWOOSH volt + bordo superiore volt.
+  const swooshes = [];
+  for (const side of [-1, 1]) swooshes.push(sideRibbon({ side, t0: 0.30, t1: 0.86, seg: 26, lift: 0.014,
+    yBot: (t) => { const k = (t - 0.30) / 0.56; return soleY(t) + 0.13 + Math.sin(k * Math.PI) * 0.10 - k * 0.02; },
+    yTop: (t) => { const k = (t - 0.30) / 0.56; return soleY(t) + 0.13 + Math.sin(k * Math.PI) * 0.10 + 0.030 + k * k * 0.115; },
+    cx, halfW, soleY, topY, z0: zAt(0), zLen: BL }));
+  body.add(new THREE.Mesh(mergeGeometries(swooshes, false), volt)); swooshes.forEach((g) => g.dispose());
+  const trim = [];
+  for (const side of [-1, 1]) trim.push(sideRibbon({ side, t0: 0.02, t1: 0.995, seg: 30, lift: 0.012,
+    yBot: (t) => topY(t) - 0.055, yTop: (t) => topY(t) - 0.012, cx, halfW, soleY, topY, z0: zAt(0), zLen: BL }));
+  body.add(new THREE.Mesh(mergeGeometries(trim, false), volt)); trim.forEach((g) => g.dispose());
+  const tab = new THREE.Mesh(new THREE.BoxGeometry(halfW(0.02) * 0.9, 0.10, 0.035), volt);
+  tab.position.set(cx, topY(0.015) - 0.02, zAt(0.003));
+  body.add(tab);
 }
 
 function buildJungle(body, barkMat) {
@@ -1131,6 +1163,9 @@ export function makeSpectators(spectatorKind, theme, hx, hz) {
     }
   }
   group.userData.kind = spectatorKind;
+  // Gli spettatori sono scenografia: toglierli dal pass ombra (rifatto ogni
+  // frame) evita ~500 caster inutili.
+  group.traverse((o) => { if (o.isMesh) o.castShadow = false; });
   return group;
 }
 
