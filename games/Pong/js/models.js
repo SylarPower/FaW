@@ -91,10 +91,10 @@ function fitPaddleArt(art, body, hitLength) {
 
 // --- Curva Q/E (piega morbida degli estremi) --------------------------------
 // Percentuale di lunghezza, su ciascun estremo, che partecipa alla piega:
-// gran parte della racchetta si piega, con il corpo centrale che resta dritto.
-const BEND_REGION = 0.55;
+// quasi tutta la racchetta si piega, solo il cuore centrale resta dritto.
+const BEND_REGION = 0.8;
 // Quanto si sposta all'indietro la punta, in frazione della lunghezza.
-const BEND_TIP = 0.44;
+const BEND_TIP = 0.66;
 
 /**
  * Cattura per ogni mesh della racchetta: posizioni di base, coordinate in
@@ -142,7 +142,9 @@ function bendProfile(t, end, amount) {
   // arriccia di più). Q piega t=-0.5, E piega t=+0.5; il corpo resta dritto.
   const s = clamp01((end < 0 ? (-0.5 + BEND_REGION) - t : t - (0.5 - BEND_REGION)) / BEND_REGION);
   if (s <= 0) return 0;
-  return amount * s * s * (3 - 2 * s) * (0.55 + 0.45 * s);
+  // Il fattore cresce verso la punta: il ricciolo finale è più marcato e la
+  // piega ricorda una molla che si carica, non una rotazione rigida.
+  return amount * s * s * (3 - 2 * s) * (0.38 + 0.62 * s);
 }
 
 function clamp01(v) {

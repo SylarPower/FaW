@@ -526,6 +526,13 @@
         <button class="btn" onclick="closeStats()">⬅ INDIETRO</button>
     </div>
 
+    <!-- ===== PAUSA (cambio scheda / focus perso) ===== -->
+    <div id="pause-screen" class="overlay-screen" style="display:none;">
+        <h1 style="color:#f59e0b; font-size:2rem;">⏸️ IN PAUSA</h1>
+        <p style="color:#aaa; font-size:0.75rem; margin:12px 0 22px;">La scheda ha perso il focus.<br>Il timer è fermo.</p>
+        <button class="btn" onclick="resumeFromPause()">▶ RIPRENDI</button>
+    </div>
+
     <!-- ===== VITTORIA ===== -->
     <div id="win-screen" class="overlay-screen" style="display:none;">
         <h1 style="color:#22c55e; font-size:2.5rem;" id="win-title">🎉 RISOLTO!</h1>
@@ -770,6 +777,7 @@ let currentPuzzleImage = null;
 // 🎮 STATO GIOCO
 // ============================================
 let gameActive = false;
+let gamePaused = false;
 let selectedSize = 3;
 let selectedType = 'numbers';
 let selectedImageId = 'landscape';
@@ -927,7 +935,7 @@ function canMove(row, col) {
 }
 
 function moveTile(row, col) {
-    if (isAnimating || !canMove(row, col)) return false;
+    if (isAnimating || gamePaused || !canMove(row, col)) return false;
 
     board[emptyPos.row][emptyPos.col] = board[row][col];
     board[row][col] = 0;
@@ -1180,12 +1188,34 @@ function startGameTimer() {
     elapsedSeconds = 0;
     updateTimerDisplay();
     gameTimer = setInterval(() => {
-        if (gameActive) {
+        if (gameActive && !gamePaused) {
             elapsedSeconds++;
             updateTimerDisplay();
         }
     }, 1000);
 }
+
+// ============================================
+// ⏸️ PAUSA AUTOMATICA (cambio scheda / focus perso)
+// ============================================
+// Solo in single player: in multiplayer il timer della sfida è condiviso e
+// non può essere fermato.
+function pauseForFocusLoss() {
+    if (!gameActive || gamePaused || isMultiplayer) return;
+    gamePaused = true;
+    document.getElementById('pause-screen').style.display = 'flex';
+}
+
+function resumeFromPause() {
+    if (!gamePaused) return;
+    gamePaused = false;
+    document.getElementById('pause-screen').style.display = 'none';
+}
+
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden) pauseForFocusLoss();
+});
+window.addEventListener('blur', pauseForFocusLoss);
 
 function updateTimerDisplay() {
     const m = Math.floor(elapsedSeconds / 60);
@@ -1356,6 +1386,7 @@ function startGame() {
     tileSize = Math.floor(maxBoardPx / selectedSize);
 
     gameActive = true;
+    gamePaused = false;
     moves = 0;
     hintsUsed = 0;
     previewVisible = false;
@@ -1411,6 +1442,8 @@ function updateMPTimerDisplay() {
 
 async function winGame() {
     gameActive = false;
+    gamePaused = false;
+    document.getElementById('pause-screen').style.display = 'none';
     clearInterval(gameTimer);
     if (mpTimerInterval) clearInterval(mpTimerInterval);
 
@@ -1520,6 +1553,8 @@ async function winGame() {
 
 function backToMenu() {
     gameActive = false;
+    gamePaused = false;
+    document.getElementById('pause-screen').style.display = 'none';
     clearInterval(gameTimer);
     if (mpTimerInterval) clearInterval(mpTimerInterval);
 
