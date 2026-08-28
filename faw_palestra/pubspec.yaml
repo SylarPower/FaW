@@ -1,0 +1,61 @@
+name: faw_palestra
+description: "FaW Palestra - app nativa Android/iOS per il tracciamento degli allenamenti."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+  flutter: ">=3.16.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.6
+
+  # Firebase (ufficiali Google, supportano Android + iOS)
+  firebase_core: ^2.24.2
+  cloud_firestore: ^4.14.0
+  firebase_auth: ^4.16.0
+  firebase_storage: ^11.5.3
+  firebase_analytics: ^10.8.0
+  firebase_crashlytics: ^3.4.8
+
+  # Riverpod per state management (moderno, type-safe, testabile)
+  flutter_riverpod: ^2.4.9
+
+  # Video player nativo (ExoPlayer su Android, AVPlayer su iOS)
+  video_player: ^2.8.2
+  chewie: ^1.5.0  # UI avanzata per video_player (controlli, fullscreen)
+
+  # Persistenza locale (cache esercizi, preferenze)
+  shared_preferences: ^2.2.2
+  path_provider: ^2.1.1
+
+  # Networking
+  http: ^1.1.2
+  cached_network_image: ^3.3.0
+
+  # Charts per statistiche (sostituisce chart.js)
+  fl_chart: ^0.66.0
+
+  # Utility
+  intl: ^0.19.0
+  uuid: ^4.2.1
+  collection: ^1.18.0
+
+  # UI helpers
+  flutter_svg: ^2.0.9
+  google_fonts: ^6.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.1
+  flutter_launcher_icons: ^0.13.1
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
+    - assets/videos/
+  # (i video veri sono su musclewiki.com, questi sono solo placeholder)
