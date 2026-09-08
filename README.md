@@ -14,7 +14,7 @@ FaW/
 ├── tests/
 │   ├── unit/               # regole pure dei nuovi giochi (node --test, niente browser)
 │   ├── faw/                # Playwright multi-contesto su relay finto (Arena/Rush/Bomba/hub)
-│   ├── palestra/           # 42 test regressivi della palestra
+│   ├── gym/                # 42 test regressivi della palestra (non toccati dal redesign)
 │   └── support/faw-relay.js  # statici + mini-Firestore in memoria per i test
 └── games/
     ├── shared/firebase-config.js   # Config Firebase condivisa (unica fonte)
@@ -99,7 +99,7 @@ npm run test:faw:chromium          # oppure: npm run test:faw
 
 # Test UI palestra (Playwright + Chromium/WebKit)
 npx playwright install --with-deps chromium webkit
-npx playwright test tests/palestra
+npx playwright test tests/gym
 ```
 
 I test `tests/faw/*` avviano da soli `tests/support/faw-relay.js` (porta 8090): serve gli

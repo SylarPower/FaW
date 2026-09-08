@@ -213,8 +213,10 @@ Comandi di riproduzione: `npm run test:unit` e
 
 - `chromium-desktop` (1280×800): **eseguito** su Bomba e hub (13 test verdi: layout,
   dialog, focus da tastiera, sfida dal banner) e in una passata precedente su Arena.
-  **Non ancora eseguito** su Rush e sui suoi 5 test: da rieseguire dopo ogni modifica
-  condivisa.
+  **Non ancora eseguito** su Rush e sui suoi 5 test: da rieseguire dopo ogni modifica condivisa.
+- Regressione palestra: `npx playwright test tests/gym --project=chromium` → **42/42**
+  (eseguita dopo i change all'hub, quindi `logout()` mirata e gli script condivisi non la
+  toccano). WebKit della stessa suite non eseguito: binario non disponibile qui.
 - Accessibilità verificata nei test: `prefers-reduced-motion` (animazioni spente — i test
   contano i giri di manciata e non il tempo reale),
   focus visibile sui bottoni, `aria-pressed` sui toggle, etichette sui campi, feedback
