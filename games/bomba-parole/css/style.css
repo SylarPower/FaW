@@ -1,0 +1,79 @@
+/* La Bomba delle Parole — stile proprio su token condivisi (nessun selettore globale). */
+.bomba__wrap { padding: 14px clamp(10px, 4vw, 20px) calc(24px + env(safe-area-inset-bottom)); max-width: 760px; margin: 0 auto; }
+.bomba__sub { font-size: .5em; letter-spacing: .18em; text-transform: uppercase; opacity: .7; }
+.bomba__actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+.bomba__actions .faw-btn { flex: 1 1 150px; }
+.bomba__join { display: flex; gap: 10px; align-items: flex-end; }
+.bomba__join .faw-field { flex: 1; margin: 0; }
+.bomba__join .faw-btn { flex: 0 0 auto; }
+.bomba__lobby-head { display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: flex-start; }
+.bomba__code { display: grid; gap: 2px; justify-items: center; padding: 8px 12px; border: 1px dashed var(--faw-line-strong); border-radius: var(--faw-r-3); background: var(--faw-surface-2); }
+.bomba__code small { color: var(--faw-text-muted); text-transform: uppercase; letter-spacing: .1em; font-size: 10px; }
+.bomba__code strong { font-family: var(--faw-font-mono); font-size: 22px; letter-spacing: .12em; }
+
+/* Hero: il blocco bomba sta in cima, così la tastiera che si apre non sposta nulla di essenziale. */
+.bomba__hero { background: var(--faw-surface); border: 1px solid var(--faw-line); border-radius: var(--faw-r-4); padding: 14px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; margin: 12px 0; }
+.bomba__hero > * { min-width: 0; }   /* niente min-content che allarghi la colonna: zero overflow a 320px */
+.bomba__hero.trema { animation: bomba-trema .28s steps(2) 3; }
+@keyframes bomba-trema { 0% { transform: translate(0, 0); } 50% { transform: translate(-2px, 1px); } 100% { transform: translate(0, 0); } }
+.bomba__holder { display: flex; align-items: center; gap: 10px; }
+.bomba__holder-avatar { width: 42px; height: 42px; border-radius: 13px; display: grid; place-items: center; font-size: 20px; background: var(--faw-surface-3); border: 1px solid var(--faw-line); flex: 0 0 auto; }
+.bomba__holder-info { min-width: 0; }
+.bomba__holder-info .faw-title { margin: 0; }
+.bomba__holder-fx { margin-left: auto; font-size: 20px; }
+
+.bomba__seq { display: flex; gap: 8px; justify-content: center; }
+.bomba__seq b { font-family: var(--faw-font-display); font-size: clamp(28px, 12vw, 52px); line-height: 1; min-width: clamp(42px, 14vw, 62px); padding: 8px 0; text-align: center; border-radius: var(--faw-r-3); background: var(--faw-surface-3); border: 1px solid var(--faw-line-strong); color: var(--faw-game-accent); letter-spacing: .04em; }
+.bomba__seq-k { text-align: center; margin: 0; }
+#seq-aiuto { text-align: center; margin: 0; }
+
+.bomba__fuse { display: grid; gap: 6px; }
+.bomba__fuse-bar { height: 12px; border-radius: 999px; background: var(--faw-surface-3); overflow: hidden; border: 1px solid var(--faw-line); }
+.bomba__fuse-bar > i { display: block; height: 100%; width: 0%; border-radius: 999px; background: var(--faw-game-accent); transition: width .12s linear; }
+.bomba__fuse-lab { margin: 0; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--faw-text-muted); text-align: right; font-family: var(--faw-font-mono); }
+.bomba__hero[data-liv="1"] .bomba__fuse-bar > i { background: #4fd1a5; }
+.bomba__hero[data-liv="2"] .bomba__fuse-bar > i { background: #cfd24a; }
+.bomba__hero[data-liv="3"] .bomba__fuse-bar > i { background: #f0a55c; }
+.bomba__hero[data-liv="4"] .bomba__fuse-bar > i { background: var(--faw-danger); }
+.bomba__hero[data-liv="5"] .bomba__fuse-bar > i { background: var(--faw-danger); animation: bomba-pulso .5s ease-in-out infinite alternate; }
+@keyframes bomba-pulso { from { opacity: .55; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .bomba__hero.trema, .bomba__hero[data-liv="5"] .bomba__fuse-bar > i { animation: none; }
+}
+
+.bomba__input { display: flex; gap: 8px; }
+.bomba__input .faw-input { flex: 1 1 0; min-width: 0; width: 100%; }
+.bomba__input .faw-btn { flex: 0 0 auto; padding-inline: 18px; }
+.bomba__fb { margin: 0; min-height: 18px; }
+.bomba__fb.is-ok { color: var(--faw-ok); }
+.bomba__fb.is-no { color: var(--faw-danger); }
+.bomba__last { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.bomba__last strong { font-family: var(--faw-font-mono); letter-spacing: .04em; }
+
+/* riga giocatore */
+.bomba__gioc { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--faw-line); border-radius: var(--faw-r-3); background: var(--faw-surface-2); }
+.bomba__gioc[data-who="me"] { border-color: var(--faw-game-accent); }
+.bomba__gioc[data-bomba="1"] { background: rgba(255, 106, 106, .12); border-color: var(--faw-danger); }
+.bomba__gioc__av { width: 30px; height: 30px; border-radius: 10px; display: grid; place-items: center; font-size: 13px; background: var(--faw-surface-3); flex: 0 0 auto; }
+.bomba__gioc__n { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.bomba__gioc__s { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--faw-text-muted); font-family: var(--faw-font-mono); }
+.bomba__gioc__boom { color: var(--faw-danger); }
+.bomba__nota { font-size: 12px; color: var(--faw-text-muted); }
+.bomba__solo { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+
+/* esito */
+.bomba__esito { text-align: center; }
+.bomba__boom { font-size: 46px; line-height: 1; }
+.bomba__esito.boom .bomba__boom { animation: bomba-pop .5s cubic-bezier(.2, .9, .2, 1.4); }
+@keyframes bomba-pop { 0% { transform: scale(.4); opacity: .2; } 60% { transform: scale(1.15); opacity: 1; } 100% { transform: scale(1); } }
+.bomba__stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(88px, 1fr)); gap: 8px; margin: 14px 0 4px; text-align: left; }
+
+@media (max-width: 400px) {
+  .bomba__actions .faw-btn { flex: 1 1 100%; }
+  .bomba__input .faw-btn { padding-inline: 14px; }
+}
+/* orizzontale: due colonne, hero compatto */
+@media (min-width: 860px) and (orientation: landscape) {
+  .bomba__wrap { max-width: 1040px; display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr); gap: 14px; align-items: start; }
+  .bomba__hero { margin: 0; }
+}

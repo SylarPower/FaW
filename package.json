@@ -3,7 +3,12 @@
   "private": true,
   "scripts": {
     "test:gym": "playwright test",
-    "test:gym:chromium": "playwright test --project=chromium"
+    "test:gym:chromium": "playwright test --project=chromium",
+    "test:unit": "node --test \"tests/unit/*.test.js\"",
+    "test:faw": "playwright test --config=playwright.faw.config.js",
+    "test:faw:chromium": "playwright test --config=playwright.faw.config.js --project=chromium",
+    "relay": "node tests/support/faw-relay.js 8090",
+    "serve": "node tests/support/faw-relay.js 8090"
   },
   "devDependencies": {
     "@playwright/test": "1.58.2",
