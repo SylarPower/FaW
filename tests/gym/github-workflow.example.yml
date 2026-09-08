@@ -1,0 +1,42 @@
+name: Gym UI
+on:
+  pull_request:
+    paths:
+      - 'games/palestra/**'
+      - 'games/shared/firebase-config.js'
+      - 'exercises.json'
+      - 'tests/gym/**'
+      - 'package*.json'
+      - 'playwright.config.js'
+      - '.github/workflows/gym-ui.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'games/palestra/**'
+      - 'tests/gym/**'
+      - 'package*.json'
+      - 'playwright.config.js'
+      - '.github/workflows/gym-ui.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  mobile-regression:
+    name: Chromium and WebKit mobile
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium webkit
+      - run: npm run test:gym -- --workers=2
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: gym-test-results
+          path: test-results/
+          retention-days: 7

@@ -1,0 +1,12 @@
+{
+  "name": "faw-ui-checks",
+  "private": true,
+  "scripts": {
+    "test:gym": "playwright test",
+    "test:gym:chromium": "playwright test --project=chromium"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.58.2",
+    "@axe-core/playwright": "4.11.1"
+  }
+}
