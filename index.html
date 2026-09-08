@@ -19,6 +19,10 @@
 		<!-- <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-check-compat.js"></script> -->
 		<!-- Config Firebase condivisa (deve stare prima dello script che inizializza Firebase) -->
 		<script src="games/shared/firebase-config.js"></script>
+		<!-- Modulo sala condiviso: serve solo a buildMatch (forma del documento identica
+		     a quella dei giochi). Nessuno stile e nessun tema applicati all'hub. -->
+		<script src="games/shared/faw-core.js"></script>
+		<script src="games/shared/faw-room.js"></script>
 		<style>
 			/* ✅ RESET E BASE */
 			* {
@@ -565,6 +569,18 @@
 						    <span style="font-size:2rem;">🏋️</span><br>Palestra
 						    <div class="game-badge solo">SOLO</div>
 						</div>
+						<div class="game-card" onclick="selezionaGioco('parole-arena', this)" id="game-parole-arena">
+						    <span style="font-size:2rem;">🏟️</span><br>Parole in Arena
+						    <div class="game-badge online">SFIDA</div>
+						</div>
+						<div class="game-card" onclick="selezionaGioco('categoria-rush', this)" id="game-categoria-rush">
+						    <span style="font-size:2rem;">⏱️</span><br>Categoria Rush
+						    <div class="game-badge online">SFIDA</div>
+						</div>
+						<div class="game-card" onclick="selezionaGioco('bomba-parole', this)" id="game-bomba-parole">
+						    <span style="font-size:2rem;">💣</span><br>La Bomba delle Parole
+						    <div class="game-badge online">SFIDA</div>
+						</div>
 						<!-- Aggiungi nuovi giochi in games/<nome>/ (index.html + css/ + js/) -->
 					</div>
 				</div>
@@ -583,9 +599,9 @@
 					<h3>📊 Le Tue Statistiche</h3>
 					<!-- Tab per cambiare vista -->
 					<div class="stats-tabs">
-						<button class="stats-tab active" onclick="showStatsTab('oggi')">Oggi</button>
-						<button class="stats-tab" onclick="showStatsTab('settimana')">Settimana</button>
-						<button class="stats-tab" onclick="showStatsTab('sempre')">Sempre</button>
+						<button class="stats-tab active" onclick="showStatsTab('oggi', this)">Oggi</button>
+						<button class="stats-tab" onclick="showStatsTab('settimana', this)">Settimana</button>
+						<button class="stats-tab" onclick="showStatsTab('sempre', this)">Sempre</button>
 					</div>
 					<!-- Contenuto statistiche -->
 					<div id="stats-content">
@@ -673,8 +689,19 @@
 			    gameof15: 'games/gameof15/index.html',
 			    neonwar: 'games/neonwar/index.html',
 			    palestra: 'games/palestra/index.html',
-			    pong: 'games/Pong/index.html'
+			    pong: 'games/Pong/index.html',
+			    'parole-arena': 'games/parole-arena/index.html',
+			    'categoria-rush': 'games/categoria-rush/index.html',
+			    'bomba-parole': 'games/bomba-parole/index.html'
 			};
+			// Etichette leggibili: i nomi interni non finiscono in faccia all'utente
+			const NOMI_GIOCHI = {
+			    ruzzle: 'Ruzzle', pictionary: 'Pictionary', gameof15: 'Gioco del 15',
+			    neonwar: 'Neon War', palestra: 'Palestra', pong: 'Pong',
+			    'parole-arena': 'Parole in Arena', 'categoria-rush': 'Categoria Rush',
+			    'bomba-parole': 'La Bomba delle Parole'
+			};
+			function nomeGioco(g) { return NOMI_GIOCHI[g] || g || 'partita'; }
 			function gameHref(gioco, query) {
 			    const base = GAME_PATHS[gioco] || ('games/' + gioco + '/index.html');
 			    return query ? (base + '?' + query) : base;
@@ -687,7 +714,10 @@
 			    pictionary: [],
 			    neonwar: [],
 			    gameof15: [],
-			    pong: []
+			    pong: [],
+			    'parole-arena': [],
+			    'categoria-rush': [],
+			    'bomba-parole': []
 			};
 			// ✅ CONFIGURAZIONE GIOCHI (aggiungi qui nuovi giochi)
 			const GIOCHI_CONFIG = {
@@ -839,8 +869,9 @@ gameof15: {
     ],
     modalita: [
         { id: "numbers", label: "NUMERI 🔢", colore: "#00ccff", testo: "#000" },
-        { id: "image", label: "IMMAGINE 🖼️", colore: "#ff6600", testo: "white" },
-        { id: "emoji", label: "EMOJI 😀", colore: "#ffd700", testo: "#000" }
+        { id: "image", label: "IMMAGINE 🖼️", colore: "#ff6600", testo: "white" }
+        // «Emoji» rimossa: games/gameof15/index.html non la implementa
+        // (nota nel gioco: «niente immagini predefinite, niente modalità emoji»).
     ],
     minGiocatori: 1,
     maxGiocatori: 8
@@ -890,6 +921,100 @@ palestra: {
     maxGiocatori: 1,
     soloOnly: true
 },
+			  'parole-arena': {
+			    nome: "Parole in Arena",
+			    icona: "🏟️",
+			    faw: true,
+			    durataDefault: "180",
+			    opzioni: [
+			      {
+			        id: "durata",
+			        label: "Durata",
+			        default: "180",
+			        valori: [
+			          { value: "120", label: "2 min" },
+			          { value: "180", label: "3 min" },
+			          { value: "240", label: "4 min" }
+			        ]
+			      },
+			      {
+			        id: "griglia",
+			        label: "Griglia",
+			        default: "5",
+			        valori: [
+			          { value: "4", label: "4×4 (veloce)" },
+			          { value: "5", label: "5×5 (standard)" },
+			          { value: "6", label: "6×6 (ampio)" }
+			        ]
+			      }
+			    ],
+			    modalita: [
+			      { id: "arena", label: "ARENA 🏟️", colore: "#f0a5ff", testo: "#000" },
+			      { id: "solo-parole", label: "SOLO PAROLE 🧺", colore: "#03dac6", testo: "#000" }
+			    ],
+			    minGiocatori: 2,
+			    maxGiocatori: 6
+			  },
+			  'categoria-rush': {
+			    nome: "Categoria Rush",
+			    icona: "⏱️",
+			    faw: true,
+			    durataDefault: "120",
+			    opzioni: [
+			      {
+			        id: "durata",
+			        label: "Durata",
+			        default: "120",
+			        valori: [
+			          { value: "120", label: "2 min (4 round)" },
+			          { value: "180", label: "3 min (6 round)" }
+			        ]
+			      }
+			    ],
+			    // «Creativo» è una modalità vera del gioco (voto tra pari), non una
+			    // etichetta decorativa: cambia punteggio e durata dei round.
+			    modalita: [
+			      { id: "classiche", label: "CLASSICHE 📚", colore: "#f0a5ff", testo: "#000" },
+			      { id: "creative", label: "CREATIVO 💭", colore: "#ffd166", testo: "#000" }
+			    ],
+			    minGiocatori: 2,
+			    maxGiocatori: 8
+			  },
+			  'bomba-parole': {
+			    nome: "La Bomba delle Parole",
+			    icona: "💣",
+			    faw: true,
+			    durataDefault: "180",
+			    opzioni: [
+			      {
+			        id: "durata",
+			        label: "Durata",
+			        default: "180",
+			        valori: [
+			          { value: "120", label: "2 min" },
+			          { value: "180", label: "3 min" },
+			          { value: "240", label: "4 min" }
+			        ]
+			      },
+			      {
+			        id: "miccia",
+			        label: "Miccia",
+			        default: "media",
+			        valori: [
+			          { value: "facile", label: "Facile · 45 s, sequenza corta" },
+			          { value: "media", label: "Media · 35 s" },
+			          { value: "dura", label: "Dura · 25 s" }
+			        ]
+			      }
+			    ],
+			    // Una sola modalità: la difficoltà è un'opzione (Miccia), non una
+			    // modalità diversa. Niente etichette che il gioco non implementa.
+			    modalita: [
+			      { id: "", label: "CREA SFIDA 💣", colore: "#ff6b6b", testo: "#fff" }
+			    ],
+			    minGiocatori: 2,
+			    maxGiocatori: 6
+			  },
 			  // Aggiungerai qui altri giochi in futuro
 			};
 			// Debug helper
@@ -1048,7 +1173,11 @@ partiteCache.pong = [];
 
 	snap.forEach(doc => {
 	    const data = { id: doc.id, ...doc.data() };
-	    if (data.gioco === 'neonwar') partiteCache.neonwar.push(data);
+	    if (GIOCHI_CONFIG[data.gioco] && GIOCHI_CONFIG[data.gioco].faw) {
+	        // giochi con la shared room: bucket proprio, così la lista resta leggibile
+	        (partiteCache[data.gioco] = partiteCache[data.gioco] || []).push(data);
+	    }
+	    else if (data.gioco === 'neonwar') partiteCache.neonwar.push(data);
 	    else if (data.gioco === 'gameof15') partiteCache.gameof15.push(data);
 	    else if (data.gioco === 'pong') partiteCache.pong.push(data);
 	    else if (data.gioco !== 'pictionary') partiteCache.ruzzle.push(data);
@@ -1110,6 +1239,11 @@ function renderTutteLePartite() {
 partiteCache.gameof15.forEach(p => renderPartitaRuzzle(p, div));
 partiteCache.pong.forEach(p => renderPartitaRuzzle(p, div));
 
+// Render giochi con la shared room (Arena / Rush / Bomba)
+['parole-arena', 'categoria-rush', 'bomba-parole'].forEach(g => {
+    (partiteCache[g] || []).forEach(p => renderPartitaFAW(p, div));
+});
+
 // Render Pictionary
 partiteCache.pictionary.forEach(p => renderPartitaPictionary(p, div));
 }
@@ -1163,7 +1297,7 @@ function renderPartitaRuzzle(p, div) {
             } else {
                 div.innerHTML += `
                     <div class="user-item live-match">
-                        <span>✅ Sfida vs ${altriGiocatori.join(', ')} (${p.gioco})</span>
+                        <span>✅ Sfida vs ${altriGiocatori.join(', ')} (${nomeGioco(p.gioco)})</span>
                         <div>
                             <button onclick="window.location.href='${gameHref(p.gioco, 'matchId=' + partitaId)}'" style="background:#03dac6; color:#000;">ENTRA</button>
                             <button onclick="event.stopPropagation(); if(confirm('Eliminare?')) db.collection('partite').doc('${partitaId}').delete()" style="background:#cf6679; margin-left:5px;">🗑️</button>
@@ -1195,13 +1329,51 @@ function renderPartitaRuzzle(p, div) {
         const altri = p.partecipanti.filter(n => n !== mioNome).join(", ");
         div.innerHTML += `
             <div class="user-item live-match">
-                <span>vs ${altri} (${p.gioco})</span>
+                <span>vs ${altri} (${nomeGioco(p.gioco)})</span>
                 <div>
                     <button onclick="window.location.href='${gameHref(p.gioco, 'matchId=' + partitaId)}'" style="background:#03dac6; color:#000;">ENTRA</button>
                     <button onclick="event.stopPropagation(); if(confirm('Eliminare?')) db.collection('partite').doc('${partitaId}').delete()" style="background:#cf6679; margin-left:5px;">🗑️</button>
                 </div>
             </div>`;
     }
+}
+
+// ========================================
+// 🏟️ RENDER GIOCHI CON SHARED ROOM (Arena/Rush/Bomba)
+// ========================================
+function renderPartitaFAW(p, div) {
+    const id = p.id;
+    const nome = nomeGioco(p.gioco);
+    const altri = (p.partecipanti || []).filter(n => n !== mioNome);
+    const url = gameHref(p.gioco, 'matchId=' + id);
+    const icona = (GIOCHI_CONFIG[p.gioco] || {}).icona || '🎮';
+    let statoText, bottoni;
+    if (p.stato === 'attesa') {
+        const pronti = (p.pronti || []).length;
+        statoText = 'in attesa (' + Math.max(1, pronti) + '/' + (p.partecipanti || []).length + ')';
+        bottoni = `<button onclick="event.stopPropagation(); window.location.href='${url}'" style="background:#03dac6; color:#000;">ENTRA</button>
+                   <button onclick="event.stopPropagation(); annullaSfida('${id}')" style="background:#cf6679; color:white; margin-left:5px;">🚫</button>`;
+    } else if (p.stato === 'pronto') {
+        statoText = 'sta per cominciare';
+        bottoni = `<button onclick="window.location.href='${url}'" style="background:#03dac6; color:#000;">ENTRA</button>`;
+    } else if (p.stato === 'conclusa') {
+        const cls = (p.risultati && p.risultati.classifica) || null;
+        const posto = cls ? cls.findIndex(c => c.nome === mioNome) + 1 : 0;
+        statoText = 'finita' + (posto === 1 ? ' · hai vinto 🏆' : (posto > 0 ? ' · ' + posto + '°' : ''));
+        bottoni = `<button onclick="window.location.href='${url}'" style="background:#9b59b6; color:white;">RISULTATI</button>
+                   <button onclick="event.stopPropagation(); if(confirm('Eliminare dalla lista?')) db.collection('partite').doc('${id}').delete()" style="background:#cf6679; color:white; margin-left:5px;">🗑️</button>`;
+    } else if (p.stato === 'annullata') {
+        statoText = 'annullata';
+        bottoni = `<button onclick="event.stopPropagation(); if(confirm('Eliminare dalla lista?')) db.collection('partite').doc('${id}').delete()" style="background:#cf6679; color:white;">🗑️</button>`;
+    } else {
+        statoText = 'in gioco';
+        bottoni = `<button onclick="window.location.href='${url}'" style="background:#03dac6; color:#000;">ENTRA</button>`;
+    }
+    div.innerHTML += `
+        <div class="user-item live-match" style="border-left-color:#f0a5ff;">
+            <span>${icona} ${nome}${altri.length ? ' vs ' + altri.join(', ') : ''} · ${statoText}</span>
+            <div>${bottoni}</div>
+        </div>`;
 }
 
 // ========================================
@@ -1577,6 +1749,46 @@ if (giocoSelezionato === 'pictionary') {
     return;
 }
 
+    // ✅ GIOCHI CON SHARED ROOM (Parole in Arena / Categoria Rush / La Bomba):
+    // la forma del documento viene da FAWRoom.buildMatch, lo stesso modulo usato
+    // dai giochi — così l'hub non può divergere (campi mancanti, seed, giocatori).
+    if (config.faw) {
+        const secondi = Math.max(60, parseInt(opzioni.durata || config.durataDefault || 180, 10) || 180);
+        const opzioniPulite = {};
+        Object.keys(opzioni).forEach(k => { if (opzioni[k] !== undefined && opzioni[k] !== null && opzioni[k] !== '') opzioniPulite[k] = opzioni[k]; });
+        const base = {
+            gioco: giocoSelezionato,
+            creator: mioNome,
+            giocatori: partecipanti,
+            durata: secondi * 1000,
+            maxGiocatori: config.maxGiocatori,
+            opzioni: opzioniPulite
+        };
+        const doc = (window.FAWRoom && FAWRoom.buildMatch) ? FAWRoom.buildMatch(base) : Object.assign({
+            stato: "attesa", host: mioNome, partecipanti: partecipanti.slice(), giocatori: {},
+            punteggi: {}, parole: {}, pronti: [], claim: {}, round: 0, seed: Math.random().toString(36).slice(2, 8).toUpperCase(),
+            createdAt: Date.now(), log: [], startAt: null, endsAt: null, fine: null,
+            rivincitaAccettataDa: [], rivincitaRifiutataDa: []
+        }, { opzioni: opzioniPulite, durata: secondi * 1000, maxGiocatori: config.maxGiocatori });
+        doc.confermaVerifica = [];
+        doc.sfidaDiretta = true;
+        doc.maxGiocatori = config.maxGiocatori;
+        showLoadingBanner('Creazione sfida ' + config.nome + '...');
+        try {
+            const docRif = await db.collection("partite").add(doc);
+            amiciSelezionati.clear();
+            document.querySelectorAll('.user-item.selected').forEach(el => el.classList.remove('selected'));
+            aggiornaBottoneSfida();
+            localStorage.setItem('ultimo_' + giocoSelezionato + '_mode', opzioniPulite.mode || '');
+            showSuccessBanner(docRif.id);
+        } catch (e) {
+            console.error("Errore creazione partita shared-room:", e);
+            removeGameBanner();
+            mostraToast('❌ Creazione non riuscita: ' + (e && e.message || 'errore'));
+        }
+        return;
+    }
+
     // ✅ CONTINUA CON LA LOGICA NORMALE PER GLI ALTRI GIOCHI
     let pIniziali = {};
     let paroleIniziali = {};
@@ -1754,7 +1966,13 @@ if (giocoSelezionato === 'pictionary') {
 			}
 
 			function logout() {
-			  localStorage.clear();
+			  // Cancella SOLO la sessione: i salvataggi dei giochi e la cache della
+			  // palestra restano sul dispositivo (un logout non deve far perdere progressi).
+			  ['mioNome', 'passwordHash', 'ultimoGioco', 'disponibile', 'schermoSicuro', 'faw:net:backend', 'faw:net:relayUrl']
+			    .forEach(k => localStorage.removeItem(k));
+			  Object.keys(localStorage).forEach(k => {
+			    if (k.indexOf('faw:') === 0 || k.indexOf('faw-') === 0) localStorage.removeItem(k);
+			  });
 			  window.location.reload();
 			}
 			// ==========================================
@@ -1949,10 +2167,12 @@ if (giocoSelezionato === 'pictionary') {
 			  }).join('');
 			}
 			// Gestione tab statistiche
-			function showStatsTab(tab) {
-			  // Aggiorna tab attivo
+			function showStatsTab(tab, btn) {
+			  // Aggiorna tab attivo (il pulsante arriva dall'alto: niente `event`
+			  // globale, che fuori da Chrome deprecato non è garantito)
 			  document.querySelectorAll('.stats-tab').forEach(t => t.classList.remove('active'));
-			  event.target.classList.add('active');
+			  const b = btn || (typeof event !== 'undefined' ? (event && event.target) : null);
+			  if (b) b.classList.add('active');
 			  // Mostra/nascondi contenuti
 			  const statsOggi = document.querySelector('.stats-grid-home');
 			  const statsSempre = document.getElementById('stats-sempre');

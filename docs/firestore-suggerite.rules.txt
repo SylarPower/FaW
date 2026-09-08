@@ -1,0 +1,144 @@
+/rulesVersion 2 — BOZZA DI LAVORO (non è ciò che è online)
+//
+// Regole Firestore suggerite per le collection usate dai giochi FaW.
+//
+// CONTESTO ONESTO (leggere prima di incollare):
+//   • Nel repository NON esiste un file di regole Firestore: l'unico file di regole
+//     presente è games/Pong/database.rules.json (Realtime Database). Lo stato reale
+//     online sul progetto `funatwork-cd237` non è verificabile da qui e va confrontato
+//     con la console prima di cambiare qualunque cosa.
+//   • L'autenticazione attuale è custom client-side (nome + SHA-256 in localStorage,
+//     `utenti/{NOME}`), NON Firebase Authentication. `request.auth` è quindi null:
+//     qualunque regola che chieda `request.auth != null` BLOCCHEREBBE hub e giochi
+//     esistenti. Per questo qui sotto ci sono due varianti.
+//   • Le regole da sole non rendono il multiplayer anti-cheat: il punteggio è calcolato
+//     lato client (vedi GAMES.md §3.1). Servono Cloud Functions per quello.
+//
+// Come provarle SENZA toccare la produzione:
+//   firebase emulators:start --only firestore
+//   firebase deploy --only firestore:rules --project <progetto-di-prova>
+// e far girare i test contro l'emulatore (i test Playwright di questo repo usano il
+// relay finto in tests/support/faw-relay.js, quindi non scrivono comunque su produzione).
+//
+// CAMPI REALI di `partite/{id}` (verificati in games/shared/faw-room.js e nei giochi):
+//   gioco, stato ('attesa'|'pronto'|'in_corso'|'chiusura'|'risultati'|'conclusa'|'annullata'),
+//   host, creator, partecipanti[String], inviti[String], opzioni{durata,mode,countdown,griglia,miccia,seed},
+//   cfg{griglia,bomba}, durata, createdAt, updatedAt, startAt, endsAt, claim{chi,at},
+//   log[], messaggi[], archive, risultati, rivincitaDi, prossimaPartita, prossimaPartitaCreataDa,
+//   rivincitaAccettataDa[], arena{}, rush{}, bomba{}
+//   NB: gli id di `partecipanti`/`inviti`/`claim`/`utenti` sono NOMI, non uid.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- helper ----------
+    function statoGiusto() {
+      return request.resource.data.stato in
+        ['attesa', 'pronto', 'in_corso', 'chiusura', 'risultati', 'conclusa', 'annullata', null];
+    }
+
+    function durataSana() {
+      // `durata` è in millisecondi: da 30 s a 30 min (i giochi stanno tra 120 000 e 240 000)
+      return !('durata' in request.resource.data) ||
+             (request.resource.data.durata is number &&
+              request.resource.data.durata >= 30000 &&
+              request.resource.data.durata <= 1800000);
+    }
+
+    function documentoPiccolo() {
+      // blocca le esplosioni di dimensione (i giochi scrivono liste corte: max 30 log, 20 parole…)
+      return request.resource.data.keys().size() <= 40;
+    }
+
+    function nonCambiaIdentita() {
+      // I campi decisi alla creazione non devono muoversi: identità della partita,
+      // regole scelte, catene di rivincita. NOTA: `cfg.griglia` è scritto una volta
+      // all'avvio da Parole in Arena (grid condivisa dal seed), quindi `cfg` non può
+      // stare tra i campi fissi; `seed` vive dentro `opzioni`, che invece è fisso.
+      let fissi = ['gioco', 'createdAt', 'opzioni', 'rivincitaDi', 'prossimaPartita'];
+      return fissi.all(k => !(k in request.resource.data) ||
+                             !(k in resource.data) ||
+                             resource.data[k] == request.resource.data[k]);
+    }
+
+    // ---------- VARIANTE A — compatibile con l'assetto attuale (senza Firebase Auth) ----------
+    // Cosa garantisce davvero: ONLY shape validation. Impedisce a un client bugdato di
+    // corrompere una partita (stato sconosciuto, durata assurda, documento gigante,
+    // identità riscritta). NON impedisce a un client volenteroso di barare: con
+    // l'auth custom non esiste un'identità verificabile lato server.
+    // Se le regole odierne sono più lasse (es. `allow read, write: if true`), questa
+    // variante è un miglioramento senza rompere nulla.
+    match /partite/{partitaId} {
+      allow read: if true;                       // le partite sono pubbliche per codice-invito
+      allow create: if statoGiusto() && durataSana() && documentoPiccolo();
+      // `update` su documento inesistente è già negato da Firestore; qui basta la forma.
+      allow update: if statoGiusto() && durataSana() && documentoPiccolo() && nonCambiaIdentita();
+      allow delete: if false;                    // l'archiviazione scrive `archive`, non cancella
+    }
+
+    // Presenza: heartbeat breve. Oggi è scrivibile da chiunque sappia il nome utente:
+    // è un limite noto, non un traguardo.
+    match /presenze/{userId} {
+      allow read: if true;
+      allow write: if request.resource.data.keys().size() <= 8;
+    }
+
+    // Amicizie / inviti sociali dell'hub: `amicizie/{A}_{B}` con liste di nomi.
+    match /amicizie/{coppia} {
+      allow read: if true;
+      allow write: if request.resource.data.keys().size() <= 12;
+    }
+
+    // Utenti (auth custom esistente + statistiche). Non toccato da questo lavoro:
+    // è il punto in cui una migrazione a Firebase Authentication cambierebbe tutto.
+    match /utenti/{userId} {
+      allow read: if true;
+      allow create, update: if request.resource.data.keys().size() <= 60;
+      allow delete: if false;
+    }
+
+    // `pictionary_rooms` resta com'è: fuori scope di questa consegna.
+
+    // ---------- VARIANTE B — da applicare DOPO la migrazione a Firebase Auth ----------
+    // Richiede due cose che oggi non ci sono, e vanno approvate perché sono una
+    // migrazione di dati/identità:
+    //   1) login con Firebase Authentication (al posto di `utenti/{NOME}` + localStorage)
+    //   2) `partecipanti`/`inviti`/`claim` che contengano UID, non nomi (con migrazione
+    //      dei documenti aperti e una finestra di compatibilità)
+    // Fino a allora le regole "vere" sotto restano commentate.
+    /*
+    match /partite/{partitaId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+                    && request.resource.data.host == request.auth.uid
+                    && request.resource.data.partecipanti.hasAll([request.auth.uid])
+                    && statoGiusto() && durataSana();
+      allow update: if request.auth != null
+                    && resource.data.partecipanti.hasAny([request.auth.uid])
+                    && nonCambiaIdentita();
+      // solo un partecipante può chiudere/riaprire; solo l'host può eliminare
+      allow delete: if request.auth != null && resource.data.host == request.auth.uid;
+    }
+    match /presenze/{uid} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == uid;
+    }
+    match /utenti/{uid} {
+      allow get: if request.auth != null;
+      allow create: if request.auth != null && request.auth.uid == uid;
+      allow update: if request.auth != null && request.auth.uid == uid
+                    && !request.resource.data.diff(resource.data).affectedKeys()
+                         .hasAny(['uid', 'createdAt']);
+    }
+    */
+  }
+}
+
+// Nota sugli indici (Firestore console → Firestore → Indexes): con le query attuali
+// non serve alcun indice composito nuovo.
+//  • `partite` dove `partecipanti array-contains X` (hub) → un solo filtro, ok.
+//  • `partite` dove `gioco == Y && stato in [..]` (coda istantanea Bomba) → due
+//    eguaglianze: servite dagli indici singoli automatici (zigzag merge), ok.
+// Servirebbero invece, se le liste venissero ordinate direttamente in query:
+//   collection: partite   fields: gioco ASC, createdAt DESC
+//   collection: partite   fields: partecipanti ARRAY, stato ASC, createdAt DESC
