@@ -10,14 +10,14 @@ FaW/
 ├── dizionario.txt          # Dizionario condiviso (Ruzzle)
 ├── exercises.json          # Dati palestra
 ├── gym-icon.png
-├── esercizi/               # Video esercizi
+├── esercizi/               # Asset legacy (non usati dalla palestra)
 └── games/
     ├── shared/firebase-config.js   # Config Firebase condivisa (unica fonte)
     ├── ruzzle/index.html
     ├── pictionary/index.html
     ├── gameof15/index.html
     ├── neonwar/index.html
-    ├── palestra/index.html
+    ├── palestra/            # UI mobile + logica + stili (vedi README dedicato)
     └── Pong/                 # index.html + css/ + js/
 ```
 
@@ -62,3 +62,9 @@ La config Firebase sta in **un solo file**: `games/shared/firebase-config.js`.
 Per cambiare progetto Firebase basta modificare `games/shared/firebase-config.js`.
 
 Le sfide multiplayer usano Firestore (`partite` o una collection dedicata). Per i giochi “tipo Ruzzle” basta `gioco: 'mio-gioco'` nel documento `partite` e il link `games/mio-gioco/index.html?matchId=...`.
+
+## Palestra mobile
+
+La palestra mantiene gli account e i dati esistenti, con una nuova esperienza mobile, modalità focus e salvataggio locale prima della sincronizzazione. Dettagli, verifiche e limiti: [games/palestra/README.md](games/palestra/README.md).
+
+Test UI: `npm ci`, `npx playwright install --with-deps chromium webkit`, `npm run test:gym`. Non è necessario npm per pubblicare o utilizzare il sito statico.

@@ -1,2 +1,7 @@
 # Anteprima 3D della scarpa (solo sviluppo, non versionata)
 /boot-preview/
+
+# Local UI verification dependencies and reports
+/node_modules/
+/test-results/
+/playwright-report/
