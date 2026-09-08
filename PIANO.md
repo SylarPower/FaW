@@ -18,7 +18,7 @@ Stato: **in corso**. Questo file è il piano operativo derivato dall'audit del c
 
 1. `index.html:1757 logout()` → `localStorage.clear()`: cancella anche `gym-data-v2:*`, `paroliere_data`, `gameof15_save`, `df_legends_save`. → Sostituire con rimozione mirata delle chiavi di sessione.
 2. `GIOCHI_CONFIG.gameof15.modalita` espone **EMOJI 😀**, ma `games/gameof15/index.html:772` dichiara «niente immagini predefinite, niente modalità emoji» → opzione inesistente. Allineare.
-3. Autenticazione custom: `hashPassword(SHA-256)` + confronto lato client su `utenti/{NOME}`, nessuna Firebase Auth, nessuna regola di sicurezza per `utenti` nel repo (esiste solo `games/Pong/database.rules.json` per RTDB). → Rischi documentati; non dichiarata risolta.
+3. Autenticazione custom: `hashPassword(SHA-256)` + confronto lato client su `utenti/{NOME}`. **Correzione**: Firebase Authentication *è attiva nel progetto* (`authDomain` in `games/shared/firebase-config.js`), ma nessuna pagina del sito chiama l'SDK Auth (verificato con grep su tutto il repo: zero occorrenze) → `request.auth` è `null`, e nel repo non c'è alcuna regola Firestore per `utenti`/`partite` (esiste solo `games/Pong/database.rules.json` per RTDB). Ora `FAWNet.ensureSignedIn()` (opt-in, default spento) + campo `authUid` nei documenti rendono possibile legare le regole all'uid senza rompere i giochi esistenti. Rischi documentati; non dichiarata risolta.
 4. Nessuna `firestore.rules` versionata nel repo → presumere quella di produzione è impossibile. Vengo forniti rules di partenza + nota esplicita.
 5. Persistenza: chiavi sparse e non namespaces, `cacheKey` condivisi tra giochi → nuovi dati dietro prefisso `faw:<gioco>:<utente>:...`.
 
@@ -68,7 +68,7 @@ Dettaglio completo in [GAMES.md](GAMES.md). Qui cosa è fatto, cosa no, e cosa r
 
 | Fase | Stato | Note |
 |---|---|---|
-| 1. Fondamenta (`faw-design.css`, `faw-core.js`, `faw-net.js`, `faw-words.js`, `faw-room.js`) + fix critici | **fatta** | `logout()` non cancella più i salvataggi; «Emoji» rimossa dal Gioco del 15 in `GIOCHI_CONFIG`; `showStatsTab` non dipende da `event`. Debito (c)/(d) **non** risolto: è infrastruttura (Firebase Auth / regole), documentato in GAMES.md §5 e §7 |
+| 1. Fondamenta (`faw-design.css`, `faw-core.js`, `faw-net.js`, `faw-words.js`, `faw-room.js`) + fix critici | **fatta** | `logout()` non cancella più i salvataggi; «Emoji» rimossa dal Gioco del 15 in `GIOCHI_CONFIG`; `showStatsTab` non dipende da `event`. Debito (c)/(d) **non** risolto (Auth: `ensureSignedIn()` pronto ma spento di default; regole: bozza in `docs/`), documentato in GAMES.md §5 e §7 |
 | 2. Parole in Arena | **fatta** | 2–6 giocatori, 120/180/240 s, griglia 4/5/6, energia, 3 potenziamenti, eventi da seed, ranking discreto, risultati + rivincita. 6 test multiplayer/solo |
 | 3. Categoria Rush | **fatta** | 2–8 giocatori, round simultanei, dataset controllato (12 categorie oggettive + 5 creative), bonus originalità/rapidità, reveal, classifica, rivincita. 5 test |
 | 4. La Bomba delle Parole | **fatta** | 2–6 giocatori, miccia assoluta non azzerabile, sequenze garantite dal dizionario, parola invalida = nessun passaggio, esplosioni con penalità, offline non blocca. 8 test |

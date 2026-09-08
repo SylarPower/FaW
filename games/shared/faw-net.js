@@ -333,6 +333,26 @@
     }
   };
 
+  /* ============================ identità (opzionale) ====================== */
+  // Il PROGETTO Firebase ha Authentication attiva (c'è `authDomain` in
+  // games/shared/firebase-config.js), ma FINO A OGGI nessuna pagina del sito chiama
+  // l'SDK di Auth: l'identità usata dal portale è il nome in `mioNome`, e le regole
+  // Firestore non possono distinguere un client dall'altro. `ensureSignedIn()` serve
+  // a colmare quel buco in modo reversibile: logga in anonimo, espone `FAWNet.uid` e
+  // permette ai documenti partita di portare `authUid`, così una regola
+  // `request.auth != null` diventa applicabile senza riscrivere i giochi.
+  // È OPT-IN e SPENTO di default: si accende con `?auth=anon` o con
+  // localStorage `faw:auth:anon = "1"`. Coi test (backend fake) è un no-op dichiarato:
+  // risolve `null` senza toccare niente.
+  var uidAttivo = null;
+  function authRichiesto() {
+    try {
+      if (typeof localStorage !== "undefined" && localStorage.getItem("faw:auth:anon") === "1") return true;
+      if (typeof location !== "undefined" && /[?&]auth=anon\b/.test(location.search || "")) return true;
+    } catch (e) {}
+    return false;
+  }
+
   /* ========================== backend: Firestore ========================= */
   function fs() {
     if (firestore) return firestore;
@@ -457,6 +477,29 @@
       return api;
     },
     backendName: function () { return detectBackend(); },
+    /** uid Firebase Auth se il gioco lo ha chiesto (`?auth=anon`), altrimenti null. */
+    uid: function () { return uidAttivo; },
+    /**
+     * Login anonimo opt-in. ritorna `uid` (stringa) o `null` quando non richiesto,
+     * quando l'SDK non c'è (backend dei test) o quando il login fallisce: in quel caso
+     * il gioco continua a funzionare come prima, senza identità verificata.
+     */
+    ensureSignedIn: function () {
+      if (!authRichiesto()) return Promise.resolve(null);
+      if (uidAttivo) return Promise.resolve(uidAttivo);
+      if (detectBackend() === "fake") return Promise.resolve(null);
+      if (!global.firebase || !global.firebase.auth) {
+        return Promise.resolve(null);
+      }
+      var auth = global.firebase.auth();
+      var esistente = auth.currentUser;
+      var p = esistente ? Promise.resolve(esistente) : auth.signInAnonymously();
+      return p.then(function (user) {
+        uidAttivo = user && user.uid ? user.uid : null;
+        return uidAttivo;
+      }).catch(function () { return null; });
+    },
+
     ready: function () { return Promise.resolve(true); },
     /**
      * Ogni mutazione di gioco passa di qui: scrive e, su errore di rete,

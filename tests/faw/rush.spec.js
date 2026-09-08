@@ -220,6 +220,65 @@ test("rush multiplayer: stessa domanda, risposta unica, rivelazione, risultati, 
   await a.ctx.close(); await b.ctx.close(); await boot.ctx.close();
 });
 
+test("rush: 4 dispositivi — unica contro in-due, e il bonus non dipende dai tempi", async ({ browser }) => {
+  const nomi = ["ALICE", "BOB", "CICE", "DINO"];
+  const { matchId } = await creaSala(browser, nomi);
+  const giocator = [];
+  for (const n of nomi) {
+    const c = await A.contesto(browser, n);
+    await apriRush(c.page, matchId);
+    giocator.push(c);
+  }
+  try {
+    for (const g of giocator) await g.page.locator("#btn-pronto").click();
+    await A.aspettaStato(giocator[0].page, matchId, ["pronto", "in_corso"]);
+    for (const g of giocator) await expect(g.page.locator("#schermo-gioco")).toBeVisible({ timeout: 25000 });
+
+    // 1) la domanda è la stessa su quattro dispositivi
+    const domande = await Promise.all(giocator.map((g) => g.page.evaluate(() => {
+      const st = window.FAWRush.stato;
+      const c = st.rounds[st.idx];
+      return c ? c.categoria + ":" + c.lettera : null;
+    })));
+    expect(new Set(domande).size, "stessa categoria e stessa lettera per tutti").toBe(1);
+    const idx = await giocator[0].page.evaluate(() => window.FAWRush.stato.idx);
+
+    // 2) tre parole diverse: Alice e Dino soli, Bob e Cice in due sulla stessa
+    const [wa, wb, wc] = await Promise.all([
+      A.rispostaValida(giocator[0].page, { indice: 0 }),
+      A.rispostaValida(giocator[1].page, { indice: 1 }),
+      A.rispostaValida(giocator[3].page, { indice: 2 })
+    ]);
+    expect(wb.word).not.toBe(wa.word);
+    expect(wc.word).not.toBe(wb.word);
+    expect(wc.word).not.toBe(wa.word);
+    await A.rispondi(giocator[0].page, wa.word);
+    await A.rispondi(giocator[1].page, wb.word);
+    await A.rispondi(giocator[2].page, wb.word);
+    await A.rispondi(giocator[3].page, wc.word);
+    await expect(giocator[0].page.locator("#round-avanzati")).toHaveText("4", "tutti e quattro hanno risposto");
+
+    // 3) chiusura del round e rivelazione: chi era solo porta a casa il bonus pieno
+    await A.portaAvanti(giocator[0].page, matchId, INPUT + 900);
+    await giocator[0].page.waitForFunction((i) => !!(((window.FAWRush.stato.data || {}).rush || {}).punteggiRound || {})[i], idx, { timeout: 25000 });
+    const doc = await A.leggiDoc(giocator[0].page, matchId);
+    const punti = doc.data.rush.punteggiRound[idx];
+    const riv = doc.data.rush.rivela[idx];
+    expect(riv.ALICE.originale).toBe(true);
+    expect(riv.DINO.originale).toBe(true);
+    expect(riv.BOB.condivisa).toBe(true);
+    expect(riv.CICE.condivisa).toBe(true);
+    expect(riv.BOB.parola).toBe(riv.CICE.parola, "stessa parola: è una coincidenza, non un'unicità");
+    // bonusUnico 60 - bonusCoppia 15 = 45; il più lento dei due può recuperare al
+    // massimo 40 di bonus velocità, quindi il distacco minimo garantito è 5 punti
+    expect(punti.ALICE - punti.BOB).toBeGreaterThanOrEqual(5);
+    expect(punti.DINO - punti.CICE).toBeGreaterThanOrEqual(5);
+    expect(punti.BOB).toBeLessThan(160, "in due non si arriva mai al premio dell'unica");
+    // e il punteggio cumulato non può essere sotto i punti del round chiuso
+    for (const n of nomi) expect(doc.data.punteggi[n]).toBeGreaterThanOrEqual(punti[n]);
+  } finally { for (const g of giocator) { try { await g.ctx.close(); } catch (e) {} } }
+});
+
 test("rush: un giocatore inattivo non blocca i round e non li vince", async ({ browser }) => {
   const { boot, matchId } = await creaSala(browser, ["ALICE", "BOB", "CINZIA"]);
   const a = await A.contesto(browser, "ALICE");

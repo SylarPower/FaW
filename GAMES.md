@@ -190,11 +190,23 @@ unico) ✓ · pareggio (dichiarato in `esito`) ✓ · entrata a partita iniziata
   `partite/presenze/amicizie/utenti`; l'unico file di regole presente è
   `games/Pong/database.rules.json` (Realtime Database, non toccato da questo lavoro).
   Cosa sia online davvero sul progetto `funatwork-cd237` non è verificabile da qui:
-  `docs/firestore-suggerite.rules.txt` è un punto di partenza
-  commentato, **non** una conferma di ciò che è online. Nota importante: con l'auth
-  custom client-side (non Firebase Authentication) le rules non possono identificare
-  l'utente, quindi non possono proteggere davvero le scritture: è il limite strutturale
-  da risolvere prima di parlare di anti-cheat o di dati multi-tenant.
+  `docs/firestore-suggerite.rules.txt` è un punto di partenza commentato,
+  **non** una conferma di ciò che è online.
+- Identità: **Firebase Authentication è attiva nel progetto** (c'è `authDomain` in
+  `games/shared/firebase-config.js`), ma **il sito non usa quell'SDK**: `grep` su tutto
+  il repository (hub, ruzzle, pictionary, gameof15, palestra, Pong) non trova una sola
+  chiamata a `firebase.auth()` / `signIn*` / `currentUser` — l'accesso del portale è
+  `utenti/{NOME}` con `hashPassword` SHA-256 client-side. Finché nessuna pagina fa
+  login, `request.auth` è `null` e le regole non possono distinguere un client
+  dall'altro: per questo i nuovi giochi funzionano alle stesse identiche condizioni di
+  Ruzzle (e alle stesse identiche debolezze).
+  Da questo lavoro parte un opt-in **spento di default**: `FAWNet.ensureSignedIn()`
+  (attivo con `?auth=anon` o localStorage `faw:auth:anon = "1"`) fa il login anonimo,
+  espone `FAWNet.uid()` e scrive `authUid` nei documenti creati da `FAWRoom.buildMatch`.
+  Serve a rendere applicabile una regola `request.auth != null` **senza** toccare i giochi
+  esistenti; per attivarla davvero servono tre passi in questo ordine: (1) firma in
+  anonimo anche nell'hub e nei giochi legacy che scrivono su `partite`, (2) deploy del
+  codice, (3) solo allora deploy delle regole.
 
 ## 6. Test eseguiti (non "da eseguire")
 
@@ -202,8 +214,8 @@ unico) ✓ · pareggio (dichiarato in `esito`) ✓ · entrata a partita iniziata
 |---|---|---|
 | `tests/unit/*.test.js` (4 file) | 80 test: fondamenti (core, parole, categorie, design tokens), Arena (selezione, punteggio, energia, eventi, power-up, antimultipli, classifica, esito), Rush (normalizzazione, combinazioni, punteggi, duplicati, tie-break, creativo), Bomba (validità con dizionario reale, miccia, passaggio, idempotenza, esplosione, offline, classifica) | **80/80** |
 | `tests/faw/arena.spec.js` | solo, flusso multiplayer completo invite→countdown→parole→risultati→rivincita, power-up con doppio tocco, parole giocate offline, griglie + evento a schermo piccolo, dialog regole/accessibilità | 6/6 su chromium |
-| `tests/faw/rush.spec.js` | solo + opzioni, multiplayer con rivelazione e rivincita, giocatore inattivo, voto tra pari nel creativo, 320 px con tastiera | 5/5 su chromium |
-| `tests/faw/bomba.spec.js` | allenamento, turno e passaggio tra due contesti, doppio tocco, esplosione condivisa e input tardivo, offline che non blocca, reload a metà round, risultati+rivincita, 320 px/overflow/tastiera/audio | 8/8 su chromium |
+| `tests/faw/rush.spec.js` | solo + opzioni, multiplayer con rivelazione e rivincita, **4 dispositivi: unica vs in-due con distacco garantito**, giocatore inattivo, voto tra pari nel creativo, 320 px con tastiera | 6/6 su chromium |
+| `tests/faw/bomba.spec.js` | allenamento, turno e passaggio tra due contesti, **giro completo a 4 dispositivi**, doppio tocco, esplosione condivisa e input tardivo, offline che non blocca, reload a metà round, risultati+rivincita, 320 px/overflow/tastiera/audio | 9/9 su chromium |
 | `tests/faw/hub.spec.js` | config dei nuovi giochi e link, «crea sfida» → documento che il gioco apre, lista partite per stato, logout che conserva i salvataggi, tab statistiche senza `event` globale (shim `firebase` sopra il relay) | 5/5 su chromium |
 
 Comandi di riproduzione: `npm run test:unit` e
@@ -230,9 +242,11 @@ Comandi di riproduzione: `npm run test:unit` e
 ## 7. Limiti noti
 
 1. **Autorità client-side**: coerente e idempotente, non anti-cheat (vedi §3.1).
-2. **Auth custom ≠ Firebase Authentication**: `passwordHash` in locale + letture/scritture su
-   `utenti/{nome}`; nessun refresh token, nessuna regola affidabile. Va valutato un
-   passaggio a Firebase Auth (o a Cloud Functions) prima di accettare dati sensibili.
+2. **Il sito non usa Firebase Auth anche se il progetto lo ha attivo**: l'accesso è
+   `utenti/{nome}` + SHA-256 in localStorage. I nuovi giochi stanno lì, come Ruzzle:
+   `ensureSignedIn()` è pronto ma **spento di default**, e attivarlo è un deploy
+   coordinato (hub + giochi legacy + regole), non una modifica locale. `authUid` è già
+   nel formato dei documenti nuovi quando il flag è acceso.
 3. **Regole Firestore non verificate**: non c'è un file di rules versionato per le
    collection usate; il draft in `docs/` va confrontato con la console del progetto.
 4. **Dizionario**: 286 305 parole, niente sotto le 4 lettere, prestiti recenti e
@@ -254,8 +268,9 @@ Comandi di riproduzione: `npm run test:unit` e
 
 ## 8. Prossime priorità
 
-1. Cloud Functions (o un realtime server) per l'autorità reale + Firebase Auth: è il
-   collo di bottiglia di 2, 3 e 1.
+1. Autorità vera: accendere `ensureSignedIn()` ovunque e legare le regole a `authUid`
+   (passi in GAMES.md §5); per il *calcolo* dei punteggi lato server servono Cloud
+   Functions. È il collo di bottiglia comune di 1, 2 e 3.
 2. `firestore.rules` definitive + test delle regole (emulator suite) prima di aprire le
    scritture a più utenti.
 3. Spec axe-core su hub + tre giochi (color contrast, label, ordine di tab) e run su

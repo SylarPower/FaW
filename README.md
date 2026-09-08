@@ -66,7 +66,7 @@ Dalla pagina del gioco, il ritorno alla home è `../../index.html`.
 Se il gioco ha una **sala condivisa** (invito, pronto, countdown, risultati, rivincita) usa gli
 impianti in `games/shared/` e metti `faw: true` nella sua voce di `GIOCHI_CONFIG`: l'hub costruisce
 allora la partita con `FAWRoom.buildMatch` e la lista partite ne legge lo stato reale. Copiare a mano
-la forma del documento è ciò che ha reso opachi `neonwar` e `gameof15`.
+la forma del documento è ciò che ha reso opachi i giochi nati prima di questi impianti.
 
 ## Configurazione Firebase
 

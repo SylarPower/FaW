@@ -208,6 +208,44 @@ test("bomba: due dispositivi — stesso round, turno, passaggio, e chi non tocca
   } finally { await s.chiudi(); }
 });
 
+test("bomba: 4 dispositivi — giro completo A→B→C→D, miccia intatta, e i non di turno non possono toccare", async ({ browser }) => {
+  const nomi = ["ALICE", "BOB", "CICE", "DINO"];
+  const s = await sala(browser, nomi);
+  try {
+    const d0 = await doc0(s.boot.page, s.matchId);
+    const inizio = d0.bomba.round.inizioAlle;
+    expect(d0.bomba.possessore).toBe("ALICE", "la bomba inizia da chi ha creato la sala");
+
+    const giaViste = [];
+    for (let k = 0; k < 4; k++) {
+      const tocca = s.giocatori[k];
+      const seq = await seqDi(tocca.page);
+      // per tutti e quattro la sequenza è la stessa: vive nel documento
+      for (const g of s.giocatori) expect(await seqDi(g.page), "stessa sequenza su ogni dispositivo").toBe(seq);
+      // chi non è di turno ha il bottone spento (e non può scrivere la propria parola)
+      for (let j = 0; j < 4; j++) {
+        if (j !== k) await expect(s.giocatori[j].page.locator("#btn-passa")).toBeDisabled({ timeout: 10000 });
+      }
+      const parola = await cercaParola(tocca.page, seq, giaViste);
+      expect(parola, "devono esserci abbastanza parole per la sequenza").toBeTruthy();
+      giaViste.push(parola);
+
+      await passa(tocca.page, parola);
+      const atteso = nomi[(k + 1) % 4];
+      const d = await waitDoc(s.boot.page, s.matchId, (x) => x.bomba.possessore === atteso, "passa a " + atteso);
+      expect(d.bomba.round.inizioAlle, "la miccia non si azzera mai al passaggio").toBe(inizio);
+      expect(d.punteggi[nomi[k]], "un punto parola a chi passa").toBe(10 + (parola.length >= 8 ? 5 : 0));
+    }
+
+    const fine = await doc0(s.boot.page, s.matchId);
+    expect(fine.bomba.possessore).toBe("ALICE", "il giro si chiude in cerchio");
+    expect(fine.bomba.usate.length).toBe(4, "quattro parole registrate, tutte diverse");
+    expect(fine.bomba.usate.sort()).toEqual([...giaViste].sort());
+    expect(Object.keys(fine.bomba.passaggi).sort()).toEqual([...nomi].sort());
+    nomi.forEach((n) => expect(fine.bomba.passaggi[n]).toBe(1));
+  } finally { await s.chiudi(); }
+});
+
 test("bomba: doppio tocco = un solo passaggio (scritture idempotenti)", async ({ browser }) => {
   const s = await sala(browser, ["ALICE", "BOB", "CIRA"]);
   try {

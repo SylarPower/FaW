@@ -65,6 +65,10 @@
     } else {
       stato.matchId = matchId;
       NET.init({ backend: "auto" });
+      // opt-in (?auth=anon / faw:auth:anon=1): mette l'uid di Firebase Auth nel
+      // documento partita (`authUid`). Di default è un no-op: nessun comportamento
+      // cambia, e i test girano con il backend finto dove è dichiaratamente null.
+      NET.ensureSignedIn();
       collegati();
     }
     bindTop();

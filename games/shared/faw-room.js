@@ -73,6 +73,9 @@
       seed: o.seed || (CORE ? CORE.shortId("S").slice(0, 8).toUpperCase() : "SEED"),
       createdAt: Date.now(),
       timestamp: Date.now(),
+      // c'è solo se il gioco ha chiesto l'identità (FAWNet.ensureSignedIn): null di default,
+      // così una regola Firestore può richiedere `request.auth != null` senza rompere i giochi esistenti
+      authUid: (global.FAWNet && typeof global.FAWNet.uid === "function" && global.FAWNet.uid()) || null,
       dataOra: new Date().toLocaleString("it-IT", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }),
       log: [],
       claim: {},
