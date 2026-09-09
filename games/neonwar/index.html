@@ -23,8 +23,9 @@
 			}
 			body.gaming { cursor: none; }
 			/* UI IN GIOCO */
+			/* Scende sotto il pulsante HOME condiviso (area di sicurezza faw-ui.css) */
 			#ui-layer {
-			position: absolute; top: 74px; left: 16px;
+			position: absolute; top: var(--faw-home-safe-y); left: 16px;
 			pointer-events: none; z-index: 10;
 			}
 			.hud-text { font-size: 1rem; color: #fff; text-shadow: 2px 2px 0 #000; margin-bottom: 5px; }

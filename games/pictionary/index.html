@@ -8,6 +8,8 @@
     <script src="https://www.gstatic.com/firebasejs/9.1.1/firebase-firestore-compat.js"></script>
     <!-- Config Firebase condivisa (prima dello script che inizializza Firebase) -->
     <script src="../shared/firebase-config.js"></script>
+    <!-- Spazio per i banner di stato fissi in cima (evita che coprano il testo) -->
+    <script src="../shared/faw-layout.js" defer></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
@@ -538,7 +540,7 @@
 
         /* === PULSANTE HOME: classe condivisa .fixed-home-btn (faw-ui.css), sempre visibile === */
         @media (min-width: 601px) {
-            .game-banner { padding-left: 148px; }
+            .game-banner { padding-left: var(--faw-home-safe-x); }
         }
 
         /* === RESPONSIVE === */
@@ -588,8 +590,8 @@
     border-right: 1px solid var(--border);
     display: flex;
     flex-direction: column;
-    /* spazio per il pulsante HOME condiviso in alto a sinistra */
-    padding: 72px 10px 15px;
+    /* area di sicurezza del pulsante HOME condiviso in alto a sinistra */
+    padding: var(--faw-home-safe-y) 10px 15px;
     gap: 20px;
     overflow-y: auto;
     z-index: 100;

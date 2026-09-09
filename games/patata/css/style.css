@@ -66,7 +66,7 @@ button { font-family: var(--font); }
   border-bottom: 1px solid var(--card-border);
 }
 .topbar-left { display: flex; align-items: center; gap: 10px; }
-.topbar { padding-left: 126px; } /* spazio per il pulsante HOME condiviso */
+.topbar { padding-left: var(--faw-home-safe-x); } /* area di sicurezza del pulsante HOME */
 .topbar-logo { font-size: 1.4rem; }
 .topbar-title {
   font-weight: 800;
@@ -390,6 +390,12 @@ button { font-family: var(--font); }
   gap: 12px;
 }
 .timer-wrap { position: relative; width: min(210px, 58vw); }
+/* Ultimi secondi: il tempo "scotta" solo con la luce, mai con un suono */
+.timer-wrap.urgent { animation: patata-urgenza 1s ease-in-out infinite; }
+@keyframes patata-urgenza {
+  0%, 100% { transform: scale(1); filter: none; }
+  50% { transform: scale(1.035); filter: drop-shadow(0 0 14px rgba(255, 59, 48, 0.45)); }
+}
 .ring { width: 100%; height: auto; display: block; transform: rotate(-90deg); }
 .ring-track {
   fill: none;
@@ -909,7 +915,7 @@ button { font-family: var(--font); }
 @keyframes slide-down { from { transform: translateY(-100%); } to { transform: translateY(0); } }
 .banner .b-emoji { font-size: 1.4rem; }
 @media (min-width: 601px) {
-  .banner { padding-left: 148px; }
+  .banner { padding-left: var(--faw-home-safe-x); }
 }
 .banner .b-text { flex: 1; min-width: 160px; }
 .banner .b-title { overflow-wrap: anywhere; }
