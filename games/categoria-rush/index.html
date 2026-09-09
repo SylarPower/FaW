@@ -1,243 +1,167 @@
 <!DOCTYPE html>
 <html lang="it">
-	<head>
-		<meta charset="UTF-8">
-		<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
-		<meta name="theme-color" content="#0d1013">
-		<meta name="description" content="Categoria Rush — stessa lettera, stessa categoria, 26 secondi.">
-		<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏁</text></svg>">
-		<title>Categoria Rush · FaW</title>
-		<link rel="stylesheet" href="../shared/faw-design.css">
-		<link rel="stylesheet" href="css/style.css">
-		<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-		<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
-		<script src="../shared/firebase-config.js"></script>
-		<script src="../shared/faw-core.js"></script>
-		<script src="../shared/faw-net.js"></script>
-		<script src="../shared/faw-categorie.js"></script>
-		<script src="../shared/faw-room.js"></script>
-		<script src="js/regole.js"></script>
-		<script src="js/partita.js"></script>
-	</head>
-	<body class="faw-scope" data-game="rush">
-		<header class="faw-topbar">
-			<a class="faw-brandmark" href="../../index.html" aria-label="Torna al portale FaW">F</a>
-			<div class="faw-topbar__title">
-				<strong>Categoria Rush</strong>
-				<span>🏁</span>
-			</div>
-			<div class="faw-topbar__spacer"></div>
-			<span class="faw-timer" id="timer" role="timer" aria-live="off">0:26</span>
-			<button class="faw-btn faw-btn--icon" data-action="regole" aria-label="Regole del gioco">?</button>
-			<button class="faw-btn faw-btn--icon" data-action="audio" aria-pressed="true" aria-label="Attiva o disattiva i suoni">
-				🔊<span class="faw-sr"> audio</span>
-			</button>
-			<button class="faw-btn faw-btn--icon" data-action="tema" aria-label="Cambia tema chiaro/scuro">◐</button>
-		</header>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+  <meta name="theme-color" content="#111019">
+  <meta name="description" content="Categoria Rush: una lettera, una categoria, partite veloci, modalità Creativo e Nomi, Cose, Città. Sfida gli amici o allenati con le parole.">
+  <title>Categoria Rush · FaW</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='24' fill='%23c4b0ff'/%3E%3Ctext x='18' y='77' font-size='80' font-family='sans-serif' font-weight='900' fill='%23111019'%3ER%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="../shared/faw-design.css">
+  <link rel="stylesheet" href="css/style.css">
+  <script defer src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script defer src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+  <script defer src="../shared/firebase-config.js"></script>
+  <script defer src="../shared/faw-core.js"></script>
+  <script defer src="../shared/faw-net.js"></script>
+  <script defer src="../shared/faw-categorie-aggiunte.js"></script>
+  <script defer src="../shared/faw-categorie.js"></script>
+  <script defer src="../shared/faw-room.js"></script>
+  <script defer src="js/nomi-cose-citta.js"></script>
+  <script defer src="../shared/faw-lessico.js"></script>
+  <script defer src="../shared/faw-lessico-link.js"></script>
+  <script defer src="js/regole.js"></script>
+  <script defer src="js/scheda.js"></script>
+  <script defer src="js/partita.js"></script>
+</head>
+<body class="faw-scope" data-game="rush">
+  <a class="rush-skip" href="#main">Vai al gioco</a>
+  <header class="faw-topbar rush-topbar">
+    <a class="rush-brand" href="../../index.html" aria-label="Torna al portale FaW"><span aria-hidden="true">R</span></a>
+    <div class="rush-brand-name"><strong>Categoria <em>Rush</em></strong><small id="top-stato">Una pausa. Una sfida.</small></div>
+    <div class="rush-tools">
+      <button class="faw-btn faw-btn--icon" data-action="regole" aria-label="Regole del gioco">?</button>
+      <button class="faw-btn faw-btn--icon" data-action="tema" aria-label="Cambia tema chiaro o scuro">◐</button>
+    </div>
+  </header>
+  <div class="faw-banner rush-connection" id="conn" hidden role="status"><span aria-hidden="true">↻</span><span class="t"></span></div>
 
-		<div class="faw-banner" id="conn" hidden role="status">
-			<span aria-hidden="true">📡</span><span class="t faw-grow"></span>
-		</div>
+  <main class="faw-main" id="main">
+    <noscript><p>Attiva JavaScript per giocare a Categoria Rush.</p></noscript>
+    <section id="schermo-boot" class="faw-card rush-loading">
+      <span class="faw-spinner" id="boot-spinner" aria-hidden="true"></span>
+      <h1 id="boot-title">Prepariamo il tuo Rush</h1>
+      <p id="boot-msg" role="status">Collegamento alla sala…</p>
+      <div class="faw-btn-row"><button class="faw-btn faw-btn--primary" id="btn-riprova" hidden>Riprova</button><a class="faw-btn faw-btn--ghost" href="../../index.html">Torna al portale</a></div>
+    </section>
 
-		<main class="faw-main">
-			<!-- ============================ BOOT ============================ -->
-			<section id="schermo-boot" class="faw-card">
-				<div class="faw-state">
-					<span class="faw-spinner" aria-hidden="true"></span>
-					<p id="boot-msg">Preparazione partite…</p>
-					<div class="faw-btn-row">
-						<a class="faw-btn" href="../../index.html">← TORNA AL PORTALE</a>
-					</div>
-				</div>
-			</section>
+    <section id="schermo-crea" hidden>
+      <div class="rush-setup">
+        <div class="rush-intro">
+          <p class="rush-kicker"><span class="rush-check" aria-hidden="true"></span> <span id="crea-eyebrow">LA SFIDA DELLE IDEE VELOCI</span></p>
+          <h1>Stessa lettera.<br>Un’idea <em>diversa.</em></h1>
+          <p id="crea-descrizione">Una categoria, 26 secondi e una sola risposta. Trova quella che gli altri non hanno pensato.</p>
+          <div class="rush-poster" aria-hidden="true"><span class="rush-poster-letter">R</span><span class="rush-poster-time"><span id="stamp-number">26</span><small>SECONDI MAX</small></span><span class="rush-poster-caption">PENSA. SCRIVI. SORPRENDI.</span></div>
+          <div class="rush-facts"><span><b>2–8</b> giocatori</span><span><b>2–3 min</b> al massimo</span><span><b>0</b> attese di turno</span></div>
+        </div>
+        <div class="faw-card rush-settings">
+          <div class="faw-card__head"><h2>Il tuo prossimo Rush</h2><span class="faw-badge">01 / SETUP</span></div>
+          <fieldset class="rush-fieldset"><legend>Come vuoi giocare?</legend>
+            <div class="rush-modes" data-seg="mode">
+              <button class="rush-mode" type="button" data-v="classiche" aria-pressed="true"><span class="rush-mode-icon" aria-hidden="true">Aa</span><span><b>Sprint</b><small>Una risposta. Tutti pronti? Stop al tempo.</small></span><span class="rush-radio" aria-hidden="true"></span></button>
+              <button class="rush-mode" type="button" data-v="nomi-cose-citta" aria-pressed="false"><span class="rush-mode-icon rush-mode-grid" aria-hidden="true">▦</span><span><b>Nomi, Cose, Città</b><small>La scheda classica. Una lettera, più categorie.</small></span><span class="rush-radio" aria-hidden="true"></span></button>
+              <button class="rush-mode" type="button" data-v="creative" aria-pressed="false"><span class="rush-mode-icon" aria-hidden="true">✳</span><span><b>Creativo</b><small>Domande libere. Gli amici votano.</small></span><span class="rush-radio" aria-hidden="true"></span></button>
+            </div>
+          </fieldset>
+          <fieldset class="rush-fieldset"><legend>Quanto dura al massimo?</legend>
+            <div class="faw-seg" data-seg="durata"><button type="button" class="faw-seg__btn" data-v="120" aria-pressed="true">2 min <small>4 round</small></button><button type="button" class="faw-seg__btn" data-v="180" aria-pressed="false">3 min <small>6 round</small></button></div>
+          </fieldset>
+          <fieldset class="rush-fieldset" id="opzioni-ncc" hidden><legend>La tua scheda</legend>
+            <div class="faw-seg" data-seg="colonne"><button type="button" class="faw-seg__btn" data-v="3" aria-pressed="false">Essenziale <small>3 categorie</small></button><button type="button" class="faw-seg__btn" data-v="6" aria-pressed="true">Completa <small>6 categorie</small></button></div>
+            <p class="rush-footnote" id="ncc-categorie-hint"></p>
+          </fieldset>
+          <fieldset class="rush-fieldset"><legend>Posti nella sala</legend>
+            <div class="faw-seg rush-seats" data-seg="giocatori"><button type="button" class="faw-seg__btn" data-v="2" aria-pressed="true">2</button><button type="button" class="faw-seg__btn" data-v="3" aria-pressed="false">3</button><button type="button" class="faw-seg__btn" data-v="4" aria-pressed="false">4</button><button type="button" class="faw-seg__btn" data-v="6" aria-pressed="false">6</button><button type="button" class="faw-seg__btn" data-v="8" aria-pressed="false">8</button></div>
+          </fieldset>
+          <p class="rush-hint" id="crea-hint" role="status"></p>
+          <button class="faw-btn faw-btn--primary faw-btn--lg rush-cta" id="btn-crea-stanza">Crea e invita <span aria-hidden="true">↗</span></button>
+          <button class="faw-btn faw-btn--ghost" id="btn-solo">Prima mi alleno da solo →</button>
+          <p class="rush-footnote" id="solo-hint">L’allenamento è locale: nessun invito, nessuna attesa.</p>
+        </div>
+      </div>
+      <div class="rush-how" id="rush-how"><div><span>01</span><p><b>Trova una risposta</b>Animali con la C? Scegli bene: non c’è solo “cane”.</p></div><div><span>02</span><p><b>Inviala in tempo</b>Se è ammessa, è definitiva. Un errore? Puoi riprovare.</p></div><div><span>03</span><p><b>Fai la differenza</b>100 punti di base, fino a 40 per la velocità e 60 se sei l’unico.</p></div></div>
+    </section>
 
-			<!-- ======================= CREA / ALLENAMENTO ======================= -->
-			<section id="schermo-crea" class="faw-stack" hidden>
-				<div class="faw-card">
-					<div class="faw-card__head">
-						<h2>Nuovo rush</h2>
-						<span class="faw-badge faw-badge--acc">2–8 giocatori</span>
-					</div>
-					<p class="faw-dim">Stessa lettera e stessa categoria per tutti. Si risponde in contemporanea, una parola a round.</p>
+    <section id="schermo-lobby" class="rush-lobby faw-stack" hidden>
+      <div class="faw-card">
+        <p class="rush-kicker">AI BLOCCHI DI PARTENZA</p>
+        <div class="faw-card__head"><h1>La tua sala</h1><span class="faw-badge faw-badge--acc" id="lobby-count">0/2</span></div>
+        <p class="faw-dim" id="lobby-meta"></p>
+        <div class="rush-invite"><span>Condividi il link con i tuoi amici.<small>La partita parte quando tutti sono pronti.</small></span><button class="faw-btn" id="btn-copia-invito">Copia invito ↗</button></div>
+        <div class="faw-list" id="lobby-lista"></div>
+        <div class="faw-btn-row"><button class="faw-btn faw-btn--primary faw-btn--lg" id="btn-pronto" aria-pressed="false">Sono pronto</button><button class="faw-btn" id="btn-avvia-subito" hidden>Avvia ora</button></div>
+        <p class="rush-hint" id="lobby-hint"></p>
+        <div id="countdown" hidden><div class="rush-countdown" role="status"><span class="rush-countdown-number" id="countdown-num">3</span><span>Ci siamo. Pronto a pensare veloce?</span></div></div>
+      </div>
+      <button class="faw-btn faw-btn--ghost" id="btn-esci-lobby">← Esci dalla sala</button>
+    </section>
 
-					<div class="faw-field">
-						<span class="faw-field__label" id="lbl-durata">Durata</span>
-						<div class="faw-seg" role="group" aria-labelledby="lbl-durata" data-seg="durata">
-							<button type="button" class="faw-seg__btn" data-v="120" aria-pressed="true">2′ · 4 round</button>
-							<button type="button" class="faw-seg__btn" data-v="180" aria-pressed="false">3′ · 6 round</button>
-						</div>
-					</div>
+    <section id="schermo-gioco" hidden>
+      <div class="rush-game-heading"><div><p class="rush-kicker" id="game-mode">SPRINT</p><h1>Round <span id="round-n">1/4</span></h1></div><div class="rush-score"><span>I tuoi punti</span><b id="punti-solo">0</b></div></div>
+      <div class="rush-progress" id="round-progress" role="group" aria-label="Avanzamento della partita"></div>
+      <div class="rush-play-layout">
+        <div class="rush-play-main">
+          <div class="faw-card rush__domanda">
+            <div class="rush-phasebar"><div class="rush-phases" id="phase-steps"><span data-phase="input">01 Scrivi</span><span data-phase="voto" hidden>02 Vota</span><span data-phase="rivela">02 Confronta</span></div><div class="rush-clock"><span id="timer-label">Tempo rimasto</span><b id="timer" role="timer" aria-live="off">0:26</b></div></div>
+            <p class="rush-round-reason" id="round-reason" role="status" hidden></p>
+            <div class="rush__testa"><div class="rush__lettera" id="round-lettera" aria-hidden="true">—</div><div class="rush__cat"><span class="rush-kicker" id="round-category-label">LA CATEGORIA È</span><h2 id="round-categoria">—</h2><p id="round-aiuto">—</p></div></div>
+            <p class="faw-sr" id="round-sr" role="status" aria-live="polite"></p>
+            <div class="rush-timebar" aria-hidden="true"><i id="round-bar"></i></div>
+            <form class="rush__form" id="frm-risposta" autocomplete="off">
+              <label for="inp-risposta" id="answer-label">La tua risposta</label>
+              <div class="rush-answer-line"><input class="faw-input" id="inp-risposta" type="text" inputmode="text" enterkeyhint="send" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" maxlength="40" placeholder="La tua parola…" aria-describedby="feedback answer-hint"><button class="faw-btn faw-btn--primary" id="btn-invia" type="submit">Invia <span aria-hidden="true">↗</span></button></div>
+              <button class="rush-pass" id="btn-passo" type="button">Non la so: passo questo round</button>
+              <p id="answer-hint" class="rush-footnote">Una risposta definitiva. Le risposte degli altri restano nascoste fino allo stop.</p>
+            </form>
+            <form id="frm-scheda" class="ncc-sheet" autocomplete="off" hidden>
+              <div class="ncc-sheet-head"><h3>La tua scheda</h3><span id="scheda-progress">0/6 categorie complete</span></div>
+              <div class="ncc-progress" aria-hidden="true"><i id="scheda-count-bar"></i></div>
+              <div class="ncc-fields" id="scheda-fields"></div>
+              <div class="ncc-actions"><button type="submit" class="faw-btn faw-btn--primary" id="btn-scheda">Consegna scheda ↗</button><button type="button" class="faw-btn" id="btn-salva-scheda" hidden>Riprova salvataggio</button></div>
+              <p id="scheda-sync" class="rush-footnote" role="status"></p>
+              <p class="rush-footnote">Tutte complete? Il tuo Stop lascia al massimo 10 s agli altri. Tutti consegnati? Si confronta subito.</p>
+            </form>
+            <p class="rush__receipt" id="receipt" role="status" hidden></p>
+            <p class="rush__feedback" id="feedback" role="status"></p>
+            <div class="rush-response-status"><span id="chip-stato">Si scrive</span><span><b id="round-avanzati">0</b> risposte ricevute</span></div>
+            <div id="giocatori-stato" class="rush-players" aria-label="Stato dei giocatori"></div>
+          </div>
+          <div class="faw-banner" id="late-note" hidden role="status">Sei entrato in corsa: giochi il tempo rimasto. I round già conclusi non cambiano.</div>
+          <div class="faw-card rush__rivela" id="rivela" hidden>
+            <div class="faw-card__head"><div><p class="rush-kicker" id="rivela-conta"></p><h2 id="rivela-title">Le vostre risposte</h2></div><span class="rush-reveal-icon" aria-hidden="true">✳</span></div>
+            <p class="rush-hint" id="rivela-sub"></p>
+            <div class="ncc-tabs" id="ncc-review-tabs" role="group" aria-label="Categoria da confrontare" hidden></div>
+            <div class="rush-reveal-list" id="rivela-lista"></div>
+            <div id="box-voto" hidden><p class="rush-hint" id="voto-hint" role="status"></p><div class="faw-btn-row" id="voto-bottoni"></div><button class="rush-pass" type="button" id="btn-astieni">Mi astengo</button></div>
+            <div class="rush-next" id="box-avanti" hidden><span id="avanti-hint" class="rush-footnote"></span><button class="faw-btn" type="button" id="btn-avanti">Pronto, avanti ↗</button></div>
+          </div>
+          <details class="faw-card rush-alternatives" id="box-altre" hidden><summary>Altre risposte ammesse <span aria-hidden="true">+</span></summary><p class="rush__altre" id="altre"></p></details>
+        </div>
+        <aside class="rush-sidebar">
+          <div class="faw-card rush__rank"><div class="faw-card__head"><h2>La corsa</h2><span class="faw-badge faw-badge--ok">LIVE</span></div><p class="rush-footnote">La classifica si aggiorna a fine round.</p><ol class="faw-rank-list" id="classifica"></ol><p class="rush-hint" id="chip-inattivi" hidden></p></div>
+          <div class="rush-score-guide" id="score-guide"><p class="rush-kicker">OGNI RISPOSTA CONTA</p><div><b>100</b><span>Risposta ammessa</span></div><div><b>+40</b><span>Velocità · al massimo</span></div><div><b>+60</b><span>Originalità · se sei l’unico</span></div><p>Stessa risposta in due? +15 a testa. In tre o più, nessun bonus originalità.</p></div>
+          <div class="rush-score-guide" id="ncc-score-guide" hidden><p class="rush-kicker">PUNTI PER CATEGORIA</p><div><b>20</b><span>Solo tu hai una risposta valida</span></div><div><b>10</b><span>Valida e diversa dalle altre</span></div><div><b>5</b><span>La stessa risposta di un altro</span></div><div><b>0</b><span>Vuota o non valida</span></div><p>Niente bonus velocità. A parità di punti, è pareggio.</p></div>
+          <p class="rush-footnote" id="solo-note" hidden>Allenamento classico. Le alternative si sbloccano dopo l’invio o a tempo scaduto.</p>
+          <button class="faw-btn faw-btn--ghost" data-action="esci">Lascia la partita</button>
+        </aside>
+      </div>
+    </section>
 
-					<div class="faw-field">
-						<span class="faw-field__label" id="lbl-num">Posti in partita</span>
-						<div class="faw-seg" role="group" aria-labelledby="lbl-num" data-seg="giocatori">
-							<button type="button" class="faw-seg__btn" data-v="2" aria-pressed="true">2</button>
-							<button type="button" class="faw-seg__btn" data-v="3" aria-pressed="false">3</button>
-							<button type="button" class="faw-seg__btn" data-v="4" aria-pressed="false">4</button>
-							<button type="button" class="faw-seg__btn" data-v="6" aria-pressed="false">6</button>
-							<button type="button" class="faw-seg__btn" data-v="8" aria-pressed="false">8</button>
-						</div>
-					</div>
+    <section id="schermo-risultati" class="faw-stack rush-results" hidden>
+      <div class="rush-finish"><span class="rush-check" aria-hidden="true"></span><p class="rush-kicker">TRAGUARDO RAGGIUNTO</p><h1 id="ris-titolo">Che Rush!</h1><p id="ris-esito"></p></div>
+      <p id="ris-tempo" class="rush-saved-time" hidden></p>
+      <div class="rush-results-grid"><div class="faw-card"><h2>Classifica finale</h2><ol class="faw-rank-list" id="ris-classifica"></ol></div><div class="faw-card"><h2>Il tuo Rush</h2><div class="rush-stats" id="ris-stats"></div></div></div>
+      <div class="faw-card"><h2>Round per round</h2><div class="rush-roundi" id="ris-rounds"></div></div>
+      <div class="faw-btn-row rush-results-actions"><button class="faw-btn faw-btn--primary faw-btn--lg" id="btn-rivincita">Un altro Rush ↗</button><a class="faw-btn" href="../../index.html">Torna al portale</a></div>
+      <div class="faw-banner" id="box-rivincita" hidden role="status"><span class="faw-grow" id="box-rivincita-testo"></span><button class="faw-btn faw-btn--primary" id="btn-accetta-rivincita">Entra</button></div>
+    </section>
+  </main>
+  <div class="rush-footer" data-lessico-slot></div>
+  <footer class="rush-footer"><span>FaW / Piccole pause, grandi sfide.</span><button type="button" data-action="regole">Come si gioca ↗</button></footer>
 
-					<div class="faw-field">
-						<span class="faw-field__label" id="lbl-mode">Categorie</span>
-						<div class="faw-choices" role="group" aria-labelledby="lbl-mode" data-seg="mode">
-							<button type="button" class="faw-choice" data-v="classiche" aria-pressed="true">
-								<b>📚 Classifiche</b><small>Città, animali, cibi… con elenco di risposte ammesse</small>
-							</button>
-							<button type="button" class="faw-choice" data-v="creative" aria-pressed="false">
-								<b>🎨 Creative</b><small>Risposte libere, vale il voto dei giocatori</small>
-							</button>
-						</div>
-					</div>
-
-					<div class="faw-btn-row">
-						<button class="faw-btn faw-btn--primary faw-btn--lg" id="btn-crea-stanza">🏁 CREA E INVITA</button>
-						<button class="faw-btn" id="btn-solo">🎯 ALLENAMENTO SOLO</button>
-					</div>
-					<p class="faw-field__hint" id="crea-hint">Le domande nascono da un database locale di categorie con risposte ammesse: niente servizi esterni.</p>
-				</div>
-			</section>
-
-			<!-- ============================ LOBBY ============================ -->
-			<section id="schermo-lobby" class="faw-stack" hidden>
-				<div class="faw-card">
-					<div class="faw-card__head">
-						<h2>Lobby</h2>
-						<span class="faw-badge faw-badge--acc"><span id="lobby-count">0/2</span></span>
-					</div>
-					<p class="faw-dim" id="lobby-meta">—</p>
-					<div class="faw-list" id="lobby-lista"></div>
-					<div class="faw-btn-row">
-						<button class="faw-btn faw-btn--primary" id="btn-pronto" aria-pressed="false">✅ SONO PRONTO</button>
-					</div>
-					<div class="faw-btn-row">
-						<button class="faw-btn" id="btn-avvia-subito" hidden>▶️ AVVIA ORA</button>
-						<button class="faw-btn" id="btn-copia-invito">🔗 COPIA INVITO</button>
-					</div>
-					<div class="faw-banner" id="late-note" hidden>
-						<span aria-hidden="true">⏱️</span>
-						<span class="faw-grow">Sei entrato a partita in corso: i round già passati valgono zero, dal prossimo giochi come gli altri.</span>
-					</div>
-					<div id="countdown" hidden>
-						<div class="faw-count-box" role="status" aria-live="polite">
-							<span class="faw-count-num faw-num" id="countdown-num">5</span>
-							<span class="faw-caps">si parte</span>
-						</div>
-					</div>
-				</div>
-				<div class="faw-card faw-card--tight">
-					<p class="faw-dim2" style="font-size:.8rem">
-					 seme della partita <span class="faw-mono" id="lobby-seed">—</span>: da lui derivano lettera e categoria di ogni round,
-					 calcolati allo stesso modo su tutti i dispositivi.
-					</p>
-				</div>
-				<button class="faw-btn faw-btn--ghost" id="btn-esci-lobby">← Esci dalla lobby</button>
-			</section>
-
-			<!-- ============================ PARTITA ============================ -->
-			<section id="schermo-gioco" hidden>
-				<div class="rush">
-					<div class="faw-hud">
-						<span class="faw-chip"><b id="round-n">1/4</b> round</span>
-						<span class="faw-chip"><b id="round-avanzati">0</b> risposte</span>
-						<span class="faw-chip" id="chip-stato">in gioco</span>
-						<span class="faw-chip" id="chip-solo" hidden><b id="punti-solo">0</b> punti</span>
-						<span class="faw-chip is-avviso" id="chip-inattivi" hidden></span>
-					</div>
-
-					<div class="faw-card rush__domanda">
-						<div class="rush__testa">
-							<div class="rush__lettera" id="round-lettera" aria-hidden="true">—</div>
-							<div class="rush__cat">
-								<span class="faw-caps">Categoria</span>
-								<h2 id="round-categoria">—</h2>
-								<p class="faw-dim" id="round-aiuto">—</p>
-							</div>
-						</div>
-						<p class="faw-sr" id="round-sr" role="status" aria-live="polite"></p>
-						<div class="faw-bar" role="presentation"><i id="round-bar"></i></div>
-
-						<form class="rush__form" id="frm-risposta" autocomplete="off">
-							<label class="faw-sr" for="inp-risposta">La tua risposta</label>
-							<input class="faw-input" id="inp-risposta" type="text" inputmode="text" enterkeyhint="send"
-								autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false"
-								maxlength="40" placeholder="La tua parola…">
-							<button class="faw-btn faw-btn--primary" id="btn-invia" type="submit">INVIA</button>
-						</form>
-						<p class="rush__receipt" id="receipt" role="status" aria-live="polite" hidden></p>
-						<p class="rush__feedback" id="feedback"></p>
-					</div>
-
-					<div class="faw-card rush__rivela" id="rivela" hidden>
-						<div class="faw-card__head">
-							<h3>Che cosa hanno scritto</h3>
-							<span class="faw-badge" id="rivela-conta">—</span>
-						</div>
-						<div class="faw-list" id="rivela-lista"></div>
-					</div>
-
-					<div class="faw-card rush__rank">
-						<div class="faw-card__head">
-							<h3>In testa</h3>
-							<span class="faw-dim2" style="font-size:.72rem">punti · uniche</span>
-						</div>
-						<ol class="faw-rank-list" id="classifica"></ol>
-					</div>
-
-					<p class="faw-dim2 solo-note" id="solo-note" hidden>
-						Allenamento: nessun avversario, le stesse regole. Sotto trovi le altre risposte ammesse, per ripassare.
-					</p>
-					<div class="faw-card faw-card--tight" id="box-altre" hidden>
-						<span class="faw-caps">Altre risposte ammesse</span>
-						<p class="rush__altre" id="altre">—</p>
-					</div>
-				</div>
-			</section>
-
-			<!-- ============================ RISULTATI ============================ -->
-			<section id="schermo-risultati" class="faw-stack" hidden>
-				<div class="faw-card">
-					<div class="faw-card__head">
-						<h2 id="ris-titolo">Risultati</h2>
-						<span class="faw-badge faw-badge--acc" id="ris-esito">—</span>
-					</div>
-					<ol class="faw-rank-list" id="ris-classifica"></ol>
-				</div>
-				<div class="faw-card">
-					<h3>Il tuo rush</h3>
-					<div class="rush-stats" id="ris-stats"></div>
-					<div class="rush-roundi" id="ris-rounds"></div>
-				</div>
-				<div class="faw-btn-row">
-					<button class="faw-btn faw-btn--primary faw-btn--lg" id="btn-rivincita">🔁 RIVINCITA SUBITO</button>
-					<a class="faw-btn faw-btn--ghost" href="../../index.html">← HUB</a>
-				</div>
-				<div class="faw-banner" id="box-rivincita" hidden>
-					<span class="faw-grow" id="box-rivincita-testo">Ti è stata proposta una rivincita.</span>
-					<button class="faw-btn faw-btn--sm faw-btn--primary" id="btn-accetta-rivincita">ACCETTA E GIOCA</button>
-				</div>
-			</section>
-		</main>
-
-		<dialog class="faw-dialog" id="dlg-regole" aria-labelledby="dlg-regole-titolo">
-			<div class="faw-dialog__head">
-				<h2 id="dlg-regole-titolo">Come si gioca</h2>
-				<button class="faw-btn faw-btn--icon" data-action="chiudi-dialogo" aria-label="Chiudi">✕</button>
-			</div>
-			<ol class="faw-regole">
-				<li><b>Un round, una parola.</b> Tutti ricevono la stessa lettera e la stessa categoria: hai 26 secondi.</li>
-				<li><b>Validità.</b> La parola deve appartenere alla categoria (l'elenco è nel gioco, non serve internet) e iniziare con la lettera del round. Minimo 3 lettere.</li>
-				<li><b>Punteggi.</b> 100 punti se la risposta è valida, più un bonus velocità (fino a 40) e un bonus originalità: +60 se sei l'unico, +15 se siete in due, 0 se siete in tre o più.</li>
-				<li><b>Risposta definitiva.</b> Una sola risposta accettata per round: dopo l'invio non si cambia. Una risposta rifiutata invece non ti blocca: puoi riprovare finché c'è tempo.</li>
-				<li><b>Round chiusi.</b> I punti li decide chi chiude il round allo scadere dei 26 secondi; ciò che arriva dopo non conta (niente recuperi tardivi).</li>
-				<li><b>Pareggi.</b> A pari punti vince chi ha più risposte uniche; poi la media di risposta più rapida; infine l'ordine alfabetico.</li>
-				<li><b>Categorie creative.</b> Nella modalità creativa non esiste un elenco chiuso: le risposte sono giudicate a voto tra giocatori (1 voto a testa sul round). Non cambia nulla nelle partite classiche.</li>
-			</ol>
-			<p class="faw-dim2">Nota onesta: i controlli sono lato client. Il gioco è pensato per partite tra amici, non per tornei con premi.</p>
-			<div class="faw-btn-row">
-				<button class="faw-btn faw-btn--primary" data-action="chiudi-dialogo">GIOCA</button>
-			</div>
-		</dialog>
-	</body>
+  <dialog class="faw-dialog" id="dlg-regole" aria-labelledby="regole-title"><div class="faw-dialog__head"><h2 id="regole-title">Un minuto per capire Rush</h2><button class="faw-btn faw-btn--icon" data-action="chiudi-dialogo" aria-label="Chiudi le regole">×</button></div><div class="faw-dialog__body">
+    <ol class="faw-regole"><li><b>Sprint:</b> stessa lettera e categoria per tutti. Hai <b>al massimo 26 secondi</b> per inviare una risposta di almeno 3 caratteri. Accenti, maiuscole e varianti previste sono riconosciuti. Puoi anche scegliere <b>Passo</b> (zero punti). Quando tutti hanno consegnato, si passa subito al confronto.</li><li>Le categorie usano <b>elenchi locali, non esaustivi</b>. Se una risposta non è in elenco puoi riprovare finché c’è tempo. Nessuna penalità.</li><li>La prima risposta accettata è <b>definitiva</b>. Vale 100 punti, fino a 40 per la velocità, più 60 se unica, 15 se condivisa in due, 0 se in tre o più. I sinonimi previsti contano come la stessa risposta.</li><li><b>Creativo:</b> niente lettera, una domanda libera. Quando tutti consegnano, o al termine dei 26 secondi, hai fino a 7 secondi per votare un’altra risposta, una sola volta. 40 punti per partecipare, 100 per ogni voto ricevuto. Puoi astenerti. Se tutti votano o si astengono, il voto finisce subito; se non ci sono risposte da votare, la fase viene saltata. Servono almeno due giocatori; in due il voto è reciproco.</li><li><b>Nomi, Cose, Città:</b> una lettera e una scheda da 3 o 6 categorie, con 50 secondi massimi. I campi vengono salvati durante la compilazione. Consegna una scheda completa per dare lo <b>Stop</b>: restano al massimo 10 secondi agli altri. Le consegne parziali valgono; quando tutti consegnano si chiude subito. Allo scadere contano solo le risposte confermate dal salvataggio.</li><li><b>Punti NCC per categoria:</b> 20 se solo tu hai una risposta valida, 10 se è diversa, 5 se condivisa, 0 se vuota o errata. Niente bonus velocità o spareggi nascosti. Nomi maschili e femminili; città italiane ed estere, secondo gli elenchi locali.</li><li>A fine round si vedono le risposte e i punti. Il pulsante <b>Pronto, avanti</b> salta il resto del confronto quando tutti sono pronti. Altrimenti il gioco prosegue da solo. Chi non risponde prende zero, <b>senza bloccare gli altri</b>. Una risposta arrivata fuori tempo non vale nel round successivo.</li><li>Vince chi ha più punti. In NCC la parità di punti è pareggio. In Sprint e Creativo gli spareggi sono: più risposte uniche, poi minor tempo medio. Se coincidono, è pareggio. Non puoi riciclare la stessa risposta nei round classici successivi.</li></ol>
+    <p class="rush-hint">Sprint e NCC si possono allenare da soli con le stesse regole, senza scritture di partita in rete. La durata indicata è un massimo: le chiusure anticipate non riducono il numero di round.</p>
+  </div><div class="faw-dialog__foot"><button class="faw-btn faw-btn--primary" data-action="chiudi-dialogo">Pronto, si gioca</button></div></dialog>
+</body>
 </html>

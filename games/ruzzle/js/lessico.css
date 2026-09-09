@@ -1,0 +1,8 @@
+.faw-lessico-link { display: block; width: fit-content; margin: 8px 0 8px auto; padding: 12px 4px; color: var(--text); text-underline-offset: 4px; }
+#lessico-stato { font-size: .75rem; line-height: 1.5; color: var(--text); padding: 0 8px; }
+#ruzzle-analysis { width: min(440px, calc(100% - 44px)); max-height: 80dvh; border: 0; border-radius: 18px; padding: 24px; background: var(--card-bg, #fff); color: var(--text, #222); }
+#ruzzle-analysis::backdrop { background: #0009; }
+#ruzzle-analysis h2 { font-size: 1.5rem; margin: 0 0 16px; }
+#ruzzle-analysis p { line-height: 1.55; font-size: .9rem; }
+#analysis-words { padding-left: 22px; line-height: 2; }
+#ruzzle-analysis button { width: 100%; min-height: 48px; background: #246b9b; color: #fff; border: 0; border-radius: 10px; font: inherit; cursor: pointer; }

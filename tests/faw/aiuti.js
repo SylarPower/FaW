@@ -3,18 +3,21 @@
  * scoperta delle parole dalla griglia reale del gioco.
  */
 "use strict";
+const { test } = require("@playwright/test");
 
 /** Crea un contesto browser isolato (→ un "giocatore" indipendente). */
 async function contesto(browser, nome, opts) {
   opts = opts || {};
   const ctx = await browser.newContext({
-    viewport: opts.viewport || { width: 390, height: 844 },
+    viewport: opts.viewport || test.info().project.use.viewport || { width: 390, height: 844 },
     hasTouch: !!opts.touch,
     isMobile: !!opts.touch,
     reducedMotion: opts.reducedMotion ? "reduce" : "no-preference",
     offline: !!opts.offline
   });
+  await ctx.route(/https:\/\/(www\.gstatic\.com|fonts\.)/, route => route.abort());
   await ctx.addInitScript((n) => {
+    if (location.origin === "null") return; // about:blank non ha uno storage accessibile
     window.localStorage.setItem("faw:net:backend", "fake");
     window.localStorage.setItem("faw:net:relayUrl", window.location.origin);
     window.localStorage.setItem("mioNome", n);
@@ -55,42 +58,6 @@ async function leggiDoc(page, matchId) {
 
 async function scriviDoc(page, matchId, patch) {
   return page.evaluate(([id, p]) => FAWNet.update("partite/" + id, p), [matchId, patch]);
-}
-
-/**
- * Cerca una parola valida nella griglia mostrata e ritorna i centri delle celle
- * in coordinate viewport, così il test trascina davvero.
- */
-async function cercaParola(page, escludi, indiceScelta) {
-  return page.evaluate(({ skip, n }) => {
-    const st = window.FAWArena && window.FAWArena.stato;
-    if (!st || !st.letters) return null;
-    const size = st.size;
-    const letters = st.letters;
-    const found = FAWWords.solveGrid(letters, size, { limit: 3000, timeMs: 6000 });
-    const usable = found.filter((f) => !skip.includes(f.word) && f.path.length >= 4 && f.path.length <= 7);
-    if (!usable.length) return null;
-    usable.sort((a, b) => Math.abs(b.word.length - 6) - Math.abs(a.word.length - 6));
-    const best = usable[Math.min(n || 0, usable.length - 1)];
-    const grid = document.getElementById("griglia");
-    return {
-      word: best.word,
-      length: best.word.length,
-      points: best.path.map((i) => {
-        const r = grid.children[i].getBoundingClientRect();
-        return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) };
-      })
-    };
-  }, { skip: escludi || [], n: indiceScelta || 0 });
-}
-
-async function trascinaParola(page, parola) {
-  const pts = parola.points;
-  await page.mouse.move(pts[0].x, pts[0].y);
-  await page.mouse.down();
-  for (let i = 1; i < pts.length; i++) await page.mouse.move(pts[i].x, pts[i].y, { steps: 4 });
-  await page.mouse.up();
-  return parola.word;
 }
 
 /** Aspetta che lo stato del documento sia uno di quelli attesi. */
@@ -146,6 +113,17 @@ async function portaAvanti(page, matchId, dentroMs) {
   }, { id: matchId, dentro: dentroMs });
 }
 
+/** Solo test: sposta l'orologio usando la timeline ADATTIVA, non indice × ciclo. */
+async function portaFaseRush(page, matchId, indice, fase) {
+  await page.evaluate(({ id, indice, fase }) => FAWNet.transact("partite/" + id, cur => {
+    const p = FAWRushRules.tempiPartita(cur)[indice];
+    const offset = fase === "rivela" ? p.fineVoto + Math.min(500, p.confrontoMs / 2)
+      : fase === "voto" ? p.fineInput + Math.min(500, p.votoMs / 2) : p.inizio + Math.min(500, p.scritturaMs / 2);
+    return { startAt: Math.round(FAWNet.clock() - offset) };
+  }), { id: matchId, indice, fase });
+  await page.waitForFunction(({ indice, fase }) => FAWRush.stato.idx === indice && FAWRush.stato.fase === fase, { indice, fase });
+}
+
 /**
  * Aspetta che il client veda il round davvero aperto nel documento (dopo uno
  * spostamento di `startAt` i due possono essere sfasati di qualche centinaio di ms).
@@ -155,9 +133,7 @@ async function attendiRound(page) {
     const st = window.FAWRush.stato;
     const d = st.data;
     if (!d || !window.FAWRushRules) return st.idx >= 0;
-    const f = window.FAWRushRules.faseRound(d.startAt || 0, window.FAWNet.clock(), {
-      rounds: st.rounds.length, modale: st.modale
-    });
+    const f = window.FAWRushRules.fasePartita(d, window.FAWNet.clock());
     return f.fase === "input" && f.indice === st.idx;
   }, null, { timeout: 15000 });
   return page.evaluate(() => window.FAWRush.stato.idx);
@@ -166,11 +142,6 @@ async function attendiRound(page) {
 /** Manda la risposta dalla UI (tap sul pulsante) e aspetta la ricevuta. */
 async function rispondi(page, parola) {
   await attendiRound(page);
-  await page.evaluate(() => {
-    const i = document.getElementById("inp-risposta");
-    i.disabled = false;
-    document.getElementById("btn-invia").disabled = false;
-  });
   await page.fill("#inp-risposta", parola);
   await page.click("#btn-invia");
   await page.waitForTimeout(250);
@@ -182,4 +153,4 @@ async function resetRelay() {
   try { await fetch(base + "/api/reset", { method: "POST" }); } catch (e) { /* relay non raggiungibile: il test fallirà da solo */ }
 }
 
-module.exports = { resetRelay, contesto, apri, creaPartita, leggiDoc, scriviDoc, cercaParola, trascinaParola, aspettaStato, aspetto, rispostaValida, portaAvanti, rispondi, attendiRound };
+module.exports = { portaFaseRush, resetRelay, contesto, apri, creaPartita, leggiDoc, scriviDoc, aspettaStato, aspetto, rispostaValida, portaAvanti, rispondi, attendiRound };

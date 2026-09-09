@@ -6,9 +6,6 @@
 <meta name="theme-color" content="#07070c">
 <meta name="description" content="La Bomba delle Parole: passa la bomba con una parola che contiene la sequenza mostrata. 2–6 giocatori, partite da 2–4 minuti.">
 <title>La Bomba delle Parole — Fun at Work</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300..700&family=IBM+Plex+Sans:wght@300..700&family=IBM+Plex+Mono:wght@400;600&display=swap">
 <link rel="stylesheet" href="../shared/faw-design.css">
 <link rel="stylesheet" href="css/style.css">
 </head>
@@ -21,7 +18,6 @@
     <small id="top-stato">in avvio…</small>
   </div>
   <div class="faw-topbar__actions">
-    <button class="faw-btn faw-btn--icon" id="btn-audio" type="button" aria-pressed="true" title="Ticchettio della miccia">🔊</button>
     <button class="faw-btn faw-btn--icon" id="btn-regole" type="button" aria-label="Come si gioca">?</button>
   </div>
 </header>
@@ -38,7 +34,7 @@
   </section>
 
   <!-- ------------------------------- crea ------------------------------- -->
-  <section id="schermo-crea" class="faw-screen">
+  <section id="schermo-crea" class="faw-screen" hidden>
     <div class="faw-card">
       <p class="faw-eyebrow">Nuova sala</p>
       <h1 class="faw-title">Quanto è lunga la miccia?</h1>
@@ -60,12 +56,13 @@
         <input type="checkbox" id="chk-countdown" checked>
         <span>
           <strong>3·2·1 prima di iniziare</strong>
-          <small>Se sei da solo puoi partire subito.</small>
+          <small>Disattiva il countdown per partire appena tutti sono pronti.</small>
         </span>
       </label>
 
       <div class="bomba__actions">
         <button class="faw-btn faw-btn--primary faw-btn--lg" id="btn-crea" type="button">Crea sala</button>
+        <button class="faw-btn faw-btn--ghost faw-btn--lg" id="btn-solo" type="button">Allenamento solo</button>
         <button class="faw-btn faw-btn--ghost faw-btn--lg" id="btn-coda" type="button">Coda istantanea</button>
       </div>
     </div>
@@ -76,7 +73,7 @@
         <div class="faw-field">
           <label for="inp-code">Codice sala</label>
           <input class="faw-input" id="inp-code" type="text" inputmode="text" autocomplete="off"
-                 autocapitalize="characters" spellcheck="false" placeholder="es. 4K7QZX" maxlength="12">
+                 autocapitalize="none" spellcheck="false" placeholder="Codice o link dell’invito" maxlength="500">
         </div>
         <button class="faw-btn faw-btn--ghost faw-btn--lg" id="btn-unisciti" type="button">Entra</button>
       </div>
@@ -85,7 +82,7 @@
   </section>
 
   <!-- ------------------------------- lobby ------------------------------ -->
-  <section id="schermo-lobby" class="faw-screen">
+  <section id="schermo-lobby" class="faw-screen" hidden>
     <div class="faw-card">
       <div class="bomba__lobby-head">
         <div>
@@ -103,12 +100,12 @@
         <button class="faw-btn faw-btn--primary faw-btn--lg" id="btn-pronto" type="button" aria-pressed="false">Sono pronto</button>
         <button class="faw-btn faw-btn--ghost faw-btn--lg" id="btn-regole-lobby" type="button">Regole</button>
       </div>
-      <p class="faw-hint" id="lobby-hint">Si parte quando siete pronti (o quando il codice scade il countdown).</p>
+      <p class="faw-hint" id="lobby-hint">Si parte quando ci sono almeno due giocatori pronti.</p>
     </div>
   </section>
 
   <!-- ------------------------------- gioco ------------------------------ -->
-  <section id="schermo-gioco" class="faw-screen">
+  <section id="schermo-gioco" class="faw-screen" hidden>
     <div class="faw-hud">
       <span class="faw-hud__item" id="hud-round">Round 1</span>
       <span class="faw-hud__item" id="hud-partite">1/2</span>
@@ -170,7 +167,7 @@
   </section>
 
   <!-- ----------------------------- risultati ---------------------------- -->
-  <section id="schermo-risultati" class="faw-screen">
+  <section id="schermo-risultati" class="faw-screen" hidden>
     <div class="faw-card bomba__esito">
       <div class="bomba__boom" id="ris-fx" aria-hidden="true">💥</div>
       <h1 class="faw-display faw-display--m" id="ris-titolo">Partita finita</h1>
@@ -193,35 +190,41 @@
   </section>
 
   <p class="faw-disconnected" id="chip-conn" hidden>
-    <span>Connessione persa: si torna da soli, nessuna parola va persa.</span>
+    <span>Connessione interrotta. La miccia continua: il passaggio vale solo dopo la conferma.</span>
   </p>
 </main>
+<div class="faw-main" data-lessico-slot></div>
 
 <!-- ------------------------------ regole ------------------------------ -->
-<dialog id="dlg-regole" class="faw-dialog">
+<dialog id="dlg-regole" class="faw-dialog" aria-labelledby="regole-title">
   <div class="faw-dialog__inner">
     <p class="faw-eyebrow">La Bomba delle Parole</p>
-    <h2 class="faw-title">Come si gioca</h2>
+    <h2 class="faw-title" id="regole-title">Come si gioca</h2>
     <ol class="faw-regole">
       <li><b>Chi ha la bomba</b> deve scrivere una parola italiana che <b>contenga la sequenza</b> mostrata (con <code>TRA</code> valgono <code>STRADA</code> e <code>TRAMONTINA</code>, non <code>RETE</code>).</li>
       <li>Parola accettata = <b>bomba passata</b> al giocatore successivo, <b>+10 punti</b> (+5 se la parola è di 8 lettere o più).</li>
       <li>La miccia <b>non si azzera</b> quando la bomba passa: il round dura sempre lo stesso tempo, per tutti.</li>
       <li>Parola <b>non valida</b> (non italiana, senza sequenza, già detta) = la bomba <b>non passa</b>. Puoi riprovare subito, non perdi punti.</li>
       <li>Se esplode tra le mani: <b>-100</b>. Si resta in gioco e si ricomincia un round; le parole già dette restano vietate per tutta la partita.</li>
-      <li>Il <b>tempo residuo non è scritto</b>: barra, colore e icona dicono quanto è corta la miccia (il ticchettio è un extra, puoi spegnerlo).</li>
+      <li>Il <b>tempo residuo non è scritto</b>: barra, colore e icona dicono quanto è corta la miccia.</li>
       <li>Se qualcuno <b>è offline</b> la bomba passa oltre da solo: nessun blocco per il gruppo.</li>
       <li>Finisce allo scadere del tempo scelto o alla <b>terza esplosione totale</b>: vince chi ha più punti (a pari punti: meno esplosioni).</li>
     </ol>
-    <p class="faw-hint">Niente panico: la parola può stare ovunque nella frase, l'importante è che contenga la sequenza.</p>
+    <p class="faw-hint">La sequenza può trovarsi all’inizio, al centro o alla fine della parola. Scrivi una sola parola, di almeno 4 lettere.</p>
     <div class="faw-dialog__actions">
       <button class="faw-btn faw-btn--primary" id="btn-regole-close" type="button">Ho capito</button>
     </div>
   </div>
 </dialog>
 
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<script src="../shared/firebase-config.js"></script>
 <script src="../shared/faw-core.js"></script>
 <script src="../shared/faw-words.js"></script>
 <script src="../shared/faw-net.js"></script>
+<script src="../shared/faw-lessico.js"></script>
+<script src="../shared/faw-lessico-link.js"></script>
 <script src="../shared/faw-room.js"></script>
 <script src="js/regole.js"></script>
 <script src="js/partita.js"></script>

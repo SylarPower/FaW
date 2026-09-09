@@ -1,0 +1,151 @@
+{
+  "base": "2026-09-09",
+  "dizionario": 286303,
+  "bomba": 286301,
+  "categorie": [
+    {
+      "ambito": "sprint-citta",
+      "gruppo": "Sprint",
+      "nome": "Città",
+      "voci": 187,
+      "canoniche": 186,
+      "lettereConQuattro": "ABCEFGILMNOPRSTV"
+    },
+    {
+      "ambito": "sprint-animali",
+      "gruppo": "Sprint",
+      "nome": "Animali",
+      "voci": 201,
+      "canoniche": 179,
+      "lettereConQuattro": "ABCDFGILMNOPRSTV"
+    },
+    {
+      "ambito": "sprint-cibo",
+      "gruppo": "Sprint",
+      "nome": "Cibo",
+      "voci": 155,
+      "canoniche": 144,
+      "lettereConQuattro": "ABCFGLMOPRSTVZ"
+    },
+    {
+      "ambito": "sprint-ufficio",
+      "gruppo": "Sprint",
+      "nome": "In ufficio",
+      "voci": 85,
+      "canoniche": 76,
+      "lettereConQuattro": "ACFLMPST"
+    },
+    {
+      "ambito": "sprint-nomi_f",
+      "gruppo": "Sprint",
+      "nome": "Nomi femminili",
+      "voci": 176,
+      "canoniche": 172,
+      "lettereConQuattro": "ABCDEFGILMNOPRSTV"
+    },
+    {
+      "ambito": "sprint-nomi_m",
+      "gruppo": "Sprint",
+      "nome": "Nomi maschili",
+      "voci": 153,
+      "canoniche": 149,
+      "lettereConQuattro": "ACDEFGILMNOPRSUV"
+    },
+    {
+      "ambito": "sprint-sport",
+      "gruppo": "Sprint",
+      "nome": "Sport",
+      "voci": 75,
+      "canoniche": 69,
+      "lettereConQuattro": "ABCKPST"
+    },
+    {
+      "ambito": "sprint-bevande",
+      "gruppo": "Sprint",
+      "nome": "Bevande",
+      "voci": 71,
+      "canoniche": 66,
+      "lettereConQuattro": "ABCGLMS"
+    },
+    {
+      "ambito": "sprint-strumenti",
+      "gruppo": "Sprint",
+      "nome": "Strumenti musicali",
+      "voci": 61,
+      "canoniche": 54,
+      "lettereConQuattro": "BCMOTV"
+    },
+    {
+      "ambito": "sprint-mestieri",
+      "gruppo": "Sprint",
+      "nome": "Mestieri",
+      "voci": 145,
+      "canoniche": 121,
+      "lettereConQuattro": "ABCDEFGILMNOPRST"
+    },
+    {
+      "ambito": "sprint-casa",
+      "gruppo": "Sprint",
+      "nome": "In casa",
+      "voci": 96,
+      "canoniche": 93,
+      "lettereConQuattro": "ABCFLMPST"
+    },
+    {
+      "ambito": "sprint-trasporti",
+      "gruppo": "Sprint",
+      "nome": "Trasporti",
+      "voci": 62,
+      "canoniche": 56,
+      "lettereConQuattro": "ABMST"
+    },
+    {
+      "ambito": "ncc-nomi",
+      "gruppo": "Nomi, Cose, Città",
+      "nome": "Nomi",
+      "voci": 333,
+      "canoniche": 333,
+      "lettereConQuattro": "ABCDEFGILMNOPRSTUVZ"
+    },
+    {
+      "ambito": "ncc-cose",
+      "gruppo": "Nomi, Cose, Città",
+      "nome": "Cose",
+      "voci": 340,
+      "canoniche": 312,
+      "lettereConQuattro": "ABCDEFGILMNOPRSTVZ"
+    },
+    {
+      "ambito": "ncc-citta",
+      "gruppo": "Nomi, Cose, Città",
+      "nome": "Città",
+      "voci": 269,
+      "canoniche": 259,
+      "lettereConQuattro": "ABCDEFGIJLMNOPRSTV"
+    },
+    {
+      "ambito": "ncc-animali",
+      "gruppo": "Nomi, Cose, Città",
+      "nome": "Animali",
+      "voci": 201,
+      "canoniche": 179,
+      "lettereConQuattro": "ABCDFGILMNOPRSTV"
+    },
+    {
+      "ambito": "ncc-mestieri",
+      "gruppo": "Nomi, Cose, Città",
+      "nome": "Mestieri",
+      "voci": 147,
+      "canoniche": 123,
+      "lettereConQuattro": "ABCDEFGILMNOPRST"
+    },
+    {
+      "ambito": "ncc-frutta",
+      "gruppo": "Nomi, Cose, Città",
+      "nome": "Frutta",
+      "voci": 68,
+      "canoniche": 52,
+      "lettereConQuattro": "ACFLMP"
+    }
+  ]
+}

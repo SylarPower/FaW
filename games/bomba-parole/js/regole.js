@@ -2,9 +2,8 @@
  * La Bomba delle Parole — regole pure (nessun DOM, nessun network).
  *
  * La bomba passa di mano con una parola italiana che CONTIENE la sequenza
- * mostrata (TR → STRADA e TRAMONTO valgono, TRENO no perché la sequenza c'è ma
- * TRENO… no: TRENO contiene TR, quindi vale; ciò che NON vale è una parola senza
- * TR come RETE). Regola unica: `parola.indexOf(sequenza) >= 0`.
+ * mostrata: con TRA valgono STRADA e TRAMONTO, non RETE.
+ * Regola unica: `parola.indexOf(sequenza) >= 0`.
  *
  * Miccia: un solo orologio. `round.inizioAlle` (tempo del server) + `micciaMs`:
  * il passaggio NON azzera mai la miccia, quindi il tempo totale del round è noto
@@ -64,7 +63,8 @@
     ROUND_SUPERATO: "Round cambiato: riprova con la nuova sequenza.",
     ROUND_NON_PRONTO: "Aspetta l'inizio del round.",
     PARTITA_NON_IN_GIOCO: "La partita non è in corso.",
-    PARTITA_NON_TROVATA: "Partita non trovata."
+    PARTITA_NON_TROVATA: "Partita non trovata.",
+    NON_PARTECIPANTE: "Non sei tra i giocatori di questa sala."
   };
   function motivoTesto(m, seq) {
     var t = MOTIVI[m];
@@ -103,6 +103,10 @@
     if (!round) return 0;
     return Math.max(0, (round.inizioAlle || 0) + (round.micciaMs || 0) - (oraMs || 0));
   }
+  function roundValido(round) {
+    return !!round && /^[A-Z]{2,3}$/.test(round.seq || "") && Number.isFinite(round.inizioAlle) &&
+      Number.isFinite(round.micciaMs) && round.inizioAlle >= 0 && round.micciaMs > 0;
+  }
   function esplodeAlle(round) { return round ? (round.inizioAlle || 0) + (round.micciaMs || 0) : 0; }
 
   /* ------------------------------ sequenze -------------------------------- */
@@ -121,9 +125,9 @@
     var d = diz();
     var cfgSeq = CFG.seq[diff] || CFG.seq.media;
     var rng = opts.rng || (global.FAWCore ? global.FAWCore.rngFrom(seed + ":bomba:" + roundIdx) : Math.random);
-    if (!d || !d.sampleSequences) return { seq: "ARE", count: 0, fallback: true };
+    if (!d || !d.isDictionaryReady()) throw new Error("Dizionario non caricato");
     var cand = d.sampleSequences({
-      len: cfgSeq.len, minWords: cfgSeq.minWords, maxWords: cfgSeq.maxWords, size: 18, rng: rng
+      len: cfgSeq.len, minWords: cfgSeq.minWords, maxWords: cfgSeq.maxWords, minLen: CFG.minLen, maxLen: CFG.maxLen, size: 18, rng: rng, exclude: opts.escluse || []
     });
     var escluse = opts.escluse || [];
     var scelta = null;
@@ -133,7 +137,7 @@
       var c = cand[(inizio + i) % n];
       if (escluse.indexOf(c.seq) < 0) { scelta = c; break; }
     }
-    if (!scelta) scelta = cand[0] || { seq: "ARE", count: 0 };
+    if (!scelta) throw new Error("Nessuna sequenza disponibile per questa difficoltà");
     return { seq: scelta.seq, count: scelta.count || 0 };
   }
 
@@ -166,7 +170,8 @@
     if (seq && w.indexOf(norm(seq)) < 0) return { ok: false, motivo: "SENZA_SEQUENZA", parola: w };
     var lista = usate || [];
     for (var i = 0; i < lista.length; i++) if (lista[i] === w) return { ok: false, motivo: "GIÀ_USATA", parola: w };
-    if (d && d.isWord && !d.isWord(w)) return { ok: false, motivo: "NON_TROVATA", parola: w };
+    if (!d || !d.isDictionaryReady || !d.isDictionaryReady()) return { ok: false, motivo: "DIZIONARIO_ASSENTE", parola: w };
+    if (d && d.isWord && !d.isWord(w, opts.lessico)) return { ok: false, motivo: "NON_TROVATA", parola: w };
     if (!d || !d.isWord) return { ok: false, motivo: "DIZIONARIO_ASSENTE", parola: w };
     return { ok: true, parola: w, punti: CFG.puntiParola + (w.length >= CFG.lenLunga ? CFG.puntiLunga : 0) };
   }
@@ -182,14 +187,16 @@
     opts = opts || {};
     function no(motivo) { return { ok: false, motivo: motivo }; }
     if (!cur) return no("PARTITA_NON_TROVATA");
+    if ((cur.partecipanti || []).indexOf(me) < 0) return no("NON_PARTECIPANTE");
     var b = cur.bomba || {};
     var round = b.round || null;
     if (cur.stato !== "in_corso" && !(cur.stato === "pronto" && (cur.startAt || 0) <= (opts.ora || 0))) return no("PARTITA_NON_IN_GIOCO");
-    if (!round) return no("ROUND_NON_PRONTO");
+    if (!roundValido(round) || !Number.isFinite(opts.ora) || opts.ora < round.inizioAlle) return no("ROUND_NON_PRONTO");
+    if (cur.endsAt && opts.ora >= cur.endsAt) return no("FUORI_TEMPO");
     if (b.roundIdx != null && opts.roundIdx != null && opts.roundIdx !== b.roundIdx) return no("ROUND_SUPERATO");
     if (b.possessore !== me) return no("NON_TUOI");
     if (opts.ora >= esplodeAlle(round)) return no("FUORI_TEMPO");
-    var v = valutaParola(opts.testo, round.seq, b.usate || [], opts);
+    var v = valutaParola(opts.testo, round.seq, b.usate || [], Object.assign({}, opts, { lessico: cur.lessico }));
     if (!v.ok) return no(v.motivo);
     return { ok: true, parola: v.parola, punti: v.punti, round: round, t: Math.round(opts.ora - (round.inizioAlle || 0)) };
   }
@@ -235,9 +242,13 @@
    * verdetto dipende dal tempo condiviso, non dal client.
    */
   function patchEsplosione(cur, opts) {
+    opts = opts || {};
+    if (!Number.isFinite(opts.ora) || !cur || !cur.bomba || !roundValido(cur.bomba.round) || opts.ora < esplodeAlle(cur.bomba.round) || ["in_corso", "pronto"].indexOf(cur.stato) < 0) return false;
+    if (cur.endsAt && cur.endsAt < esplodeAlle(cur.bomba.round)) return false;
     var b = cur.bomba || {};
     var round = b.round || {};
     var vittima = b.possessore;
+    if ((cur.partecipanti || []).indexOf(vittima) < 0) return false;
     var esplosioni = Object.assign({}, b.esplosioni || {});
     if (vittima) esplosioni[vittima] = (esplosioni[vittima] || 0) + 1;
     var totEsp = Object.keys(esplosioni).reduce(function (a, k) { return a + esplosioni[k]; }, 0);
@@ -254,6 +265,9 @@
       patch.stato = "conclusa";
       patch.finito = (cur.partecipanti || []).slice();
       patch["bomba.finitaPer"] = opts.ora >= (cur.endsAt || Infinity) ? "tempo" : (totEsp >= (cur.maxEsplosioni || CFG.esplosioniMax) ? "esplosioni" : "round");
+      // L'ultima esplosione salva ANCHE i risultati, inclusa la penalità appena applicata.
+      var finale = applica(cur, patch);
+      Object.assign(patch, patchRisultati(finale, opts.ora, finale.bomba.finitaPer));
       return { patch: patch, finita: true };
     }
     var seq = scegliSequenza(cur.seed || "SEED", (b.roundIdx || 0) + 1, b.difficolta || "media", {
@@ -273,9 +287,10 @@
   /** Il possessore è offline da troppo tempo? La bomba passa senza colpevoli. */
   function puoAutoPassare(cur, me, opts) {
     opts = opts || {};
-    if (!cur || !cur.bomba || !cur.bomba.possessore) return false;
+    if (!cur || !cur.bomba || !cur.bomba.possessore || (cur.partecipanti || []).indexOf(me) < 0) return false;
     if (cur.stato !== "in_corso") return false;
     var b = cur.bomba, round = b.round || {};
+    if (!roundValido(round) || !Number.isFinite(opts.ora) || opts.ora < round.inizioAlle || (cur.endsAt && opts.ora >= cur.endsAt)) return false;
     if (opts.ora >= esplodeAlle(round)) return false;         // troppo tardi: esplode e basta
     var det = ((cur.giocatori || {})[b.possessore] || {});
     var visto = det.visto || 0;
@@ -321,7 +336,7 @@
       };
     });
     var conteggio = contaParole(b.storico);
-    out.forEach(function (r) { r.parole = conteggio[r.nome] || 0; });
+    out.forEach(function (r) { r.parole = (b.passaggi || {})[r.nome] == null ? (conteggio[r.nome] || 0) : b.passaggi[r.nome]; });
     out.sort(function (a, b2) {
       if (b2.punti !== a.punti) return b2.punti - a.punti;
       if (a.esplosioni !== b2.esplosioni) return a.esplosioni - b2.esplosioni;
@@ -357,11 +372,36 @@
     return r.da + " ha passato «" + r.w + "» +" + r.p;
   }
 
+  function applica(cur, patch) {
+    var next = JSON.parse(JSON.stringify(cur));
+    Object.keys(patch).forEach(function (path) {
+      var keys = path.split("."), o = next;
+      for (var i = 0; i < keys.length - 1; i++) o = o[keys[i]] || (o[keys[i]] = {});
+      o[keys[keys.length - 1]] = patch[path];
+    });
+    return next;
+  }
+
+  function patchRisultati(cur, ora, motivo) {
+    var b = cur.bomba || {}, cls = classifica(cur.punteggi, b);
+    return { stato: "conclusa", finito: (cur.partecipanti || []).slice(), "bomba.finitaPer": motivo,
+      risultati: { gioco: "bomba-parole", classifica: cls, esito: esito(cls), punteggiFinale: cur.punteggi || {},
+        parole: b.usate || [], round: (b.roundIdx || 0) + 1, finePer: motivo, endAt: ora } };
+  }
+
+  function patchFineTempo(cur, ora) {
+    if (!cur || ["in_corso", "pronto"].indexOf(cur.stato) < 0 || !Number.isFinite(ora) || !Number.isFinite(cur.endsAt) || ora < cur.endsAt) return false;
+    // Se la miccia scade prima del tempo partita, va risolta prima l'esplosione.
+    if (cur.bomba && roundValido(cur.bomba.round) && esplodeAlle(cur.bomba.round) <= cur.endsAt) return false;
+    return patchRisultati(cur, ora, "tempo");
+  }
+
   function chi(o) { return o ? Object.keys(o) : []; }
 
   return {
+    patchFineTempo: patchFineTempo, patchRisultati: patchRisultati,
     CFG: CFG, MOTIVI: MOTIVI, norm: norm, motivoTesto: motivoTesto,
-    statoMiccia: statoMiccia, rimastoMs: rimastoMs, esplodeAlle: esplodeAlle,
+    roundValido: roundValido, statoMiccia: statoMiccia, rimastoMs: rimastoMs, esplodeAlle: esplodeAlle,
     scegliSequenza: scegliSequenza, ampiezzaSequenza: ampiezzaSequenza,
     valutaParola: valutaParola, puoPassare: puoPassare,
     patchPassaggio: patchPassaggio, patchEsplosione: patchEsplosione, dopo: dopo,

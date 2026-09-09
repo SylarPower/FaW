@@ -28,7 +28,7 @@
     diff: "media", micciaMs: CFG.micciaMs.media,
     roundIdx: -1, roundVisto: -1, inGioco: false, t0: 0,
     durataMs: 180000, datiLocali: null, esplosoRound: -1, liv: -1,
-    audioOn: true, ultimoTickAudio: 0, tentativiPasso: 0, chiusa: false,
+    tentativiPasso: 0, chiusa: false, pending: null, serial: 0, retryAt: 0,
     busy: CORE ? CORE.onceGuard(400) : function () { return true; }
   };
 
@@ -50,15 +50,17 @@
     // difficoltà: campo del gioco → cfg scritto da chi crea → opzioni dell'hub
     var diff = b.difficolta || ((cur.cfg || {}).bomba || {}).difficolta || ((cur.opzioni || {}).miccia) || stato.diff;
     var micciaMs = b.micciaMs || ((cur.cfg || {}).bomba || {}).micciaMs || CFG.micciaMs[diff] || CFG.micciaMs.media;
-    var idx = b.roundIdx == null ? 0 : b.roundIdx;
+    if (!Number.isFinite(micciaMs) || micciaMs <= 0) micciaMs = CFG.micciaMs[diff] || CFG.micciaMs.media;
+    var idx = Number.isInteger(b.roundIdx) && b.roundIdx >= 0 ? b.roundIdx : 0;
     var rr = Object.assign({}, b.round || {});
-    if (!rr.seq) {
+    if (!/^[A-Z]{2,3}$/.test(rr.seq || "")) {
       var s = R.scegliSequenza(cur.seed || "SEED", idx, diff, { escluse: b.sequences || [] });
       rr.seq = s.seq; rr.possibili = s.count;
     }
     var inizio = Math.max(ora(), (cur.startAt || 0) + 200);
     rr.i = idx; rr.inizioAlle = inizio; rr.micciaMs = micciaMs;
-    var poss = b.possessore || cur.host || cur.creator || (cur.partecipanti || [])[0] || stato.me;
+    var nomi = cur.partecipanti || [];
+    var poss = nomi.indexOf(b.possessore) >= 0 ? b.possessore : (nomi.indexOf(cur.host) >= 0 ? cur.host : nomi[0]);
     var patch = {
       stato: "in_corso",
       "bomba.difficolta": diff,
@@ -85,13 +87,13 @@
 
   function avvio() {
     CORE.initTheme();
-    CORE.armaSuoni();
     stato.me = CORE.user() || "OSPITE";
     var dUrl = CORE.qs("durata"), mic = CORE.qs("miccia");
     if (dUrl === "120" || dUrl === "180" || dUrl === "240") stato.durataScelta = parseInt(dUrl, 10);
     if (CFG.micciaMs[mic]) stato.diff = mic;
     stato.micciaMs = CFG.micciaMs[stato.diff];
-    preparaSequenze();
+    NET.init({ backend: "auto" });
+    bindRegole();
 
     var matchId = CORE.qs("matchId");
     if (!matchId) {
@@ -127,6 +129,7 @@
         }
         return;
       }
+      preparaSequenze();
       fn();
     }
     if (!WORDS) { fine(new Error("FAWWords non disponibile")); return; }
@@ -143,7 +146,7 @@
     // volta sola per sessione e resta dentro il turno di caricamento)
     if (!WORDS || !WORDS.sampleSequences) return;
     var c = CFG.seq[stato.diff] || CFG.seq.media;
-    try { WORDS.sampleSequences({ len: c.len, minWords: c.minWords, maxWords: c.maxWords, size: 18 }); } catch (e) {}
+    try { WORDS.sampleSequences({ len: c.len, minWords: c.minWords, maxWords: c.maxWords, size: 18, minLen: CFG.minLen, maxLen: CFG.maxLen }); } catch (e) {}
   }
 
   function mostra(quale) {
@@ -152,18 +155,21 @@
       var n = $(mappa[k]);
       if (n) n.hidden = k !== quale;
     });
+    if (document.body.getAttribute("data-schermo") !== quale) global.scrollTo(0, 0);
     document.body.setAttribute("data-schermo", quale);
   }
 
   /* --------------------------------- sala -------------------------------- */
 
   function collegati() {
+    if (stato.room) stato.room.stop();
     mostra("lobby");
     NET.init({ backend: "auto" });
     stato.room = ROOM.open({ matchId: stato.matchId, nome: stato.me, net: NET });
     stato.room.on({
-      state: function (d) { unisciti(d); onStato(d); },
-      gone: function () { CORE.toast("Partita terminata o rimossa", "warn", 4000); },
+      state: function (d) { if (!d) return; if (d.gioco !== GIOCO) { erroreSala("Questo invito è per un altro gioco. Torna al portale."); return; } unisciti(d); if (!stato._accessDenied) onStato(d); },
+      gone: function () { erroreSala("Invito non disponibile: la sala è stata rimossa o il codice non è corretto."); },
+      error: function () { if (!stato.data) erroreSala("Non riesco a caricare la sala. Controlla la connessione e riprova."); },
       status: function (s) {
         var b = el("chip-sospeso");
         if (b) b.hidden = s === "online";
@@ -172,34 +178,63 @@
         if (c) c.hidden = s === "online";
       }
     });
-    stato.room.start();
+    try { stato.room.start(); } catch (e) { erroreSala("Connessione non disponibile. Ricarica la pagina o torna al portale."); return; }
     stato.room.startWatchdog(function () { watchdog(); }, 2000);
     avviaTicking();
     bindGioco();
   }
 
+  function erroreSala(testo) {
+    stato.inGioco = false;
+    if (stato.room) stato.room.stop();
+    clearInterval(stato.tick);
+    mostra("boot");
+    var box = document.querySelector("#schermo-boot .faw-card");
+    box.innerHTML = '<h1 class="faw-title">Sala non disponibile</h1><p>' + esc(testo) + '</p><div class="bomba__actions"><button class="faw-btn" type="button" id="btn-riprova-sala">Riprova</button><a class="faw-btn" href="../../index.html">Torna al portale</a></div>';
+    $("btn-riprova-sala").addEventListener("click", function () { location.reload(); });
+  }
+
+  function scrivi(mutate) {
+    var serial = stato.serial;
+    return NET.transact(stato.room.path, mutate).then(function (res) {
+      if (res.applied && serial === stato.serial) onStato(res.data);
+      return res;
+    });
+  }
+
   function unisciti(d) {
     if (!d || stato._join) return;
     if ((d.partecipanti || []).indexOf(stato.me) >= 0) { stato._join = true; return; }
-    if (d.stato === "conclusa" || d.stato === "annullata") {
+    if (ROOM.isStale(d) || ["attesa", "pronto", "in_corso"].indexOf(d.stato) < 0) {
+      stato._accessDenied = true;
+      erroreSala("Questa sala non è più aperta. Crea una nuova sfida dal portale.");
       stato._join = true;
       CORE.toast("Partita già chiusa: crea una nuova sfida dall’hub", "warn", 4000);
       return;
     }
     if ((d.partecipanti || []).length >= (d.maxGiocatori || 6)) {
+      stato._accessDenied = true;
+      erroreSala("Posti esauriti in questa sala.");
       stato._join = true;
       CORE.toast("Posti esauriti in questa partita", "warn", 4000);
       return;
     }
+    if (!CORE.user()) { stato._accessDenied = true; erroreSala("Accedi dal portale per entrare nella sala."); return; }
     stato._join = true;
-    stato.room.addPlayer(stato.me).catch(function () {
-      CORE.toast("Ingresso non riuscito: ricarica la pagina", "error", 4000);
+    stato.room.addPlayer(stato.me).then(function (res) {
+      if (!res.data || (res.data.partecipanti || []).indexOf(stato.me) < 0) {
+        stato._accessDenied = true; erroreSala("Non è stato possibile entrare: la sala è piena o è terminata.");
+      }
+    }).catch(function () {
+      stato._accessDenied = true; erroreSala("Ingresso non riuscito. Controlla la connessione e riprova.");
     });
   }
 
   function onStato(d) {
     if (!d) return;
+    WORDS.setPublication(d.lessico || {});
     stato.data = d;
+    stato.serial++;
     // la difficoltà la decide chi crea (dal banner dell'hub o dalla sala): il
     // documento ha sempre l'ultima parola, così tutti giocano la stessa partita
     var sceltaDoc = ((d.opzioni || {}).miccia) || ((d.cfg || {}).bomba || {}).difficolta || (d.bomba || {}).difficolta;
@@ -208,7 +243,10 @@
       stato.micciaMs = (d.bomba || {}).micciaMs || ((d.cfg || {}).bomba || {}).micciaMs || CFG.micciaMs[sceltaDoc];
     }
     var s = d.stato;
+    if (s === "attesa" && ROOM.isStale(d)) { erroreSala("Questo invito è scaduto. Crea una nuova sala dal portale."); return; }
+    if (s === "annullata") { erroreSala("La partita è stata annullata. Puoi creare una nuova sfida dal portale."); return; }
     if (s === "attesa") {
+      $("top-stato").textContent = "sala d’attesa";
       mostra("lobby");
       renderLobby(d);
       return;
@@ -221,7 +259,7 @@
       else $("top-stato").textContent = d.bomba && d.bomba.possessore ? "in corso" : "in corso";
       return;
     }
-    if (s === "conclusa" || s === "annullata") {
+    if (s === "conclusa" || s === "risultati") {
       stato.inGioco = false;
       mostra("risultati");
       renderRisultati(d);
@@ -267,6 +305,10 @@
     $("miccia-hint").textContent = hintDifficolta(stato.diff);
     var bCrea = $("btn-crea");
     if (bCrea) bCrea.addEventListener("click", function () { creaStanza(bCrea); });
+    $("btn-solo").addEventListener("click", function () {
+      stato.durataScelta = parseInt($("sel-durata").value, 10);
+      avviaSolo();
+    });
     var bCoda = $("btn-coda");
     if (bCoda) bCoda.addEventListener("click", function () { entraInCoda(bCoda); });
     var bU = $("btn-unisciti");
@@ -274,7 +316,7 @@
     var inp = $("inp-code");
     if (inp) inp.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); entraCodice(); } });
     bindRegole();
-    bindAudio();
+
   }
 
   function bindRegole() {
@@ -291,8 +333,9 @@
   }
 
   function creaStanza(btn) {
+    if (btn.disabled) return;
+    if (!CORE.user()) { CORE.toast("Accedi dal portale per creare una sala, oppure scegli Allenamento solo.", "warn", 4500); return; }
     btn.disabled = true;
-    var durata = (parseInt(($("sel-durata") || {}).value, 10) || crea.durata) * 1000;
     var durata = (parseInt(($("sel-durata") || {}).value, 10) || crea.durata) * 1000;
     ROOM.create({
       gioco: GIOCO,
@@ -301,7 +344,7 @@
       maxGiocatori: 6,
       durata: durata,
       opzioni: {
-        durata: String(Math.round(durata / 1000)), miccia: stato.diff, countdown: $("chk-countdown").checked ? 5 : 0
+        durata: String(Math.round(durata / 1000)), miccia: stato.diff, countdown: $("chk-countdown").checked ? 3 : 0
       },
       cfg: { bomba: { difficolta: stato.diff, micciaMs: CFG.micciaMs[stato.diff], esplosioniMax: CFG.esplosioniMax } }
     }).then(function (id) {
@@ -317,45 +360,48 @@
   }
 
   function entraCodice() {
-    var v = ($("inp-code").value || "").trim().toUpperCase().replace(/[^A-Z0-9_-]/g, "");
-    if (!v) { CORE.toast("Inserisci il codice sala", "warn"); return; }
-    var b = $("btn-unisciti");
-    if (b) b.disabled = true;
-    // il codice coincide con l’id della sala: si verifica che esista e sia aperta
-    NET.get("partite/" + v).then(function (data) {
-      if (!data) { CORE.toast("Nessuna sala con questo codice", "error", 3500); return; }
-      if (data.stato === "conclusa" || data.stato === "annullata") { CORE.toast("Quella partita è già finita", "warn", 3500); return; }
+    var v = ($("inp-code").value || "").trim();
+    try { if (/^https?:\/\//i.test(v)) v = new URL(v).searchParams.get("matchId") || ""; } catch (e) { v = ""; }
+    // Gli id Firestore sono case-sensitive e possono superare i 12 caratteri.
+    if (!/^[A-Za-z0-9_-]{1,128}$/.test(v)) { CORE.toast("Inserisci il codice completo o il link dell’invito.", "warn"); return; }
+    var btn = $("btn-unisciti"); if (btn.disabled) return; btn.disabled = true;
+    NET.get("partite/" + v).then(function (snap) {
+      var data = snap.data;
+      if (!snap.exists || !data || data.gioco !== GIOCO) { CORE.toast("Nessuna sala Bomba con questo codice.", "warn"); return; }
+      if (ROOM.isStale(data) || ["attesa", "pronto", "in_corso"].indexOf(data.stato) < 0) { CORE.toast("Questa partita è già finita o l’invito è scaduto.", "warn"); return; }
+      if ((data.partecipanti || []).indexOf(stato.me) < 0 && data.partecipanti.length >= (data.maxGiocatori || 6)) { CORE.toast("La sala è al completo.", "warn"); return; }
       location.href = "index.html?matchId=" + encodeURIComponent(v);
-    }).catch(function () { CORE.toast("Controllo fallito: riprova", "error", 3000); })
-      .then(function () { if (b) b.disabled = false; });
+    }).catch(function () { CORE.toast("Controllo non riuscito. Riprova.", "warn"); })
+      .finally(function () { btn.disabled = false; });
   }
 
   function entraInCoda(btn) {
-    if (stato._coda) { CORE.toast("Ricerca già in corso…", "warn"); return; }
-    btn.disabled = true;
-    stato._coda = true;
-    var cerca = NET.onCol("partite", [
-      { field: "gioco", op: "==", value: GIOCO },
-      { field: "stato", op: "in", value: ["attesa"] }
-    ], function (docs) {
-      var aperta = (docs || []).filter(function (d) {
-        var x = d.data || {};
-        return (x.partecipanti || []).length < (x.maxGiocatori || 6) && (x.partecipanti || []).indexOf(stato.me) < 0;
-      }).sort(function (a, b) { return (b.data.createdAt || 0) - (a.data.createdAt || 0); })[0];
-      if (!aperta) {
-        CORE.toast("Nessuna sala aperta: creane una, si entra anche dal tuo codice", "warn", 3500);
-        return;
-      }
-      cerca && cerca();
-      location.href = "index.html?matchId=" + encodeURIComponent(aperta.id);
+    if (stato._coda) return;
+    if (!CORE.user()) { CORE.toast("Accedi dal portale per unirti agli altri, oppure prova da solo.", "warn", 4000); return; }
+    btn.disabled = true; stato._coda = true;
+    CORE.toast("Cerco una sala aperta…", "", 1800);
+    NET.ready().then(function () {
+      var cerca = NET.onCol("partite", [{ field: "gioco", op: "==", value: GIOCO }], function (docs) {
+        if (!stato._coda) return;
+        var aperta = (docs || []).filter(function (d) {
+          var x = d.data || {};
+          return x.stato === "attesa" && !ROOM.isStale(x) && (x.partecipanti || []).length < (x.maxGiocatori || 6) && (x.partecipanti || []).indexOf(stato.me) < 0;
+        }).sort(function (a, b) { return b.data.createdAt - a.data.createdAt; })[0];
+        if (!aperta) return;
+        stato._codaFatto = true; stato._coda = false;
+        if (cerca) cerca();
+        location.href = "index.html?matchId=" + encodeURIComponent(aperta.id);
+      });
+      stato.stopCoda = cerca;
+      stato.codaTimer = setTimeout(function () {
+        if (!stato._coda) return;
+        stato._coda = false; btn.disabled = false; cerca();
+        CORE.toast("Nessuna sala aperta. Creane una e invita un amico.", "warn", 3500);
+      }, 4000);
+    }).catch(function () {
+      stato._coda = false; btn.disabled = false;
+      CORE.toast("Ricerca non riuscita. Controlla la connessione e riprova.", "warn", 4000);
     });
-    setTimeout(function () {
-      if (!stato._codaFatto) {
-        stato._coda = false;
-        btn.disabled = false;
-        cerca && cerca();
-      }
-    }, 4000);
   }
 
   /* -------------------------------- lobby -------------------------------- */
@@ -375,7 +421,7 @@
     }).join("");
     var max = d.maxGiocatori || 6;
     $("lobby-hint").textContent = nomi.length + "/" + max + " giocatori · miccia " +
-      Math.round(((d.cfg || {}).bomba || {}).micciaMs || stato.micciaMs) / 1000 + " s · si parte quando siete pronti";
+      Math.round((((d.cfg || {}).bomba || {}).micciaMs || stato.micciaMs) / 1000) + " s · " + (nomi.length < 2 ? "invita almeno un amico per iniziare" : "si parte quando siete pronti");
     var b = $("btn-pronto");
     if (b) {
       var sonPronto = pronti.indexOf(stato.me) >= 0;
@@ -400,10 +446,7 @@
           stato.room.maybeStart({ forza: true, nome: stato.me }).catch(function () { CORE.toast("Avvio non riuscito: riprova", "error"); });
           return;
         }
-        if (tot === 1) {
-          stato.room.maybeStart({ forza: true, nome: stato.me }).catch(function () { CORE.toast("Avvio non riuscito", "error"); });
-          return;
-        }
+        if (tot === 1) { CORE.toast("Invita un amico: in sala servono almeno due giocatori.", "warn"); return; }
         CORE.toast("Aspetta che anche gli altri premano «Sono pronto»", "warn", 3000);
       });
       $("btn-regole-lobby").addEventListener("click", apriRegole);
@@ -425,13 +468,13 @@
     if (frm) frm.addEventListener("submit", function (e) { e.preventDefault(); passa(); });
     var inp = $("inp-parola");
     if (inp) {
-      CORE.keepInputVisible(inp, 260);
+      inp.addEventListener("focus", function () { CORE.keepInputVisible(inp, 180); });
       inp.addEventListener("input", function () {
-        if (!stato.busy("fb")) mostraFeedback("", false);
+        if (!stato.pending) mostraFeedback("", false);
       });
     }
     bindRegole();
-    bindAudio();
+
   }
 
   function apriRegole() {
@@ -441,25 +484,6 @@
     else d.setAttribute("open", "");
     var c = $("btn-regole-close");
     if (c) setTimeout(function () { c.focus(); }, 30);
-  }
-
-  function bindAudio() {
-    var b = $("btn-audio");
-    if (!b || b._b) return;
-    b._b = true;
-    var aggiorna = function () {
-      var on = CORE.soundOn();
-      b.textContent = on ? "🔊" : "🔇";
-      b.setAttribute("aria-pressed", String(!!on));
-      b.title = on ? "Ticchettio della miccia: attivo" : "Ticchettio della miccia: disattivo";
-    };
-    b._update = aggiorna;
-    aggiorna();
-    b.addEventListener("click", function () {
-      CORE.setSoundOn(!CORE.soundOn());
-      aggiorna();
-      CORE.toast(CORE.soundOn() ? "Ticchettio attivo" : "Ticchettio spento (la barra resta identica)", "ok", 2200);
-    });
   }
 
   function render(d) {
@@ -499,15 +523,24 @@
     var poss = b.possessore;
     var mio = poss === stato.me;
     var inp = $("inp-parola"), btn = $("btn-passa");
-    var nonAncora = d.stato === "pronto" || (d.startAt || 0) > ora();
-    inp.disabled = nonAncora;
-    btn.disabled = nonAncora || !mio;
-    btn.textContent = nonAncora ? "…" : (mio ? "Passa" : "Non è la tua mano");
-    inp.placeholder = mio ? "parola con «" + ((b.round || {}).seq || "") + "»" : "Scrivi pure, poi invii quando arriva a te";
-    if (!mio && !nonAncora) {
-      $("attesa-k").textContent = "Aspetta";
+    var r = b.round || {};
+    var pausa = !!r.inizioAlle && ora() < r.inizioAlle;
+    var nonAncora = d.stato === "pronto" || !r.inizioAlle || pausa;
+    var scaduta = !R.roundValido(r) || r.inizioAlle && (ora() >= R.esplodeAlle(r) || (d.endsAt && ora() >= d.endsAt));
+    inp.disabled = !!nonAncora || !!scaduta;
+    inp.readOnly = !!stato.pending;
+    btn.disabled = !!nonAncora || !!scaduta || !mio || !!stato.pending;
+    btn.textContent = nonAncora ? "Aspetta…" : stato.pending ? "Invio…" : mio ? "Passa" : "Aspetta il turno";
+    inp.placeholder = mio ? "Parola con «" + (r.seq || "") + "»" : "Prepara la tua parola…";
+    if (pausa) {
+      $("attesa-k").textContent = "Nuovo round tra";
+      $("attesa-n").textContent = String(Math.ceil((r.inizioAlle - ora()) / 1000));
+      $("attesa-t").textContent = "La miccia riparte tra poco";
+      $("box-attesa").hidden = false;
+    } else if (!mio && !nonAncora) {
+      $("attesa-k").textContent = "Il turno di";
       $("attesa-n").textContent = "💣";
-      $("attesa-t").textContent = (poss || "?") + " ha la bomba" + (((b.esplosioni || {})[poss] || 0) ? " · " + b.esplosioni[poss] + " esplosioni" : "");
+      $("attesa-t").textContent = (poss || "?") + " · puoi già preparare la parola";
       $("box-attesa").hidden = false;
     } else $("box-attesa").hidden = true;
     var label = $("holder-fx");
@@ -516,7 +549,7 @@
 
   function renderLista(d) {
     var b = d.bomba || {};
-    var parole = R.contaParole(b.storico);
+    var parole = b.passaggi || R.contaParole(b.storico);
     $("bomba-lista").innerHTML = (d.partecipanti || []).map(function (n) {
       var e = (b.esplosioni || {})[n] || 0;
       var p = ((d.punteggi || {})[n] || 0);
@@ -543,6 +576,7 @@
   }
 
   function onNuovoRound(b) {
+    if (stato.pending) { clearTimeout(stato.retryTimer); stato.pending = null; }
     var inp = $("inp-parola");
     if (inp) { inp.value = ""; inp.disabled = false; }
     var btn = $("btn-passa");
@@ -570,54 +604,49 @@
   /* ------------------------------- passaggio ------------------------------ */
 
   function passa() {
+    if (stato.pending || !stato.data) return;
     if (stato.solo) { passaSolo(); return; }
-    var inp = $("inp-parola");
-    var testo = (inp.value || "").trim();
-    if (!testo) { mostraFeedback("Scrivi una parola.", true); return; }
-    var d = stato.data || {};
-    var b = d.bomba || {};
-    // verifica locale immediata (stesse regole pure), poi la ri-applico in transazione
-    var v = R.valutaParola(testo, (b.round || {}).seq, b.usate || []);
-    if (!v.ok) { rifiuto(v.motivo, (b.round || {}).seq); return; }
-    stato._puntiAttesi = v.punti;
-    if (b.possessore !== stato.me) { rifiuto("NON_TUOI"); return; }
-    var roundAttivo = b.round || {};
-    if (ora() >= R.esplodeAlle(roundAttivo)) { rifiuto("FUORI_TEMPO"); return; }
-
-    var me = stato.me, roundIdx = b.roundIdx || 0;
-    var tent = stato.tentativiPasso;
-    NET.transact(stato.room.path, function (cur) {
-      if (!cur) return false;
-      var ok = R.puoPassare(cur, me, { ora: ora(), testo: testo, roundIdx: roundIdx });
-      if (!ok.ok) { stato._rifiuto = ok.motivo; return false; }
-      var eff = R.patchPassaggio(cur, me, ok, { ora: ora(), attivi: attivi(cur) });
-      stato._appunto = eff;
+    var b = stato.data.bomba || {};
+    var request = { testo: $("inp-parola").value.trim(), roundIdx: b.roundIdx, tentativi: 0 };
+    var local = R.puoPassare(stato.data, stato.me, { ora: ora(), testo: request.testo, roundIdx: request.roundIdx });
+    if (!local.ok) { rifiuto(local.motivo, (b.round || {}).seq); return; }
+    request.parola = local.parola;
+    stato.pending = request;
+    renderTurno(stato.data);
+    tentaPassaggio(request);
+  }
+  function tentaPassaggio(request) {
+    if (stato.pending !== request) return;
+    request.tentativi++;
+    var motivo = null, punti = 0, prossimo = null;
+    scrivi(function (cur) {
+      var v = R.puoPassare(cur, stato.me, { ora: ora(), testo: request.testo, roundIdx: request.roundIdx });
+      if (!v.ok) { motivo = v.motivo; return false; }
+      var eff = R.patchPassaggio(cur, stato.me, v, { ora: ora(), attivi: attivi(cur) });
+      punti = v.punti; prossimo = eff.prossimo;
       return eff.patch;
     }).then(function (res) {
-      if (res && res.applied) {
-        stato.tentativiPasso = 0;
-        var app = stato._appunto || {};
-        CORE.beep("ok");
-        CORE.vibrate(12);
-        mostraFeedback("Passata a " + (app.prossimo || (b.possessore === stato.me ? "?" : "chi tocca")) + " (+" + (stato._puntiAttesi || CFG.puntiParola) + ")", false);
-        inp.value = "";
-        var chip = $("chip-sospeso");
-        if (chip) chip.hidden = true;
+      if (stato.pending !== request) return;
+      stato.pending = null;
+      var confermata = res.applied || (((res.data || {}).bomba || {}).storico || []).some(function (r) { return r.r === request.roundIdx && r.da === stato.me && r.w === request.parola; });
+      if (confermata) { CORE.vibrate(12);
+        $("inp-parola").value = "";
+        mostraFeedback("Passaggio confermato" + (prossimo ? " → " + prossimo : "") + (punti ? " (+" + punti + ")" : ""), false);
+      } else rifiuto(motivo || "FUORI_TEMPO", ((stato.data.bomba || {}).round || {}).seq);
+      renderTurno(stato.data);
+    }).catch(function (err) {
+      if (stato.pending !== request) return;
+      var b = stato.data.bomba || {};
+      if (request.tentativi < 3 && b.roundIdx === request.roundIdx && ora() < R.esplodeAlle(b.round) && err.code !== "permission-denied") {
+        mostraFeedback("Invio in attesa di conferma. Riprovo " + request.tentativi + "/3: la miccia continua.", true);
+        stato.retryTimer = setTimeout(function () { tentaPassaggio(request); }, 600 * request.tentativi);
       } else {
-        rifiuto(String(stato._rifiuto || "FUORI_TEMPO"), (((stato.data || {}).bomba || {}).round || {}).seq);
+        stato.pending = null; renderTurno(stato.data);
+        mostraFeedback("Passaggio non confermato. Riprova se hai ancora la bomba.", true);
       }
-    }).catch(function () {
-      if ((stato.tentativiPasso += 1) <= 3) {
-        mostraFeedback("Invio in sospeso: riprovo (" + stato.tentativiPasso + "/3)", true);
-        setTimeout(passa, 400 * stato.tentativiPasso);
-        return;
-      }
-      mostraFeedback("Non arrivato: riprova a inviare (nessun punto perso).", true);
-      stato.tentativiPasso = 0;
     });
   }
   function rifiuto(motivo, seq) {
-    CORE.beep("nope");
     CORE.vibrate([14, 40, 14]);
     var t = R.motivoTesto(motivo, seq) || "Parola non accettata.";
     mostraFeedback(t, true);
@@ -644,16 +673,16 @@
 
   function tick() {
     var d = stato.data;
-    if (!d) return;
+    if (!d || ["pronto", "in_corso"].indexOf(d.stato) < 0 || (!stato.solo && (d.partecipanti || []).indexOf(stato.me) < 0)) return;
     var b = d.bomba || {};
     var r = b.round || null;
     // countdown di inizio partita: chi arriva primo apre il round (transazione idempotente)
-    if (d.stato === "pronto" && (d.startAt || 0) <= ora() && !stato._passato && !stato.solo) {
+    if (d.stato === "pronto" && (d.startAt || 0) <= ora() && !stato._passato && !stato.solo && ora() >= stato.retryAt) {
       stato._passato = true;
-      NET.transact(stato.room.path, function (cur) {
+      scrivi(function (cur) {
         if (!cur || cur.stato !== "pronto" || (cur.startAt || 0) > ora()) return false;
         return inizializzaRound(cur, "avvio");
-      }).then(function (res) { if (res && res.applied) mostra("gioco"); }).catch(function () { stato._passato = false; });
+      }).catch(function () { stato.retryAt = ora() + 1500; }).finally(function () { stato._passato = false; });
     }
     if (d.stato === "pronto") {
       var rest = Math.max(0, Math.ceil(((d.startAt || 0) - ora()) / 1000));
@@ -664,15 +693,18 @@
       $("hud-tempo").textContent = CORE.fmtTime(Math.max(0, ((d.endsAt || 0) - ora()) / 1000));
       return;
     }
-    if ((!r || !r.inizioAlle) && d.stato === "in_corso" && !stato.solo && !stato._fixRound) {
+    if (!R.roundValido(r) && d.stato === "in_corso" && !stato.solo && !stato._fixRound && ora() >= stato.retryAt) {
       stato._fixRound = true;
-      NET.transact(stato.room.path, function (cur) {
-        if (!cur || cur.stato !== "in_corso" || ((cur.bomba || {}).round || {}).inizioAlle) return false;
+      scrivi(function (cur) {
+        if (!cur || cur.stato !== "in_corso" || R.roundValido((cur.bomba || {}).round)) return false;
         return inizializzaRound(cur, "riavvio");
-      }).catch(function () { stato._fixRound = false; });
+      }).catch(function () { stato.retryAt = ora() + 1500; }).finally(function () { stato._fixRound = false; });
       return;
     }
-    if (!r || !r.inizioAlle) return;
+    if (!R.roundValido(r)) return;
+    renderTurno(d);
+    if (d.endsAt && ora() >= d.endsAt && d.endsAt < R.esplodeAlle(r)) { chiudiPerTempo(); return; }
+    if (ora() < r.inizioAlle) return;
     var trascorso = ora() - (r.inizioAlle || 0);
     var micciaMs = r.micciaMs || stato.micciaMs;
     var m = R.statoMiccia(trascorso, micciaMs);
@@ -687,53 +719,28 @@
       if (m.livello >= 4 && m.livello !== 5) CORE.vibrate(8);
     }
     $("hud-tempo").textContent = CORE.fmtTime(Math.max(0, ((d.endsAt || 0) - ora()) / 1000));
-    audioMiccia(m);
-    if (m.esplosa && stato.esplosoRound !== b.roundIdx) {
-      stato.esplosoRound = b.roundIdx;
+    if (m.esplosa && stato.esplosoRound !== b.roundIdx && ora() >= stato.retryAt) {
       esplodi();
       return;
     }
     if (stato.inGioco && (d.endsAt || 0) <= ora() && !stato.chiusa) chiudiPerTempo();
   }
 
-  /** ticchettio: extra, non indispensabile; la stessa info resta visiva */
-  function audioMiccia(m) {
-    if (!CORE.soundOn() || !stato.inGioco || document.hidden) return;
-    var ogni = Math.max(140, 620 - m.livello * 100);
-    var t = Date.now();
-    if (t - stato.ultimoTickAudio < ogni) return;
-    stato.ultimoTickAudio = t;
-    CORE.beep(300 + m.livello * 70, 22, 0.02);
-  }
-
   function esplodi() {
+    if (stato._esplodendo || !stato.data || !round() || ora() < R.esplodeAlle(round())) return;
     if (stato.solo) { esplodiSolo(); return; }
-    var b = (stato.data || {}).bomba || {};
-    var idx = b.roundIdx || 0;
-    stato.room.resolveOnce("bomba:espl:" + idx, function (cur) {
-      var bb = (cur || {}).bomba || {};
-      var rr = bb.round || {};
-      if (ora() < R.esplodeAlle(rr)) return false;             // non è ancora il momento
-      if (bb.roundIdx !== idx) return false;                    // qualcun altro è già andato avanti
-      if (cur.stato !== "in_corso" && cur.stato !== "pronto") return false;
-      var out = R.patchEsplosione(cur, { ora: ora(), attivi: attivi(cur), rng: null });
-      var patch = out.patch;
-      if (out.finita) patch.stato = "conclusa";
-      if (cur.stato === "pronto") patch.stato = cur.stato;      // non forzarlo, ci pensa maybeStart
-      return patch;
+    var b = stato.data.bomba || {}, idx = b.roundIdx, vittima = b.possessore;
+    stato._esplodendo = true;
+    scrivi(function (cur) {
+      if (!cur || (cur.bomba || {}).roundIdx !== idx) return false;
+      var result = R.patchEsplosione(cur, { ora: ora(), attivi: attivi(cur) });
+      return result ? result.patch : false;
     }).then(function (res) {
-      if (!res || !res.applied) return;
-      var vittime = ((stato.data || {}).bomba || {}).possessore;
-      CORE.beep("boom");
-      CORE.vibrate([30, 60, 30, 60, 80]);
-      if (!CORE.reducedMotion()) {
-        var h = $("bomba-hero");
-        h.classList.add("trema");
-        setTimeout(function () { h.classList.remove("trema"); }, 1200);
-      }
-      $("holder-fx").textContent = "💥";
-      CORE.toast("💥 " + (vittime === stato.me ? "Sei stato tu!" : vittime + " è rimasto con la bomba") + " −100", "warn", 3000);
-    }).catch(function () {});
+      if (!res.applied) return;
+      stato.esplosoRound = idx; CORE.vibrate([30, 60, 30]);
+      CORE.toast("💥 " + (vittima === stato.me ? "La bomba è esplosa nelle tue mani" : vittima + " ha la bomba") + " · −100 punti", "warn", 3000);
+    }).catch(function () { stato.retryAt = ora() + 1500; })
+      .finally(function () { stato._esplodendo = false; });
   }
 
   /** il possessore offline non blocca il giro */
@@ -744,9 +751,9 @@
     var holder = b.possessore;
     if (!holder) return;
     if (!R.puoAutoPassare(d, stato.me, { ora: ora() })) return;
-    var chiave = "bomba:auto:" + (b.roundIdx || 0) + ":" + holder;
+    var chiave = "bomba:auto:" + (b.roundIdx || 0) + ":" + holder + ":" + Math.round(b.ultimoPasso || 0);
     stato.room.resolveOnce(chiave, function (cur) {
-      if (!R.puoAutoPassare(cur, cur.host, { ora: ora() })) return false;
+      if (!cur || (cur.bomba || {}).possessore !== holder || (cur.bomba || {}).roundIdx !== b.roundIdx || !R.puoAutoPassare(cur, stato.me, { ora: ora() })) return false;
       var out = R.patchAutoPassaggio(cur, { ora: ora(), attivi: attivi(cur) });
       if (!out.prossimo || out.prossimo === ((cur.bomba || {}).possessore)) return false;
       return out.patch;
@@ -761,46 +768,20 @@
 
   function chiudiPerTempo() {
     if (stato.solo) { chiudiSolo(); return; }
+    if (stato.chiusa || ora() < stato.retryAt) return;
     stato.chiusa = true;
-    var b = (stato.data || {}).bomba || {};
-    var r = R.classifica((stato.data || {}).punteggi || {}, b);
-    var es = R.esito(r);
-    stato.room.resolveOnce("bomba:chiudi", function (cur) {
-      if (!cur || cur.stato === "conclusa" || cur.stato === "annullata") return false;
-      var bb = cur.bomba || {};
-      var cls = R.classifica(cur.punteggi || {}, bb);
-      var e2 = R.esito(cls);
-      return {
-        stato: "conclusa",
-        finito: (cur.partecipanti || []).slice(),
-        risultati: {
-          gioco: GIOCO,
-          classifica: cls.map(function (c) { return { nome: c.nome, punti: c.punti, parole: c.parole, esplosioni: c.esplosioni, passaggi: c.passaggi }; }),
-          esito: e2,
-          punteggiFinale: cur.punteggi || {},
-          parole: (bb.usate || []).slice(0, 200),
-          round: (bb.roundIdx || 0) + 1,
-          finePer: bb.finitaPer || "tempo",
-          endAt: ora(),
-          chiusoDa: stato.me
-        }
-      };
-    }).catch(function () { stato.chiusa = false; });
+    scrivi(function (cur) { return R.patchFineTempo(cur, ora()); })
+      .catch(function () { stato.retryAt = ora() + 1500; })
+      .finally(function () { stato.chiusa = false; });
   }
 
   function watchdog() {
     var d = stato.data;
-    if (!d || stato.solo) return;
-    if (d.stato === "in_corso" || d.stato === "pronto") {
-      var b = d.bomba || {};
-      var r = b.round || {};
-      if (ora() >= R.esplodeAlle(r) && stato.esplosoRound !== b.roundIdx) { stato.esplosoRound = b.roundIdx; esplodi(); }
-      autoPassa();
-      // host perso: prendo il timone se serve (la transazione è idempotente)
-      var hostVisto = ((d.giocatori || {})[d.host] || {}).visto || 0;
-      if (d.host !== stato.me && (ora() - hostVisto) > ROOM.IDLE_MS) stato.room.claimHost().catch(function () {});
-      if (d.stato === "pronto" && ora() >= (d.startAt || 0)) stato.room.maybeStart().catch(function () {});
-    }
+    if (!d || stato.solo || ["attesa", "pronto", "in_corso"].indexOf(d.stato) < 0) return;
+    tick();
+    autoPassa();
+    var hostVisto = ((d.giocatori || {})[d.host] || {}).visto || 0;
+    if (d.host !== stato.me && ora() - hostVisto > 45000) stato.room.claimHost().catch(function () {});
   }
 
   /* ------------------------------- risultati ------------------------------ */
@@ -818,7 +799,7 @@
     var esitoBox = document.querySelector(".bomba__esito");
     if (esitoBox && !CORE.reducedMotion()) { esitoBox.classList.add("boom"); setTimeout(function () { esitoBox.classList.remove("boom"); }, 900); }
     var b = d.bomba || {};
-    var parole = R.contaParole(b.storico);
+    var parole = b.passaggi || R.contaParole(b.storico);
     $("ris-stats").innerHTML = [
       ["punti", mio.punti == null ? "—" : mio.punti],
       ["parole valide", parole[stato.me] || 0],
@@ -855,7 +836,7 @@
       var altri = (dd.partecipanti || []).filter(function (n) { return n !== stato.me; });
       var acc = dd.rivincitaAccettataDa || [];
       if (dd.prossimaPartita) {
-        hint.textContent = "Rivincita pronta: " + altri.length + "/" + Math.max(1, altri.length) + " hanno accettato" + (dd.prossimaPartita === dd.id ? "" : " · entra tu");
+        hint.textContent = "Rivincita pronta: " + acc.length + "/" + (dd.partecipanti || []).length + " hanno accettato · entra tu";
         btn.textContent = "Entra in rivincita";
         btn.dataset.href = "index.html?matchId=" + encodeURIComponent(dd.prossimaPartita);
       } else {
@@ -868,7 +849,10 @@
     aggiornaRematch();
     if (stato.room) stato.room.on({ state: function (dd) { if (dd) aggiornaRematch(dd); } });
     btn.addEventListener("click", function () {
-      if (btn.dataset.href) { location.href = btn.dataset.href; return; }
+      if (stato.solo) { avviaSolo(); return; }
+      if (btn.disabled) return;
+      if (btn.dataset.href) { stato.room.acceptRematch().then(function () { location.href = btn.dataset.href; }).catch(function () { CORE.toast("Ingresso non riuscito: riprova", "warn"); }); return; }
+      btn.disabled = true;
       CORE.withRetry(function () {
         return stato.room.proposeRematch({
           durata: (stato.data || {}).durata,
@@ -879,7 +863,7 @@
         if (!id) { CORE.toast("Rivincita non riuscita: la partita è già archiviata", "warn"); return; }
         CORE.toast("Rivincita proposta: si entra quando accettano", "ok");
         aggiornaRematch();
-      }).catch(function () { CORE.toast("Rivincita non riuscita: riprova", "error", 3500); });
+      }).catch(function () { CORE.toast("Rivincita non riuscita: riprova", "error", 3500); }).finally(function () { btn.disabled = false; });
     });
     var home = $("btn-home");
     if (home) home.addEventListener("click", function () { location.href = "../../index.html"; });
@@ -888,14 +872,21 @@
 
   /* --------------------------------- solo --------------------------------- */
 
-  function avviaSolo() {
+  var startingSolo = false;
+  async function avviaSolo() {
+    if (startingSolo) return; startingSolo = true;
+    var lex;
+    try { lex = await global.FAWLessico.loadSolo(NET); WORDS.setPublication(lex.snapshot); }
+    finally { startingSolo = false; }
+    if (lex.origine !== "pubblicato") CORE.toast("Lessico: " + lex.origine, "warn", 6000);
     stato.solo = true;
+    stato.esplosoRound = -1; stato.roundVisto = -1; stato.liv = -1; stato.chiusa = false; stato.pending = null;
     var seed = CORE.shortId("B").toUpperCase();
     var durataMs = (stato.durataScelta || 120) * 1000;
     var seq = R.scegliSequenza(seed, 0, stato.diff, {});
     stato.t0 = ora();
     var d = {
-      id: "solo", gioco: GIOCO, stato: "in_corso", host: stato.me, creator: stato.me,
+      id: "solo", lessico: lex.snapshot, gioco: GIOCO, stato: "in_corso", host: stato.me, creator: stato.me,
       partecipanti: [stato.me], giocatori: (function () { var o = {}; o[stato.me] = { nome: stato.me, visto: Date.now(), pronto: true }; return o; })(),
       punteggi: (function () { var o = {}; o[stato.me] = 0; return o; })(),
       opzioni: { miccia: stato.diff }, cfg: { bomba: { difficolta: stato.diff } },
@@ -924,14 +915,12 @@
     var testo = (inp.value || "").trim();
     if (!testo) { mostraFeedback("Scrivi una parola.", true); return; }
     var b = d.bomba || {};
-    if (ora() >= R.esplodeAlle(b.round)) { rifiuto("FUORI_TEMPO", b.round.seq); return; }
-    var v = R.valutaParola(testo, b.round.seq, b.usate);
+    var v = R.puoPassare(d, stato.me, { ora: ora(), testo: testo, roundIdx: b.roundIdx });
     if (!v.ok) { rifiuto(v.motivo, b.round.seq); return; }
     var eff = R.patchPassaggio(d, stato.me, v, { ora: ora(), attivi: [stato.me] });
     applica(d, eff.patch);
     d.bomba.possessore = stato.me;     // da solo la bomba torna subito a te
     d.bomba.ultimoPasso = ora();
-    CORE.beep("ok");
     CORE.vibrate(12);
     mostraFeedback("Ok +" + v.punti + " — ancora", false);
     inp.value = "";
@@ -941,10 +930,11 @@
   function esplodiSolo() {
     var d = stato.dataLocale;
     var out = R.patchEsplosione(d, { ora: ora(), attivi: [stato.me] });
+    if (!out) return;
+    stato.esplosoRound = d.bomba.roundIdx;
     applica(d, out.patch);
     if (out.finita) { d.stato = "conclusa"; renderRisultati(d); stato.inGioco = false; mostra("risultati"); return; }
     d.bomba.possessore = stato.me;
-    CORE.beep("boom");
     CORE.vibrate([30, 60, 30]);
     CORE.toast("💥 −100: nuova sequenza", "warn", 2500);
     render(d);
@@ -952,13 +942,9 @@
 
   function chiudiSolo() {
     var d = stato.dataLocale;
-    d.stato = "conclusa";
-    d.bomba.finitaPer = "tempo";
-    d.risultati = {
-      classifica: R.classifica(d.punteggi, d.bomba),
-      esito: R.esito(R.classifica(d.punteggi, d.bomba)),
-      round: (d.bomba.roundIdx || 0) + 1
-    };
+    var patch = R.patchFineTempo(d, ora());
+    if (!patch) return;
+    applica(d, patch);
     stato.inGioco = false;
     mostra("risultati");
     renderRisultati(d);
@@ -973,6 +959,13 @@
     });
     return obj;
   }
+
+  global.addEventListener("pagehide", function () {
+    clearInterval(stato.tick); clearTimeout(stato.retryTimer); clearTimeout(stato.codaTimer);
+    if (stato.stopCoda) stato.stopCoda();
+    if (stato.room) stato.room.close();
+  });
+  global.addEventListener("pageshow", function (e) { if (e.persisted) location.reload(); });
 
   /* -------------------------------- bootstrap ------------------------------ */
 

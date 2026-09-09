@@ -192,10 +192,12 @@ test("bomba: esplosione — penalità al possessore e nuovo round con miccia nuo
 
 test("bomba: fine partita per tempo o per numero di esplosioni", () => {
   const d = doc({ endsAt: 30000 });
-  let out = R.patchEsplosione(d, { ora: 36000, attivi: d.partecipanti });
-  assert.equal(out.finita, true, "tempo scaduto: si chiude");
-  assert.equal(out.patch.stato, "conclusa");
-  assert.equal(out.patch["bomba.finitaPer"], "tempo");
+  assert.equal(R.patchEsplosione(d, { ora: 36000 }), false, "il tempo partita era scaduto prima della miccia");
+  const tempo = R.patchFineTempo(d, 36000);
+  assert.equal(tempo.stato, "conclusa");
+  assert.equal(tempo["bomba.finitaPer"], "tempo");
+  assert.deepEqual(tempo.risultati.punteggiFinale, d.punteggi, "nessuna esplosione dopo il termine");
+  let out;
 
   const d2 = doc({ maxEsplosioni: 3, bomba: Object.assign({}, d.bomba, { esplosioni: { BOB: 1, CIRA: 1 }, roundIdx: 4 }) });
   out = R.patchEsplosione(d2, { ora: 36000, attivi: d2.partecipanti });
@@ -302,7 +304,7 @@ test("bomba: classifica per punti, poi esplosioni, poi passaggi; pareggio dichia
   };
   const cls = R.classifica({ ALFA: 40, BOB: 70, CIRA: 70, DANI: -60 }, b);
   assert.deepEqual(cls.map((c) => c.nome), ["BOB", "CIRA", "ALFA", "DANI"]);
-  assert.equal(cls[0].parole, 1);
+  assert.equal(cls[0].parole, 3, "conteggio completo: lo storico può essere troncato");
   assert.equal(cls[2].esplosioni, 2, "ALFA: due esplosioni");
   assert.equal(cls[3].esplosioni, 1, "DANI: una");
   const es = R.esito(cls);
@@ -327,4 +329,32 @@ test("bomba: riga di storico leggibile (feed del gioco)", () => {
   assert.equal(R.rigaStorico({ da: "ALFA", w: "STRADA", p: 10 }), "ALFA ha passato «STRADA» +10");
   assert.equal(R.rigaStorico({ da: "BOB", esplode: true }), "BOB è rimasto con la bomba");
   assert.equal(R.rigaStorico({ da: "CIRA", salto: true }), "CIRA non c'era: bomba passata");
+});
+
+test("bomba: round incompleti e tempi non finiti non accettano parole né esplodono", () => {
+  for (const patch of [{ seq: '' }, { seq: '###' }, { inizioAlle: undefined }, { inizioAlle: '1000' }, { micciaMs: NaN }, { micciaMs: -1 }]) {
+    const d = doc(); Object.assign(d.bomba.round, patch);
+    assert.equal(R.roundValido(d.bomba.round), false);
+    assert.equal(R.puoPassare(d, 'ALFA', { ora: 9000, testo: 'strada', roundIdx: 0 }).motivo, 'ROUND_NON_PRONTO');
+    assert.equal(R.patchEsplosione(d, { ora: 90000 }), false);
+  }
+  for (const ora of [NaN, Infinity, undefined]) {
+    assert.equal(R.patchEsplosione(doc(), { ora }), false);
+    assert.equal(R.patchFineTempo(doc(), ora), false);
+  }
+  const d = doc(); d.bomba.possessore = 'ESTRANEO';
+  assert.equal(R.patchEsplosione(d, { ora: 90000 }), false);
+});
+
+test("bomba: il risultato dell'ultima esplosione include la penalità, una sola volta", () => {
+  let d = doc({ maxEsplosioni: 1 }); d.punteggi.ALFA = 40;
+  const out = R.patchEsplosione(d, { ora: 36000 });
+  assert.equal(out.finita, true);
+  const { applyPatch } = require('../../games/shared/faw-net');
+  d = applyPatch(d, out.patch);
+  assert.equal(d.punteggi.ALFA, -60);
+  assert.equal(d.risultati.punteggiFinale.ALFA, -60);
+  assert.equal(d.risultati.classifica.find(c => c.nome === 'ALFA').esplosioni, 1);
+  assert.equal(R.patchEsplosione(d, { ora: 90000 }), false);
+  assert.equal(R.patchFineTempo(d, 90000), false);
 });
