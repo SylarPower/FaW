@@ -1393,10 +1393,9 @@
 				</div>
 				<p style="margin-bottom:20px; color:var(--text-main);">Scegli la modalità di gioco:</p>
 				<div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
-					<button class="btn-action" style="width:auto; padding:12px 25px; margin-top:0;" onclick="confirmNewGame(false, false, false)">CLASSICA</button>
-					<button class="btn-action" style="width:auto; padding:12px 25px; margin-top:0;" onclick="confirmNewGame(true, false, false)">BONUS ⭐</button>
-					<button class="btn-action" style="width:auto; padding:12px 25px; margin-top:0;" onclick="confirmNewGame(true, true, false)">CRAZY 🤪</button>
-					<button class="btn-action" style="width:auto; padding:12px 25px; margin-top:0;" onclick="confirmNewGame(true, true, true)">BIATCH 💅</button>
+					<button class="btn-action" style="width:auto; padding:12px 25px; margin-top:0;" onclick="confirmNewGame(false, false)">CLASSICA</button>
+					<button class="btn-action" style="width:auto; padding:12px 25px; margin-top:0;" onclick="confirmNewGame(true, false)">BONUS ⭐</button>
+					<button class="btn-action" style="width:auto; padding:12px 25px; margin-top:0;" onclick="confirmNewGame(true, true)">CRAZY 🤪</button>
 				</div>
 			</div>
 		</div>
@@ -1619,12 +1618,7 @@
 			  title: 'BUSET MAIALONE',
 			  desc: 'Hai trovato l amore della tua vita!',
 			  check: (ctx) => ctx.last.word === 'BUSET'
-			}, {
-			  id: 'biatch_move',
-			  title: 'MAL DI TESTA 💅',
-			  desc: 'Hai fatto girare la griglia tante volte!',
-			  check: (ctx) => isBiatchMode && rotationCount > 10
-			}];
+		}];
 			// --- ✅ STATO CENTRALIZZATO INPUT ---
 			const inputState = {
 			  isDragging: false,
@@ -1708,7 +1702,6 @@
 			let currentGameTimestamp = null;
 			let currentHighlightedWord = null;
 			let isCrazyMode = false;
-			let isBiatchMode = false;
 			let currentGameData = null;
 			let dizionarioCustomApplicato = false;
 			let unsubscribePartita = null;
@@ -2004,24 +1997,23 @@
 			  newGameModal.style.display = 'flex';
 			}
 			
-			function confirmNewGame(withBonus, isCrazy = false, isBiatch = false) {
+			function confirmNewGame(withBonus, isCrazy = false) {
 			  if (typeof matchId !== 'undefined' && matchId) {
-			    creaRivincitaPersonalizzata(withBonus, isCrazy, isBiatch);
+			    creaRivincitaPersonalizzata(withBonus, isCrazy);
 			    return;
 			  }
 			  useBonuses = withBonus || isCrazy;
 			  isCrazyMode = isCrazy;
-			  isBiatchMode = isBiatch;
 			  const selectedSize = parseInt(modalGridSelect.value) || 5;
 			  gridSize = selectedSize;
 			  newGameModal.style.display = 'none';
 			  initGame(null);
 			  copySeedNewGame();
 			}
-			async function creaRivincitaPersonalizzata(bonus, crazy, biatch) {
+			async function creaRivincitaPersonalizzata(bonus, crazy) {
 			  const snap = await db.collection("partite").doc(matchId).get();
 			  const v = snap.data();
-			  let mode = crazy ? 'crazy' : (biatch ? 'biatch' : (bonus ? 'bonus' : 'classic'));
+			  let mode = crazy ? 'crazy' : (bonus ? 'bonus' : 'classic');
 			  let pts = {};
 			  let words = {};
 			  v.partecipanti.forEach(p => {
@@ -2115,9 +2107,8 @@
 			  btnTerminate.style.display = 'none';
 			  if (forceSeed) {
 			    currentSeed = forceSeed;
-			    isBiatchMode = currentSeed.includes('-B1');
 			    isCrazyMode = currentSeed.includes('-C1');
-			    useBonuses = currentSeed.endsWith('+') || isCrazyMode || isBiatchMode;
+			    useBonuses = currentSeed.endsWith('+') || isCrazyMode;
 			    const sizeMatch = currentSeed.match(/-S(\d+)/);
 			    if (sizeMatch && sizeMatch[1]) {
 			      gridSize = parseInt(sizeMatch[1]);
@@ -2137,7 +2128,6 @@
 			    const selectedTime = parseInt(modalTimer ? modalTimer.value : 180);
 			    timeRemaining = selectedTime;
 			    let tags = `-S${gridSize}-T${timeRemaining}`;
-			    if (isBiatchMode) tags += "-B1";
 			    if (isCrazyMode) tags += "-C1";
 			    else if (useBonuses) tags += "+";
 			    currentSeed = baseSeed + tags;
@@ -2419,7 +2409,7 @@
 			  document.querySelectorAll('.tile').forEach(t => t.classList.remove('blurred'));
 			  const rotateBtn = document.getElementById('manual-rotate-btn');
 			  if (rotateBtn) {
-			    rotateBtn.style.display = isBiatchMode ? 'none' : 'block';
+			    rotateBtn.style.display = 'block';
 			  }
 			  updateTimerDisplay();
 			  timerInterval = setInterval(() => {
@@ -2451,7 +2441,7 @@
 			    listEl.classList.remove('blurred-list');
 			    btnPause.textContent = "PAUSA";
 			    btnPause.classList.remove('paused');
-			    if (rotateBtn && !isBiatchMode) rotateBtn.style.display = 'block';
+			    if (rotateBtn) rotateBtn.style.display = 'block';
 			    timerInterval = setInterval(() => {
 			      timeRemaining--;
 			      updateTimerDisplay();
@@ -2555,7 +2545,7 @@
 			  sortControls.style.display = "flex";
 			  btnMissed.style.display = "block";
 			  const rotateBtn = document.getElementById('manual-rotate-btn');
-			  if (rotateBtn && !isBiatchMode) rotateBtn.style.display = 'block';
+			  if (rotateBtn) rotateBtn.style.display = 'block';
 			  document.getElementById('fixed-home-btn').style.display = 'block';
 			  fireConfettiLight();
 			}
@@ -2859,10 +2849,6 @@
 			    });
 			    if (pts >= 10) fireConfettiLight();
 			    if (word === "BUSET") triggerBusetExplosion();
-			    if (isBiatchMode) {
-			      rotateGrid();
-			      showBiatchOverlay();
-			    }
 			    runAchievementCheck(word, pts);
 			    updateTotalScore();
 			    // Pulisci SUBITO
@@ -3682,15 +3668,6 @@ function aggiornaLiveScorePostGame(data) {
 			  }
 			}
 			
-			function showBiatchOverlay() {
-			  const texts = ["GIRA BIATCH!", "OPS!", "DI QUA!", "MUOVITI!", "🐷🐷🐷"];
-			  const overlay = document.createElement('div');
-			  overlay.style = "position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); font-size:5rem; font-weight:900; color:#ff00ff; z-index:10000; pointer-events:none; text-shadow: 5px 5px 0px black;";
-			  overlay.textContent = texts[Math.floor(Math.random() * texts.length)];
-			  document.body.appendChild(overlay);
-			  fireConfetti(overlay);
-			  setTimeout(() => overlay.remove(), 800);
-			}
 			window.addEventListener('click', (e) => {
 			  if (e.target.classList.contains('modal-overlay')) {
 			    if (e.target.id === 'game-end-modal') {
@@ -3794,7 +3771,6 @@ if (data.stato === "attesa") {
     timeRemaining = parseInt(data.opzioni?.tempo) || 180;
     initialTime = timeRemaining;
     currentSeed = data.opzioni?.seed || 'DEFAULT';
-    isBiatchMode = (data.opzioni?.mode === 'biatch');
     isCrazyMode = (data.opzioni?.mode === 'crazy');
     useBonuses = (data.opzioni?.mode !== 'classic');
     
@@ -3861,8 +3837,7 @@ if (data.stato === "in_corso") {
             timeRemaining = parseInt(data.opzioni?.tempo) || 180;
             initialTime = timeRemaining;
             currentSeed = data.opzioni?.seed || 'DEFAULT';
-            isBiatchMode = (data.opzioni?.mode === 'biatch');
-            isCrazyMode = (data.opzioni?.mode === 'crazy');
+                    isCrazyMode = (data.opzioni?.mode === 'crazy');
             useBonuses = (data.opzioni?.mode !== 'classic');
             
             // ✅ Genera griglia se non già fatto
@@ -3900,7 +3875,7 @@ if (data.stato === "in_corso") {
             analysisMsg.style.display = "block";
             
             const rotateBtn = document.getElementById('manual-rotate-btn');
-            if (rotateBtn && !isBiatchMode) rotateBtn.style.display = 'block';
+            if (rotateBtn) rotateBtn.style.display = 'block';
         }
         
         if (finito.length < data.partecipanti.length) {
@@ -3943,7 +3918,7 @@ if (data.stato === "in_corso") {
 			        sortControls.style.display = "flex";
 			        btnMissed.style.display = "block";
 			        const rotateBtn = document.getElementById('manual-rotate-btn');
-			        if (rotateBtn && !isBiatchMode) rotateBtn.style.display = 'block';
+			        if (rotateBtn) rotateBtn.style.display = 'block';
 			      }
 			      if (!conferma.includes(mioNome)) {
 			        // Non ho ancora cliccato VERIFICA
@@ -4501,15 +4476,14 @@ async function applicaModificaDizionario(parola, tipo) {
 																		<option value="7" ${grigliaCorrente === '7' ? 'selected' : ''}>7x7</option>
 																		<option value="10" ${grigliaCorrente === '10' ? 'selected' : ''}>10x10</option>
 																	</select>
-																	<button onclick="creaRivincitaConSelettori(false, false, false)" style="padding:6px 12px; border:none; border-radius:4px; background:white; color:#333; cursor:pointer; font-weight:bold;">CLASSICA</button>
-																	<button onclick="creaRivincitaConSelettori(true, false, false)" style="padding:6px 12px; border:none; border-radius:4px; background:#f1c40f; color:#333; cursor:pointer; font-weight:bold;">BONUS ⭐</button>
-																	<button onclick="creaRivincitaConSelettori(true, true, false)" style="padding:6px 12px; border:none; border-radius:4px; background:#e74c3c; color:white; cursor:pointer; font-weight:bold;">CRAZY 🤪</button>
-																	<button onclick="creaRivincitaConSelettori(true, true, true)" style="padding:6px 12px; border:none; border-radius:4px; background:#ff00ff; color:white; cursor:pointer; font-weight:bold;">BIATCH 💅</button>
-																</div>
+																	<button onclick="creaRivincitaConSelettori(false, false)" style="padding:6px 12px; border:none; border-radius:4px; background:white; color:#333; cursor:pointer; font-weight:bold;">CLASSICA</button>
+																	<button onclick="creaRivincitaConSelettori(true, false)" style="padding:6px 12px; border:none; border-radius:4px; background:#f1c40f; color:#333; cursor:pointer; font-weight:bold;">BONUS ⭐</button>
+																	<button onclick="creaRivincitaConSelettori(true, true)" style="padding:6px 12px; border:none; border-radius:4px; background:#e74c3c; color:white; cursor:pointer; font-weight:bold;">CRAZY 🤪</button>
+																	</div>
 			`;
 			  document.body.appendChild(banner);
 			}
-			async function creaRivincitaConSelettori(bonus, crazy, biatch) {
+			async function creaRivincitaConSelettori(bonus, crazy) {
 			const tempo = document.getElementById('rivincita-tempo').value;
 			const griglia = document.getElementById('rivincita-griglia').value;
 			
@@ -4525,7 +4499,7 @@ async function applicaModificaDizionario(parola, tipo) {
 			try {
 			  const snap = await db.collection("partite").doc(matchId).get();
 			  const v = snap.data();
-			  let mode = crazy ? 'crazy' : (biatch ? 'biatch' : (bonus ? 'bonus' : 'classic'));
+			  let mode = crazy ? 'crazy' : (bonus ? 'bonus' : 'classic');
 			  
 			  let pts = {}; 
 			  let words = {}; 

@@ -220,6 +220,25 @@
     return out;
   }
 
+  /**
+   * Compatibilità snapshot Firestore:
+   * - SDK compat (v8 API, usato da hub/patata/ruzzle/...): `snap.exists` è una
+   *   PROPRIETÀ booleana → `snap.exists()` lancia "snap.exists is not a function".
+   * - SDK modulare (v9+, usato da Pong) e mock dei test: `snap.exists()` è un METODO.
+   * Questo helper supporta entrambi i casi.
+   */
+  function docExists(snap) {
+    if (!snap) return false;
+    if (typeof snap.exists === 'function') {
+      try {
+        return !!snap.exists();
+      } catch (e) {
+        return false;
+      }
+    }
+    return !!snap.exists;
+  }
+
   /* ---------------- HELPERS DI STATO ---------------- */
   function roundOrderFor(partecipanti, roundNum) {
     const N = partecipanti.length;
@@ -492,7 +511,7 @@
     start() {
       this.unsub = this.ref.onSnapshot(
         (snap) => {
-          if (!snap.exists()) {
+          if (!docExists(snap)) {
             if (this.onDead) this.onDead();
             return;
           }
@@ -514,7 +533,7 @@
     transact(mutator) {
       return this.db.runTransaction(async (t) => {
         const snap = await t.get(this.ref);
-        if (!snap.exists()) return { aborted: true };
+        if (!docExists(snap)) return { aborted: true };
         const state = normState(snap.data());
         const up = mutator(state, { me: this.me, now: Date.now() });
         if (!up) return { aborted: true };
@@ -540,7 +559,7 @@
     findWordAuthor, flagThreshold, flagsByOthers, flagResolved, validateWord,
     mutReady, mutStart, mutSubmitWord, mutWrongWord, mutTimeout, mutConferma,
     mutFlag, mutResolveFlag, mutNextRound, normState, SoloBackend, FirebaseBackend,
-    toFirestoreUpdate
+    toFirestoreUpdate, docExists
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = core;
   if (global) global.__PATATA_CORE = core;
@@ -597,7 +616,7 @@
   const ringWrap = document.querySelector('.timer-wrap');
 
   /* ---------------- UTILITY UI ---------------- */
-  const AVATAR_COLORS = ['#ffc94d', '#4cc9f0', '#34d399', '#ff8fa3', '#c084fc', '#ff9e2c', '#7dd3fc', '#f9a8d4'];
+  const AVATAR_COLORS = ['#fed7aa', '#bae6fd', '#bbf7d0', '#fecdd3', '#ddd6fe', '#fde68a', '#99f6e0', '#fecaca'];
   function avatarColor(name) {
     let h = 0;
     for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
@@ -691,7 +710,7 @@
 
   /* ---------------- CONFETTI ---------------- */
   function confetti() {
-    const colors = ['#ffc94d', '#ff9e2c', '#ff5f1f', '#4cc9f0', '#34d399', '#ffffff'];
+    const colors = ['#ea580c', '#f59e0b', '#4f46e5', '#0ea5e9', '#16a34a', '#ec4899'];
     for (let i = 0; i < 140; i++) {
       const p = document.createElement('div');
       p.className = 'confetti-p';
@@ -756,7 +775,7 @@
           fb.collection('config').doc('dizionario').get(),
           new Promise((_, rej) => setTimeout(() => rej(new Error('fb timeout')), 5000))
         ]);
-        if (doc.exists) {
+        if (docExists(doc)) {
           const d = doc.data() || {};
           (d.extra || []).forEach((w) => {
             const n = normalizeWord(w);
@@ -1136,7 +1155,7 @@
     try {
       const newId = await G.db.runTransaction(async (t) => {
         const snap = await t.get(G.backend.ref);
-        if (!snap.exists()) return null;
+        if (!docExists(snap)) return null;
         const st = normState(snap.data());
         if (st.stato !== 'conclusa') return null;
         if (st.prossimaPartita) return st.prossimaPartita;
@@ -1178,12 +1197,21 @@
       toast('Errore nella creazione della rivincita', 'err');
     }
   }
+  function fieldValue() {
+    return (G.fs && G.fs.FieldValue) ||
+      (typeof firebase !== 'undefined' && firebase.firestore && firebase.firestore.FieldValue) ||
+      null;
+  }
   function accettaRivincita() {
-    G.backend.ref.update({ rivincitaAccettataDa: G.fs.FieldValue.arrayUnion(G.me) }).catch(() => {});
+    const FV = fieldValue();
+    if (!G.backend || !FV) return;
+    G.backend.ref.update({ rivincitaAccettataDa: FV.arrayUnion(G.me) }).catch(() => {});
     SFX.confirm();
   }
   function rifiutaRivincita() {
-    G.backend.ref.update({ rivincitaRifiutataDa: G.fs.FieldValue.arrayUnion(G.me) }).catch(() => {});
+    const FV = fieldValue();
+    if (!G.backend || !FV) return;
+    G.backend.ref.update({ rivincitaRifiutataDa: FV.arrayUnion(G.me) }).catch(() => {});
   }
   function renderRematch(s) {
     const N = s.partecipanti.length;
@@ -1476,9 +1504,16 @@
       try {
         const cfg = window.FAW_REQUIRE_FIREBASE_CONFIG();
         if (cfg && !G.db) {
-          firebase.initializeApp(cfg);
-          G.fs = firebase.firestore;
-          G.db = G.fs();
+          if (typeof firebase.firestore === 'undefined') {
+            console.warn('[Patata] firebase-firestore-compat.js non caricato: solo allenamento disponibile.');
+          } else {
+            // Evita "duplicate-app" in caso di doppia inizializzazione (HMR, reload parziali, test)
+            if (!firebase.apps || firebase.apps.length === 0) {
+              firebase.initializeApp(cfg);
+            }
+            G.fs = firebase.firestore;
+            G.db = firebase.firestore();
+          }
         }
       } catch (e) {
         console.warn('[Patata] init Firebase non riuscito:', e.message);
