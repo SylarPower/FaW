@@ -101,7 +101,7 @@ async function until(fn, what, timeout = 20000) {
   const fb = document.getElementById('feedback');
   ok(fb.classList.contains('ok') && fb.textContent.includes(validWord), 'feedback verde con la parola');
 
-  console.log('\n[4] Parola sbagliata → penalità');
+  console.log('\n[4] Parola sbagliata → nessun decremento del timer');
   await sleep(1200); // supera il cooldown anti-spam di 1s
   const dBefore2 = window.__PATATA.state.turno.deadline;
   input.value = 'zzzz';
@@ -112,7 +112,7 @@ async function until(fn, what, timeout = 20000) {
     return f.classList.contains('err');
   }, 'feedback err'), 'feedback rosso mostrato: ' + document.getElementById('feedback').textContent.trim());
   const dAfter2 = window.__PATATA.state.turno.deadline;
-  ok(dAfter2 <= dBefore2 - 5000 + 300, 'deadline −5s per parola sbagliata');
+  ok(dAfter2 === dBefore2, 'deadline INVARIATA per parola sbagliata (nessun tempo tolto)');
   ok(window.__PATATA.state.storia.length === 1, 'parola sbagliata NON in storia');
 
   console.log('\n[5] Timeout → scottatura + recap');
