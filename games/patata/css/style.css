@@ -30,8 +30,8 @@
   --radius-sm: 10px;
   --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.05);
   --shadow-pop: 0 2px 8px rgba(16, 24, 40, 0.06), 0 12px 32px rgba(16, 24, 40, 0.1);
-  --font: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  --font-display: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font: 'Nunito', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Nunito', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -66,6 +66,7 @@ button { font-family: var(--font); }
   border-bottom: 1px solid var(--card-border);
 }
 .topbar-left { display: flex; align-items: center; gap: 10px; }
+.topbar { padding-left: 126px; } /* spazio per il pulsante HOME condiviso */
 .topbar-logo { font-size: 1.4rem; }
 .topbar-title {
   font-weight: 800;
@@ -659,6 +660,8 @@ button { font-family: var(--font); }
   animation: fade-in 0.25s;
   overflow-y: auto;
 }
+/* centra quando ci sta, scrolla dal bordo quando non ci sta */
+.overlay > * { margin: auto; }
 @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
 
 /* Recap */
@@ -778,6 +781,7 @@ button { font-family: var(--font); }
   border-top: 1px solid var(--card-border);
   flex-wrap: wrap;
 }
+.recap-foot .btn { flex-shrink: 0; }
 .conf-progress {
   flex: 1;
   font-size: 0.8rem;
@@ -804,6 +808,8 @@ button { font-family: var(--font); }
 .fine {
   width: 100%;
   max-width: 600px;
+  max-height: 92vh;
+  overflow-y: auto;
   padding: 30px 26px;
   text-align: center;
   animation: card-in 0.3s ease;
@@ -891,6 +897,8 @@ button { font-family: var(--font); }
   z-index: 200;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  row-gap: 8px;
   gap: 12px;
   padding: 13px 18px;
   background: var(--card);
@@ -900,7 +908,12 @@ button { font-family: var(--font); }
 }
 @keyframes slide-down { from { transform: translateY(-100%); } to { transform: translateY(0); } }
 .banner .b-emoji { font-size: 1.4rem; }
-.banner .b-text { flex: 1; }
+@media (min-width: 601px) {
+  .banner { padding-left: 148px; }
+}
+.banner .b-text { flex: 1; min-width: 160px; }
+.banner .b-title { overflow-wrap: anywhere; }
+.banner .b-sub { overflow-wrap: anywhere; }
 .banner .b-title { font-weight: 700; font-size: 0.9rem; }
 .banner .b-sub { font-size: 0.76rem; color: var(--text-1); margin-top: 2px; }
 .banner .b-actions { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -946,7 +959,7 @@ button { font-family: var(--font); }
   .feed { max-height: 240px; }
 }
 @media (max-width: 560px) {
-  .topbar-title { font-size: 0.72rem; }
+  .topbar-title { display: none; }
   .config-grid { grid-template-columns: repeat(2, 1fr); }
   .ltile { width: 50px; height: 60px; font-size: 1.7rem; }
   .timer-sec { font-size: 2.5rem; }

@@ -6,10 +6,10 @@
 		<title>NEON WAR 🚀</title>
 		<link rel="preconnect" href="https://fonts.googleapis.com">
 		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-		<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Tektur:wght@500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-		<link rel="stylesheet" href="../../shared/faw-ui.css">
+		<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+		<link rel="stylesheet" href="../shared/faw-ui.css">
 		<style>
-			/* Font: Press Start 2P (arcade) + Tektur/Inter (UI) */
+			/* Font unico piattaforma: Nunito */
 			body {
 			margin: 0; overflow: hidden;
 			background:
@@ -17,14 +17,14 @@
 				 radial-gradient(1000px 600px at 10% 110%, rgba(255, 0, 85, 0.07), transparent 60%),
 				 #0b0c14;
 			color: #fff;
-			font-family: 'Press Start 2P', monospace;
+			font-family: 'Nunito', system-ui, sans-serif;
 			user-select: none;
 			cursor: default;
 			}
 			body.gaming { cursor: none; }
 			/* UI IN GIOCO */
 			#ui-layer {
-			position: absolute; top: 20px; left: 20px;
+			position: absolute; top: 74px; left: 16px;
 			pointer-events: none; z-index: 10;
 			}
 			.hud-text { font-size: 1rem; color: #fff; text-shadow: 2px 2px 0 #000; margin-bottom: 5px; }
@@ -56,7 +56,7 @@
 			z-index: 20; text-align: center;
 			}
 			.overlay-screen h1, .overlay-screen h2 {
-			font-family: 'Tektur', 'Press Start 2P', sans-serif;
+			font-family: 'Nunito', system-ui, sans-serif;
 			letter-spacing: 3px;
 			}
 			#start-screen h1 {
@@ -129,33 +129,7 @@
 			backdrop-filter: blur(10px);
 			-webkit-backdrop-filter: blur(10px);
 			}
-			#fixed-home-btn {
-			position: fixed;
-			bottom: 20px;
-			right: 20px;
-			z-index: 99999;
-			display: block;
-			}
-			#fixed-home-btn button {
-			background: rgba(14, 16, 30, 0.9);
-			backdrop-filter: blur(14px);
-			-webkit-backdrop-filter: blur(14px);
-			color: #fff;
-			border: 1px solid rgba(0, 204, 255, 0.5);
-			padding: 13px 22px;
-			border-radius: 50px;
-			font-weight: bold;
-			font-size: 0.68rem;
-			cursor: pointer;
-			box-shadow: 0 10px 30px rgba(0,0,0,0.55);
-			transition: all 0.2s ease;
-			font-family: 'Press Start 2P', monospace;
-			}
-			#fixed-home-btn button:hover {
-			transform: scale(1.07) translateY(-2px);
-			border-color: #00ccff;
-			box-shadow: 0 14px 36px rgba(0,0,0,0.6), 0 0 24px rgba(0, 204, 255, 0.35);
-			}
+			/* HOME: pulsante condiviso .fixed-home-btn (faw-ui.css), sempre visibile */
 		</style>
 	</head>
 	<body>
@@ -207,9 +181,7 @@
 				<button class="btn btn-shop" onclick="openShop()">NEGOZIO</button>
 			</div>
 		</div>
-		<div id="fixed-home-btn">
-			<button onclick="window.location.href='../../index.html'">🏠 HOME</button>
-		</div>
+		<button id="fixed-home-btn" class="fixed-home-btn" onclick="window.location.href='../../index.html'" title="Torna alla home di FaW">🏠 HOME</button>
 		<canvas id="gameCanvas"></canvas>
 		<script>
 			
@@ -334,7 +306,6 @@
 			    isPaused = true;
 			    document.body.classList.remove('gaming');
 			    document.getElementById('pause-screen').style.display = 'flex';
-				document.getElementById('fixed-home-btn').style.display = 'block';
 			}
 			
 			function resumeGame() {
@@ -342,7 +313,6 @@
 			    isPaused = false;
 			    document.body.classList.add('gaming');
 			    document.getElementById('pause-screen').style.display = 'none';
-				document.getElementById('fixed-home-btn').style.display = 'none';
 			    loop();
 			}
 			
@@ -470,7 +440,6 @@
 			
 			    enemies = []; particles = []; powerups = []; bullets = []; floatingTexts = [];
 			    gameActive = true; isPaused = false;
-			    document.getElementById('fixed-home-btn').style.display = 'none';
 			    requestAnimationFrame(loop);
 			}
 			
@@ -492,7 +461,6 @@
 				document.getElementById('earnedCoins').innerText = coinsEarned;
 				
 				document.getElementById('game-over-screen').style.display = 'flex';
-				document.getElementById('fixed-home-btn').style.display = 'block';
 				shakeIntensity = 20;
 				draw(); 
 			}

@@ -34,7 +34,8 @@
   const PATATA_PENALTY = 10;      // −10 pt per la scottatura
   const TIMEOUT_GRACE = 2500;     // tolleranza prima di dichiarare la scottatura
   const LETTER_THRESHOLD = 12;    // min parole nel dizionario per una combo valida
-  const TICK_MS = 250;
+  const TICK_MS = 1000;           // tick logico (il timer visivo gira a parte, via rAF)
+  const STUCK_FALLBACK_MS = 12000; // se chi "guida" l'azione non risponde, subentrano gli altri
 
   // Frequenza (approssimativa) delle lettere italiane, senza Q (→ QU)
   const LETTER_WEIGHTS = {
@@ -224,7 +225,7 @@
    * Compatibilità snapshot Firestore:
    * - SDK compat (v8 API, usato da hub/patata/ruzzle/...): `snap.exists` è una
    *   PROPRIETÀ booleana → `snap.exists()` lancia "snap.exists is not a function".
-   * - SDK modulare (v9+, usato da Pong) e mock dei test: `snap.exists()` è un METODO.
+   * - SDK modulare (v9+) e mock dei test: `snap.exists()` è un METODO.
    * Questo helper supporta entrambi i casi.
    */
   function docExists(snap) {
@@ -237,6 +238,19 @@
       }
     }
     return !!snap.exists;
+  }
+
+  /**
+   * Rileva gli errori di rate limit / quota Firestore (HTTP 429).
+   * L'SDK compat 9.x li riporta a volte come code "unknown" con messaggio
+   * "Server responded with status 429": controlliamo anche il messaggio.
+   */
+  function isRateLimitError(e) {
+    if (!e) return false;
+    const code = String(e.code || '');
+    const msg = String(e.message || '');
+    if (code === 'resource-exhausted') return true;
+    return /429|too many requests|quota exceeded|rate ?limit/i.test(msg);
   }
 
   /* ---------------- HELPERS DI STATO ---------------- */
@@ -507,6 +521,14 @@
       this._subs = new Set();
       this.unsub = null;
       this.onDead = null; // doc rimosso → callback (redirect)
+      this.onError = null;
+      // Backoff anti-429: quando Firestore risponde "too many requests"
+      // (quota giornaliera o traffico eccessivo) sospendiamo le transazioni
+      // automatiche e rallentiamo progressivamente i tentativi.
+      this.rateLimitedUntil = 0;
+      this.rateLimitBackoff = 4000;
+      this.rateLimitEpisode = false;
+      this.onRateLimit = null; // callback UI (una volta per "episodio")
     }
     start() {
       this.unsub = this.ref.onSnapshot(
@@ -540,7 +562,23 @@
         if (up.__error) return { aborted: true, error: up.__error };
         t.update(this.ref, toFirestoreUpdate(up, this.fs));
         return { ok: true };
+      }).then((res) => {
+        // Round trip completato: la connessione è tornata sana → reset backoff
+        this.rateLimitBackoff = 4000;
+        if (this.rateLimitEpisode) this.rateLimitEpisode = false;
+        return res;
       }).catch((e) => {
+        if (isRateLimitError(e)) {
+          const now = Date.now();
+          this.rateLimitedUntil = now + this.rateLimitBackoff;
+          this.rateLimitBackoff = Math.min(this.rateLimitBackoff * 2, 60000);
+          if (!this.rateLimitEpisode) {
+            this.rateLimitEpisode = true;
+            console.warn('[Patata] Firestore sta limitando le richieste (429): backoff attivo, riprovo automaticamente.');
+            if (this.onRateLimit) this.onRateLimit(this.rateLimitedUntil - now);
+          }
+          return { failed: true, rateLimited: true, error: { code: 'RATE_LIMIT', message: e && e.message } };
+        }
         console.error('[Patata] errore transazione:', e);
         return { failed: true, error: { code: e && e.code ? e.code : 'NET', message: e && e.message } };
       });
@@ -559,7 +597,7 @@
     findWordAuthor, flagThreshold, flagsByOthers, flagResolved, validateWord,
     mutReady, mutStart, mutSubmitWord, mutWrongWord, mutTimeout, mutConferma,
     mutFlag, mutResolveFlag, mutNextRound, normState, SoloBackend, FirebaseBackend,
-    toFirestoreUpdate, docExists
+    toFirestoreUpdate, docExists, isRateLimitError
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = core;
   if (global) global.__PATATA_CORE = core;
@@ -597,7 +635,8 @@
     lastWholeSec: -1,
     statsSaved: false,
     redirected: false,
-    lastFeedbackTimer: null
+    lastFeedbackTimer: null,
+    actionSince: {}        // prima osservazione di ogni condizione "agibile" (anti-storm)
   };
 
   /* ---------------- ELEMENTI DOM ---------------- */
@@ -817,18 +856,42 @@
     }, extra || {});
   }
 
+  /* ---------------- CHI AGISCE (anti "transaction storm") ----------------
+     Le azioni di avanzamento (start, timeout, risoluzione contestazioni,
+     prossimo turno) vengono tentate da UN solo client per volta:
+     - il "referente" dell'azione (chi tiene la patata per il timeout,
+       altrimenti il primo partecipante) agisce subito;
+     - gli altri subentrano solo se la condizione resta bloccata troppo a
+       lungo (referente offline), scaglionati per evitare picchi.
+     Senza questo, N client sparano la STESSA transazione a ogni tick:
+     è la causa principale dei 429 "Too Many Requests" di Firestore. */
+  function myStaggerMs(s) {
+    const i = (s.partecipanti || []).indexOf(G.me);
+    return (i < 0 ? 0 : i) * 900;
+  }
+  function mayAct(s, key, referent) {
+    if (referent === G.me) return true; // il referente agisce subito
+    const k = s.round + ':' + key;
+    if (G.actionSince[k] === undefined) {
+      G.actionSince[k] = Date.now();
+      return false;
+    }
+    return Date.now() - G.actionSince[k] > STUCK_FALLBACK_MS + myStaggerMs(s);
+  }
+
   async function logicaTick() {
     const s = G.state;
     if (!s || G.busy) return;
+    if (G.backend && G.backend.rateLimitedUntil > Date.now()) return; // backoff 429 attivo
     G.busy = true;
     try {
       if (s.stato === 'attesa') {
         if (G.solo) return;
         if (s.pronti.indexOf(G.me) === -1) {
-          await G.backend.transact(mutReady);
+          await G.backend.transact(mutReady); // azione personale, una volta sola
           return;
         }
-        if (s.pronti.length >= s.partecipanti.length) {
+        if (s.pronti.length >= s.partecipanti.length && mayAct(s, 'start', s.partecipanti[0])) {
           await G.backend.transact(mutStart);
         }
         return;
@@ -837,7 +900,10 @@
 
       if (s.roundData.fase === 'giochi' && s.turno) {
         if (Date.now() > s.turno.deadline + TIMEOUT_GRACE) {
-          await G.backend.transact(mutTimeout);
+          // Agisce chi tiene la patata; se è offline subentrano gli altri.
+          if (mayAct(s, 'timeout', s.turno.giocatore)) {
+            await G.backend.transact(mutTimeout);
+          }
         }
         return;
       }
@@ -846,12 +912,13 @@
         // Risolvi le contestazioni raggiunte (maggioranza di chi non è l'autore)
         const flags = s.roundData.flags || {};
         for (const word of Object.keys(flags)) {
-          if (flagResolved(s, word)) {
+          if (flagResolved(s, word) && mayAct(s, 'flag:' + word, s.partecipanti[0])) {
             const r = await G.backend.transact((st) => mutResolveFlag(st, { word }));
             if (r && r.ok) toast('🚩 "' + word + '" contestata: punti rimossi', 'ok');
+            break; // al massimo una risoluzione per tick
           }
         }
-        if (s.confermaTurno.length >= s.partecipanti.length) {
+        if (s.confermaTurno.length >= s.partecipanti.length && mayAct(s, 'next', s.partecipanti[0])) {
           await G.backend.transact(mutNextRound);
         }
       }
@@ -1309,6 +1376,7 @@
       G.prevTurn = null;
       G.prevUltimoTs = 0;
       G.lastWholeSec = -1;
+      G.actionSince = {};
       el.feedback.className = 'feedback';
       el.feedback.textContent = '';
       el['word-input'].value = '';
@@ -1446,7 +1514,11 @@
       return;
     }
     if (r.failed) {
-      toast('Connessione instabile, riprova', 'err');
+      if (r.rateLimited) {
+        toast('⏳ Firestore sta limitando le richieste: riprova tra qualche istante', 'err');
+      } else {
+        toast('Connessione instabile, riprova', 'err');
+      }
       return;
     }
     SFX.ok();
@@ -1556,6 +1628,10 @@
       G.backend.onError = (e) => {
         toast('Errore di connessione a Firebase', 'err');
         console.error(e);
+      };
+      G.backend.onRateLimit = (msWait) => {
+        const sec = Math.max(1, Math.ceil(msWait / 1000));
+        toast('⏳ Server sovraccarico (limite richieste): riprovo automaticamente tra ' + sec + ' s', 'err');
       };
       G.backend.start();
     }

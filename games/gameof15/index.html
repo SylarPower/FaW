@@ -6,7 +6,7 @@
     <title>GIOCO DEL 15 🧩</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Tektur:wght@500;600;700;800&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
     <!-- Config Firebase condivisa (prima dello script che inizializza Firebase) -->
@@ -22,7 +22,7 @@
             overflow: hidden;
             background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16132d 100%);
             color: #e8e8f0;
-            font-family: 'Inter', -apple-system, sans-serif;
+            font-family: 'Nunito', -apple-system, sans-serif;
             user-select: none;
             cursor: default;
             height: 100vh;
@@ -38,11 +38,11 @@
 
         /* ===== HUD ===== */
         #ui-layer {
-            position: absolute; top: 15px; left: 15px;
+            position: absolute; top: 74px; left: 16px;
             pointer-events: none; z-index: 10;
         }
         .hud-text { font-size: 0.8rem; color: #fff; text-shadow: 2px 2px 0 #000; margin-bottom: 4px; }
-        .score-big { font-family: 'Tektur', 'Inter', sans-serif; font-size: 1.3rem; color: #fbbf24; font-weight: 800; font-variant-numeric: tabular-nums; }
+        .score-big { font-family: 'Nunito', system-ui, sans-serif; font-size: 1.3rem; color: #fbbf24; font-weight: 800; font-variant-numeric: tabular-nums; }
         .coin-text { font-size: 0.7rem; color: #fbbf24; margin-top: 5px; }
 
         #hud-right {
@@ -50,9 +50,9 @@
             pointer-events: none; z-index: 10;
             text-align: right;
         }
-.timer-display { font-family: 'Tektur', 'Inter', sans-serif; font-size: 1.6rem; color: #a78bfa; font-weight: 800; text-shadow: 0 0 22px rgba(167, 139, 250, 0.45); font-variant-numeric: tabular-nums; }
+.timer-display { font-family: 'Nunito', system-ui, sans-serif; font-size: 1.6rem; color: #a78bfa; font-weight: 800; text-shadow: 0 0 22px rgba(167, 139, 250, 0.45); font-variant-numeric: tabular-nums; }
         .moves-display {
-            font-family: 'Tektur', 'Inter', sans-serif;
+            font-family: 'Nunito', system-ui, sans-serif;
             font-size: 0.95rem; color: #f59e0b;
             font-variant-numeric: tabular-nums;
             margin-top: 8px;
@@ -73,8 +73,8 @@
             padding: 15px 30px; margin: 8px;
             font-family: inherit; font-size: 0.75rem;
             font-weight: 800;
-            background: rgba(255,255,255,0.07); color: #e8e8f0;
-            border: 1px solid rgba(255,255,255,0.16);
+            background: rgba(255,255,255,0.14); color: #ffffff;
+            border: 1px solid rgba(255,255,255,0.45);
             border-radius: 14px;
             cursor: pointer; text-transform: uppercase;
             transition: all 0.2s ease;
@@ -90,7 +90,7 @@
 
         /* ===== TITOLO ===== */
         .game-title {
-            font-family: 'Tektur', 'Inter', sans-serif;
+            font-family: 'Nunito', system-ui, sans-serif;
             font-weight: 800;
             letter-spacing: 1px;
             font-size: 2.7rem;
@@ -129,7 +129,7 @@
             overflow: hidden;
         }
         .mode-card .mode-name {
-            font-family: 'Tektur', 'Inter', sans-serif;
+            font-family: 'Nunito', system-ui, sans-serif;
             font-weight: 700;
         }
         .mode-card::before {
@@ -199,7 +199,7 @@
                         top 0.18s cubic-bezier(0.25, 0.46, 0.45, 0.94),
                         transform 0.1s, box-shadow 0.2s;
             font-size: 1.5rem;
-            font-family: 'Tektur', 'Inter', sans-serif;
+            font-family: 'Nunito', system-ui, sans-serif;
             font-weight: 700;
             color: #fff;
             z-index: 2;
@@ -317,30 +317,7 @@
         .price-tag { color: #ffd700; font-size: 0.6rem; }
         .owned-tag { color: #888; font-size: 0.6rem; }
 
-        /* ===== PULSANTE HOME ===== */
-        #fixed-home-btn {
-            position: fixed; bottom: 20px; right: 20px;
-            z-index: 99999; display: none;
-        }
-        #fixed-home-btn button {
-            background: rgba(16, 17, 32, 0.92);
-            backdrop-filter: blur(14px);
-            -webkit-backdrop-filter: blur(14px);
-            color: #fff;
-            border: 1px solid rgba(124, 58, 237, 0.6);
-            padding: 12px 22px; border-radius: 50px;
-            font-weight: 800; font-size: 0.65rem;
-            letter-spacing: 1px;
-            cursor: pointer;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.55);
-            transition: all 0.2s;
-            font-family: 'Inter', -apple-system, sans-serif;
-        }
-        #fixed-home-btn button:hover {
-            transform: scale(1.07) translateY(-2px);
-            border-color: #22d3ee;
-            box-shadow: 0 14px 36px rgba(0,0,0,0.6), 0 0 22px rgba(34, 211, 238, 0.3);
-        }
+        /* ===== PULSANTE HOME: usa la classe condivisa .fixed-home-btn (faw-ui.css) ===== */
 
         /* ===== PULSANTI IN GIOCO ===== */
         #game-buttons {
@@ -386,7 +363,7 @@
             background: linear-gradient(135deg, #7c3aed, #a855f7);
             border-radius: 10px;
             padding: 5px 14px;
-            font-family: 'Tektur', 'Inter', sans-serif;
+            font-family: 'Nunito', system-ui, sans-serif;
             font-weight: 700;
             font-size: 0.62rem;
             margin: 5px 0;
@@ -626,10 +603,8 @@
         <div class="mp-timer-bar"><div class="mp-timer-fill" id="mp-timer-fill"></div></div>
     </div>
 
-    <!-- PULSANTE HOME -->
-    <div id="fixed-home-btn">
-        <button onclick="tornaHome()">🏠 HOME</button>
-    </div>
+    <!-- PULSANTE HOME (condiviso, sempre visibile) -->
+    <button id="fixed-home-btn" class="fixed-home-btn" onclick="tornaHome()" title="Torna alla home di FaW">🏠 HOME</button>
 
 <script>
 // ============================================
@@ -662,7 +637,6 @@ let mpReadyBusy = false;
 
 if (matchId && mioNome) {
     isMultiplayer = true;
-    document.getElementById('fixed-home-btn').style.display = 'block';
     unsubscribePartita = db.collection("partite").doc(matchId).onSnapshot(doc => {
         const data = doc.data();
         if (!data) return;
@@ -1440,7 +1414,6 @@ function startGame() {
     document.getElementById('hud-right').style.display = 'block';
     document.getElementById('game-buttons').style.display = 'flex';
     document.getElementById('puzzle-container').style.display = 'block';
-    document.getElementById('fixed-home-btn').style.display = isMultiplayer ? 'block' : 'none';
     const shuffleBtn = document.querySelector('#game-buttons button[onclick="shuffleBoard()"]');
     if (shuffleBtn) shuffleBtn.style.display = isMultiplayer ? 'none' : '';
 
@@ -1590,7 +1563,6 @@ async function winGame() {
         document.getElementById('puzzle-container').style.display = 'none';
         document.getElementById('puzzle-board').classList.remove('glow-win');
         document.getElementById('win-screen').style.display = 'flex';
-        if (isMultiplayer) document.getElementById('fixed-home-btn').style.display = 'block';
     }, solved ? 1500 : 500);
 }
 
@@ -1608,7 +1580,6 @@ function backToMenu() {
     document.getElementById('mp-timer').style.display = 'none';
 
     document.getElementById('start-screen').style.display = 'flex';
-    document.getElementById('fixed-home-btn').style.display = 'block';
     showMainRecords();
 }
 
@@ -1807,7 +1778,6 @@ drawBg();
 // ============================================
 updateWalletUI();
 showMainRecords();
-document.getElementById('fixed-home-btn').style.display = 'block';
 if (isMultiplayer) {
     const solo = document.getElementById('solo-actions');
     if (solo) solo.style.display = 'none';

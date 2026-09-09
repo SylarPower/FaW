@@ -13,17 +13,22 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
     <!-- Config Firebase condivisa (prima dello script che inizializza Firebase) -->
     <script src="../shared/firebase-config.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" />
     <link rel="stylesheet" href="base.css" />
     <link rel="stylesheet" href="premium.css" />
   </head>
   <body>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
+    <!-- Pulsante HOME condiviso (come in tutti i giochi FaW) -->
+    <a class="fixed-home-btn" href="../../index.html" aria-label="Torna al portale FaW"
+      >🏠 HOME</a
+    >
+
     <!-- TOP BAR -->
     <div class="topbar">
-      <a class="brand" href="../../index.html" aria-label="Torna al portale FaW"
-        >G<span> / </span></a
-      >
       <h1>GymTracker <span class="pro-label">PRO</span></h1>
       <div style="display: flex; gap: 6px; align-items: center">
         <button

@@ -41,7 +41,7 @@ html {
 }
 body {
   font-family:
-    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   background: var(--bg);
   color: var(--tx);
   min-height: 100vh;
@@ -90,6 +90,33 @@ body {
   border: 1px solid var(--brd);
 }
 
+/* ===== PULSANTE HOME CONDIVISO (stesso stile di .fixed-home-btn in faw-ui.css) ===== */
+.fixed-home-btn {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  z-index: 10010;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  color: #111827;
+  font-family: inherit;
+  font-weight: 800;
+  font-size: 0.84rem;
+  letter-spacing: 0.02em;
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(16, 24, 40, 0.1);
+}
+.fixed-home-btn:active {
+  transform: scale(0.97);
+}
+
 /* ===== TOPBAR ===== */
 .topbar {
   position: sticky;
@@ -97,13 +124,30 @@ body {
   z-index: 100;
   background: rgba(30, 30, 30, 0.92);
   border-bottom: 1px solid var(--brd);
-  padding: 12px 16px;
+  padding: 12px 16px 12px 126px; /* spazio per il pulsante HOME condiviso */
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
+}
+@media (max-width: 480px) {
+  .fixed-home-btn {
+    top: 10px;
+    left: 10px;
+    padding: 8px 12px;
+    font-size: 0.78rem;
+  }
+  .topbar {
+    padding-left: 102px;
+  }
+  .topbar h1 {
+    font-size: 0.95rem;
+  }
+  .topbar .pro-label {
+    display: none;
+  }
 }
 [data-theme="light"] .topbar {
   background: rgba(255, 255, 255, 0.92);
@@ -1133,6 +1177,10 @@ body.is-dragging * {
   display: none;
 }
 body.in-session .topbar {
+  display: none;
+}
+/* in sessione il pulsante HOME condiviso lascia posto al tasto ESCI (←) */
+body.in-session .fixed-home-btn {
   display: none;
 }
 body.in-session .bn {

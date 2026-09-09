@@ -263,6 +263,57 @@ const waitSnap = async (name, pred, what, timeout = 5000) => {
     eq(doc3.patate, { ALFA: 0, BETA: 1, GAMMA: 1 }, 'scottature: BETA e GAMMA');
 
     console.log('\n=================');
+
+    console.log('\n[7] Rate limit 429: backoff + flag rateLimited (anti-flood)');
+    let failsLeft = 0;
+    const rlFsMod = () => ({
+      collection: MockFS.collection.bind(MockFS),
+      runTransaction(fn) {
+        if (failsLeft > 0) {
+          failsLeft--;
+          // come l'SDK compat 9.x: code "unknown" + messaggio con 429
+          const err = new Error('Server responded with status 429');
+          err.code = 'unknown';
+          return Promise.reject(err);
+        }
+        return MockFS.runTransaction(fn);
+      }
+    });
+    rlFsMod.FieldValue = mockFieldValues;
+    const rlClient = new C.FirebaseBackend(rlFsMod, MATCH_ID, 'ALFA');
+    rlClient.start();
+    await sleep(30);
+    let notified = 0;
+    rlClient.onRateLimit = () => { notified++; };
+
+    ok(C.isRateLimitError(Object.assign(new Error('Server responded with status 429'), { code: 'unknown' })), 'isRateLimitError riconosce il 429 "unknown"');
+    ok(C.isRateLimitError({ code: 'resource-exhausted', message: 'quota' }), 'isRateLimitError riconosce resource-exhausted');
+    ok(!C.isRateLimitError(new Error('permession denied')), 'altri errori NON sono rate limit');
+
+    failsLeft = 2;
+    const r1 = await rlClient.transact(C.mutConferma);
+    ok(r1 && r1.failed && r1.rateLimited === true && r1.error.code === 'RATE_LIMIT', 'transazione 429 → {failed, rateLimited}');
+    ok(notified === 1, 'onRateLimit notificato una sola volta per episodio (got ' + notified + ')');
+    ok(rlClient.rateLimitedUntil > Date.now(), 'backoff attivo: rateLimitedUntil nel futuro');
+    ok(rlClient.rateLimitBackoff === 8000, 'backoff raddoppiato 4s → 8s (got ' + rlClient.rateLimitBackoff + 'ms)');
+
+    const r2 = await rlClient.transact(C.mutConferma);
+    ok(r2 && r2.rateLimited === true, 'secondo 429 consecutivo → di nuovo rateLimited');
+    ok(notified === 1, 'nessuna nuova notifica nello stesso episodio');
+    ok(rlClient.rateLimitBackoff === 16000, 'backoff raddoppiato ancora 8s → 16s');
+
+    // connessione tornata sana: round trip ok → reset backoff ed episodio
+    const r3 = await rlClient.transact(C.mutConferma); // stato conclusa → aborted (ma round trip riuscito)
+    ok(r3 && r3.aborted === true, 'transazione successiva torna a funzionare (aborted: stato conclusa)');
+    ok(rlClient.rateLimitBackoff === 4000, 'backoff resettato a 4s');
+    ok(rlClient.rateLimitEpisode === false, 'episodio rate limit chiuso');
+
+    failsLeft = 1;
+    await rlClient.transact(C.mutConferma);
+    ok(notified === 2, 'nuovo episodio 429 → nuova notifica (got ' + notified + ')');
+    rlClient.stop();
+
+    console.log('\n=================');
     console.log(`PASSATI: ${passed}  FALLITI: ${failed}`);
     process.exit(failed ? 1 : 0);
   } catch (e) {
