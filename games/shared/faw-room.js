@@ -1,5 +1,5 @@
 /**
- * FAWRoom — macchina a stati della partita condivisa da Rush e Bomba.
+ * FAWRoom — macchina a stati della partita condivisa dai tre nuovi giochi.
  *
  * Un solo posto per: creazione, invito, lobby, pronto/non pronto, countdown,
  * avvio, chiusura, risultati, abbandono, inattività, rivincita.
@@ -48,19 +48,18 @@
   function deepClone(o) { return o == null ? o : JSON.parse(JSON.stringify(o)); }
 
   function seedFrom(id) {
-    return CORE ? CORE.hashKey(String(id || "FAW")) : String(id || "FAW");
+    var s = String(id || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+    return (s + "FAW").slice(0, 10);
   }
 
   /** Costruisce il documento iniziale di una partita. */
   function buildMatch(o) {
-    var giocatori = Array.from(new Set(o.giocatori));
+    var giocatori = o.giocatori.slice();
     var punteggi = {}, parole = {}, giocatoriMap = {};
     giocatori.forEach(function (n) { punteggi[n] = 0; parole[n] = []; giocatoriMap[n] = { nome: n, visto: now(), pronto: false }; });
     return {
       gioco: o.gioco,
-      versione: 2,
-      minGiocatori: o.minGiocatori || 2,
-      maxGiocatori: o.maxGiocatori || 8,
+      versione: 1,
       stato: "attesa",
       creator: o.creator || giocatori[0],
       host: o.creator || giocatori[0],
@@ -131,11 +130,6 @@
     return 180000;
   }
 
-  function countdownSeconds(cur) {
-    var value = Number((cur.opzioni || {}).countdown);
-    return Number.isFinite(value) && (cur.opzioni || {}).countdown != null ? Math.max(0, Math.min(10, value)) : 5;
-  }
-
   /** Mappa giocatori tolerant: i doc creati dall'hub hanno solo `partecipanti`. */
   function giocatoriMap(data) {
     var out = {};
@@ -194,15 +188,14 @@
     /* ---- scritture aggregate (throttle) ---- */
 
     function schedule() {
-      if (self.closed || self.flushTimer) return;
+      if (self.flushTimer) return;
       self.flushTimer = setTimeout(function () { self.flushTimer = null; flush(); }, FLUSH_MS);
     }
 
     /** Accoda un patch (chiavi dotted supportate) e lo scrive al prossimo flush. */
     function queue(patch, ops) {
-      if (self.closed) return;
       if (!self.pending) self.pending = {};
-      Object.keys(patch || {}).forEach(function (k) { self.pending[k] = patch[k]; });
+      Object.keys(patch).forEach(function (k) { self.pending[k] = patch[k]; });
       if (ops) {
         if (!self.pendingOps) self.pendingOps = {};
         Object.keys(ops).forEach(function (k) {
@@ -218,13 +211,12 @@
     }
 
     function flush() {
-      if (self.writing) return Promise.resolve(false);
       if (self.flushTimer) { clearTimeout(self.flushTimer); self.flushTimer = null; }
       if (!self.pending && !self.pendingOps) return Promise.resolve(false);
       var patch = self.pending, ops = self.pendingOps;
       self.pending = null; self.pendingOps = null;
       var out = {};
-      Object.keys(patch || {}).forEach(function (k) { out[k] = patch[k]; });
+      Object.keys(patch).forEach(function (k) { out[k] = patch[k]; });
       Object.keys(ops || {}).forEach(function (k) { out[k] = ops[k]; });
       self.writing = true;
       return net.update(self.path, out).then(function () {
@@ -234,13 +226,7 @@
         self.lastErr = e;
         emit("status", "offline");
         // rimetti in coda ciò che non è stato scritto, poi ritenta con backoff
-        if (!self.closed) {
-          // Le nuove foglie (soprattutto la presenza) prevalgono sul tentativo fallito.
-          self.pending = Object.assign({}, patch || {}, self.pending || {});
-          var recentOps = self.pendingOps;
-          self.pendingOps = ops || {};
-          queue({}, recentOps);
-        }
+        queue(patch, ops);
         return false;
       });
     }
@@ -260,11 +246,10 @@
     function heartbeat() {
       if (self.closed || !self.data) return;
       var d = self.data;
-      if ((d.partecipanti || []).indexOf(me) < 0 || ["attesa", "pronto", "in_corso"].indexOf(d.stato) < 0) return;
       var visto = now();
       var changed = !d.giocatori || !d.giocatori[me] || Math.abs((d.giocatori[me].visto || 0) - visto) > 8000;
       if (!changed) return;
-      queue({ ["giocatori." + me + ".visto"]: visto });
+      queue({ ["giocatori." + me]: Object.assign({}, (d.giocatori || {})[me] || {}, { nome: me, visto: visto }) });
     }
 
     function inattivi(data) {
@@ -289,9 +274,9 @@
         if (!canMove(cur.stato, to)) return false;
         var patch = { stato: to, riv: (cur.riv || 0) + 1 };
         if (to === "pronto") {
-          var cd = countdownSeconds(cur);
+          var cd = Math.max(3, (cur.opzioni && cur.opzioni.countdown) || 5);
           patch.startAt = now() + cd * 1000;
-          patch.endsAt = patch.startAt + durataMs(cur);
+          patch.endsAt = patch.startAt + (cur.durata || 180000);
         }
         if (to === "chiusura") patch.closeAt = now();
         if (extraFn) Object.assign(patch, extraFn(cur) || {});
@@ -305,16 +290,26 @@
      * Se il reclamante muore, dopo `ttlMs` un altro può riprovare.
      * `work(data)` deve tornare il patch da applicare (o false per niente).
      */
-    function resolveOnce(key, work) {
-      // Claim e risultato nella STESSA transazione. Il vecchio doppio passaggio
-      // scriveva __claim/patch come dati e non controllava mai `fatto`.
+    function resolveOnce(key, work, ttlMs) {
+      ttlMs = ttlMs || 20000;
       return net.transact(self.path, function (cur) {
-        if (!cur || ((cur.claim || {})[key] || {}).fatto) return false;
-        var out = work(cur);
-        if (out === false) return false;
-        var patch = out || {};
-        patch["claim." + key] = { by: me, t: now(), fatto: true };
-        return patch;
+        if (!cur) return false;
+        var c = (cur.claim || {})[key];
+        if (c && !c.fatto && (now() - c.t) < ttlMs && c.by !== me) return false;
+        var claimPatch = {};
+        claimPatch["claim." + key] = { by: me, t: now(), fatto: false };
+        // prima reclama, poi applica: due transazioni brevi evitano blocchi lunghi
+        return { __claim: true, patch: claimPatch };
+      }).then(function (res) {
+        if (!res || !res.applied) return { applied: false };
+        return net.transact(self.path, function (cur) {
+          if (!cur) return false;
+          var out = work(cur);
+          if (out === false) return false;
+          var patch = out || {};
+          patch["claim." + key] = { by: me, t: now(), fatto: true };
+          return patch;
+        });
       });
     }
 
@@ -352,16 +347,16 @@
 
     function markReady(v) {
       return net.transact(self.path, function (cur) {
-        if (!cur || cur.stato !== "attesa" || (cur.partecipanti || []).indexOf(me) < 0) return false;
+        if (!cur || cur.stato !== "attesa") return false;
         var p = cur.pronti || [];
         var has = p.indexOf(me) >= 0;
         if (has === !!v) return false;
         var patch = v
-          ? { pronti: net.ops.arrayUnion(me), ["giocatori." + me]: Object.assign({}, (cur.giocatori || {})[me] || {}, { nome: me, pronto: true, visto: now() }) }
-          : { pronti: net.ops.arrayRemove(me), ["giocatori." + me]: Object.assign({}, (cur.giocatori || {})[me] || {}, { nome: me, pronto: false, visto: now() }) };
+          ? { pronti: net.ops.arrayUnion(me), ["giocatori." + me]: Object.assign({}, cur.giocatori[me] || {}, { nome: me, pronto: true, visto: now() }) }
+          : { pronti: net.ops.arrayRemove(me), ["giocatori." + me]: Object.assign({}, cur.giocatori[me] || {}, { nome: me, pronto: false, visto: now() }) };
         return patch;
       }).then(function (res) {
-        if (res && res.applied && v) return maybeStart().then(function () { return res; });
+        if (res && res.applied && v) maybeStart();
         return res;
       });
     }
@@ -375,34 +370,25 @@
      */
     function maybeStart(opts) {
       opts = opts || {};
-      function transition(cur) {
+      return net.transact(self.path, function (cur) {
         if (!cur || cur.stato !== "attesa") return false;
         var tot = (cur.partecipanti || []).length;
-        var pronti = (cur.pronti || []).filter(function (n) { return cur.partecipanti.indexOf(n) >= 0; });
-        if (tot < (cur.minGiocatori || 2)) return false;
+        var pronti = cur.pronti || [];
         if (opts.forza) {
-          if (cur.host !== me || opts.nome !== me || !tot) return false;
+          if (cur.host !== opts.nome || !tot) return false;
         } else if (pronti.length < tot) return false;
-        var cd = countdownSeconds(cur);
+        var cd = Math.max(3, (cur.opzioni && cur.opzioni.countdown) || 5);
         var startAt = now() + cd * 1000;
-        var patch = { stato: "pronto", startAt: startAt, endsAt: startAt + durataMs(cur) };
+        var patch = { stato: "pronto", startAt: startAt, endsAt: startAt + (cur.durata || 180000) };
         if (opts.forza) { patch.forzatoDa = opts.nome; patch.pronti = (cur.partecipanti || []).slice(); }
         return patch;
-      }
-      var lessico = global.FAWLessico;
-      if (!lessico || !net.transactMany) return net.transact(self.path, transition);
-      return net.transactMany([self.path, lessico.PUB], function (docs) {
-        var cur = docs[self.path], patch = transition(cur);
-        if (!patch) return false;
-        if (["categoria-rush", "bomba-parole"].indexOf(cur.gioco) >= 0 && !cur.lessico) patch.lessico = lessico.forMatch(cur, docs[lessico.PUB]);
-        var writes = {}; writes[self.path] = patch; return writes;
-      }).then(function (r) { return { applied: r.applied, data: r.data[self.path] }; });
+      });
     }
 
     function addPlayer(nome) {
       if (!nome) return Promise.resolve(false);
       return net.transact(self.path, function (cur) {
-        if (!cur || isStale(cur) || ["attesa", "pronto", "in_corso"].indexOf(cur.stato) < 0) return false;
+        if (!cur) return false;
         if ((cur.partecipanti || []).indexOf(nome) >= 0) return false;
         if ((cur.partecipanti || []).length >= (cur.maxGiocatori || 8)) return false;
         var mid = cur.stato === "in_corso" || cur.stato === "pronto" || cur.stato === "chiusura";
@@ -410,8 +396,9 @@
           partecipanti: net.ops.arrayUnion(nome),
           ["punteggi." + nome]: 0,
           ["parole." + nome]: [],
-          ["giocatori." + nome]: { nome: nome, visto: now(), pronto: false, entraInCorsa: mid }
+          ["giocatori." + nome]: { nome: nome, visto: now(), pronto: !mid, entraInCorsa: mid }
         };
+        if (!mid) patch.pronti = net.ops.arrayUnion(nome);
         return patch;
       });
     }
@@ -439,13 +426,13 @@
     /** L'host non risponde: il primo che arriva reclama l'hosting. */
     function claimHost() {
       return net.transact(self.path, function (cur) {
-        if (!cur || (cur.partecipanti || []).indexOf(me) < 0 || ["attesa", "pronto", "in_corso"].indexOf(cur.stato) < 0) return false;
+        if (!cur) return false;
         var t = now();
         var hostVisto = ((cur.giocatori || {})[cur.host] || {}).visto || 0;
         if (cur.host === me) return false;
         if (t - hostVisto < HOST_LOST_MS) return false;
         var patch = { host: me, hostClaim: { by: me, t: t } };
-        patch["giocatori." + me] = Object.assign({}, (cur.giocatori || {})[me] || {}, { nome: me, visto: t });
+        patch["giocatori." + me] = Object.assign({}, cur.giocatori[me] || {}, { nome: me, visto: t });
         return patch;
       });
     }
@@ -457,43 +444,33 @@
 
     /* ---- rivincita ---- */
 
-    var rematchPromise = null;
     function proposeRematch(overrides) {
-      if (rematchPromise) return rematchPromise;
-      rematchPromise = net.get(self.path).then(function (snap) {
-        var base = snap.data;
-        if (!base || ["risultati", "conclusa"].indexOf(base.stato) < 0 || (base.partecipanti || []).indexOf(me) < 0) {
-          throw new Error("La rivincita si propone a partita finita.");
-        }
-        if (base.prossimaPartita) return base.prossimaPartita;
-        var id = self.id + "_r";
-        var opzioni = Object.assign({}, base.opzioni, (overrides && overrides.opzioni) || {});
-        delete opzioni.seed; // il seed della partita precedente non deve prevalere sul nuovo
-        var nuovo = buildMatch({
-          gioco: base.gioco, creator: me,
-          giocatori: (overrides && overrides.giocatori) || base.partecipanti,
-          opzioni: opzioni, cfg: Object.assign({}, base.cfg, (overrides && overrides.cfg) || {}),
-          durata: (overrides && overrides.durata) || base.durata,
-          maxGiocatori: base.maxGiocatori, minGiocatori: base.minGiocatori, seed: seedFrom(id)
-        });
-        nuovo.rivincitaDi = self.id;
-        return net.transact(COLLECTION + "/" + id, function (cur) { return cur ? false : nuovo; })
-          .then(function () {
-            return net.transact(self.path, function (cur) {
-              if (!cur || cur.prossimaPartita) return false;
-              return { prossimaPartita: id, prossimaPartitaCreataDa: me,
-                rivincitaAccettataDa: [me], rivincitaRifiutataDa: [] };
-            });
-          }).then(function (res) { return (res.data && res.data.prossimaPartita) || id; });
-      }).finally(function () { rematchPromise = null; });
-      return rematchPromise;
+      var base = deepClone(self.data || {});
+      var giocatori = (overrides && overrides.giocatori) || base.partecipanti || [me];
+      var nuovo = buildMatch({
+        gioco: base.gioco,
+        creator: me,
+        giocatori: giocatori,
+        opzioni: Object.assign({}, base.opzioni, (overrides && overrides.opzioni) || {}),
+        cfg: Object.assign({}, base.cfg, (overrides && overrides.cfg) || {}),
+        durata: (overrides && overrides.durata) || base.durata
+      });
+      nuovo.rivincitaDi = self.id;
+      return net.add(COLLECTION, nuovo).then(function (id) {
+        return net.update(self.path, {
+          prossimaPartita: id,
+          prossimaPartitaCreataDa: me,
+          rivincitaAccettataDa: [me],
+          rivincitaRifiutataDa: []
+        }).then(function () { return id; });
+      });
     }
 
     function acceptRematch() {
       var nxt = self.data && self.data.prossimaPartita;
       if (!nxt) return Promise.resolve(false);
       return net.transact(path, function (cur) {
-        if (!cur || !cur.prossimaPartita || (cur.partecipanti || []).indexOf(me) < 0) return false;
+        if (!cur) return false;
         if ((cur.rivincitaAccettataDa || []).indexOf(me) >= 0) return false;
         return { rivincitaAccettataDa: net.ops.arrayUnion(me) };
       }).then(function () { return nxt; });
@@ -525,7 +502,7 @@
 
     function startWatchdog(fn, ms) {
       var t = setInterval(function () {
-        if (typeof document !== "undefined" && document.hidden) return;
+        if (document && document.hidden) return;
         try { fn(); } catch (e) {}
       }, ms || 4000);
       self.subs.push({ __timer: t });
@@ -536,26 +513,20 @@
 
     function start(handlers) {
       if (handlers) on(handlers);
-      if (self.un) return self;
       self.un = net.onDoc(self.path, function (data, meta) {
         if (self.closed) return;
         if (data === null && meta && meta.missing) {
           emit("gone", meta);
           return;
         }
-        if (meta && meta.error) { self.lastErr = meta.error; emit("status", "offline"); emit("error", meta.error); return; }
-        if (!data) return;
-        self.lastErr = null;
         self.data = data;
-        emit("status", "online");
         emit("state", data);
-        heartbeat();
         // all'avvio: se la partita è ferma a metà da una ricarica, riprende
-        if (data && data.stato === "attesa" && (data.pronti || []).indexOf(me) >= 0) maybeStart().catch(function () { emit("status", "offline"); });
+        if (data && data.stato === "attesa" && (data.pronti || []).indexOf(me) >= 0) maybeStart();
       });
       self.hbTimer = setInterval(heartbeat, 12000);
       if (global.addEventListener) {
-        self._vis = function () { if (!document.hidden) { heartbeat(); flush(); maybeStart().catch(function () { emit("status", "offline"); }); } };
+        self._vis = function () { if (!document.hidden) { heartbeat(); flush(); maybeStart(); } };
         document.addEventListener("visibilitychange", self._vis);
       }
       return self;
@@ -587,11 +558,15 @@
 
   function create(opts) {
     var net = opts.net || NET;
-    var id = opts.id || (CORE ? CORE.shortId("M").toUpperCase() : "M" + Date.now());
-    var doc = buildMatch(Object.assign({}, opts, { seed: opts.seed || seedFrom(id) }));
-    // Scegli prima l'id: una risposta di rete persa non crea una seconda sala.
-    return net.transact(COLLECTION + "/" + id, function (cur) { return cur ? false : doc; })
-      .then(function () { return id; });
+    var doc = buildMatch(opts);
+    doc.maxGiocatori = opts.maxGiocatori || 8;
+    return net.add(COLLECTION, doc).then(function (id) {
+      return net.update(COLLECTION + "/" + id, { seed: seedFrom(id) }).then(function () { return id; });
+    }).catch(function (e) {
+      // fallback browser senza add(): doc id deterministico
+      var id = (CORE ? CORE.shortId("m") : "m" + Date.now());
+      return net.set(COLLECTION + "/" + id, doc).then(function () { return id; });
+    });
   }
 
   function remaining(data, field) {

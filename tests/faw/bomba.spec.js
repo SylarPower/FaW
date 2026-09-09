@@ -183,7 +183,7 @@ test("bomba: due dispositivi — stesso round, turno, passaggio, e chi non tocca
 
     // BOB non può passare: bottone spento e scritta chiara, senza messaggi d'errore
     await expect(bob.page.locator("#btn-passa")).toBeDisabled();
-    await expect(bob.page.locator("#btn-passa")).toHaveText("Aspetta il turno");
+    await expect(bob.page.locator("#btn-passa")).toHaveText("Non è la tua mano");
     // e se forza il transato, le regole lo rifiutano
     const forcato = await bob.page.evaluate((p) => window.FAWBombaRules.puoPassare(window.FAWBomba.stato.data, "BOB", { ora: Date.now(), testo: p, roundIdx: 0 }).motivo, await cercaParola(bob.page, seqA, []));
     expect(forcato).toBe("NON_TUOI");
@@ -254,10 +254,7 @@ test("bomba: doppio tocco = un solo passaggio (scritture idempotenti)", async ({
     const parola = await cercaParola(a, seq, []);
     await a.fill("#inp-parola", parola);
     // due invii quasi simultanei
-    // Un doppio click reale, non due comandi Playwright che possono attendere
-    // il turno successivo dopo che il primo ha correttamente spento il pulsante.
-    await expect(a.locator("#btn-passa")).toBeEnabled();
-    await a.locator("#btn-passa").dblclick();
+    await Promise.all([a.click("#btn-passa"), a.click("#btn-passa")]);
     await waitDoc(a, s.matchId, (doc) => doc.bomba.passaggi.ALICE >= 1, "passaggio registrato");
     await a.waitForTimeout(1200);
     const doc = await doc0(a, s.matchId);
@@ -387,7 +384,7 @@ test("bomba: fine partita, classifica e rivincita con un tap", async ({ browser 
   } finally { await s.chiudi(); }
 });
 
-test("bomba: 320px senza overflow, hero fermo quando la tastiera apre, nessuna funzione audio", async ({ browser }) => {
+test("bomba: 320px senza overflow, hero fermo quando la tastiera apre, audio disattivabile", async ({ browser }) => {
   const { ctx, page } = await A.contesto(browser, "ALICE", { viewport: { width: 320, height: 568 }, touch: true });
   await apriBomba(page, null, "solo=1");
   await page.waitForFunction(() => window.FAWBomba.stato.data && window.FAWBomba.stato.data.bomba.round, null, { timeout: 15000 });
@@ -419,17 +416,19 @@ test("bomba: 320px senza overflow, hero fermo quando la tastiera apre, nessuna f
   expect(dopo.frmPos, "il form non deve essere position:fixed").not.toBe("fixed");
   expect(dopo.inputVibile, "l'input resta visibile dopo il focus").toBe(true);
   // target touch minimi
-  const dimensioni = await page.evaluate(() => ["#btn-passa", "#btn-regole", "#inp-parola"].map((s) => {
+  const dimensioni = await page.evaluate(() => ["#btn-passa", "#btn-audio", "#btn-regole", "#inp-parola"].map((s) => {
     const r = document.querySelector(s).getBoundingClientRect();
     return { s, h: Math.round(r.height), w: Math.round(r.width) };
   }));
   for (const d of dimensioni) expect(d.h, d.s + " troppo basso per il pollice").toBeGreaterThanOrEqual(44);
   const larga = dimensioni.find((d) => d.s === "#inp-parola");
   expect(larga.w, "il campo parola deve restare comodo da digitare a 320px").toBeGreaterThanOrEqual(150);
-  // Tutte le informazioni restano visive; non c'è un motore audio nascosto.
-  await expect(page.locator("#btn-audio")).toHaveCount(0);
-  expect(await page.evaluate(() => ["beep", "soundOn", "setSoundOn", "armaSuoni"].some(k => k in FAWCore))).toBe(false);
-  await expect(page.locator("#fuse-lab")).not.toHaveText("");
+  // audio: si spegne, e l'informazione della miccia resta tutta visiva
+  const lab = await page.locator("#fuse-lab").textContent();
+  await page.click("#btn-audio");
+  expect(await page.locator("#btn-audio").getAttribute("aria-pressed")).toBe("false");
+  expect(await page.locator("#fuse-lab").textContent()).toBe(lab, "niente informazione persa spegnendo l'audio");
+  expect(await page.evaluate(() => window.FAWCore.soundOn())).toBe(false, "audio spento per davvero");
   expect(page.__errors || [], "errori di pagina: " + JSON.stringify(page.__errors)).toEqual([]);
   await ctx.close();
 });

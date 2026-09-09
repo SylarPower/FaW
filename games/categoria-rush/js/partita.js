@@ -1,594 +1,964 @@
 /**
- * Rush — controller e viste. Le transizioni sono tutte in regole.js.
- * Allenamento e multiplayer consumano lo stesso documento e gli stessi reducer.
- * Il ticker anima il tempo; solo risposte, voti e confini di fase scrivono in rete.
+ * Categoria Rush — client di gioco (DOM + rete).
+ *
+ * Le decisioni di punteggio stanno in `js/regole.js` (pure, testate). Questo file
+ * fa solo tre cose: mostrare lo stato, raccogliere UNA risposta per round, e
+ * chiudere i round con una transazione per round (mai per tasto premuto).
+ *
+ * Timing: i round derivano da `startAt` (timestamp del server stimato da
+ * FAWNet.clock()), quindi un reload o un ritardo di rete non spostano la domanda:
+ * si riprende il round in corso con il tempo vero rimasto.
+ *
+ * Limite dichiarato: la validazione è client-side e chiude il round il primo
+ * client che ci arriva. È un gioco tra amici, non un sistema anti-cheat.
  */
 (function (global) {
   "use strict";
-  var CORE = global.FAWCore, NET = global.FAWNet, ROOM = global.FAWRoom;
-  var CAT = global.FAWCategorie, N = global.FAWNcc, R = global.FAWRushRules, CFG = R.CFG;
+
+  var CORE = global.FAWCore;
+  var NET = global.FAWNet;
+  var ROOM = global.FAWRoom;
+  var CAT = global.FAWCategorie;
+  var R = global.FAWRushRules;
+  var CFG = R.CFG;
+
   var $ = function (id) { return document.getElementById(id); };
-  var esc = CORE.escapeHtml;
-  var ora = function () { return NET.clock(); };
-  var setup = { durata: 120, giocatori: 2, mode: "classiche", colonne: 6 };
+  function el(id) { return $(id); }
   var stato = {
-    me: "", matchId: null, room: null, data: null, dataLocale: null, solo: false,
-    rounds: [], idx: -1, fase: "attesa", modale: "classiche", inGioco: false,
-    pending: null, pendingVote: null, pendingNext: null, reviewCat: null, reviewIdx: -1, serial: 0, closing: false, retryAt: 0,
-    feedback: null, joining: false, screen: "boot"
+    me: "", matchId: null, room: null, data: null,
+    solo: false, seed: "", rounds: [], idx: -1, fase: "attesa",
+    modale: "classiche", roundMs: CFG.roundMs, inputMs: CFG.inputMs,
+    inviatoRound: -1, inGioco: false, t0: 0, risultatiShown: false,
+    dataLocale: null, error: null, _chiudendo: false
   };
-  var scheda = null;
-  var timer = null, retryTimer = null, statusOff = null;
+
   var MOTIVI = {
-    SCHEDA_NON_VALIDA: "Correggi i campi segnalati, oppure svuotali per una consegna parziale.",
-    BOZZA_SUPERATA: "È già stata salvata una bozza più recente. Ricarica prima di consegnare.",
-    VUOTO: "Scrivi una risposta.", CORTA: "Servono almeno 3 lettere.", LUNGA: "Massimo 40 caratteri.",
-    CARATTERI: "Usa solo lettere, spazi, apostrofi o trattini. Niente numeri o simboli.",
-    LETTERA: "La risposta deve iniziare con «{L}».",
-    NON_CATEGORIA: "Non è nell’elenco di «{C}». Prova un’altra risposta: hai ancora tempo.",
-    GIA_DATA: "Hai già usato questa risposta. Scegline un’altra.",
-    CATEGORIA_SCONOSCIUTA: "Categoria non disponibile. Ricarica la pagina.",
-    DIZIONARIO_ASSENTE: "Database categorie non caricato. Ricarica la pagina.",
-    ROUND_SUPERATO: "Il round è cambiato. Questa risposta non è stata inviata nel nuovo round.",
-    ROUND_GIA_CHIUSO: "Tempo scaduto: la risposta non è arrivata entro il round.",
-    ROUND_GIA_PUNTEGGIATO: "Questo round è già concluso.",
-    HAI_GIA_RISPOSTO: "La risposta di questo round è definitiva: vale quella già inviata.",
-    COUNTDOWN_IN_CORSO: "Aspetta il via.", NON_PARTECIPANTE: "Non sei tra i giocatori di questa sala.",
-    PARTITA_NON_IN_GIOCO: "La partita non è in corso.", PARTITA_NON_TROVATA: "Partita non trovata."
+    VUOTO: "Scrivi una parola.",
+    CORTA: "Servono almeno 3 lettere.",
+    LUNGA: "Troppo lunga: massimo 40 caratteri.",
+    CARATTERI: "Solo lettere, niente numeri.",
+    LETTERA: "Deve iniziare con «{L}».",
+    NON_CATEGORIA: "Non è una risposta di «{C}».",
+    GIA_DATA: "L'avevi già data in un round precedente.",
+    TROPPO_CORTA: "Serve una risposta di almeno 8 lettere (o due parole).",
+    CATEGORIA_SCONOSCIUTA: "Categoria non disponibile: riprova a ricaricare.",
+    DIZIONIONARIO_ASSENTE: "Database categorie non caricato."
   };
-  function messaggio(motivo, combo) {
-    return (MOTIVI[motivo] || "Invio non riuscito. Riprova.").replace("{L}", (combo || {}).lettera || "?").replace("{C}", (combo || {}).nome || "questa categoria");
-  }
-  function text(id, value) { var n = $(id), v = String(value); if (n && n.textContent !== v) n.textContent = v; }
-  function html(id, value) { var n = $(id); if (n && n._html !== value) { n.innerHTML = value; n._html = value; } }
-  function show(screen) {
-    if (stato.screen === screen && document.body.dataset.schermo === screen) return;
-    ["boot", "crea", "lobby", "gioco", "risultati"].forEach(function (s) { $("schermo-" + s).hidden = s !== screen; });
-    stato.screen = screen;
-    global.scrollTo(0, 0);
-    document.body.dataset.schermo = screen;
-  }
-  function errore(titolo, descrizione, retry) {
-    stato.inGioco = false;
-    show("boot");
-    $("boot-spinner").hidden = true;
-    text("boot-title", titolo); text("boot-msg", descrizione);
-    $("btn-riprova").hidden = !retry;
-  }
-  function feedback(testo, ko) {
-    stato.feedback = { round: stato.idx, testo: testo, ko: !!ko };
-    text("feedback", testo);
-    $("feedback").classList.toggle("is-ko", !!ko);
-    $("inp-risposta").setAttribute("aria-invalid", String(!!ko));
-  }
-  function connesso(status) {
-    $("conn").hidden = status === "online" || stato.solo;
-    $("conn").querySelector(".t").textContent = "Connessione interrotta. Il tempo continua: l’invio vale solo se confermato entro il round.";
-  }
-  function attuale() { return stato.data ? R.fasePartita(stato.data, ora()) : null; }
-  function risposte(d, i) { return (((d || {}).rush || {}).risposte || {})[i] || {}; }
-  function mia(d, i) { return risposte(d, i)[stato.me]; }
-  function membro(d) { return (d.partecipanti || []).indexOf(stato.me) >= 0; }
-
-  /* -------------------------- sala / stato -------------------------- */
-  function ricevi(d) {
-    if (!d) return;
-    stato.serial++;
-    stato.data = d;
-    if (stato.solo) stato.dataLocale = d;
-    var conf = R.impostazioni(d);
-    stato.rounds = conf.domande; stato.modale = conf.modale;
-    stato.roundMs = conf.ciclo.roundMs; stato.inputMs = conf.ciclo.inputMs;
-    stato.durataMs = conf.rounds * conf.ciclo.roundMs;
-    stato.seed = (d.opzioni || {}).seed || d.seed;
-    document.body.dataset.mode = stato.modale;
-    if (d.stato === "annullata") { errore("Sfida annullata", "Questa sala è stata chiusa. Puoi creare un nuovo Rush dal portale."); return; }
-    if (d.stato === "conclusa" || d.stato === "risultati") { renderRisultati(d); return; }
-    var f = attuale();
-    if (d.stato === "attesa" || (d.stato === "pronto" && f.fase === "attesa")) {
-      stato.inGioco = false; show("lobby"); renderLobby(d); countdown(d);
-    } else {
-      stato.inGioco = true; show("gioco"); renderRound(d, f);
-    }
-    avanza();
+  function motivoTesto(m, combo) {
+    var t = MOTIVI[m] || "Risposta non accettata.";
+    return t.replace("{L}", (combo && combo.lettera) || "?").replace("{C}", (combo && combo.nome) || "categoria");
   }
 
-  function scrivi(mutate) {
-    if (stato.solo) {
-      var patch = mutate(stato.data);
-      if (patch) ricevi(NET.applyPatch(stato.data, patch));
-      return Promise.resolve({ applied: !!patch, data: stato.data });
-    }
-    var serial = stato.serial;
-    return NET.transact(stato.room.path, mutate).then(function (res) {
-      // Una risposta di transazione non deve riportare indietro uno snapshot più recente.
-      if (res.applied && serial === stato.serial) ricevi(res.data);
-      return res;
-    });
-  }
+  function ora() { return NET && NET.clock ? NET.clock() : Date.now(); }
+  var tocca = (typeof matchMedia === "function" && matchMedia("(hover: none)").matches);
+  function comboDi(i) { return stato.rounds[i] || null; }
+  function roundDi(data, i) { return (((data || {}).rush || {}).risposte || {})[i] || {}; }
 
-  function collegati() {
-    if (stato.room) stato.room.stop();
-    stato.joining = false;
-    stato.room = ROOM.open({ matchId: stato.matchId, nome: stato.me, net: NET });
-    stato.room.start({
-      state: function (d) {
-        if (d.gioco !== "categoria-rush") { errore("Questo invito non è per Rush", "Apri il gioco corretto dalla lista delle sfide."); return; }
-        if (membro(d)) { ricevi(d); return; }
-        if (stato.joining) return;
-        if (ROOM.isStale(d) || ["attesa", "pronto", "in_corso"].indexOf(d.stato) < 0) { errore("Sala chiusa", "L’invito è scaduto o la partita è già terminata."); return; }
-        if ((d.partecipanti || []).length >= (d.maxGiocatori || 8)) { errore("La sala è al completo", "Chiedi un nuovo invito al tuo amico."); return; }
-        if (!CORE.user()) { errore("Accedi per entrare", "Torna al portale ed effettua l’accesso, poi riapri questo invito."); return; }
-        stato.joining = true;
-        stato.room.addPlayer(stato.me).then(function (res) {
-          if (res.data && membro(res.data)) ricevi(res.data);
-          else errore("Ingresso non riuscito", "La sala è piena o non è più aperta.");
-        }).catch(function () { errore("Connessione non riuscita", "Non siamo riusciti a entrare nella sala.", true); })
-          .finally(function () { stato.joining = false; });
-      },
-      gone: function () { errore("Invito non disponibile", "La sala è stata rimossa oppure il link non è corretto."); },
-      error: function (code) { if (!stato.data) errore("Sala non raggiungibile", code === "permission-denied" ? "Firebase non consente l’accesso a questa sala. Torna al portale e riprova." : "Controlla la connessione e riprova.", true); },
-      status: connesso
-    });
-    stato.room.startWatchdog(function () {
-      if (!stato.data || !membro(stato.data)) return;
-      avanza();
-      var d = stato.data, visto = ((d.giocatori || {})[d.host] || {}).visto || 0;
-      if (["attesa", "pronto", "in_corso"].indexOf(d.stato) >= 0 && d.host !== stato.me && ora() - visto > 45000) {
-        stato.room.claimHost().catch(function () {});
-      }
-    }, 2500);
-    startTimer();
-  }
+  /* ------------------------------- avvio -------------------------------- */
 
-  function renderLobby(d) {
-    var pronti = d.pronti || [], nomi = d.partecipanti || [], countdownOn = d.stato === "pronto";
-    text("top-stato", "Sala d’attesa · " + nomi.length + " giocatori");
-    text("lobby-count", pronti.length + "/" + nomi.length + " pronti");
-    text("lobby-meta", stato.rounds.length + " round · " + (stato.modale === "creative" ? "Creativo · voto tra amici" : stato.modale === N.MODE ? "Nomi, Cose, Città · " + stato.rounds[0].categorie.length + " categorie" : "Sprint · lettera e categoria"));
-    html("lobby-lista", nomi.map(function (n) {
-      var pronto = pronti.indexOf(n) >= 0;
-      return '<div class="faw-row"><span class="faw-avatar">' + esc(CORE.initials(n)) + '</span><span class="faw-row__main"><b class="faw-row__name">' + esc(n) + (n === stato.me ? " (tu)" : "") + '</b><small class="faw-row__meta">' + (d.host === n ? "Organizzatore" : "Giocatore") + '</small></span><span class="faw-badge ' + (pronto ? "faw-badge--ok" : "") + '">' + (pronto ? "Pronto ✓" : "In attesa") + '</span></div>';
-    }).join(""));
-    var io = pronti.indexOf(stato.me) >= 0;
-    text("btn-pronto", io ? "Non sono pronto" : "Sono pronto");
-    $("btn-pronto").setAttribute("aria-pressed", String(io));
-    $("btn-pronto").disabled = countdownOn || !membro(d);
-    $("btn-avvia-subito").hidden = d.host !== stato.me || countdownOn || nomi.length < 2;
-    text("lobby-hint", nomi.length < 2 ? "Manca un avversario. Condividi l’invito: la sala non parte da sola." : "Tutti pronti? Si parte automaticamente. L’organizzatore può avviare anche chi è in attesa.");
-  }
-  function countdown(d) {
-    var on = d.stato === "pronto";
-    $("countdown").hidden = !on;
-    if (on) text("countdown-num", Math.max(0, Math.ceil((d.startAt - ora()) / 1000)));
-  }
-
-  /* -------------------------- viste di gioco ------------------------- */
-  function renderRound(d, f) {
-    if (!f) return;
-    var combo = stato.rounds[Math.max(0, f.indice)];
-    if (!combo) return;
-    var faseCambiata = stato.idx !== f.indice || stato.fase !== f.fase;
-    if (stato.idx !== f.indice) {
-      stato.idx = f.indice; stato.feedback = null;
-      $("inp-risposta").value = ""; $("inp-risposta").setAttribute("aria-invalid", "false");
-      text("feedback", "");
-      if (stato.pending && stato.pending.roundIdx !== f.indice) { clearTimeout(retryTimer); stato.pending = null; }
-      if (stato.pendingVote && stato.pendingVote.roundIdx !== f.indice) stato.pendingVote = null;
-      if (stato.pendingNext && stato.pendingNext.roundIdx !== f.indice) stato.pendingNext = null;
-      $("box-altre").open = false;
-    }
-    stato.fase = f.fase;
-    document.body.dataset.phase = f.fase;
-    text("top-stato", stato.solo ? "Allenamento · solo tu e le idee" : (d.partecipanti || []).length + " giocatori · in contemporanea");
-    text("game-mode", stato.solo ? "ALLENAMENTO" : (stato.modale === "creative" ? "CREATIVO" : stato.modale === N.MODE ? "NOMI, COSE, CITTÀ" : "SPRINT"));
-    text("round-n", (Math.max(0, f.indice) + 1) + "/" + f.rounds);
-    html("round-progress", stato.rounds.map(function (_, i) { return '<span class="' + (i < f.indice ? "is-done" : i === f.indice ? "is-current" : "") + '"></span>'; }).join(""));
-    text("round-lettera", combo.lettera || "✳");
-    text("round-categoria", combo.nome);
-    text("round-category-label", stato.modale === N.MODE ? "LA SCHEDA È" : "LA CATEGORIA È");
-    text("round-aiuto", stato.modale === N.MODE ? "Una lettera, " + combo.categorie.length + " categorie. Completa la scheda e chiama lo Stop." : combo.lettera ? "Inizia con «" + combo.lettera + "». Almeno 3 lettere." : "Nessuna lettera obbligatoria. Sorprendi gli altri.");
-    text("round-sr", "Round " + (Math.max(0, f.indice) + 1) + " di " + f.rounds + ". " + (combo.lettera ? "Lettera " + combo.lettera + ". " : "") + "Categoria: " + combo.nome + ". " + (f.fase === "voto" ? "Vota la tua risposta preferita." : f.fase === "rivela" ? "Consegne chiuse. Confrontiamo le risposte." : ""));
-    $("solo-note").hidden = !stato.solo;
-    $("score-guide").hidden = stato.modale !== "classiche";
-    $("ncc-score-guide").hidden = stato.modale !== N.MODE;
-    text("solo-note", stato.modale === N.MODE ? "Allenamento NCC: ogni risposta valida vale 20 punti. Consegna e prosegui al tuo ritmo." : "Allenamento Sprint. Le alternative si sbloccano dopo l’invio o a tempo scaduto.");
-    $("late-note").hidden = !(((d.giocatori || {})[stato.me] || {}).entraInCorsa);
-    document.querySelectorAll("[data-phase]").forEach(function (n) {
-      if (!n.dataset.phase || n === document.body) return;
-      if (n.dataset.phase === "voto") n.hidden = stato.modale !== "creative";
-      if (n.dataset.phase === "rivela") n.textContent = (stato.modale === "creative" ? "03" : "02") + " Confronta";
-      n.classList.toggle("is-active", n.dataset.phase === f.fase);
-    });
-    renderInput(d, f);
-    scheda.render(d, f);
-    renderRisposte(d, f);
-    html("classifica", classificaHtml(R.classifica(d.punteggi || {}, (d.rush || {}).statistiche, { modale: stato.modale })));
-    text("punti-solo", (d.punteggi || {})[stato.me] || 0);
-    var inattivi = stato.solo ? [] : R.inattivi(d.partecipanti, (d.rush || {}).risposte, f.indice - 1);
-    $("chip-inattivi").hidden = !inattivi.length;
-    text("chip-inattivi", inattivi.join(", ") + " non sta rispondendo. La partita continua.");
-    var alternative = stato.solo && stato.modale === "classiche" && combo.lettera && (mia(d, f.indice) || f.fase === "rivela");
-    $("box-altre").hidden = !alternative;
-    if (alternative) text("altre", CAT.rispostePer(CAT.byId(combo.categoria, stato.data.lessico), combo.lettera).join(" · "));
-    renderTimer(f);
-    if (faseCambiata) global.scrollTo(0, 0);
-  }
-
-  function renderInput(d, f) {
-    var m = mia(d, f.indice), p = stato.pending && stato.pending.roundIdx === f.indice;
-    $("frm-risposta").hidden = stato.modale === N.MODE;
-    var timing = (((d.rush || {}).tempi || {})[f.indice] || {});
-    var reason = timing.motivo === "tutti" ? "Tutti hanno consegnato: nessun secondo da aspettare."
-      : timing.stopDa ? timing.stopDa + " ha dato lo Stop! Al massimo 10 secondi agli altri." : "";
-    $("round-reason").hidden = !reason;
-    text("round-reason", reason);
-    var aperto = f.fase === "input" && membro(d);
-    var input = $("inp-risposta"), btn = $("btn-invia");
-    input.disabled = !aperto;
-    input.readOnly = !!m || !!p;
-    btn.disabled = !aperto || !!m || !!p;
-    $("btn-passo").disabled = btn.disabled;
-    text("btn-invia", p ? "Invio…" : m ? "Inviata ✓" : "Invia ↗");
-    input.placeholder = f.fase === "attesa" ? "Si parte tra poco…" : !aperto ? "Tempo scaduto" : "La tua risposta…";
-    $("frm-risposta").classList.toggle("is-lock", !aperto || !!m || !!p);
-    $("frm-risposta").setAttribute("aria-busy", String(!!p));
-    $("receipt").hidden = !m || stato.modale === N.MODE;
-    if (m && stato.modale !== N.MODE) {
-      if (input.value !== m.parola) input.value = m.parola;
-      text("receipt", m.passo ? "✓ Hai passato. Zero punti, ma nessuna attesa inutile." : (stato.solo ? "✓ Accettata: " : "✓ Risposta inviata: ") + m.parola + ". " + (f.fase === "input" ? "I punti arrivano a fine round." : "Risposta definitiva."));
-      stato.inviatoRound = f.indice;
-    } else stato.inviatoRound = -1;
-    var rows = risposte(d, f.indice), nomi = R.giocatoriRound(d, f.indice);
-    var count = nomi.filter(function (n) { return !!rows[n]; }).length;
-    text("round-avanzati", count + "/" + nomi.length);
-    text("chip-stato", f.fase === "input" ? (m ? (stato.solo ? "Risposta acquisita" : "Aspettiamo gli altri") : p ? "In attesa di conferma" : "Tocca anche a te") : f.fase === "voto" ? "Scegli la tua preferita" : f.fase === "attesa" ? "Pronti al via" : "Confrontiamo le risposte");
-    html("giocatori-stato", nomi.map(function (n) { return '<span class="rush-player ' + (rows[n] ? "is-ready" : "") + '">' + (rows[n] ? "✓ " : "· ") + esc(n === stato.me ? "Tu" : n) + '</span>'; }).join(""));
-  }
-
-  function renderTimer(f) {
-    text("timer", CORE.fmtTime(Math.max(0, Math.ceil(f.entroMs / 1000))));
-    text("timer-label", f.fase === "input" ? "Tempo rimasto" : f.fase === "voto" ? "Per votare" : f.fase === "attesa" ? "Si parte tra" : "Prossimo round");
-    $("timer").classList.toggle("is-urgente", f.fase === "input" && f.entroMs <= 5000);
-    var total = f.faseMs || 1;
-    $("round-bar").style.transform = "scaleX(" + Math.max(0, Math.min(1, f.entroMs / total)) + ")";
-  }
-
-  function renderRisposte(d, f) {
-    var i = f.fase === "input" ? f.indice - 1 : f.indice;
-    var rush = d.rush || {}, es = (rush.punteggiRound || {})[i], dettagli = (rush.dettagliRound || {})[i] || {};
-    var votazione = f.fase === "voto", combo = stato.rounds[i];
-    $("rivela").hidden = i < 0 || (!es && !votazione && f.fase !== "rivela");
-    $("box-voto").hidden = !votazione;
-    $("ncc-review-tabs").hidden = stato.modale !== N.MODE || !es;
-    $("box-avanti").hidden = f.fase !== "rivela" || !es;
-    if ($("rivela").hidden) return;
-    text("rivela-conta", "ROUND " + (i + 1) + (combo && combo.lettera ? " / " + combo.lettera + " · " + combo.nome : ""));
-    text("rivela-title", votazione ? "Chi ti ha sorpreso?" : f.fase === "input" ? "Il round appena finito" : "Le vostre risposte");
-    text("rivela-sub", stato.modale === N.MODE ? "20 solo tu · 10 diversa · 5 condivisa · 0 vuota o non valida. Scegli una categoria." : votazione ? "Vota un’altra risposta. Un solo voto, definitivo." : es ? "Velocità e originalità, punto per punto." : "Calcolo dei punti in corso…");
-    var entries = (rush.rivela || {})[i] || risposte(d, i);
-    renderAvanti(d, f);
-    if (stato.modale === N.MODE && es) {
-      if (stato.reviewIdx !== i) { stato.reviewIdx = i; stato.reviewCat = combo.categorie[0]; }
-      html("ncc-review-tabs", combo.categorie.map(function (id) { return '<button class="faw-btn" type="button" data-categoria="' + id + '" aria-pressed="' + (stato.reviewCat === id) + '">' + esc(N.byId(id).nome) + '</button>'; }).join(""));
-      html("rivela-lista", tabellaSchede(entries, R.giocatoriRound(d, i), stato.reviewCat));
+  function avvio() {
+    CORE.initTheme();
+    CORE.armaSuoni();
+    stato.me = CORE.user() || "OSPITE";
+    var matchId = CORE.qs("matchId");
+    var gUrl = CORE.qs("griglia"), dUrl = parseInt(CORE.qs("durata"), 10);
+    if (dUrl === 120 || dUrl === 180) stato.durataScelta = dUrl;
+    if (gUrl === "creative") stato.modeScelto = "creative";
+    if (!matchId) {
+      if (CORE.qs("solo") === "1") avviaSolo();
+      else { mostra("crea"); bindCrea(); }
       return;
     }
-    html("rivela-lista", R.giocatoriRound(d, i).map(function (n) {
-      var r = entries[n], det = dettagli[n] || {}, good = r && r.parola && r.ok !== false;
-      var tag = !good ? "Nessuna risposta valida" : votazione ? "Da votare" : stato.modale === "creative" ? (det.voti || 0) + " voti" : det.condivisa === 1 ? "Unica ✳" : "In comune";
-      var breakdown = es && good ? (stato.modale === "creative" ? (det.base || 0) + " partecipazione + " + (det.voti || 0) * CFG.puntiVoto + " voti" : (det.base || 0) + " base + " + (det.velocita || 0) + " velocità + " + (det.originalita || 0) + " originalità") : "";
-      return '<div class="riv-riga ' + (n === stato.me ? "is-me" : "") + '"><p class="chi">' + esc(n) + (n === stato.me ? " · tu" : "") + '</p><p class="cosa ' + (good ? "" : "is-ko") + '">' + esc(good ? r.parola : r && r.motivo === "PASSO" ? "Passo" : "Tempo scaduto") + '</p><div class="riv-meta"><span>' + esc(tag) + '</span><b>' + (es ? "+" + (es[n] || 0) : "—") + '</b></div>' + (breakdown ? '<p class="riv-breakdown">' + esc(breakdown) + '</p>' : "") + '</div>';
-    }).join(""));
-    if (votazione) {
-      var voto = ((rush.voti || {})[i] || {})[stato.me], locked = !!voto || !!stato.pendingVote;
-      var candidati = R.giocatoriRound(d, i).filter(function (n) { return n !== stato.me && entries[n] && entries[n].parola && entries[n].ok !== false; });
-      text("voto-hint", voto ? (voto.astensione ? "✓ Astensione registrata." : "✓ Hai votato " + voto.voto + ". Grazie!") : stato.pendingVote ? "Conferma del voto…" : candidati.length ? "Scegli chi merita il bonus, oppure astieniti. Tutti finiti? Avanti subito." : "Nessun’altra risposta da votare. Si prosegue automaticamente.");
-      $("btn-astieni").disabled = locked || !candidati.length;
-      html("voto-bottoni", candidati.map(function (n) { return '<button type="button" class="faw-btn" data-voto="' + esc(n) + '" aria-pressed="' + String(!!voto && voto.voto === n) + '"' + (locked ? " disabled" : "") + '>👏 ' + esc(n) + '</button>'; }).join(""));
-    }
+    stato.matchId = matchId;
+    NET.init({ backend: "auto" });
+      // opt-in (?auth=anon / faw:auth:anon=1): mette l'uid di Firebase Auth nel
+      // documento partita (`authUid`). Di default è un no-op: nessun comportamento
+      // cambia, e i test girano con il backend finto dove è dichiaratamente null.
+      NET.ensureSignedIn();
+    collegati();
   }
 
-  function ragioneNcc(r) {
-    if (!r) return "Non compilata";
-    return { ESCLUSIVA: "Solo tu", UNICA: "Diversa", CONDIVISA: "Condivisa", MANCANTE: "Non compilata", LETTERA: "Lettera errata", NON_CATEGORIA: "Fuori elenco", CORTA: "Troppo corta", LUNGA: "Troppo lunga", CARATTERI: "Caratteri non ammessi" }[r.esito] || "Non valida";
-  }
-  function tabellaSchede(entries, players, id) {
-    return '<table class="ncc-table"><caption class="faw-sr">' + esc(N.byId(id).nome) + '</caption><thead><tr><th scope="col">Giocatore</th><th scope="col">Risposta</th><th scope="col">Punti</th></tr></thead><tbody>' + players.map(function (nome) {
-      var cell = ((entries[nome] || {}).scheda || {})[id];
-      return '<tr class="' + (nome === stato.me ? "is-me" : "") + '"><th scope="row">' + esc(nome === stato.me ? "Tu" : nome) + '</th><td>' + esc(cell && cell.parola || "—") + '<small>' + esc(ragioneNcc(cell)) + '</small></td><td><b>+' + (cell && cell.punti || 0) + '</b></td></tr>';
-    }).join("") + '</tbody></table>';
-  }
-  function renderAvanti(d, f) {
-    if (f.fase !== "rivela") return;
-    var a = (((d.rush || {}).avanti || {})[f.indice] || {}), players = R.giocatoriRound(d, f.indice);
-    $("btn-avanti").disabled = !!a[stato.me] || !!stato.pendingNext || players.indexOf(stato.me) < 0;
-    text("btn-avanti", a[stato.me] ? "Pronto ✓" : stato.pendingNext ? "Conferma…" : f.indice === f.rounds - 1 ? "Pronto, risultati ↗" : "Pronto, avanti ↗");
-    text("avanti-hint", players.filter(function (n) { return !!a[n]; }).length + "/" + players.length + " pronti. Si prosegue anche allo scadere.");
-  }
-  function avanti() {
-    if (stato.pendingNext || !stato.data) return;
-    var req = { roundIdx: stato.idx };
-    if (!R.avantiPatch(stato.data, stato.me, req, ora())) return;
-    stato.pendingNext = req; renderAvanti(stato.data, attuale());
-    scrivi(function (cur) { return R.avantiPatch(cur, stato.me, req, ora()); })
-      .catch(function () { CORE.toast("Conferma non riuscita. Il prossimo round partirà comunque.", "warn"); })
-      .finally(function () { if (stato.pendingNext === req) stato.pendingNext = null; if (stato.inGioco) renderAvanti(stato.data, attuale()); });
+  function mostra(quale) {
+    var mappa = { boot: "schermo-boot", crea: "schermo-crea", lobby: "schermo-lobby", gioco: "schermo-gioco", risultati: "schermo-risultati" };
+    Object.keys(mappa).forEach(function (k) {
+      var n = $(mappa[k]);
+      if (n) n.hidden = k !== quale;
+    });
+    document.body.setAttribute("data-schermo", quale);
   }
 
-  function classificaHtml(c) {
-    var rank = 1;
-    return c.map(function (r, i) { if (i && (stato.modale !== N.MODE || r.punti !== c[i - 1].punti)) rank = i + 1; return '<li class="faw-rank ' + (r.nome === stato.me ? "is-me " : "") + ((i === 0 || stato.modale === N.MODE && r.punti === c[0].punti) && r.punti > 0 ? "is-top" : "") + '"><span class="n">' + rank + '</span><span class="nm">' + esc(r.nome) + (r.nome === stato.me ? " (tu)" : "") + '</span><span class="pw">' + r.uniche + ' uniche</span><span class="pt">' + r.punti + '</span></li>'; }).join("");
-  }
+  /* --------------------------------- sala -------------------------------- */
 
-  /* ------------------------ una risposta / un voto -------------------- */
-  function invia(passo) {
-    if (stato.pending || !stato.data) return;
-    var f = attuale(), combo = stato.rounds[stato.idx];
-    if (mia(stato.data, stato.idx)) { feedback(MOTIVI.HAI_GIA_RISPOSTO, true); return; }
-    if (f.indice !== stato.idx) { feedback(MOTIVI.ROUND_SUPERATO, true); return; }
-    var request = stato.modale === N.MODE ? scheda.payload() : { roundIdx: stato.idx, testo: $("inp-risposta").value.trim(), passo: passo === true };
-    request.tentativi = 0;
-    var local = R.rispostaPatch(stato.data, stato.me, request, ora());
-    if (!local.ok) { feedback(messaggio(local.motivo, combo), true); if (local.errori) scheda.errors(local.errori); return; }
-    feedback("", false);
-    if (stato.solo) { ricevi(NET.applyPatch(stato.data, local.patch)); return; }
-    stato.pending = request;
-    renderInput(stato.data, f); scheda.render(stato.data, f);
-    tentaInvio(request);
-  }
-  function tentaInvio(request) {
-    if (stato.pending !== request) return;
-    request.tentativi++;
-    var motivo = null;
-    scrivi(function (cur) {
-      var result = R.rispostaPatch(cur, stato.me, request, ora());
-      motivo = result.motivo;
-      return result.ok ? result.patch : false;
-    }).then(function (res) {
-      if (stato.pending !== request) return;
-      stato.pending = null;
-      if (res.applied || (res.data && mia(res.data, request.roundIdx))) {
-        if (stato.idx === request.roundIdx) feedback("", false);
-      } else if (stato.idx === request.roundIdx) feedback(messaggio(motivo, stato.rounds[request.roundIdx]), true);
-      if (stato.inGioco) renderRound(stato.data, attuale());
-    }).catch(function (e) {
-      if (stato.pending !== request) return;
-      var f = attuale();
-      var retry = request.tentativi < 3 && f.indice === request.roundIdx && f.fase === "input" && e.code !== "permission-denied";
-      if (retry) {
-        feedback("Invio in attesa di conferma. Riprovo " + request.tentativi + "/3: il tempo continua.", false);
-        retryTimer = setTimeout(function () { tentaInvio(request); }, request.tentativi * 600);
-      } else {
-        stato.pending = null;
-        if (f.indice === request.roundIdx) feedback("Invio non confermato. Controlla la connessione e riprova se c’è ancora tempo.", true);
-        if (stato.inGioco) renderRound(stato.data, f);
+  function collegati() {
+    mostra("lobby");
+    NET.init({ backend: "auto" });
+    stato.room = ROOM.open({ matchId: stato.matchId, nome: stato.me, net: NET });
+    stato.room.on({
+      state: function (d) { unisciti(d); onStato(d); },
+      gone: function () { CORE.toast("Partita terminata o rimossa", "warn"); location.href = "../../index.html"; },
+      status: function (s) {
+        var b = el("conn");
+        if (!b) return;
+        b.hidden = s === "online";
+        b.querySelector(".t").textContent = s === "online" ? "" : "Connessione persa: riprovo, le risposte restano in coda";
       }
     });
-  }
-  function vota(nome, astieni) {
-    if (stato.pendingVote || !stato.room) return;
-    var request = { roundIdx: stato.idx, nome: nome, astieni: !!astieni };
-    if (!R.votoPatch(stato.data, stato.me, request, ora())) return;
-    stato.pendingVote = request;
-    renderRisposte(stato.data, attuale());
-    scrivi(function (cur) { return R.votoPatch(cur, stato.me, request, ora()); })
-      .then(function (res) { if (!res.applied) CORE.toast("Voto già registrato o tempo scaduto.", "warn"); })
-      .catch(function () { CORE.toast("Voto non confermato. Riprova se c’è tempo.", "warn"); })
-      .finally(function () { if (stato.pendingVote === request) stato.pendingVote = null; if (stato.inGioco) renderRisposte(stato.data, attuale()); });
+    stato.room.start();
+    stato.room.startWatchdog(function () { watchdog(); }, 2500);
+    avviaTicking();
   }
 
-  /* ------------------------- orologio / avanzamento ------------------- */
-  function daAvanzare(d) {
-    if (!d || !d.startAt || ["pronto", "in_corso", "chiusura"].indexOf(d.stato) < 0 || ora() < d.startAt) return false;
-    if (d.stato === "pronto" || !(d.rush || {}).domande) return true;
-    var f = attuale();
-    if (f.fase === "finita") return true;
-    if ((f.fase === "voto" || f.fase === "rivela") && !((((d.rush || {}).tempi || {})[f.indice] || {}).giocatori)) return true;
-    if (f.fase === "input" && R.tuttiConsegnati(d, f.indice)) return true;
-    if (f.fase === "voto" && R.tuttiVotato(d, f.indice)) return true;
-    if (f.fase === "rivela" && R.tuttiAvanti(d, f.indice)) return true;
-    return stato.rounds.some(function (_, i) { return !((d.rush || {}).punteggiRound || {})[i] && R.puoChiudere(d, i, { ora: ora() }); });
-  }
-  function avanza() {
-    var d = stato.data;
-    if (!daAvanzare(d) || stato.closing || ora() < stato.retryAt) return Promise.resolve(false);
-    if (stato.solo) {
-      var patch = R.avanza(d, ora());
-      if (patch) ricevi(NET.applyPatch(d, patch));
-      return Promise.resolve(!!patch);
+  function unisciti(d) {
+    if (!d || stato._join) return;
+    if ((d.partecipanti || []).indexOf(stato.me) >= 0) { stato._join = true; return; }
+    if (d.stato === "conclusa" || d.stato === "annullata") {
+      stato._join = true;
+      CORE.toast("Partita già chiusa: crea una nuova sfida dall'hub", "warn", 4000);
+      return;
     }
-    if (!stato.room || !membro(d)) return Promise.resolve(false);
-    stato.closing = true;
-    return scrivi(function (cur) { return R.avanza(cur, ora()); })
-      .catch(function () { stato.retryAt = ora() + 1500; return false; })
-      .finally(function () { stato.closing = false; });
-  }
-  function startTimer() { if (!timer) timer = setInterval(tick, 150); }
-  function tick() {
-    var d = stato.data;
-    if (!d || ["attesa", "pronto", "in_corso", "chiusura"].indexOf(d.stato) < 0) return;
-    if (d.stato === "attesa") return;
-    var f = attuale();
-    if (stato.screen === "lobby") {
-      countdown(d);
-      if (f.fase !== "attesa") { stato.inGioco = true; show("gioco"); renderRound(d, f); }
-    } else if (f.indice !== stato.idx || f.fase !== stato.fase) renderRound(d, f);
-    else renderTimer(f);
-    scheda.tick(f);
-    avanza();
+    if ((d.partecipanti || []).length >= (d.maxGiocatori || 8)) {
+      stato._join = true;
+      CORE.toast("Posti esauriti in questa partita", "warn", 4000);
+      return;
+    }
+    stato._join = true;
+    stato.room.addPlayer(stato.me).then(function (ok) {
+      if (!ok) CORE.toast("Non sei entrato in partita (posti pieni o partita chiusa)", "warn", 4000);
+    });
   }
 
-  /* --------------------------- risultati / rivincita ----------------- */
-  function renderRisultati(d) {
-    stato.inGioco = false; stato.pending = null; stato.pendingNext = null; clearTimeout(retryTimer); scheda.stop();
-    show("risultati"); text("top-stato", "Al traguardo");
-    var c = (d.risultati || {}).classifica || R.classifica(d.punteggi, (d.rush || {}).statistiche, { modale: stato.modale });
-    var es = (d.risultati || {}).esito || R.esito(c, { modale: stato.modale }), io = c.find(function (r) { return r.nome === stato.me; }) || {};
-    text("ris-titolo", stato.solo ? "Allenamento finito!" : es.pareggio ? "Un Rush alla pari." : es.campione === stato.me ? "Questo Rush è tuo!" : "Che sfida!");
-    text("ris-esito", stato.solo ? (io.punti || 0) + " punti. Pronto a sfidare gli amici?" : es.pareggio ? "Pareggio tra " + es.pari.join(" e ") : (es.campione || "—") + " vince con " + (c[0] || {}).punti + " punti.");
-    html("ris-classifica", classificaHtml(c));
-    var cells = stato.modale === N.MODE ? stato.rounds.length * stato.rounds[0].categorie.length : stato.rounds.length;
-    var stats = [["Punti", io.punti || 0], ["Valide", (io.valide || 0) + "/" + cells], ["Uniche", io.uniche || 0], stato.modale === N.MODE ? ["Categorie", stato.rounds[0].categorie.length] : ["Tempo medio", io.tempoMedio == null ? "—" : (io.tempoMedio / 1000).toFixed(1) + " s"]];
-    html("ris-stats", stats.map(function (s) { return '<div class="faw-stat"><span class="faw-stat__k">' + s[0] + '</span><b class="faw-stat__v">' + esc(String(s[1])) + '</b></div>'; }).join(""));
-    var saved = (d.risultati || {}).secondiRisparmiati || 0;
-    $("ris-tempo").hidden = !saved;
-    text("ris-tempo", saved + " secondi di attesa risparmiati. Stessi round, più ritmo.");
-    html("ris-rounds", stato.rounds.map(function (q, i) {
-      var r = mia(d, i), punti = (((d.rush || {}).punteggiRound || {})[i] || {})[stato.me] || 0;
-      if (stato.modale === N.MODE) {
-        var entry = (((d.rush || {}).rivela || {})[i] || {})[stato.me] || {};
-        return '<details class="ncc-history"><summary><span>Round ' + (i + 1) + ' · Lettera ' + esc(q.lettera) + '</span><b>+' + punti + ' ⌄</b></summary><table class="ncc-table"><caption class="faw-sr">La tua scheda</caption><thead><tr><th scope="col">Categoria</th><th scope="col">Risposta</th><th scope="col">Punti</th></tr></thead><tbody>' + q.categorie.map(function (id) {
-          var cell = (entry.scheda || {})[id];
-          return '<tr><th scope="row">' + esc(N.byId(id).nome) + '</th><td>' + esc(cell && cell.parola || "—") + '<small>' + esc(ragioneNcc(cell)) + '</small></td><td>+' + (cell && cell.punti || 0) + '</td></tr>';
-        }).join("") + '</tbody></table></details>';
+  function onStato(data) {
+    if (!data) return;
+    stato.data = data;
+    var opts = data.opzioni || {};
+    stato.modale = opts.mode === "creative" ? "creative" : "classiche";
+    var ciclo = R.ciclo(stato.modale);
+    stato.roundMs = ciclo.roundMs;
+    stato.inputMs = ciclo.inputMs;
+    stato.durataMs = ROOM.durataMs(data);
+    var n = R.numeroRound(stato.durataMs, ciclo.roundMs);
+    stato.seed = String(opts.seed || data.seed || "SEED");
+    var gen = R.roundsDaSeed(stato.seed, n, { modale: stato.modale });
+    if (gen.length !== n) gen = R.roundsDaSeed(stato.seed, n, { modale: "classiche" }).slice(0, n);
+    stato.rounds = gen.length ? gen : [{ i: 0, categoria: "-", nome: "In attesa del database categorie", lettera: "-", possibili: 0 }];
+
+    var f = R.faseRound(data.startAt || 0, ora(), { rounds: n, modale: stato.modale });
+    stato.fase = f.fase;
+    if (data.stato === "attesa") { stato.inGioco = false; mostra("lobby"); renderLobby(data); }
+    else if (data.stato === "pronto") {
+      if (!stato.inGioco) { renderLobby(data); mostra("lobby"); }
+      countdownView(data, f);
+    } else if (data.stato === "in_corso" || data.stato === "chiusura") {
+      entraInGioco(data, f);
+      chiudiRoundSospesi(data, f);
+    } else if (data.stato === "risultati" || data.stato === "conclusa") {
+      chiudiPartita(data, f, true);
+    } else if (data.stato === "annullata") {
+      mostra("lobby");
+      CORE.toast("Partita annullata dall'host", "warn", 5000);
+    }
+    var late = ((data.giocatori || {})[stato.me] || {}).entraInCorsa;
+    if (late && el("late-note")) el("late-note").hidden = false;
+  }
+
+  /* ------------------------------- lobby --------------------------------- */
+
+  function renderLobby(data) {
+    var g = ROOM.giocatoriMap(data);
+    var pronti = data.pronti || [];
+    var lista = el("lobby-lista");
+    if (lista) {
+      lista.innerHTML = Object.keys(g).map(function (n) {
+        var ok = pronti.indexOf(n) >= 0;
+        return '<div class="faw-row" style="cursor:default">' +
+          '<span class="faw-avatar">' + CORE.escapeHtml(CORE.initials(n)) + "</span>" +
+          '<span class="faw-row__main"><span class="faw-row__name">' + CORE.escapeHtml(n) + (n === stato.me ? " (tu)" : "") + "</span>" +
+          '<span class="faw-row__meta">' + (ok ? "pronto" : "in attesa") + "</span></span>" +
+          '<span class="faw-badge ' + (ok ? "faw-badge--ok" : "") + '">' + (ok ? "✅" : "⏳") + "</span></div>";
+      }).join("");
+    }
+    var ioPronto = pronti.indexOf(stato.me) >= 0;
+    var btn = el("btn-pronto");
+    if (btn) {
+      btn.textContent = ioPronto ? "⏸️ NON SONO PRONTO" : "✅ SONO PRONTO";
+      btn.setAttribute("aria-pressed", String(ioPronto));
+    }
+    var tot = (data.partecipanti || []).length;
+    if (el("lobby-count")) el("lobby-count").textContent = Math.min(pronti.length, tot) + "/" + tot;
+    if (el("lobby-seed")) el("lobby-seed").textContent = stato.seed;
+    if (el("lobby-meta")) {
+      el("lobby-meta").textContent = stato.rounds.length + " round da " + Math.round(stato.inputMs / 1000) + " s · " +
+        (stato.modale === "creative" ? "categorie creative (voto tra pari)" : "categorie con elenco risposte") +
+        " · " + tot + " giocatori";
+    }
+    var avvia = el("btn-avvia-subito");
+    if (avvia) avvia.hidden = data.host !== stato.me || data.stato !== "attesa";
+  }
+
+  function countdownView(data, f) {
+    var rem = Math.max(0, ((data.startAt || 0) - ora()) / 1000);
+    var box = el("countdown");
+    if (!box) return;
+    if (rem <= 0) { box.hidden = true; entraInGioco(data, f); return; }
+    box.hidden = false;
+    el("countdown-num").textContent = String(Math.ceil(rem));
+    clearTimeout(stato._cd);
+    stato._cd = setTimeout(function () { if (stato.data) countdownView(stato.data, R.faseRound(stato.data.startAt || 0, ora(), { rounds: stato.rounds.length, modale: stato.modale })); }, 200);
+  }
+
+  /* ------------------------------- partita -------------------------------- */
+
+  function entraInGioco(data, f) {
+    if (data && data.stato === "pronto" && (data.startAt || 0) > ora()) return;
+    if (!stato.inGioco) {
+      stato.inGioco = true;
+      mostra("gioco");
+      if (el("solo-note")) el("solo-note").hidden = !stato.solo;
+      var i = el("inp-risposta");
+      if (i && !stato.solo && !tocca) { try { i.focus({ preventScroll: true }); } catch (e) {} }
+    }
+    // lo stato del documento passa a `in_corso` allo scadere del countdown:
+    // un solo client lo scrive, gli altri lo vedono dal watch
+    if (!stato.solo && data && data.stato === "pronto" && (data.startAt || 0) <= ora() && !stato._passato) {
+      stato._passato = true;
+      NET.transact(stato.room.path, function (cur) {
+        if (!cur || cur.stato !== "pronto" || (cur.startAt || 0) > ora()) return false;
+        return { stato: "in_corso", iniziatoDa: stato.me };
+      }).catch(function () { stato._passato = false; });
+    }
+    renderRound(data || stato.dataLocale, f || R.faseRound((data || {}).startAt || 0, ora(), { rounds: stato.rounds.length, modale: stato.modale }));
+  }
+
+  /** A ogni stato utile: se un round è chiuso ma non ancora punteggiato, chiudilo. */
+  function chiudiRoundSospesi(data, f) {
+    if (stato.solo || !data || !stato.room) return;
+    var fino = f.indice - 1;
+    if (f.fase === "finita") fino = f.rounds - 1;
+    for (var i = 0; i <= fino; i++) chiudiRound(i, data);
+  }
+
+  function chiudiRound(i, data) {
+    if (i < 0 || !stato.room) return Promise.resolve(false);
+    var cur = data || stato.data || {};
+    if ((((cur.rush || {}).punteggiRound || {})[i])) return Promise.resolve(false);
+    if (stato._closing && stato._closing[i]) return Promise.resolve(false);
+    stato._closing = stato._closing || {};
+    stato._closing[i] = true;
+    var ciclo = R.ciclo(stato.modale);
+    return stato.room.resolveOnce("rush:round:" + i, function (d) {
+      if (!d) return false;
+      if ((((d.rush || {}).punteggiRound || {})[i])) return false;
+      // il round deve essere davvero chiuso nel tempo condiviso: niente chiusure
+      // anticipate (ruberebbero il tempo di risposta agli altri)
+      if (!R.puoChiudere(d, i, { ora: ora(), modale: stato.modale, durataMs: ROOM.durataMs(d) })) return false;
+      var risposte = ((d.rush || {}).risposte || {})[i] || {};
+      var es = stato.modale === "creative"
+        ? R.punteggiVotazione(risposte, ((d.rush || {}).voti || {})[i] || {}, { giocatori: d.partecipanti || [] })
+        : R.punteggiRound(risposte, { giocatori: d.partecipanti || [], inputMs: ciclo.inputMs });
+      var riv = R.rivela(risposte, es);
+      var patch = { ["rush.punteggiRound." + i]: es.punti, ["rush.rivela." + i]: riv };
+      Object.keys(es.punti).forEach(function (nome) {
+        if (es.punti[nome]) patch["punteggi." + nome] = NET.ops.increment(es.punti[nome]);
+      });
+      patch["rush.statistiche"] = R.accumulaStati((d.rush || {}).statistiche, "sala", riv);
+      patch["rush.roundChiuso"] = i;
+      return patch;
+    }).then(function (res) {
+      stato._closing[i] = false;
+      var ok = !!(res && res.applied);
+      if (ok) CORE.beep("ok");
+      return ok;
+    }).catch(function () { stato._closing[i] = false; return false; });
+  }
+
+  /* -------------------------------- rendering ----------------------------- */
+
+  function renderRound(data, f) {
+    var combo = comboDi(f.indice) || stato.rounds[0];
+    if (!combo) return;
+    var anteprima = f.indice < 0;
+    if (f.indice !== stato.idx) {
+      stato.idx = f.indice;
+      stato.inviatoRound = -1;
+      var i = el("inp-risposta");
+      if (i) { i.value = ""; i.disabled = false; }
+      var form = el("frm-risposta");
+      if (form) form.classList.remove("is-lock");
+      var rec = el("receipt");
+      if (rec) rec.hidden = true;
+      el("feedback").textContent = "";
+      try { i && i.focus({ preventScroll: true }); } catch (e) {}
+      CORE.beep("click");
+    }
+    el("round-n").textContent = (Math.max(0, f.indice) + 1) + "/" + f.rounds;
+    el("round-lettera").textContent = combo.lettera || "★";
+    el("round-categoria").textContent = combo.nome;
+    el("round-aiuto").textContent = combo.lettera
+      ? "Una parola da 3 lettere in su che inizia con «" + combo.lettera + "»."
+      : "Risposta libera: la giudicano i giocatori col voto.";
+    el("round-sr").textContent = "Round " + (Math.max(0, f.indice) + 1) + " di " + f.rounds + ". " +
+      (combo.lettera ? "Lettera " + combo.lettera + ". " : "") + "Categoria: " + combo.nome + ".";
+    if (anteprima) el("chip-stato").textContent = "si parte";
+    else el("chip-stato").textContent = f.fase === "input" ? "si scrive" : (f.fase === "voto" ? "si vota" : (f.fase === "rivela" ? "rivelazione" : "finita"));
+
+    // chi non sta rispondendo si vede (ma non blocca niente): avviso discreto
+    var chipIn = el("chip-inattivi");
+    if (chipIn) {
+      var fermiss = stato.solo ? [] : R.inattivi((data && data.partecipanti) || [], (data && data.rush && data.rush.risposte) || {}, f.indice - 1);
+      if (fermiss.length) {
+        chipIn.hidden = false;
+        chipIn.textContent = "⚠️ " + fermiss.join(", ") + " non sta rispondendo";
+        chipIn.title = "I round si chiudono comunque: nessuno può bloccare la partita";
+      } else chipIn.hidden = true;
+    }
+
+    var tot = 0;
+    if (data && data.rush && data.rush.risposte) {
+      var r = data.rush.risposte[f.indice] || {};
+      tot = Object.keys(r).length;
+    } else if (stato.solo) tot = 0;
+    el("round-avanzati").textContent = String(tot);
+
+    // la barra del tempo è animazione locale: il verdetto resta il tempo del server
+    var frac = f.fase === "input" ? Math.max(0, Math.min(1, (f.entroInputMs || 0) / CFG.inputMs)) : (anteprima ? 1 : 0);
+    var bar = el("round-bar");
+    if (bar) bar.style.width = Math.round(frac * 100) + "%";
+
+    renderRivela(data, f, combo);
+    renderClassifica(data);
+    renderInputStato(f);
+    renderAltreSolo(f, combo);
+  }
+
+  function renderInputStato(f) {
+    var i = el("inp-risposta"), b = el("btn-invia");
+    var inAnteprima = f.indice < 0;   // countdown: la domanda si vede, si scrive dopo
+    var blocca = inAnteprima || f.fase !== "input" || (stato.inviatoRound === f.indice && !stato.solo);
+    if (i) { i.disabled = blocca; i.placeholder = f.fase === "input" ? "La tua parola…" : (blocca && f.fase === "input" ? "Risposta inviata" : "Round chiuso"); }
+    if (b) b.disabled = blocca;
+    var form = el("frm-risposta");
+    if (form) form.classList.toggle("is-lock", blocca);
+  }
+
+  function renderRivela(data, f, combo) {
+    var box = el("rivela"), lista = el("rivela-lista");
+    if (!box || !lista) return;
+    var i = f.fase === "input" ? f.indice - 1 : f.indice;
+    var rush = (data && data.rush) || {};
+    var inVoto = f.fase === "voto";
+    var riv = rush.rivela ? rush.rivela[i] : null;
+    // nella finestra di voto i punteggi non esistono ancora: si mostrano le parole
+    // (è ciò su cui si vota), tenendo la colonna punti vuota
+    if (!riv && inVoto && rush.risposte && rush.risposte[i]) {
+      riv = {};
+      Object.keys(rush.risposte[i]).forEach(function (n) {
+        var r = rush.risposte[i][n] || {};
+        riv[n] = { parola: r.parola, ok: r.ok !== false, motivo: r.motivo || null, t: r.t || 0, originale: false, condivisa: false };
+      });
+    }
+    if (stato.solo) {
+      var s2 = (stato.rivelaSolo || {})[f.indice];
+      if (s2) { riv = {}; riv[stato.me] = s2; }
+      i = f.indice;
+    }
+    if (!riv || !Object.keys(riv).length) {
+      box.hidden = true;
+      var vecchio = el("box-voto");
+      if (vecchio) vecchio.remove();
+      return;
+    }
+    box.hidden = false;
+    var punti = (!inVoto && rush.punteggiRound) ? (rush.punteggiRound[i] || {}) : null;
+    var nomi = Object.keys(riv).sort(function (a, b) {
+      if (punti) return (punti[b] || 0) - (punti[a] || 0) || (a < b ? -1 : 1);
+      return (riv[a].t || 0) - (riv[b].t || 0);
+    });
+    lista.innerHTML = nomi.map(function (n) {
+      var r = riv[n] || {};
+      var tag = !r.ok ? '<span class="faw-badge faw-badge--bad">' + CORE.escapeHtml(motivoTesto(r.motivo, combo)) + "</span>"
+        : r.originale ? '<span class="faw-badge faw-badge--acc">unica</span>'
+        : r.condivisa ? '<span class="faw-badge faw-badge--warn">in comune</span>' : "";
+      var destra = punti ? '<div class="punti">+' + (punti[n] || 0) + "</div>" + tag
+        : '<span class="faw-badge faw-badge--ok">da votare</span>';
+      return '<div class="riv-riga ' + (r.originale ? "is-unica " : "") + (n === stato.me ? "is-me" : "") + '">' +
+        '<div><div class="chi">' + CORE.escapeHtml(n) + (n === stato.me ? " (tu)" : "") + " · " + Math.round((r.t || 0) / 1000) + "s</div>" +
+        '<div class="cosa ' + (r.ok ? "" : "is-ko") + '">' + CORE.escapeHtml(r.parola || "—") + "</div></div>" +
+        '<div style="text-align:right">' + destra + "</div></div>";
+    }).join("");
+    if (el("rivela-conta")) el("rivela-conta").textContent = nomi.length + " risposte";
+    if (inVoto) renderVoti(data, f, riv);
+    else { var bv = el("box-voto"); if (bv) bv.remove(); }
+  }
+
+  /** Finestra di voto (solo modalità creativa): un voto a testa, poi si chiude il round. */
+  function renderVoti(data, f, riv) {
+    var box = el("rivela");
+    if (!box) return;
+    var altri = Object.keys(riv).filter(function (n) { return n !== stato.me && riv[n] && riv[n].ok; });
+    var mio = ((data.rush || {}).voti || {})[f.indice] || {};
+    var vecchio = el("box-voto");
+    if (vecchio) vecchio.remove();
+    var wrap = document.createElement("div");
+    wrap.className = "faw-btn-row";
+    wrap.id = "box-voto";
+    if (!altri.length) {
+      wrap.innerHTML = '<p class="faw-dim2">Nessuna risposta da votare: vale la partecipazione.</p>';
+    } else if (mio.voto) {
+      wrap.innerHTML = '<p class="faw-dim2">Voto dato a ' + CORE.escapeHtml(mio.voto) + " ✓</p>";
+    } else {
+      wrap.innerHTML = '<span class="faw-caps">La risposta più riuscita?</span>' + altri.map(function (n) {
+        return '<button class="faw-btn faw-btn--sm" type="button" data-voto="' + CORE.escapeHtml(n) + '">👏 ' + CORE.escapeHtml(n) + "</button>";
+      }).join("");
+      wrap.addEventListener("click", function (e) {
+        var bt = e.target.closest("[data-voto]");
+        if (!bt) return;
+        var nome = bt.getAttribute("data-voto");
+        Array.prototype.forEach.call(wrap.querySelectorAll("[data-voto]"), function (x) { x.disabled = true; });
+        NET.transact(stato.room.path, function (cur) {
+          if (!cur) return false;
+          var f2 = R.faseRound(cur.startAt || 0, ora(), { rounds: stato.rounds.length, modale: "creative" });
+          if (f2.fase !== "voto" || f2.indice !== f.indice) return false;
+          return { ["rush.voti." + f.indice + "." + stato.me]: { voto: nome, t: ora() } };
+        }).then(function () { CORE.toast("Voto dato", "ok"); });
+      });
+    }
+    box.appendChild(wrap);
+  }
+
+  function renderClassifica(data) {
+    var box = el("classifica");
+    if (!box) return;
+    var punteggi = (data && data.punteggi) || {};
+    var stat = (data && data.rush && data.rush.statistiche) || {};
+    var c = R.classifica(punteggi, stat);
+    box.innerHTML = c.map(function (x, i) {
+      return '<li class="faw-rank ' + (i === 0 ? "is-top " : "") + (x.nome === stato.me ? "is-me" : "") + '">' +
+        '<span class="n">' + (i + 1) + "</span>" +
+        '<span class="nm">' + CORE.escapeHtml(x.nome) + (x.nome === stato.me ? " (tu)" : "") + "</span>" +
+        '<span class="pw">' + x.uniche + " uniche</span>" +
+        '<span class="pt">' + x.punti + "</span></li>";
+    }).join("");
+  }
+
+  /** Allenamento: sotto alla domanda compaiono le altre risposte ammesse (ripasso). */
+  function renderAltreSolo(f, combo) {
+    var box = el("box-altre");
+    if (!box || !stato.solo || !CAT || !combo || !combo.lettera) { if (box) box.hidden = true; return; }
+    var cat = CAT.byId(combo.categoria);
+    var liste = cat ? CAT.rispostePer(cat, combo.lettera) : [];
+    el("altre").textContent = liste.length ? liste.slice(0, 24).join(" · ") : "Nessuna risposta in elenco per questa lettera.";
+    box.hidden = false;
+  }
+
+  /* --------------------------------- invio -------------------------------- */
+
+  function giaUsate() {
+    var d = stato.data || stato.dataLocale || {};
+    var ris = (d.rush || {}).risposte || {};
+    var out = [];
+    Object.keys(ris).forEach(function (i) {
+      var r = ris[i][stato.me];
+      if (r && (r.ok !== false) && Number(i) !== stato.idx) out.push(r.parola);
+    });
+    return out;
+  }
+
+  function invia() {
+    var input = el("inp-risposta");
+    var testo = input ? input.value : "";
+    var combo = comboDi(stato.idx) || stato.rounds[0];
+    if (!combo) return;
+    var f = R.faseRound((stato.data || {}).startAt || stato.t0, ora(), { rounds: stato.rounds.length, modale: stato.modale });
+    if (f.fase !== "input") { mostraFeedback("Il round è chiuso: niente recuperi.", true); return; }
+    if (stato.inviatoRound === f.indice) {
+      if (el("inp-risposta") && el("inp-risposta").value) {
+        mostraFeedback("Hai già mandato la risposta di questo round: è definitiva.", true);
+        return;
       }
-      return '<div class="roundo"><span class="q">' + String(i + 1).padStart(2, "0") + '</span><div><small>' + esc((q.lettera ? q.lettera + " · " : "") + q.nome) + '</small><span class="w">' + esc(r ? r.passo ? "Passo" : r.parola : "Nessuna risposta") + '</span></div><b class="p">+' + punti + '</b></div>';
-    }).join(""));
-    $("box-rivincita").hidden = !d.prossimaPartita;
-    $("btn-rivincita").disabled = false;
-    text("btn-rivincita", d.prossimaPartita ? "Entra nella rivincita ↗" : stato.solo ? "Mi alleno ancora ↗" : "Un altro Rush ↗");
-    if (d.prossimaPartita) text("box-rivincita-testo", (d.prossimaPartitaCreataDa === stato.me ? "Hai proposto" : d.prossimaPartitaCreataDa + " propone") + " la rivincita. " + (d.rivincitaAccettataDa || []).length + "/" + (d.partecipanti || []).length + " hanno accettato.");
-  }
-  function entraRivincita() {
-    return stato.room.acceptRematch().then(function (id) { if (id) location.href = "index.html?matchId=" + encodeURIComponent(id); })
-      .catch(function () { CORE.toast("Ingresso non riuscito. Riprova.", "warn"); });
-  }
-  function rivincita() {
-    if (stato.solo) { avviaSolo(); return; }
-    if (stato.data.prossimaPartita) { entraRivincita(); return; }
-    $("btn-rivincita").disabled = true;
-    stato.room.proposeRematch().then(function () { CORE.toast("Rivincita pronta. Entra e invita gli altri a seguirti.", "ok"); })
-      .catch(function () { CORE.toast("Rivincita non riuscita. Riprova.", "warn"); })
-      .finally(function () { $("btn-rivincita").disabled = false; });
+      stato.inviatoRound = -1;   // era un tentativo locale non registrato: si può riprovare
+    }
+
+    // feedback immediato sul dato locale: la stessa regola viene riapplicata
+    // dentro la transazione, così un client manomesso non passa comunque
+    var v = R.valutaRisposta(testo, combo, { giaUsate: giaUsate() });
+    if (!v.ok) {
+      mostraFeedback(motivoTesto(v.motivo, combo), true);
+      CORE.beep("nope");
+      CORE.vibrate([14, 40, 14]);
+      return;
+    }
+
+    if (stato.solo) {
+      var iSolo = f.indice;
+      if (stato.inviatoRound === iSolo) return;
+      var es = R.punteggiRound({ [stato.me]: { parola: v.parola, canonica: v.canonica, ok: true, t: Math.max(0, CFG.inputMs - f.entroInputMs) } }, { inputMs: CFG.inputMs });
+      stato.rivelaSolo = stato.rivelaSolo || {};
+      stato.rivelaSolo[iSolo] = { parola: v.parola, ok: true, t: Math.max(0, Math.round(CFG.inputMs - (f.entroInputMs || 0))), originale: true, condivisa: false };
+      stato.punteggiSolo = stato.punteggiSolo || {};
+      stato.punteggiSolo[iSolo] = es.punti[stato.me];
+      stato.puntiSolo = (stato.puntiSolo || 0) + es.punti[stato.me];
+      stato.inviatoRound = iSolo;
+      var ps = el("punti-solo");
+      if (ps) ps.textContent = String(stato.puntiSolo);
+      var cs = el("chip-solo");
+      if (cs) cs.hidden = false;
+      receipt("Accettata: +" + es.punti[stato.me] + " punti", false);
+      CORE.beep("ok");
+      if (input) input.disabled = true;
+      var bb = el("btn-invia");
+      if (bb) bb.disabled = true;
+      renderRivela(stato.dataLocale, f, combo);
+      return;
+    }
+
+    var me = stato.me, modale = stato.modale, roundVisto = f.indice, scritto = v;
+    var tentativi = 0;
+    // UNA scrittura per round, dentro una transazione con guard: doppio tocco,
+    // retry di rete e risposte tardive non producono mai un secondo effetto
+    NET.transact(stato.room.path, function (cur) {
+      if (!cur) return false;
+      var via = R.puoScrivere(cur, me, { ora: ora(), modale: modale, durataMs: cur.durata });
+      if (!via.ok) { stato._rifiuto = via.motivo; return false; }
+      var i = via.indice;
+      var v2 = R.valutaRisposta(testo, comboDi(i) || combo, { giaUsate: giaUsateDa(cur, i) });
+      if (!v2.ok) { stato._rifiuto = v2.motivo + "@" + i; return false; }
+      var t = Math.max(1, via.t);
+      var patch = {};
+      patch["rush.risposte." + i + "." + me] = { parola: v2.parola, canonica: v2.canonica, ok: true, t: t };
+      stato._accettata = { i: i, parola: v2.parola };
+      return patch;
+    }).then(function (res) {
+      if (res && res.applied) {
+        clearTimeout(stato._ritenta);
+        var acc = stato._accettata || { i: roundVisto, parola: scritto.parola };
+        stato.inviatoRound = acc.i;
+        receipt("Risposta inviata: " + acc.parola, false);
+        CORE.beep("ok");
+        if (input) input.disabled = true;
+        var bt = el("btn-invia");
+        if (bt) bt.disabled = true;
+        el("feedback").textContent = "";
+      } else {
+        var motivo = String(stato._rifiuto || "ROUND_GIA_CHIUSO");
+        var at = motivo.indexOf("@");
+        var motivoPuro = at < 0 ? motivo : motivo.slice(0, at);
+        var comboGiudizio = at < 0 ? combo : (comboDi(Number(motivo.slice(at + 1))) || combo);
+        if (motivoPuro === "HAI_GIA_RISPOSTO") {
+          var gia = (((((stato.data || {}).rush || {}).risposte || {})[roundVisto] || {})[me]);
+          receipt("Avevi già inviato «" + (gia ? gia.parola : scritto.parola) + "»: vale quella.", false);
+        } else if (MOTIVI[motivoPuro]) mostraFeedback(motivoTesto(motivoPuro, comboGiudizio), true);
+        else if (motivoPuro === "COUNTDOWN_IN_CORSO") mostraFeedback("Aspetta il via del round.", true);
+        else mostraFeedback("Il round è chiuso: niente recuperi.", true);
+      }
+    }).catch(function () {
+      // errore di rete: si ritenta un paio di volte (la transazione è idempotente
+      // per round, quindi un doppio invio non può contare due volte)
+      if ((tentativi += 1) <= 3) {
+        stato._ritenta = setTimeout(function () { invia(); }, 350 * tentativi);
+        mostraFeedback("Invio in sospeso: riprovo (" + tentativi + "/3)", true);
+        var campo = el("inp-risposta");
+        if (campo) campo.disabled = true;   // si blocca l'input, non la risposta
+        return;
+      }
+      var campo2 = el("inp-risposta");
+      if (campo2) campo2.disabled = false;
+      mostraFeedback("Invio non arrivato: riprova tu (la risposta non è stata registrata).", true);
+    });
   }
 
-  /* ---------------------------- setup / allenamento ------------------- */
-  function renderSetup() {
-    document.querySelectorAll("#schermo-crea [data-seg]").forEach(function (seg) {
-      seg.querySelectorAll("[data-v]").forEach(function (b) {
-        b.setAttribute("aria-pressed", String(b.dataset.v === String(setup[seg.dataset.seg])));
-        if (seg.dataset.seg === "durata") {
-          var c = R.ciclo(setup.mode), n = R.numeroRound(Number(b.dataset.v) * 1000, c.roundMs);
-          b.querySelector("small").textContent = n + " round";
-        }
+  /** Risposte già date dalla stessa persona (per il round `i`, le esclude). */
+  function giaUsateDa(data, i) {
+    var ris = ((data || {}).rush || {}).risposte || {};
+    var out = [];
+    Object.keys(ris).forEach(function (k) {
+      if (Number(k) === i) return;
+      var r = ris[k][stato.me];
+      if (r && r.ok !== false) out.push(r.parola);
+    });
+    return out;
+  }
+
+  function receipt(txt, ko) {
+    var r = el("receipt");
+    if (!r) return;
+    r.hidden = false;
+    r.classList.toggle("is-ko", !!ko);
+    r.innerHTML = "<span aria-hidden=\"true\">" + (ko ? "⚠️" : "✅") + "</span><span>" + CORE.escapeHtml(txt) + "</span>";
+  }
+  function mostraFeedback(txt, ko) {
+    var f = el("feedback");
+    if (!f) return;
+    f.textContent = txt;
+    f.classList.toggle("is-ko", !!ko);
+  }
+
+  /** In solo non c'è un documento: lo stato locale ha la stessa forma, per riusare i render. */
+  function flushLocale() {
+    if (!stato.solo) return;
+    var d = {
+      partecipanti: [stato.me], host: stato.me, punteggi: { [stato.me]: stato.puntiSolo || 0 },
+      parole: {}, stato: "in_corso", rush: { risposte: { 0: {} }, punteggiRound: stato.punteggiSolo ? { 0: { [stato.me]: stato.puntiSolo } } : {}, statistiche: {} },
+      startAt: stato.t0, endsAt: stato.t0 + stato.durataMs
+    };
+    stato.dataLocale = d;
+    stato.data = d;
+  }
+
+  /* -------------------------------- ticker -------------------------------- */
+
+  var tickTimer = null;
+  function avviaTicking() {
+    if (tickTimer) return;
+    tickTimer = setInterval(tick, 150);
+  }
+  function tick() {
+    var data = stato.data || stato.dataLocale;
+    if (!data || !stato.inGioco) return;
+    var f = R.faseRound(data.startAt || stato.t0, ora(), { rounds: stato.rounds.length, modale: stato.modale });
+    if (f.fase === "finita") {
+      if (!stato.solo) chiudiRound(f.rounds - 1, data);
+      chiudiPartita(data, f, false);
+      return;
+    }
+    if (f.fase === "rivela" && !stato.solo) chiudiRound(f.indice, data);
+    if (f.indice !== stato.idx || f.fase !== stato.fase) {
+      stato.fase = f.fase;
+      renderRound(data, f);
+      return;
+    }
+    stato.fase = f.fase;
+    // aggiorna solo timer e barra: niente riscritture del DOM a raffica
+    var ms = f.entroMs;
+    var tm = el("timer");
+    if (tm) {
+      var s = Math.max(0, Math.ceil(ms / 1000));
+      var txt = Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+      if (tm.textContent !== txt) tm.textContent = txt;
+      tm.classList.toggle("is-urgente", f.fase === "input" && s <= 5);
+    }
+    if (f.fase === "input") {
+      var bar = el("round-bar");
+      if (bar) bar.style.width = Math.round(Math.max(0, Math.min(1, f.entroInputMs / CFG.inputMs)) * 100) + "%";
+    }
+    var tot = Object.keys(roundDi(data, f.indice)).length;
+    var chip = el("round-avanzati");
+    if (chip && chip.textContent !== String(tot)) chip.textContent = String(tot);
+    if (f.fase === "input" && f.entroInputMs < 6000 && !stato._avvisatoRound) {
+      stato._avvisatoRound = f.indice;
+      if (tot === 0 || !data.punteggi) { /* nessuno panico: solo un bip di avviso */ }
+      CORE.beep("tick");
+    }
+  }
+
+  function watchdog() {
+    var data = stato.data;
+    if (!data || stato.solo) return;
+    if (data.stato === "attesa" || data.stato === "pronto") return;
+    var f = R.faseRound(data.startAt || 0, ora(), { rounds: stato.rounds.length, modale: stato.modale });
+    for (var i = Math.max(0, f.indice - 1); i <= f.indice; i++) chiudiRound(i, data);
+    if (f.fase === "finita") chiudiPartita(data, f, false);
+    var hv = ((data.giocatori || {})[stato.me] || {}).visto;
+    if (data.host !== stato.me && hv && ora() - hv > ROOM.IDLE_MS + 20000) stato.room.claimHost();
+  }
+
+  /* ------------------------------ fine partita ---------------------------- */
+
+  function chiudiPartita(data, f, giaChiusa) {
+    if (stato._chiudendo && !giaChiusa) return;
+    if (stato.solo) { renderRisultatiSolo(); return; }
+    if (giaChiusa) { renderRisultati(data); return; }
+    stato._chiudendo = true;
+    var n = stato.rounds.length;
+    // chiude l'ultimo round (se serve) e poi congela i risultati
+    chiudiRound(n - 1, data).then(function () {
+      return stato.room.resolveOnce("rush:chiudi", function (cur) {
+        if (!cur) return false;
+        if (cur.stato === "conclusa" || cur.stato === "risultati") return false;
+        var c = R.classifica(cur.punteggi || {}, (cur.rush || {}).statistiche || {});
+        return {
+          stato: "conclusa",
+          finito: (cur.partecipanti || []).slice(),
+          "risultati.classifica": c,
+          "risultati.esito": R.esito(c),
+          "risultati.punteggiFinale": cur.punteggi || {},
+          "risultati.parole": (cur.rush || {}).risposte || {},
+          "risultati.round": cur.rounds || cur.rush && cur.rush.punteggiRound || {},
+          "risultati.endAt": ora(),
+          "risultati.chiusoDa": stato.me,
+          "rush.rounds": n
+        };
+      });
+    }).then(function (res) {
+      stato._chiudendo = false;
+      if (res && res.applied && stato.data) renderRisultati(stato.data);
+    }).catch(function () { stato._chiudendo = false; });
+  }
+
+  function renderRisultati(data) {
+    if (!data) return;
+    var ris = data.risultati || {};
+    var c = ris.classifica || R.classifica(data.punteggi || {}, (data.rush || {}).statistiche || {});
+    var es = ris.esito || R.esito(c);
+    stato.inGioco = false;
+    mostra("risultati");
+    el("ris-titolo").textContent = "Risultati";
+    el("ris-esito").textContent = es.pareggio ? "Pareggio" : (es.campione === stato.me ? "Hai vinto tu" : "Vinse " + (es.campione || "—"));
+    el("ris-classifica").innerHTML = c.map(function (x, i) {
+      return '<li class="faw-rank faw-rank--lg ' + (i === 0 ? "is-top " : "") + (x.nome === stato.me ? "is-me" : "") + '">' +
+        '<span class="n">' + (i + 1) + "</span><span class=\"nm\">" + CORE.escapeHtml(x.nome) + (x.nome === stato.me ? " (tu)" : "") + "</span>" +
+        '<span class="pw">' + x.uniche + " uniche</span><span class=\"pt\">" + x.punti + "</span></li>";
+    }).join("");
+    var mio = c.filter(function (x) { return x.nome === stato.me; })[0] || {};
+    var stat = ((data.rush || {}).statistiche || {})[stato.me] || {};
+    el("ris-stats").innerHTML = [
+      statista("Punti", mio.punti || 0),
+      statista("Valide", (stat.valide || 0) + "/" + stato.rounds.length),
+      statista("Uniche", stat.uniche || 0),
+      statista("Tempo medio", stat.tetti && stat.tetti.length ? (Math.round(stat.tetti.reduce(function (a, b) { return a + b; }, 0) / stat.tetti.length / 100) / 10 + " s") : "—")
+    ].join("");
+    var pr = (data.rush || {}).punteggiRound || {};
+    el("ris-rounds").innerHTML = stato.rounds.map(function (rc, i) {
+      var mia = roundDi(data, i)[stato.me];
+      var punti = (pr[i] || {})[stato.me] || 0;
+      return '<div class="roundo"><span class="q">' + (i + 1) + "</span>" +
+        '<span class="w ' + (mia && mia.ok ? "" : "is-ko") + '">' + CORE.escapeHtml((rc.lettera || "") + " · " + (mia ? mia.parola : "niente")) + "</span>" +
+        '<span class="t">' + (mia ? Math.round((mia.t || 0) / 1000) + "s" : "—") + "</span>" +
+        '<span class="p">+' + punti + "</span></div>";
+    }).join("");
+    renderBoxRivincita(data);
+    CORE.beep("ok");
+  }
+
+  function statista(k, v) {
+    return '<div class="faw-stat"><span class="faw-stat__k">' + CORE.escapeHtml(k) + "</span><span class=\"faw-stat__v\">" + CORE.escapeHtml(String(v)) + "</span></div>";
+  }
+
+  function renderRisultatiSolo() {
+    stato.inGioco = false;
+    mostra("risultati");
+    var punti = stato.puntiSolo || 0;
+    el("ris-titolo").textContent = "Allenamento finito";
+    el("ris-esito").textContent = punti + " punti";
+    var mine = stato.rivelaSolo || {};
+    el("ris-classifica").innerHTML = Object.keys(mine).sort().map(function (i) {
+      var r = mine[i];
+      return '<li class="faw-rank"><span class="n">' + (Number(i) + 1) + "</span>" +
+        '<span class="nm">' + CORE.escapeHtml(r.parola) + "</span><span class=\"pw\">" + Math.round((r.t || 0) / 1000) + "s</span>" +
+        '<span class="pt">+' + ((stato.punteggiSolo || {})[i] || 0) + "</span></li>";
+    }).join("");
+    el("ris-stats").innerHTML = [statista("Round", stato.rounds.length), statista("Punti", punti)].join("");
+    el("ris-rounds").innerHTML = "";
+    var b = el("btn-rivincita");
+    if (b) b.textContent = "🔁 ANCORA UNA VOLTA";
+    var box = el("box-rivincita");
+    if (box) box.hidden = true;
+  }
+
+  /* -------------------------------- rivincita ------------------------------ */
+
+  function rivincita() {
+    if (stato.solo) { location.href = "index.html?solo=1"; return; }
+    el("btn-rivincita").disabled = true;
+    var d = stato.data || {};
+    stato.room.proposeRematch({
+      giocatori: (d.partecipanti || [stato.me]).slice(),
+      opzioni: d.opzioni || {},
+      durata: d.durata
+    }).then(function (id) {
+      if (!id) { CORE.toast("Rivincita non riuscita: la partita è già archiviata", "warn"); return; }
+      CORE.toast("Rivincita proposta: si entra quando accettano", "ok");
+      renderBoxRivincita(stato.data);
+    }).catch(function () {
+      el("btn-rivincita").disabled = false;
+      CORE.toast("Rivincita non riuscita: riprova", "error");
+    });
+  }
+
+  function accettaRivincita() {
+    var d = stato.data || {};
+    var nxt = d.prossimaPartita;
+    if (!nxt) return;
+    stato.room.acceptRematch().then(function () { location.href = "index.html?matchId=" + nxt; });
+  }
+
+  function renderBoxRivincita(data) {
+    var box = el("box-rivincita");
+    if (!box) return;
+    var nxt = data && data.prossimaPartita;
+    var daMe = data && data.prossimaPartitaCreataDa === stato.me;
+    if (nxt && !daMe) {
+      box.hidden = false;
+      el("box-rivincita-testo").textContent = (data.prossimaPartitaCreataDa || "Un avversario") + " propone la rivincita.";
+    } else if (nxt && daMe) {
+      box.hidden = false;
+      el("box-rivincita-testo").textContent = "Rivincita proposta: si entra quando gli altri accettano.";
+    } else box.hidden = true;
+    var btn = el("btn-rivincita");
+    if (btn && nxt && daMe) btn.textContent = "⏳ RIVINCITA PROPOSTA";
+  }
+
+  /* ------------------------------- pannello ------------------------------- */
+
+  var crea = { durata: 120, giocatori: 2, mode: "classiche" };
+
+  function bindCrea() {
+    Array.prototype.forEach.call(document.querySelectorAll("#schermo-crea [data-seg]"), function (seg) {
+      seg.addEventListener("click", function (e) {
+        var b = e.target.closest("[data-v]");
+        if (!b) return;
+        Array.prototype.forEach.call(seg.querySelectorAll("[data-v]"), function (x) {
+          x.setAttribute("aria-pressed", String(x === b));
+        });
+        crea[seg.getAttribute("data-seg")] = b.getAttribute("data-v");
+        renderHintCrea();
       });
     });
-    var ciclo = R.ciclo(setup.mode), n = R.numeroRound(Number(setup.durata) * 1000, ciclo.roundMs);
-    var ncc = setup.mode === N.MODE;
-    text("crea-hint", n + (ncc ? " lettere · scheda da " + setup.colonne + " categorie. 50 s + 10 s di confronto al massimo. Stop: ultimi 10 s." : " round · fino a 26 s" + (setup.mode === "creative" ? " + 7 s di voto + 5 s di confronto." : " + 4 s di confronto.")) + " Tutti finiti? Si prosegue subito. Limite totale: " + CORE.fmtTime(n * ciclo.roundMs / 1000) + ".");
-    $("opzioni-ncc").hidden = !ncc;
-    text("ncc-categorie-hint", N.categorie(setup.colonne).map(function (c) { return c.nome; }).join(" · "));
-    text("crea-eyebrow", ncc ? "IL GRANDE CLASSICO, A RITMO RUSH" : "UNA LETTERA. MILLE POSSIBILITÀ.");
-    text("crea-descrizione", ncc ? "Nomi, cose, città: la stessa lettera su tutta la scheda. Compila, chiama lo Stop e confronta le tue idee con quelle degli amici." : "La categoria cambia, la sfida no: trova la risposta più originale prima che finisca il tempo.");
-    text("stamp-number", ncc ? "50" : "26");
-    html("rush-how", (ncc ? [["Compila la scheda", "La stessa lettera per nomi, cose, città e le altre categorie."], ["Chiama lo Stop", "Tutte valide? 10 secondi agli altri. Tutti consegnati? Si chiude subito."], ["Confronta le risposte", "20 / 10 / 5 / 0 punti per categoria. Conta l’idea, non la velocità."]]
-      : setup.mode === "creative" ? [["Libera le idee", "Una domanda aperta, nessuna lettera obbligatoria."], ["Scegli la preferita", "Un voto per un’altra risposta, oppure ti astieni."], ["Pronti, avanti", "40 punti di partecipazione e 100 a voto. Tutti finiti? Si prosegue."]]
-      : [["Trova una risposta", "Animali con la C? Scegli bene: non c’è solo cane."], ["Inviala in tempo", "Se è ammessa, è definitiva. Non la sai? Puoi passare."], ["Fai la differenza", "100 punti di base, fino a 40 per la velocità e 60 se sei l’unico."]]).map(function (h, i) { return '<div><span>0' + (i + 1) + '</span><p><b>' + h[0] + '</b>' + h[1] + '</p></div>'; }).join(""));
-    $("btn-solo").disabled = setup.mode === "creative";
-    text("solo-hint", setup.mode === "creative" ? "Il creativo richiede amici che votino. Per allenarti scegli Sprint o Nomi, Cose, Città." : "L’allenamento è locale: nessun invito, nessuna attesa.");
-  }
-  function creaStanza() {
-    if (!CORE.user()) { CORE.toast("Accedi dal portale per invitare gli amici. Puoi già allenarti da solo.", "warn", 5000); return; }
-    var btn = $("btn-crea-stanza"); if (btn.disabled) return; btn.disabled = true;
-    var c = R.ciclo(setup.mode), n = R.numeroRound(Number(setup.durata) * 1000, c.roundMs);
-    ROOM.create({ gioco: "categoria-rush", creator: stato.me, giocatori: [stato.me],
-      maxGiocatori: Number(setup.giocatori), durata: n * c.roundMs,
-      opzioni: { durata: String(setup.durata), mode: setup.mode, colonne: Number(setup.colonne), countdown: 3 }
-    }).then(function (id) {
-      stato.matchId = id;
-      history.replaceState(null, "", "index.html?matchId=" + encodeURIComponent(id));
-      collegati();
-    }).catch(function () { CORE.toast("Sala non creata. Controlla la connessione e riprova.", "warn"); })
-      .finally(function () { btn.disabled = false; });
-  }
-  var startingSolo = false;
-  async function avviaSolo() {
-    if (startingSolo) return; startingSolo = true;
-    var lex;
-    try { lex = await global.FAWLessico.loadSolo(NET); }
-    finally { startingSolo = false; }
-    if (stato.room) { stato.room.stop(); stato.room = null; }
-    clearTimeout(retryTimer);
-    stato.solo = true; stato.idx = -1; stato.pending = null; stato.pendingVote = null; stato.pendingNext = null;
-    stato.retryAt = 0; stato.feedback = null;
-    var mode = setup.mode === "creative" ? "classiche" : setup.mode, c = R.ciclo(mode);
-    var n = R.numeroRound(Number(setup.durata) * 1000, c.roundMs);
-    var start = ora() + 2000;
-    var d = ROOM.buildMatch({ gioco: "categoria-rush", creator: stato.me, giocatori: [stato.me],
-      durata: n * c.roundMs, opzioni: { mode: mode, colonne: Number(setup.colonne), durata: String(setup.durata) } });
-    d.lessico = lex.snapshot;
-    if (lex.origine !== "pubblicato") CORE.toast("Lessico: " + lex.origine, "warn", 6000);
-    d.stato = "in_corso"; d.startAt = start; d.endsAt = start + d.durata;
-    stato.t0 = start;
-    connesso("online"); ricevi(d); startTimer();
-  }
-  function esci() {
-    if (stato.inGioco && !global.confirm("Lasciare questo Rush? Il tempo continuerà per gli altri giocatori.")) return;
-    var p = stato.room && stato.data && stato.data.stato === "attesa" ? stato.room.removePlayer(stato.me) : Promise.resolve();
-    p.then(function () { location.href = stato.solo ? "index.html" : "../../index.html"; })
-      .catch(function () { CORE.toast("Uscita non confermata. Riprova.", "warn"); });
-  }
-  function ready(force) {
-    if (!stato.room || !stato.data) return;
-    var btn = $(force ? "btn-avvia-subito" : "btn-pronto");
-    if (btn.disabled) return; btn.disabled = true;
-    var p = force ? stato.room.maybeStart({ forza: true, nome: stato.me }) : stato.room.markReady((stato.data.pronti || []).indexOf(stato.me) < 0);
-    p.catch(function () { CORE.toast("Conferma non riuscita. Riprova.", "warn"); })
-      .finally(function () { btn.disabled = stato.data.stato !== "attesa"; });
+    renderHintCrea();
+    el("btn-crea-stanza").addEventListener("click", function () { creaStanza(el("btn-crea-stanza")); });
+    el("btn-solo").addEventListener("click", function () { avviaSolo(); });
   }
 
-  function init() {
-    CORE.initTheme(); NET.init({ backend: "auto" });
-    stato.me = CORE.user() || "OSPITE";
-    if (["120", "180"].indexOf(CORE.qs("durata")) >= 0) setup.durata = Number(CORE.qs("durata"));
-    if (["creative", N.MODE].indexOf(CORE.qs("mode")) >= 0) setup.mode = CORE.qs("mode");
-    if (["3", "6"].indexOf(CORE.qs("colonne")) >= 0) setup.colonne = Number(CORE.qs("colonne"));
-    scheda = global.FAWRushScheda({ state: function () { return stato; }, now: ora, write: scrivi, submit: invia, message: messaggio });
+  function renderHintCrea() {
+    var ciclo = R.ciclo(crea.mode);
+    var n = R.numeroRound(parseInt(crea.durata, 10) * 1000, ciclo.roundMs);
+    var h = el("crea-hint");
+    if (h) {
+      h.textContent = n + " round da " + Math.round(ciclo.inputMs / 1000) + " s" +
+        (crea.mode === "creative" ? " · risposte giudicate a voto (7 s di voto, poi i punti)" : " · elenco di risposte ammesse nel gioco") +
+        ". Durata effettiva " + Math.round(n * ciclo.roundMs / 1000) + " s.";
+    }
+  }
+
+  function creaStanza(btn) {
+    btn.disabled = true;
+    var durata = parseInt(crea.durata, 10) * 1000;
+    var ciclo = R.ciclo(crea.mode);
+    var n = R.numeroRound(durata, ciclo.roundMs);
+    ROOM.create({
+      gioco: "categoria-rush",
+      creator: stato.me,
+      giocatori: [stato.me],
+      maxGiocatori: parseInt(crea.giocatori, 10) || 2,
+      durata: n * ciclo.roundMs,
+      opzioni: { durata: String(Math.round(n * ciclo.roundMs / 1000)), mode: crea.mode, countdown: 5 }
+    }).then(function (id) {
+      stato.matchId = id;
+      if (history.replaceState) history.replaceState(null, "", "index.html?matchId=" + id);
+      collegati();
+      CORE.toast("Stanza creata: condividi il link", "ok");
+    }).catch(function (e) {
+      btn.disabled = false;
+      CORE.toast("Creazione non riuscita (" + (e && e.message || "errore") + ")", "error");
+    });
+  }
+
+  /* ---------------------------------- solo --------------------------------- */
+
+  function avviaSolo() {
+    stato.solo = true;
+    NET.init({ backend: "auto" });
+    stato.modale = crea && crea.mode === "creative" ? "creative" : "classiche";
+    var ciclo = R.ciclo(stato.modale);
+    var durata = (stato.durataScelta || crea.durata || 120) * 1000;
+    var n = R.numeroRound(durata, ciclo.roundMs);
+    stato.durataMs = n * ciclo.roundMs;
+    stato.roundMs = ciclo.roundMs;
+    stato.inputMs = ciclo.inputMs;
+    stato.seed = CORE.shortId("SOLO").toUpperCase();
+    stato.rounds = R.roundsDaSeed(stato.seed, n, { modale: stato.modale });
+    stato.t0 = Date.now() + 2000;
+    stato.idx = -1;
+    stato.inGioco = true;
+    stato.me = stato.me || CORE.user() || "OSPITE";
+    flushLocale();
+    mostra("gioco");
+    avviaTicking();
+    var i = el("inp-risposta");
+    if (i) i.value = "";
+    renderRound(stato.dataLocale, R.faseRound(stato.t0, Date.now(), { rounds: n, modale: stato.modale }));
+    CORE.toast("Allenamento: " + n + " round, nessuna classifica", "", 2600);
+  }
+
+  /* --------------------------------- top bar ------------------------------- */
+
+  function bindTop() {
     document.body.addEventListener("click", function (e) {
       var b = e.target.closest("[data-action]");
       if (!b) return;
-      if (b.dataset.action === "regole") CORE.showDialog($("dlg-regole"));
-      if (b.dataset.action === "chiudi-dialogo") $("dlg-regole").close();
-      if (b.dataset.action === "tema") CORE.toggleTheme();
-      if (b.dataset.action === "esci") esci();
+      var a = b.getAttribute("data-action");
+      if (a === "regole") { el("dlg-regole") && CORE.showDialog(el("dlg-regole")); }
+      if (a === "chiudi-dialogo") { var dlg = el("dlg-regole"); if (dlg) dlg.close(); }
+      if (a === "audio") {
+        var nuovo = !CORE.soundOn();
+        CORE.setSoundOn(nuovo);
+        b.setAttribute("aria-pressed", String(nuovo));
+        b.innerHTML = (nuovo ? "🔊" : "🔇") + '<span class="faw-sr"> audio</span>';
+      }
+      if (a === "tema") CORE.toggleTheme();
+      if (a === "esci") esci();
     });
-    document.querySelectorAll("#schermo-crea [data-seg]").forEach(function (seg) { seg.addEventListener("click", function (e) {
-      var b = e.target.closest("[data-v]"); if (!b) return; setup[seg.dataset.seg] = b.dataset.v; renderSetup();
-    }); });
-    $("frm-risposta").addEventListener("submit", function (e) { e.preventDefault(); invia(); });
-    $("btn-passo").addEventListener("click", function () { invia(true); });
-    $("btn-astieni").addEventListener("click", function () { vota(null, true); });
-    $("btn-avanti").addEventListener("click", avanti);
-    $("ncc-review-tabs").addEventListener("click", function (e) { var b = e.target.closest("[data-categoria]"); if (b) { stato.reviewCat = b.dataset.categoria; renderRisposte(stato.data, attuale()); } });
-    $("inp-risposta").addEventListener("input", function () { if (!stato.pending) feedback("", false); });
-    $("inp-risposta").addEventListener("focus", function () { CORE.keepInputVisible($("inp-risposta"), 200); });
-    if (global.visualViewport) global.visualViewport.addEventListener("resize", function () { if (document.activeElement && document.activeElement.matches("#inp-risposta, #scheda-fields input")) CORE.keepInputVisible(document.activeElement, 60); });
-    $("box-voto").addEventListener("click", function (e) { var b = e.target.closest("[data-voto]"); if (b && !b.disabled) vota(b.dataset.voto); });
-    $("btn-crea-stanza").addEventListener("click", creaStanza);
-    $("btn-solo").addEventListener("click", avviaSolo);
-    $("btn-pronto").addEventListener("click", function () { ready(false); });
-    $("btn-avvia-subito").addEventListener("click", function () { ready(true); });
-    $("btn-esci-lobby").addEventListener("click", esci);
-    $("btn-rivincita").addEventListener("click", rivincita);
-    $("btn-accetta-rivincita").addEventListener("click", entraRivincita);
-    $("btn-riprova").addEventListener("click", function () { location.reload(); });
-    $("btn-copia-invito").addEventListener("click", function () {
-      if (navigator.clipboard) navigator.clipboard.writeText(location.href).then(function () { CORE.toast("Link copiato. Mandalo ai tuoi amici!", "ok"); }, function () { CORE.toast("Copia il link dalla barra degli indirizzi.", "warn"); });
-      else CORE.toast("Copia il link dalla barra degli indirizzi.", "warn");
+    var form = el("frm-risposta");
+    if (form) form.addEventListener("submit", function (e) { e.preventDefault(); invia(); });
+    var inp = el("inp-risposta");
+    if (inp) {
+      // tastiera virtuale: la casella resta centrata nel pezzo di schermo visibile,
+      // così la domanda non viene mai coperta e la pagina non "salta"
+      inp.addEventListener("focus", function () { CORE.keepInputVisible(inp, 240); });
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener("resize", function () {
+          if (document.activeElement === inp) CORE.keepInputVisible(inp, 60);
+        });
+      }
+    }
+    if (inp) inp.addEventListener("input", function () {
+      // nessuna scrittura per tasto: si valida solo in locale, il documento
+      // viene toccato quando premi INVIA
+      var v = el("feedback");
+      if (v && v.classList.contains("is-ko")) { v.textContent = ""; v.classList.remove("is-ko"); }
     });
-    document.addEventListener("visibilitychange", function () { if (!document.hidden) tick(); else scheda.flush(); });
-    global.addEventListener("pagehide", function () {
-      clearInterval(timer); clearTimeout(retryTimer); scheda.stop(); if (statusOff) statusOff(); if (stato.room) stato.room.close();
+    el("btn-rivincita").addEventListener("click", rivincita);
+    el("btn-accetta-rivincita").addEventListener("click", accettaRivincita);
+    el("btn-pronto").addEventListener("click", function () {
+      var d = stato.data;
+      if ((d.partecipanti || []).length < 2) {
+        CORE.toast("Sei solo: invita un amico col link, oppure avvia tu", "warn", 3500);
+        return;
+      }
+      var ioPronto = (d.pronti || []).indexOf(stato.me) >= 0;
+      stato.room.markReady(!ioPronto).then(function () {
+        return NET.get(stato.room.path);
+      }).then(function (snap) { if (snap.exists) onStato(snap.data); });
     });
-    global.addEventListener("pageshow", function (e) { if (e.persisted) location.reload(); });
-    statusOff = NET.status(connesso);
-    renderSetup();
-    stato.matchId = CORE.qs("matchId");
-    if (stato.matchId) collegati();
-    else if (CORE.qs("solo") === "1") avviaSolo();
-    else show("crea");
+    el("btn-avvia-subito").addEventListener("click", function () {
+      stato.room.maybeStart({ forza: true, nome: stato.me }).then(function (ok) {
+        CORE.toast(ok ? "Countdown avviato" : "Start non riuscito: partita già iniziata o non sei l'host", ok ? "ok" : "warn");
+      });
+    });
+    el("btn-copia-invito").addEventListener("click", function () {
+      var url = location.href;
+      if (navigator.clipboard) navigator.clipboard.writeText(url).then(function () { CORE.toast("Link copiato: invialo a chi vuoi sfidare", "ok"); });
+      else CORE.toast(url, "", 6000);
+    });
+    el("btn-esci-lobby").addEventListener("click", esci);
   }
-  global.FAWRush = { stato: stato, invia: invia, chiudiRound: avanza, renderRound: renderRound };
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init); else init();
-})(window);
+
+  function esci() {
+    if (stato.solo) { location.href = "index.html"; return; }
+    if (stato.room) {
+      if (stato.data && stato.data.stato === "attesa") stato.room.removePlayer(stato.me);
+      stato.room.flush();
+    }
+    location.href = "../../index.html";
+  }
+
+  function init() {
+    NET.init({ backend: "auto" });
+    bindTop();
+    avvio();
+  }
+
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
+  else init();
+
+  global.FAWRush = { stato: stato, invia: invia, chiudiRound: chiudiRound, renderRound: renderRound };
+})(typeof window !== "undefined" ? window : globalThis);

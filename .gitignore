@@ -5,6 +5,3 @@
 /node_modules/
 /test-results/
 /playwright-report/
-
-# Scratch screenshots and local verification artifacts
-/.arena/

@@ -138,7 +138,7 @@ test("room: transizioni legali e non", () => {
 });
 
 test("room: documento iniziale coerente con l'hub", () => {
-  const d = ROOM.buildMatch({ gioco: "categoria-rush", creator: "ALICE", giocatori: ["ALICE", "BOB"], opzioni: { griglia: "5", durata: "180" } });
+  const d = ROOM.buildMatch({ gioco: "parole-arena", creator: "ALICE", giocatori: ["ALICE", "BOB"], opzioni: { griglia: "5", durata: "180" } });
   assert.equal(d.stato, "attesa");
   assert.deepEqual(d.partecipanti, ["ALICE", "BOB"]);
   assert.deepEqual(d.punteggi, { ALICE: 0, BOB: 0 });
@@ -234,8 +234,7 @@ test("categorie: validazione — lettere, accenti, maiuscole, varianti, fuori ca
   assert.equal(CAT.valida(" Pizza ", cibo, "P").ok, true);
   assert.equal(CAT.valida("pizza", cibo, "p").canonical, "pizza");
   assert.equal(CAT.valida("LASAGNE", cibo, "L").ok, true, "plurale ammesso come variante");
-  assert.equal(CAT.valida("melanzana", cibo, "M").ok, true, "singolare aggiunto al catalogo ampliato");
-  assert.equal(CAT.groupKey("melanzane", cibo), CAT.groupKey("melanzana", cibo));
+  assert.equal(CAT.valida("melanzana", cibo, "M").ok, false);
   assert.equal(CAT.valida("melanzane", cibo, "M").ok, true);
   assert.equal(CAT.valida("prosciutto", cibo, "P").motivo, undefined);
   assert.equal(CAT.valida("pane", cibo, "M").motivo, "LETTERA");
