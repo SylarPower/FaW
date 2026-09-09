@@ -127,7 +127,7 @@
 			/* ---------------- HEADER ---------------- */
 			.hub-header {
 				position: sticky;
-				top: 0;
+				top: var(--faw-top-inset);
 				z-index: 40;
 				background: var(--faw-panel-solid);
 				border-bottom: 1px solid var(--faw-border);
@@ -181,28 +181,13 @@
 			}
 			#user-display { font-weight: 600; font-size: 0.88rem; white-space: nowrap; }
 
-			#btn-disponibilita {
-				display: inline-flex;
-				align-items: center;
-				gap: 7px;
-				padding: 8px 14px;
-				border-radius: 999px;
-				border: 1px solid var(--faw-border);
-				background: var(--faw-panel);
-				color: var(--faw-text);
-				font-weight: 600;
-				font-size: 0.8rem;
-				cursor: pointer;
-				transition: all var(--faw-fast) var(--faw-ease);
-			}
-			#btn-disponibilita:hover { border-color: var(--faw-border-2); }
-			#btn-disponibilita.is-on { background: var(--faw-ok-soft); border-color: #bbf7d0; color: var(--faw-ok); }
-			#btn-disponibilita.is-off { background: var(--faw-danger-soft); border-color: #fecaca; color: var(--faw-danger); }
-			:root[data-theme='dark'] #btn-disponibilita.is-on { border-color: rgba(34, 197, 94, 0.4); }
-			:root[data-theme='dark'] #btn-disponibilita.is-off { border-color: rgba(239, 68, 68, 0.4); }
-
-			/* ---------------- LAYOUT ---------------- */
-			#main-app { position: relative; z-index: 1; }
+			/* ---------------- LAYOUT ----------------
+			   --faw-top-inset: spazio occupato dagli elementi fissi in cima
+			   (banner sfida / popup invito). Header sticky e pagina si spostano
+			   verso il basso, cosi' nulla finisce coperto dal testo flottante. */
+			:root { --faw-top-inset: 0px; --faw-popup-h: 0px; }
+			.hub-header { top: var(--faw-top-inset); }
+			#main-app { position: relative; z-index: 1; padding-top: var(--faw-top-inset); }
 			.hub-main {
 				max-width: var(--hub-max);
 				margin: 0 auto;
@@ -213,11 +198,25 @@
 				align-items: start;
 			}
 			.hub-col-main { display: grid; gap: 20px; min-width: 0; }
-			.hub-col-side { display: grid; gap: 20px; position: sticky; top: 84px; }
+			.hub-col-side { display: grid; gap: 20px; position: sticky; top: calc(84px + var(--faw-top-inset)); }
 			@media (max-width: 1100px) {
 				.hub-main { grid-template-columns: 1fr; }
 				.hub-col-side { position: static; }
 			}
+
+			/* ---------------- AGGIORNAMENTO MANUALE LISTA PARTITE ---------------- */
+			.refresh-box { display: flex; align-items: center; gap: 10px; }
+			.refresh-meta {
+				font-size: 0.72rem;
+				font-weight: 600;
+				letter-spacing: 0.02em;
+				color: var(--faw-text-3);
+				white-space: nowrap;
+			}
+			.refresh-ico { display: inline-block; transition: transform var(--faw-fast) var(--faw-ease); }
+			#btn-refresh-partite:hover .refresh-ico { transform: rotate(-45deg); }
+			#btn-refresh-partite.is-loading { opacity: 0.65; pointer-events: none; }
+			#btn-refresh-partite.is-loading .refresh-ico { animation: faw-spin 800ms linear infinite; }
 
 			/* ---------------- GRID GIOCHI ---------------- */
 			.game-grid {
@@ -547,7 +546,7 @@
 			/* ---------------- BANNER SFIDA (top) ---------------- */
 			.game-banner {
 				position: fixed;
-				top: 0;
+				top: var(--faw-popup-h);
 				left: 50%;
 				transform: translateX(-50%);
 				z-index: 9999;
@@ -574,6 +573,14 @@
 			.banner-left .b-title { font-weight: 700; font-size: 0.92rem; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 			.banner-left .b-sub { font-size: 0.78rem; color: var(--faw-text-2); }
 			.banner-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+			.banner-opt { display: inline-flex; align-items: center; gap: 6px; }
+			.banner-opt > span {
+				font-size: 0.68rem;
+				font-weight: 700;
+				letter-spacing: 0.06em;
+				text-transform: uppercase;
+				color: var(--faw-text-3);
+			}
 			.banner-right select {
 				padding: 8px 12px;
 				border-radius: 9px;
@@ -626,7 +633,7 @@
 				top: 0;
 				left: 50%;
 				transform: translateX(-50%);
-				z-index: 9998;
+				z-index: 10000;
 				width: min(560px, 94vw);
 				padding: 20px 22px 18px;
 				border-radius: 0 0 22px 22px;
@@ -750,7 +757,6 @@
 						<div class="faw-pill faw-pill--live" title="Giocatori attivi negli ultimi 60s"><span class="faw-dot"></span><b id="online-count">0</b>&nbsp;online</div>
 						<button id="theme-toggle" class="faw-btn faw-btn--icon" onclick="fawToggleTheme()" title="Cambia tema chiaro/scuro" aria-label="Cambia tema">🌙</button>
 						<div class="user-chip"><span class="faw-avatar" id="user-avatar">FA</span><span id="user-display"></span></div>
-						<button id="btn-disponibilita" onclick="toggleDisponibilita()" title="Disponibilità per le sfide"></button>
 						<button class="faw-btn faw-btn--ghost faw-btn--sm" onclick="logout()" title="Esci">Esci ⏻</button>
 					</div>
 				</div>
@@ -805,13 +811,19 @@
 						</div>
 					</div>
 
-					<div class="faw-card">
-						<div class="faw-card__head">
-							<h2>⚡ Partite in Corso</h2>
-							<span class="faw-pill faw-pill--live"><span class="faw-dot"></span>LIVE</span>
+				<div class="faw-card">
+					<div class="faw-card__head">
+						<h2>⚡ Partite in Corso</h2>
+						<div class="refresh-box">
+							<span class="refresh-meta" id="refresh-meta" title="Ultimo aggiornamento della lista">—</span>
+							<button id="btn-refresh-partite" class="faw-btn faw-btn--ghost faw-btn--sm"
+								onclick="refreshPartite(true)" title="Aggiorna ora la lista (auto ogni 60s)">
+								<span class="refresh-ico" aria-hidden="true">⟳</span> Aggiorna
+							</button>
 						</div>
-						<div id="lista-partite"></div>
 					</div>
+					<div id="lista-partite"></div>
+				</div>
 
 					<div class="faw-card">
 						<div class="faw-card__head">
@@ -976,10 +988,44 @@
 			  av.style.setProperty('--h', h);
 			}
 
+// --- NAVIGAZIONE (unico punto di redirect: testabile e tracciabile) ---
+			function fawVaiA(url) { window.location.href = url; }
+
 // --- CONTEGGIO ONLINE (social proof nell'header) ---
 			function aggiornaOnlineCount(n) {
 			  const el = document.getElementById('online-count');
 			  if (el) el.textContent = n;
+			}
+
+// --- SPAZIO PER GLI ELEMENTI FISSI IN CIMA (banner sfida / popup invito) ---
+			/* Il banner e il popup invito sono ancorati in alto: senza questo
+			   accorgimento finirebbero sopra l'header e il testo della pagina.
+			   Misuriamo la loro altezza reale e spostiamo header + contenuto. */
+			function fawElementoVisibile(el) {
+			  /* La visibilita' si legge dagli stili, non dal box model: il CSSOM
+			     View impone un genitore di offset nullo sugli elementi fixed, e
+			     popup e banner dell'hub sono tutti fixed. */
+			  if (!el) return false;
+			  if (el.style && el.style.display === 'none') return false;
+			  const cs = window.getComputedStyle ? window.getComputedStyle(el) : null;
+			  if (cs && (cs.display === 'none' || cs.visibility === 'hidden')) return false;
+			  return true;
+			}
+			function fawSyncTopInset() {
+			  try {
+			    const popup = document.getElementById('invite-popup');
+			    const banner = document.getElementById('game-banner');
+			    const popupH = fawElementoVisibile(popup) ? popup.offsetHeight : 0;
+			    const bannerH = fawElementoVisibile(banner) ? banner.offsetHeight : 0;
+			    const root = document.documentElement;
+			    root.style.setProperty('--faw-popup-h', popupH + 'px');
+			    root.style.setProperty('--faw-top-inset', (popupH + bannerH) + 'px');
+			  } catch (e) { /* noop */ }
+			}
+			window.addEventListener('resize', fawSyncTopInset);
+			if (typeof ResizeObserver === 'function') {
+			  // intercetta anche i cambi di altezza (testo che va a capo, banner dinamici)
+			  new ResizeObserver(fawSyncTopInset).observe(document.body);
 			}
 
 // --- CONFETTI (micro-reward al successo) ---
@@ -1268,9 +1314,8 @@ if (mioNome && passwordHashSalvato) {
         document.getElementById('main-app').style.display = 'block';
         document.getElementById('user-display').textContent = "👤 " + mioNome;
         fawSyncUserChip();
-        aggiornaUIDisponibilita();
         aggiornaPresenza();
-        setInterval(aggiornaPresenza, 20000);
+        setInterval(aggiornaPresenza, PRESENZA_HEARTBEAT_MS);
         listen();
         caricaStorico();
     };
@@ -1321,9 +1366,8 @@ if (mioNome && passwordHashSalvato) {
 			    document.getElementById('main-app').style.display = 'block';
 			    document.getElementById('user-display').textContent = "👤 " + mioNome;
 			    fawSyncUserChip();
-			    aggiornaUIDisponibilita();
 			    aggiornaPresenza();
-			    setInterval(aggiornaPresenza, 20000);
+			    setInterval(aggiornaPresenza, PRESENZA_HEARTBEAT_MS);
 			    listen();
 			    caricaStorico();
 			  } catch (e) {
@@ -1337,46 +1381,48 @@ if (mioNome && passwordHashSalvato) {
 			    btn.style.cursor = 'pointer';
 			  }
 			}
-			async function aggiornaPresenza() {
+			/* Presenza: chi e' nell'hub e' sempre disponibile, quindi non scriviamo
+			   piu' nessun flag "disponibile". Lo stato "in partita" si ricava dalla
+			   cache delle partite gia' scaricata dall'hub (niente query extra). */
+			function partitaAttivaCorrente() {
 			  let inPartita = false;
 			  let partitaId = null;
+			  const tutte = []
+			    .concat(partiteCache.ruzzle || [], partiteCache.patata || [],
+			          partiteCache.neonwar || [], partiteCache.gameof15 || [],
+			          partiteCache.pictionary || []);
+			  tutte.forEach(p => {
+			    if (!p) return;
+			    const stato = p.stato;
+			    if (stato === 'conclusa' || stato === 'results') return;
+			    if ((p.rivincitaRifiutataDa || []).length > 0) return;
+			    const partecipanti = p.partecipanti || p.players || [];
+			    if (!partecipanti.includes(mioNome)) return;
+			    if (stato === 'in_corso' || stato === 'drawing' || stato === 'interpreting' || stato === 'voting') {
+			      inPartita = true; partitaId = p.id;
+			      return;
+			    }
+			    // In attesa: sono impegnato solo se ho creato la sfida o l'ho accettata
+			    const accettanti = p.rivincitaAccettataDa || [];
+			    if (partecipanti[0] === mioNome || accettanti.includes(mioNome)) {
+			      inPartita = true; partitaId = p.id;
+			    }
+			  });
+			  return { inPartita, partitaId };
+			}
+			async function aggiornaPresenza() {
+			  if (!db || !mioNome) return;
+			  const { inPartita, partitaId } = partitaAttivaCorrente();
 			  try {
-			    const snap = await db.collection("partite").where("partecipanti", "array-contains", mioNome).where("stato", "in", ["attesa", "in_corso"]).get();
-			    // ✅ Controlla ogni partita trovata
-			    snap.forEach(doc => {
-			      const p = doc.data();
-			      const rifiutanti = p.rivincitaRifiutataDa || [];
-			      // ✅ Considera "in partita" SOLO se:
-			      // 1. Nessuno ha rifiutato
-			      // 2. La partita è effettivamente attiva (in_corso) o tutti hanno accettato
-			      if (rifiutanti.length === 0) {
-			        // Nessun rifiuto - controlla se è in corso o se tutti hanno accettato
-			        if (p.stato === "in_corso") {
-			          inPartita = true;
-			          partitaId = doc.id;
-			        } else if (p.stato === "attesa") {
-			          // In attesa: sono "in partita" solo se ho accettato o sono il creatore
-			          const accettanti = p.rivincitaAccettataDa || [];
-			          const sonoCreatore = p.partecipanti[0] === mioNome;
-			          const hoAccettato = accettanti.includes(mioNome);
-			          if (sonoCreatore || hoAccettato) {
-			            inPartita = true;
-			            partitaId = doc.id;
-			          }
-			        }
-			      }
-			      // Se qualcuno ha rifiutato, NON è considerata partita attiva
+			    await db.collection("presenze").doc(mioNome).set({
+			      nome: mioNome,
+			      last: Date.now(),
+			      inPartita: inPartita,
+			      partitaId: partitaId
 			    });
 			  } catch (e) {
 			    console.error("Errore aggiornaPresenza:", e);
 			  }
-			  db.collection("presenze").doc(mioNome).set({
-			    nome: mioNome,
-			    last: Date.now(),
-			    inPartita: inPartita,
-			    partitaId: partitaId,
-			    disponibile: localStorage.getItem('disponibile') !== 'false'
-			  });
 			}
 
 function listen() {
@@ -1408,52 +1454,107 @@ function listen() {
         aggiornaListaAmici(snap, presenzeData);
     });
 
-    // LISTENER 3: Partite Ruzzle/NeonWar
-    db.collection("partite")
-        .where("partecipanti", "array-contains", mioNome)
-        .onSnapshot(snap => {
-partiteCache.ruzzle = [];
-partiteCache.patata = [];
-partiteCache.neonwar = [];
-partiteCache.gameof15 = [];
-
-	snap.forEach(doc => {
-	    const data = { id: doc.id, ...doc.data() };
-	    if (data.gioco === 'neonwar') partiteCache.neonwar.push(data);
-	    else if (data.gioco === 'gameof15') partiteCache.gameof15.push(data);
-	    else if (data.gioco === 'patata') partiteCache.patata.push(data);
-	    else if (data.gioco !== 'pictionary') partiteCache.ruzzle.push(data);
-	});
-
-            renderTutteLePartite();
-        });
-
-    // ✅ PICTIONARY: Caricamento manuale invece di listener (evita loop)
-    caricaPartitePictionary();
-    setInterval(caricaPartitePictionary, 5000);
+    // PARTITE: niente listener in tempo reale. La lista "Partite in Corso"
+    // si aggiorna una volta al minuto (o a mano con il pulsante ⟳), cosi'
+    // non sfarfalla di continuo e non brucia letture Firestore.
+    avviaRefreshPartite();
 }
 
-async function caricaPartitePictionary() {
-    if (!mioNome) return;
+/* ========================================
+   🔄 LISTA PARTITE — aggiornamento manuale + 1/min
+   ======================================== */
+/* La finestra "online" dell'hub e' di 60 secondi: un battito ogni 30s resta
+   ampiamente dentro la finestra e taglia di un terzo le scritture Firestore. */
+const PRESENZA_HEARTBEAT_MS = 30000;
+const REFRESH_PARTITE_MS = 60000;   // cadenza automatica: ogni minuto
+const REFRESH_MIN_GAP_MS = 4000;    // anti-rimbalzo su focus/click ravvicinati
+let ultimoRefreshPartite = 0;
+let refreshPartiteInCorso = null;
+let refreshPartiteTimer = null;
+let refreshMetaTimer = null;
+let ultimaFirmaPartite = '';
 
-    try {
-        const snap = await db.collection("pictionary_rooms")
-            .where("players", "array-contains", mioNome)
-            .get();
+function partiteInCache() {
+    return [].concat(
+        partiteCache.ruzzle || [], partiteCache.patata || [],
+        partiteCache.neonwar || [], partiteCache.gameof15 || [],
+        partiteCache.pictionary || []
+    );
+}
 
-        partiteCache.pictionary = [];
+async function refreshPartite(manuale = false) {
+    if (!db || !mioNome) return;
+    if (refreshPartiteInCorso) return refreshPartiteInCorso;
+    const adesso = Date.now();
+    if (!manuale && adesso - ultimoRefreshPartite < REFRESH_MIN_GAP_MS) return;
 
-        snap.forEach(doc => {
-            const data = doc.data();
-            if (data && data.players && Array.isArray(data.players) && data.stato !== 'results') {
-                partiteCache.pictionary.push({ id: doc.id, ...data });
-            }
-        });
+    const btn = document.getElementById('btn-refresh-partite');
+    if (btn) btn.classList.add('is-loading');
 
-        renderTutteLePartite();
-    } catch (e) {
-        console.warn("⚠️ Errore caricamento Pictionary:", e.message);
-    }
+    refreshPartiteInCorso = (async () => {
+        try {
+            const [snapPartite, snapPic] = await Promise.all([
+                db.collection('partite').where('partecipanti', 'array-contains', mioNome).get(),
+                db.collection('pictionary_rooms').where('players', 'array-contains', mioNome).get()
+            ]);
+
+            partiteCache.ruzzle = [];
+            partiteCache.patata = [];
+            partiteCache.neonwar = [];
+            partiteCache.gameof15 = [];
+            snapPartite.forEach(doc => {
+                const data = { id: doc.id, ...doc.data() };
+                if (data.gioco === 'neonwar') partiteCache.neonwar.push(data);
+                else if (data.gioco === 'gameof15') partiteCache.gameof15.push(data);
+                else if (data.gioco === 'patata') partiteCache.patata.push(data);
+                else if (data.gioco !== 'pictionary') partiteCache.ruzzle.push(data);
+            });
+
+            partiteCache.pictionary = [];
+            snapPic.forEach(doc => {
+                const data = { id: doc.id, ...doc.data() };
+                if (data.players && Array.isArray(data.players) && data.stato !== 'results') {
+                    partiteCache.pictionary.push(data);
+                }
+            });
+
+            ultimoRefreshPartite = Date.now();
+            renderTutteLePartite();
+            aggiornaPresenza();
+        } catch (e) {
+            console.warn('⚠️ Errore aggiornamento partite:', e && e.message);
+            if (manuale) mostraToast('⚠️ Aggiornamento non riuscito, riprova', 'err');
+        } finally {
+            if (btn) btn.classList.remove('is-loading');
+            aggiornaRefreshMeta();
+            refreshPartiteInCorso = null;
+        }
+    })();
+    return refreshPartiteInCorso;
+}
+
+function avviaRefreshPartite() {
+    refreshPartite(false);
+    if (refreshPartiteTimer) clearInterval(refreshPartiteTimer);
+    refreshPartiteTimer = setInterval(() => refreshPartite(false), REFRESH_PARTITE_MS);
+    if (refreshMetaTimer) clearInterval(refreshMetaTimer);
+    refreshMetaTimer = setInterval(aggiornaRefreshMeta, 15000);
+    // Al ritorno sulla scheda: aggiornamento immediato (con anti-rimbalzo),
+    // cosi' un invito appena arrivato compare senza aspettare il minuto.
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) refreshPartite(false);
+    });
+    window.addEventListener('focus', () => refreshPartite(false));
+}
+
+function aggiornaRefreshMeta() {
+    const el = document.getElementById('refresh-meta');
+    if (!el) return;
+    if (!ultimoRefreshPartite) { el.textContent = '—'; return; }
+    const s = Math.max(0, Math.round((Date.now() - ultimoRefreshPartite) / 1000));
+    el.textContent = s < 5 ? 'aggiornato ora'
+        : s < 60 ? `aggiornato ${s}s fa`
+        : `aggiornato ${Math.round(s / 60)} min fa`;
 }
 
 // ========================================
@@ -1464,28 +1565,8 @@ const invitiIgnorati = new Set();     // id chiusi con ✖ (restano nella lista 
 let inviteFlashTimer = null;
 let inviteTitleOriginale = null;
 
-function suonoInvito() {
-  try {
-    const AC = window.AudioContext || window.webkitAudioContext;
-    if (!AC) return;
-    if (!window.__inviteAudioCtx) window.__inviteAudioCtx = new AC();
-    const a = window.__inviteAudioCtx;
-    if (a.state === 'suspended') a.resume();
-    [660, 880].forEach((f, i) => {
-      const o = a.createOscillator();
-      const g = a.createGain();
-      const t0 = a.currentTime + i * 0.17;
-      o.type = 'sine';
-      o.frequency.value = f;
-      g.gain.setValueAtTime(0.0001, t0);
-      g.gain.exponentialRampToValueAtTime(0.18, t0 + 0.02);
-      g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.3);
-      o.connect(g).connect(a.destination);
-      o.start(t0);
-      o.stop(t0 + 0.32);
-    });
-  } catch (e) { /* audio non disponibile: ok */ }
-}
+/* Nessuna segnalazione sonora in FaW: gli inviti si annunciano solo
+   in modo visivo (popup + flash del titolo della scheda). */
 
 function avviaFlashTitolo(msg) {
   if (inviteFlashTimer) return; // già attivo
@@ -1545,8 +1626,7 @@ function aggiornaInviti() {
     popup.style.display = 'block';
     popup.classList.add('invite-live');
     if (nuovoArrivo) {
-      suonoInvito();
-      try { if (navigator.vibrate) navigator.vibrate([80, 60, 80]); } catch (e) { /* noop */ }
+      // Solo segnali visivi: nessun suono, nessuna vibrazione.
       avviaFlashTitolo(`${inv.da} ti sfida a ${cfg.nome}!`);
     }
   } else {
@@ -1554,15 +1634,16 @@ function aggiornaInviti() {
     popup.classList.remove('invite-live');
     fermaFlashTitolo();
   }
+  fawSyncTopInset();
 }
 
 function accettaInvito(inv) {
   if (inv.tipo === 'pictionary') {
-    window.location.href = gameHref('pictionary', 'room=' + inv.id);
+    fawVaiA(gameHref('pictionary', 'room=' + inv.id));
     return;
   }
   invitiNotificati.add(inv.id);
-  accettaSfida(inv.id);
+  accettaSfida(inv.id, inv.gioco);
 }
 function rifiutaInvito(inv) {
   invitiNotificati.add(inv.id);
@@ -1588,14 +1669,33 @@ function chiudiInvito() {
 // ========================================
 // ✅ RENDER UNIFICATO
 // ========================================
-function renderTutteLePartite() {
+function firmaListaPartite() {
+    // Serve a non ricostruire il DOM (e non far "sfarfallare" la lista)
+    // quando i dati non sono cambiati tra un refresh e l'altro.
+    try {
+        return giocoSelezionato + '|' + JSON.stringify(partiteInCache().map(p => ({
+            id: p.id, gioco: p.gioco, stato: p.stato,
+            n: (p.partecipanti || p.players || []).length,
+            acc: p.rivincitaAccettataDa || [], rif: p.rivincitaRifiutataDa || []
+        })));
+    } catch (e) { return ''; }
+}
+
+function renderTutteLePartite(forza = false) {
     const div = document.getElementById('lista-partite');
     const configGioco = GIOCHI_CONFIG[giocoSelezionato] || GIOCHI_CONFIG.ruzzle;
+
+    const firma = firmaListaPartite();
+    if (!forza && firma && firma === ultimaFirmaPartite) {
+        aggiornaInviti();   // gli inviti dipendono anche da scelte locali (✖ ignora)
+        return;
+    }
+    ultimaFirmaPartite = firma;
 
     // Reset completo
     const soloHref = gameHref(giocoSelezionato);
     div.innerHTML = `
-        <div class="user-item u-row--solo" onclick="window.location.href='${soloHref}'">
+        <div class="user-item u-row--solo" onclick="fawVaiA('${soloHref}')">
             <span>🎯 Allenamento Solo (${configGioco.nome})</span>
             <button class="u-btn--enter">GIOCA →</button>
         </div>`;
@@ -1662,7 +1762,7 @@ function renderPartitaRuzzle(p, div) {
                     <div class="user-item u-row--wait">
                         <span>⏳ Sfida creata: in attesa (${numAccettanti}/${totale})</span>
                         <div>
-                            <button class="u-btn--ghost" onclick="event.stopPropagation(); window.location.href='${gameHref(p.gioco, 'matchId=' + partitaId)}'">APRI</button>
+                            <button class="u-btn--ghost" onclick="event.stopPropagation(); fawVaiA('${gameHref(p.gioco, 'matchId=' + partitaId)}')">APRI</button>
                             <button class="u-btn--decline" onclick="event.stopPropagation(); annullaSfida('${partitaId}')">🚫 ANNULLA</button>
                         </div>
                     </div>`;
@@ -1671,7 +1771,7 @@ function renderPartitaRuzzle(p, div) {
                     <div class="user-item u-row--live">
                         <span><i class="live-dot"></i>Pronta vs ${altriGiocatori.join(', ')} (${nomeGioco})</span>
                         <div>
-                            <button class="u-btn--enter" onclick="window.location.href='${gameHref(p.gioco, 'matchId=' + partitaId)}'">ENTRA →</button>
+                            <button class="u-btn--enter" onclick="fawVaiA('${gameHref(p.gioco, 'matchId=' + partitaId)}')">ENTRA →</button>
                             ${delBtn}
                         </div>
                     </div>`;
@@ -1683,14 +1783,14 @@ function renderPartitaRuzzle(p, div) {
                 div.innerHTML += `
                     <div class="user-item u-row--accepted">
                         <span>✅ Hai accettato: in attesa degli altri (${numAccettanti}/${totale})</span>
-                        <button class="u-btn--enter" onclick="window.location.href='${gameHref(p.gioco, 'matchId=' + partitaId)}'">ENTRA →</button>
+                        <button class="u-btn--enter" onclick="fawVaiA('${gameHref(p.gioco, 'matchId=' + partitaId)}')">ENTRA →</button>
                     </div>`;
             } else {
                 div.innerHTML += `
                     <div class="user-item u-row--challenge">
                         <span>⚔️ SFIDA DA ${creatore.toUpperCase()} — ${nomeGioco}</span>
                         <div>
-                            <button class="u-btn--accept" onclick="event.stopPropagation(); accettaSfida('${partitaId}')">✅ ACCETTA</button>
+                            <button class="u-btn--accept" onclick="event.stopPropagation(); accettaSfida('${partitaId}', '${p.gioco}')">✅ ACCETTA</button>
                             <button class="u-btn--decline" onclick="event.stopPropagation(); rifiutaSfida('${partitaId}')">✖️</button>
                         </div>
                     </div>`;
@@ -1703,7 +1803,7 @@ function renderPartitaRuzzle(p, div) {
             <div class="user-item u-row--live">
                 <span><i class="live-dot"></i>In gioco con ${altri} (${nomeGioco})</span>
                 <div>
-                    <button class="u-btn--enter" onclick="window.location.href='${gameHref(p.gioco, 'matchId=' + partitaId)}'">ENTRA →</button>
+                    <button class="u-btn--enter" onclick="fawVaiA('${gameHref(p.gioco, 'matchId=' + partitaId)}')">ENTRA →</button>
                     ${delBtn}
                 </div>
             </div>`;
@@ -1731,7 +1831,7 @@ function renderPartitaPictionary(p, div) {
         <div class="user-item u-row--live">
             <span><i class="live-dot"></i>🎨 ${altri.length > 0 ? `vs ${altri}` : 'Pictionary'} — ${statoText}</span>
             <div>
-                <button class="u-btn--enter" onclick="window.location.href='${gameHref('pictionary', 'room=' + roomId)}'">ENTRA →</button>
+                <button class="u-btn--enter" onclick="fawVaiA('${gameHref('pictionary', 'room=' + roomId)}')">ENTRA →</button>
                 <button class="u-btn--del" title="Elimina" onclick="event.stopPropagation(); eliminaPictionary('${roomId}')">🗑️</button>
             </div>
         </div>`;
@@ -1780,9 +1880,10 @@ function renderPartitaPictionary(p, div) {
 			    const presenza = presenzeData[nomeAmico] || {};
 			    const isOnline = !!presenza.nome;
 			    const inPartita = presenza.inPartita || false;
-			    const disponibile = presenza.disponibile !== false;
+			    // Chi e' nell'hub e' sempre raggiungibile: lo stato di
+			    // reperibilita' manuale e' stato rimosso.
 			    // ✅ Determina se è selezionabile: i giochi solo allenamento non permettono sfide ad amici
-			    const isSelezionabile = !giocoSolo && isOnline && disponibile && !inPartita;
+			    const isSelezionabile = !giocoSolo && isOnline && !inPartita;
 			    let statoIcon, statoColor, statoText;
 			    if (giocoSolo) {
 			      statoIcon = '🚫';
@@ -1792,10 +1893,6 @@ function renderPartitaPictionary(p, div) {
 			      statoIcon = '⚫';
 			      statoColor = '#555';
 			      statoText = 'Offline';
-			    } else if (!disponibile) {
-			      statoIcon = '🔴';
-			      statoColor = '#e74c3c';
-			      statoText = 'Non disponibile';
 			    } else if (inPartita) {
 			      statoIcon = '🎮';
 			      statoColor = '#f39c12';
@@ -1889,13 +1986,19 @@ function renderPartitaPictionary(p, div) {
 			  if (isGiocoSolo()) {
 			    amiciSelezionati.clear();
 			    document.querySelectorAll('.user-item.selected').forEach(item => item.classList.remove('selected'));
-			    removeGameBanner();
+			    chiudiBannerSfida(true);
 			  }
 			  aggiornaBottoneSfida();
 			  aggiornaListaAmiciDaCache();
 
+			  // La barra sfida segue il gioco selezionato: se e' aperta si
+			  // ricostruisce con opzioni/modalita' del nuovo gioco (e sparisce
+			  // se il nuovo gioco e' solo allenamento).
+			  renderBannerSfida();
+
 			  // ✅ Aggiorna il pulsante Allenamento Solo
 			  aggiornaAllenamentoSolo();
+			  renderTutteLePartite();
 			}
 
 			// ✅ Nuova funzione per aggiornare l'allenamento solo
@@ -1903,10 +2006,15 @@ function renderPartitaPictionary(p, div) {
 			  const config = GIOCHI_CONFIG[giocoSelezionato];
 			  const allenamentoDiv = document.querySelector('#lista-partite .user-item.u-row--solo');
 			  if (allenamentoDiv && config) {
-			    allenamentoDiv.onclick = () => window.location.href = gameHref(giocoSelezionato);
+			    allenamentoDiv.onclick = () => fawVaiA(gameHref(giocoSelezionato));
 			    allenamentoDiv.querySelector('span').textContent = `🎯 Allenamento Solo (${config.nome})`;
 			  }
 			}
+
+			/* La barra "SFIDA …" e' legata al gioco selezionato: `renderBannerSfida()`
+			   la ricostruisce ogni volta che serve, cosi' cambiando gioco le opzioni
+			   e le modalita' diventano subito quelle del gioco appena scelto. */
+			let bannerSfidaAperto = false;
 
 			function apriModalSfida() {
 			  const config = GIOCHI_CONFIG[giocoSelezionato];
@@ -1921,57 +2029,79 @@ function renderPartitaPictionary(p, div) {
 			    mostraToast('❌ Gioco non configurato');
 			    return;
 			  }
+			  if (!amiciSelezionati.size) {
+			    mostraToast('Seleziona almeno un amico da sfidare');
+			    return;
+			  }
+			  bannerSfidaAperto = true;
+			  renderBannerSfida();
+			}
+
+			function renderBannerSfida() {
+			  if (!bannerSfidaAperto) return;
+			  const config = GIOCHI_CONFIG[giocoSelezionato];
+			  // Gioco solo allenamento: la barra non ha ragione di esistere
+			  if (!config || isGiocoSolo()) {
+			    chiudiBannerSfida(true);
+			    return;
+			  }
 			  const nomiSelezionati = Array.from(amiciSelezionati).join(', ');
-			  removeGameBanner();
 			  // Genera HTML opzioni dinamicamente
 			  let opzioniHtml = '';
-			  config.opzioni.forEach(opt => {
+			  (config.opzioni || []).forEach(opt => {
 			    const salvato = localStorage.getItem(`ultimo_${giocoSelezionato}_${opt.id}`) || opt.default;
 			    let selectHtml = `
-											<select id="opt-${opt.id}-banner">`;
+										<select id="opt-${opt.id}-banner" aria-label="${opt.label}">`;
 			    opt.valori.forEach(v => {
 			      selectHtml += `
-												<option value="${v.value}" ${salvato === v.value ? 'selected' : ''}>${v.label}</option>`;
+											<option value="${v.value}" ${salvato === v.value ? 'selected' : ''}>${v.label}</option>`;
 			    });
 			    selectHtml += ' </select>';
-			    opzioniHtml += selectHtml;
+			    opzioniHtml += `<label class="banner-opt"><span>${opt.label}</span>${selectHtml}</label>`;
 			  });
 			  // Genera HTML modalità dinamicamente
 			  let modalitaHtml = '';
-			  config.modalita.forEach(m => {
+			  (config.modalita || []).forEach(m => {
 			    modalitaHtml += `
-											<button class="btn-banner" style="background:${m.colore}; color:${m.testo};" onclick="creaPartitaDaBanner('${m.id}')">${m.label}</button>`;
+										<button class="btn-banner" style="background:${m.colore}; color:${m.testo};" onclick="creaPartitaDaBanner('${m.id}')">${m.label}</button>`;
 			  });
+			  removeGameBanner();
 			  const banner = document.createElement('div');
 			  banner.id = 'game-banner';
 			  banner.className = 'game-banner';
 			  banner.style.background = 'var(--faw-panel-solid)';
 			  banner.innerHTML = `
-
-											<div class="banner-left">
-												<span class="b-ico">${config.icona}</span>
-												<div>
-													<div class="b-title">SFIDA ${config.nome.toUpperCase()} — ${nomiSelezionati}</div>
-													<div class="b-sub">Scegli opzioni e modalità</div>
-												</div>
+										<div class="banner-left">
+											<span class="b-ico">${config.icona}</span>
+											<div>
+												<div class="b-title">SFIDA ${config.nome.toUpperCase()} — ${nomiSelezionati}</div>
+												<div class="b-sub">Scegli opzioni e modalità</div>
 											</div>
-											<div class="banner-right">
-			      ${opzioniHtml}
-			      ${modalitaHtml}
+										</div>
+										<div class="banner-right">
+						      ${opzioniHtml}
+						      ${modalitaHtml}
 
-												<button class="btn-banner btn-cancel-banner" onclick="chiudiBannerSfida()">✖️</button>
-											</div>
-			`;
+											<button class="btn-banner btn-cancel-banner" onclick="chiudiBannerSfida()" title="Chiudi">✖️</button>
+										</div>
+			  `;
 			  document.body.appendChild(banner);
+			  fawSyncTopInset();
 			}
 
+			/* Rimuove solo il DOM: lo stato "barra sfida aperta" lo gestisce
+			   chiudiBannerSfida(), altrimenti il re-render su cambio gioco
+			   si auto-spegerebbe a meta'. */
 			function removeGameBanner() {
 			  const existing = document.getElementById('game-banner');
 			  if (existing) existing.remove();
+			  fawSyncTopInset();
 			}
 
-			function chiudiBannerSfida() {
+			function chiudiBannerSfida(silenzioso = false) {
+			  bannerSfidaAperto = false;
 			  removeGameBanner();
+			  if (silenzioso) { aggiornaBottoneSfida(); return; }
 			  // ✅ Deseleziona tutti gli amici
 			  amiciSelezionati.clear();
 			  document.querySelectorAll('.user-item.selected').forEach(el => el.classList.remove('selected'));
@@ -2039,21 +2169,15 @@ if (giocoSelezionato === 'pictionary') {
             sfidaDiretta: true
         });
 
-        console.log(`✅ Room Pictionary creata: ${roomCode}`);
-
         // Salva ultima modalità
         localStorage.setItem('ultimo_pictionary_mode', modalitaId);
 
-        // ✅ ASPETTA 500ms prima del redirect (evita race condition)
-        setTimeout(() => {
-            // Deseleziona amici
-            amiciSelezionati.clear();
-            document.querySelectorAll('.user-item.selected').forEach(el => el.classList.remove('selected'));
-            aggiornaBottoneSfida();
-
-            // Redirect
-            window.location.href = gameHref('pictionary', 'room=' + roomCode);
-        }, 500);
+        // Chi ha creato la sfida entra SUBITO nella lobby: nessun banner di
+        // conferma da chiudere, si passa direttamente alla partita.
+        amiciSelezionati.clear();
+        document.querySelectorAll('.user-item.selected').forEach(el => el.classList.remove('selected'));
+        aggiornaBottoneSfida();
+        fawVaiA(gameHref('pictionary', 'room=' + roomCode));
 
     } catch (e) {
         console.error("❌ Errore creazione Pictionary:", e);
@@ -2095,21 +2219,23 @@ if (giocoSelezionato === 'pictionary') {
 			            opzioni: opzioni
 			        });
 
-			        // Deseleziona amici
-			        amiciSelezionati.clear();
-			        document.querySelectorAll('.user-item.selected').forEach(el => el.classList.remove('selected'));
-			        aggiornaBottoneSfida();
+		        // Deseleziona amici
+		        amiciSelezionati.clear();
+		        document.querySelectorAll('.user-item.selected').forEach(el => el.classList.remove('selected'));
+		        aggiornaBottoneSfida();
 
-			        // Mostra conferma
-			        showSuccessBanner(doc.id);
-			    } catch (e) {
-			        console.error("Errore creazione partita:", e);
-			        removeGameBanner();
-			        mostraToast('❌ Errore creazione sfida');
-			    }
-			}
+		        // Chi invita entra SUBITO nella lobby: la sfida resta visibile
+		        // agli altri nella lista "Partite in Corso".
+		        fawVaiA(gameHref(giocoSelezionato, 'matchId=' + doc.id));
+		    } catch (e) {
+		        console.error("Errore creazione partita:", e);
+		        removeGameBanner();
+		        mostraToast('❌ Errore creazione sfida');
+		    }
+		}
 
 			function showLoadingBanner(messaggio) {
+			  bannerSfidaAperto = false;
 			  removeGameBanner();
 			  // Aggiungi animazione spin se non esiste
 			  if (!document.getElementById('spin-style-index')) {
@@ -2138,33 +2264,6 @@ if (giocoSelezionato === 'pictionary') {
 			  document.body.appendChild(banner);
 			}
 
-			function showSuccessBanner(partitaId) {
-			  removeGameBanner();
-			  const banner = document.createElement('div');
-			  banner.id = 'game-banner';
-			  banner.className = 'game-banner';
-			  banner.style.background = 'var(--faw-ok-soft)';
-			  banner.innerHTML = `
-
-											<div class="banner-left">
-												<span class="b-ico">✅</span>
-												<div>
-													<div class="b-title">Sfida creata!</div>
-													<div class="b-sub">In attesa che gli altri accettino</div>
-												</div>
-											</div>
-											<div class="banner-right">
-												<button class="btn-banner" style="background:white; color:#333;" onclick="window.location.href='${gameHref(giocoSelezionato, 'matchId=' + partitaId)}'">ENTRA SUBITO</button>
-												<button class="btn-banner btn-cancel-banner" onclick="removeGameBanner()">OK</button>
-											</div>
-			`;
-			  document.body.appendChild(banner);
-			  fawConfetti(30);
-			  setTimeout(() => {
-			    const b = document.getElementById('game-banner');
-			    if (b && b.innerHTML.includes('Sfida creata')) removeGameBanner();
-			  }, 5000);
-			}
 			function caricaStorico() {
 			  if (!db) { console.warn('[FaW] caricaStorico(): Firebase non disponibile.'); return; }
 			  // Carico le partite e le ordino in JavaScript (evita errore indici Firebase)
@@ -2198,12 +2297,23 @@ if (giocoSelezionato === 'pictionary') {
 			  });
 			  alert("Richiesta inviata!");
 			}
-			async function accettaSfida(partitaId) {
-			  await db.collection("partite").doc(partitaId).update({
-			    rivincitaAccettataDa: firebase.firestore.FieldValue.arrayUnion(mioNome)
-			  });
-			  // Toast di conferma
-			  mostraToast('✅ Sfida accettata!');
+			/* Chi accetta entra SUBITO nella lobby: niente toast da aspettare. */
+			async function accettaSfida(partitaId, gioco) {
+			  let target = gioco;
+			  if (!target) {
+			    const trovata = partiteInCache().find(p => p.id === partitaId);
+			    target = trovata ? trovata.gioco : giocoSelezionato;
+			  }
+			  try {
+			    await db.collection("partite").doc(partitaId).update({
+			      rivincitaAccettataDa: firebase.firestore.FieldValue.arrayUnion(mioNome)
+			    });
+			  } catch (e) {
+			    console.error("Errore accettazione sfida:", e);
+			    mostraToast('⚠️ Non sono riuscito ad accettare, riprova', 'err');
+			    return;
+			  }
+			  fawVaiA(gameHref(target, 'matchId=' + partitaId));
 			}
 			async function rifiutaSfida(partitaId) {
 			  if (!confirm('Sicuro di rifiutare la sfida?')) return;
@@ -2465,24 +2575,6 @@ if (giocoSelezionato === 'pictionary') {
 			  location.reload();
 			}
 
-			function toggleDisponibilita() {
-			  const attuale = localStorage.getItem('disponibile') !== 'false';
-			  const nuovo = !attuale;
-			  localStorage.setItem('disponibile', nuovo);
-			  aggiornaUIDisponibilita();
-			  aggiornaPresenza(); // Aggiorna Firebase
-			}
-
-
-			function aggiornaUIDisponibilita() {
-			  const disponibile = localStorage.getItem('disponibile') !== 'false';
-			  const btn = document.getElementById('btn-disponibilita');
-			  if (btn) {
-			    btn.classList.toggle('is-on', disponibile);
-			    btn.classList.toggle('is-off', !disponibile);
-			    btn.textContent = disponibile ? '\u{1F7E2} Disponibile' : '\u{1F534} Non disturbare';
-			  }
-			}
 			async function eliminaPictionary(roomId) {
 			    if (!confirm('Eliminare questa partita Pictionary?')) return;
 			    try {

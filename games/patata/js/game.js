@@ -36,6 +36,10 @@
   const LETTER_THRESHOLD = 12;    // min parole nel dizionario per una combo valida
   const TICK_MS = 1000;           // tick logico (il timer visivo gira a parte, via rAF)
   const STUCK_FALLBACK_MS = 12000; // se chi "guida" l'azione non risponde, subentrano gli altri
+  const RATE_LIMIT_BACKOFF_MIN = 4000;   // primo backoff dopo un 429
+  const RATE_LIMIT_BACKOFF_MAX = 60000;  // tetto del backoff anti-429
+  const ACTION_RETRY_MIN = 2000;         // primo retry di un'azione fallita
+  const ACTION_RETRY_MAX = 30000;        // tetto dei retry: mai martellare Firestore
 
   // Frequenza (approssimativa) delle lettere italiane, senza Q (→ QU)
   const LETTER_WEIGHTS = {
@@ -506,6 +510,8 @@
       this._emit();
       return { ok: true };
     }
+    // In solo non c'e' rete: il contratto resta identico al backend Firebase
+    applyAtomic(mutator) { return this.transact(mutator); }
     stop() {}
   }
 
@@ -526,9 +532,10 @@
       // (quota giornaliera o traffico eccessivo) sospendiamo le transazioni
       // automatiche e rallentiamo progressivamente i tentativi.
       this.rateLimitedUntil = 0;
-      this.rateLimitBackoff = 4000;
+      this.rateLimitBackoff = RATE_LIMIT_BACKOFF_MIN;
       this.rateLimitEpisode = false;
       this.onRateLimit = null; // callback UI (una volta per "episodio")
+      this.onRecover = null;   // callback UI quando la connessione torna sana
     }
     start() {
       this.unsub = this.ref.onSnapshot(
@@ -552,6 +559,10 @@
       if (this.state) cb(this.state);
       return () => this._subs.delete(cb);
     }
+    _emit() {
+      if (!this.state) return;
+      this._subs.forEach((cb) => cb(this.state));
+    }
     transact(mutator) {
       return this.db.runTransaction(async (t) => {
         const snap = await t.get(this.ref);
@@ -563,30 +574,102 @@
         t.update(this.ref, toFirestoreUpdate(up, this.fs));
         return { ok: true };
       }).then((res) => {
-        // Round trip completato: la connessione è tornata sana → reset backoff
-        this.rateLimitBackoff = 4000;
-        if (this.rateLimitEpisode) this.rateLimitEpisode = false;
+        // Round trip completato (anche con "aborted"): la connessione è sana.
+        this._rateLimitOk();
         return res;
-      }).catch((e) => {
-        if (isRateLimitError(e)) {
-          const now = Date.now();
-          this.rateLimitedUntil = now + this.rateLimitBackoff;
-          this.rateLimitBackoff = Math.min(this.rateLimitBackoff * 2, 60000);
-          if (!this.rateLimitEpisode) {
-            this.rateLimitEpisode = true;
-            console.warn('[Patata] Firestore sta limitando le richieste (429): backoff attivo, riprovo automaticamente.');
-            if (this.onRateLimit) this.onRateLimit(this.rateLimitedUntil - now);
-          }
-          return { failed: true, rateLimited: true, error: { code: 'RATE_LIMIT', message: e && e.message } };
+      }).catch((e) => this._writeError(e, 'transazione'));
+    }
+    /* Scrittura "atomica" senza lettura: per i campi che usano arrayUnion
+       (pronti / confermaTurno / flags) la transazione non serve. Ogni
+       transazione Firestore costa una BatchGetDocuments (lettura) in piu':
+       toglierla da qui e' il taglio piu' grosso sui consumi di quota. */
+    applyAtomic(mutator) {
+      const state = this.state;
+      if (!state) return Promise.resolve({ aborted: true });
+      const up = mutator(state, { me: this.me, now: Date.now() });
+      if (!up) return Promise.resolve({ aborted: true });
+      if (up.__error) return Promise.resolve({ aborted: true, error: up.__error });
+      applyPartial(state, up);   // UI aggiornata subito, senza attendere il server
+      this._emit();
+      return this.ref.update(toFirestoreUpdate(up, this.fs))
+        .then(() => { this._rateLimitOk(); return { ok: true }; })
+        .catch((e) => this._writeError(e, 'update'));
+    }
+    _rateLimitOk() {
+      this.rateLimitBackoff = RATE_LIMIT_BACKOFF_MIN;
+      if (this.rateLimitEpisode) {
+        this.rateLimitEpisode = false;
+        if (this.onRecover) this.onRecover();
+      }
+    }
+    _writeError(e, cosa) {
+      if (isRateLimitError(e)) {
+        const now = Date.now();
+        this.rateLimitedUntil = now + this.rateLimitBackoff;
+        this.rateLimitBackoff = Math.min(this.rateLimitBackoff * 2, RATE_LIMIT_BACKOFF_MAX);
+        // Un solo avviso per "episodio": i 429 arrivano a raffica e l'utente
+        // non deve essere sommerso di toast.
+        if (!this.rateLimitEpisode) {
+          this.rateLimitEpisode = true;
+          console.warn('[Patata] Firestore sta limitando le richieste (429): backoff attivo, riprovo automaticamente.');
+          if (this.onRateLimit) this.onRateLimit(this.rateLimitedUntil - now);
         }
-        console.error('[Patata] errore transazione:', e);
-        return { failed: true, error: { code: e && e.code ? e.code : 'NET', message: e && e.message } };
-      });
+        return { failed: true, rateLimited: true, error: { code: 'RATE_LIMIT', message: e && e.message } };
+      }
+      console.error('[Patata] errore ' + cosa + ':', e);
+      return { failed: true, error: { code: e && e.code ? e.code : 'NET', message: e && e.message } };
     }
     stop() {
       if (this.unsub) this.unsub();
     }
   }
+
+  /* ---------------- CHI AGISCE (anti "transaction storm") ----------------
+     Le azioni di avanzamento (start, timeout, risoluzione contestazioni,
+     prossimo turno) vengono tentate da UN solo client per volta:
+     - il "referente" dell'azione (chi tiene la patata per il timeout,
+       altrimenti il primo partecipante) agisce subito;
+     - gli altri subentrano solo se la condizione resta bloccata troppo a
+       lungo (referente offline), scaglionati per evitare picchi;
+     - ogni tentativo fallito allunga l'attesa del singolo client
+       (2s → 4s → 8s … fino a 30s): nessuno martella piu' Firestore.
+     Senza queste regole N client sparano la STESSA transazione a ogni tick:
+     è la causa principale dei 429 "Too Many Requests" di Firestore. */
+  class ActionGate {
+    constructor(opts) {
+      const o = opts || {};
+      this.stuckMs = o.stuckMs || STUCK_FALLBACK_MS;
+      this.minRetry = o.minRetry || ACTION_RETRY_MIN;
+      this.maxRetry = o.maxRetry || ACTION_RETRY_MAX;
+      this.book = {};
+    }
+    /** Posso provare questa azione ADESSO? (ruolo + backoff personale) */
+    mayAct(key, info) {
+      const now = info.now;
+      const b = this.book[key] || (this.book[key] = { visti: 0, next: 0, retry: this.minRetry });
+      if (!info.isReferent) {
+        // Non sono il referente: subentro solo se la situazione resta ferma
+        if (b.visti === 0) { b.visti = now; return false; }
+        if (now - b.visti <= this.stuckMs + (info.staggerMs || 0)) return false;
+      }
+      if (now < b.next) return false;   // backoff dopo un tentativo fallito
+      b.next = now + b.retry;           // prenotazione: un solo tentativo in volo
+      return true;
+    }
+    ok(key) {
+      const b = this.book[key];
+      if (b) { b.retry = this.minRetry; b.visti = 0; }
+    }
+    /** Solo i fallimenti veri allungano l'attesa: un "aborted" significa che
+        un altro client ha gia' fatto il lavoro, quindi non e' un errore. */
+    failed(key, res) {
+      if (res && (res.ok || res.aborted)) return;
+      const b = this.book[key] || (this.book[key] = { visti: 0, next: 0, retry: this.minRetry });
+      b.retry = Math.min(b.retry * 2, this.maxRetry);
+    }
+    reset() { this.book = {}; }
+  }
+
 
   /* ---------------- ESPOSIZIONE PER TEST ---------------- */
   const core = {
@@ -597,7 +680,9 @@
     findWordAuthor, flagThreshold, flagsByOthers, flagResolved, validateWord,
     mutReady, mutStart, mutSubmitWord, mutWrongWord, mutTimeout, mutConferma,
     mutFlag, mutResolveFlag, mutNextRound, normState, SoloBackend, FirebaseBackend,
-    toFirestoreUpdate, docExists, isRateLimitError
+    toFirestoreUpdate, docExists, isRateLimitError, ActionGate,
+    STUCK_FALLBACK_MS, ACTION_RETRY_MIN, ACTION_RETRY_MAX, TICK_MS,
+    RATE_LIMIT_BACKOFF_MIN, RATE_LIMIT_BACKOFF_MAX
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = core;
   if (global) global.__PATATA_CORE = core;
@@ -626,7 +711,6 @@
     backend: null,
     db: null,
     state: null,
-    soundOn: localStorage.getItem('patata_suono') !== 'off',
     letterCache: new Map(),
     busy: false,
     prevTurn: null,
@@ -636,12 +720,12 @@
     statsSaved: false,
     redirected: false,
     lastFeedbackTimer: null,
-    actionSince: {}        // prima osservazione di ogni condizione "agibile" (anti-storm)
+    rateLimited: false     // Firestore ha risposto 429: lo diciamo all'utente
   };
 
   /* ---------------- ELEMENTI DOM ---------------- */
   const el = {};
-  ['screen-loading', 'load-status', 'load-count', 'app', 'round-badge', 'btn-suono',
+  ['screen-loading', 'load-status', 'load-count', 'app', 'round-badge',
    'screen-lobby', 'cfg-tempo', 'cfg-turni', 'cfg-lettere', 'lobby-players',
    'lobby-status', 'lobby-status-text', 'btn-start-solo', 'lobby-hint',
    'screen-game', 'letter-tiles', 'letters-avail', 'ring-fill', 'timer-sec',
@@ -678,9 +762,6 @@
     }
     return html;
   }
-  function vibrate(pattern) {
-    try { if (navigator.vibrate) navigator.vibrate(pattern); } catch (e) { /* noop */ }
-  }
   function toast(msg, kind) {
     el.toast.textContent = msg;
     el.toast.className = 'toast' + (kind ? ' ' + kind : '');
@@ -712,40 +793,7 @@
     el.banner.classList.add('hidden');
   }
 
-  /* ---------------- AUDIO (WebAudio, nessun asset) ---------------- */
-  let actx = null;
-  function audio() {
-    if (!G.soundOn) return null;
-    try {
-      if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
-      if (actx.state === 'suspended') actx.resume();
-      return actx;
-    } catch (e) { return null; }
-  }
-  function beep(freq, dur, type, gain, when) {
-    const a = audio();
-    if (!a) return;
-    const t0 = a.currentTime + (when || 0);
-    const o = a.createOscillator();
-    const g = a.createGain();
-    o.type = type || 'sine';
-    o.frequency.value = freq;
-    g.gain.setValueAtTime(0.0001, t0);
-    g.gain.exponentialRampToValueAtTime(gain || 0.12, t0 + 0.015);
-    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-    o.connect(g).connect(a.destination);
-    o.start(t0);
-    o.stop(t0 + dur + 0.05);
-  }
-  const SFX = {
-    turn: () => { beep(523, 0.09, 'sine', 0.12); beep(784, 0.12, 'sine', 0.12, 0.09); },
-    ok: () => { beep(659, 0.08, 'sine', 0.14); beep(880, 0.13, 'sine', 0.14, 0.07); },
-    err: () => beep(150, 0.2, 'sawtooth', 0.1),
-    patata: () => { beep(392, 0.12, 'square', 0.09); beep(262, 0.14, 'square', 0.09, 0.13); beep(131, 0.32, 'square', 0.09, 0.28); },
-    tick: () => beep(1000, 0.035, 'square', 0.045),
-    confirm: () => beep(700, 0.09, 'sine', 0.1),
-    win: () => { [523, 659, 784, 1047].forEach((f, i) => beep(f, 0.16, 'sine', 0.13, i * 0.13)); }
-  };
+  /* Nessun audio in FaW: il feedback di gioco e' solo visivo/tattile. */
 
   /* ---------------- CONFETTI ---------------- */
   function confetti() {
@@ -856,28 +904,23 @@
     }, extra || {});
   }
 
-  /* ---------------- CHI AGISCE (anti "transaction storm") ----------------
-     Le azioni di avanzamento (start, timeout, risoluzione contestazioni,
-     prossimo turno) vengono tentate da UN solo client per volta:
-     - il "referente" dell'azione (chi tiene la patata per il timeout,
-       altrimenti il primo partecipante) agisce subito;
-     - gli altri subentrano solo se la condizione resta bloccata troppo a
-       lungo (referente offline), scaglionati per evitare picchi.
-     Senza questo, N client sparano la STESSA transazione a ogni tick:
-     è la causa principale dei 429 "Too Many Requests" di Firestore. */
+  const gate = new ActionGate();
   function myStaggerMs(s) {
     const i = (s.partecipanti || []).indexOf(G.me);
     return (i < 0 ? 0 : i) * 900;
   }
-  function mayAct(s, key, referent) {
-    if (referent === G.me) return true; // il referente agisce subito
-    const k = s.round + ':' + key;
-    if (G.actionSince[k] === undefined) {
-      G.actionSince[k] = Date.now();
-      return false;
-    }
-    return Date.now() - G.actionSince[k] > STUCK_FALLBACK_MS + myStaggerMs(s);
+  function actionKey(s, key) {
+    return s.stato + ':' + (s.round || 0) + ':' + key;
   }
+  function mayAct(s, key, referent) {
+    return gate.mayAct(actionKey(s, key), {
+      now: Date.now(),
+      isReferent: referent === G.me,
+      staggerMs: myStaggerMs(s)
+    });
+  }
+  function actionOk(s, key) { gate.ok(actionKey(s, key)); }
+  function actionFailed(s, key, res) { gate.failed(actionKey(s, key), res); }
 
   async function logicaTick() {
     const s = G.state;
@@ -887,12 +930,19 @@
     try {
       if (s.stato === 'attesa') {
         if (G.solo) return;
+        // Segnarsi pronti e' un arrayUnion: scrittura diretta, nessuna lettura.
         if (s.pronti.indexOf(G.me) === -1) {
-          await G.backend.transact(mutReady); // azione personale, una volta sola
+          if (mayAct(s, 'ready:' + G.me, G.me)) {
+            const r = await G.backend.applyAtomic(mutReady);
+            if (r && r.ok) actionOk(s, 'ready:' + G.me);
+            else actionFailed(s, 'ready:' + G.me, r);
+          }
           return;
         }
         if (s.pronti.length >= s.partecipanti.length && mayAct(s, 'start', s.partecipanti[0])) {
-          await G.backend.transact(mutStart);
+          const r = await G.backend.transact(mutStart);
+          if (r && r.ok) actionOk(s, 'start');
+          else actionFailed(s, 'start', r);
         }
         return;
       }
@@ -902,7 +952,9 @@
         if (Date.now() > s.turno.deadline + TIMEOUT_GRACE) {
           // Agisce chi tiene la patata; se è offline subentrano gli altri.
           if (mayAct(s, 'timeout', s.turno.giocatore)) {
-            await G.backend.transact(mutTimeout);
+            const r = await G.backend.transact(mutTimeout);
+            if (r && r.ok) actionOk(s, 'timeout');
+            else actionFailed(s, 'timeout', r);
           }
         }
         return;
@@ -914,12 +966,19 @@
         for (const word of Object.keys(flags)) {
           if (flagResolved(s, word) && mayAct(s, 'flag:' + word, s.partecipanti[0])) {
             const r = await G.backend.transact((st) => mutResolveFlag(st, { word }));
-            if (r && r.ok) toast('🚩 "' + word + '" contestata: punti rimossi', 'ok');
+            if (r && r.ok) {
+              actionOk(s, 'flag:' + word);
+              toast('🚩 "' + word + '" contestata: punti rimossi', 'ok');
+            } else {
+              actionFailed(s, 'flag:' + word, r);
+            }
             break; // al massimo una risoluzione per tick
           }
         }
         if (s.confermaTurno.length >= s.partecipanti.length && mayAct(s, 'next', s.partecipanti[0])) {
-          await G.backend.transact(mutNextRound);
+          const r = await G.backend.transact(mutNextRound);
+          if (r && r.ok) actionOk(s, 'next');
+          else actionFailed(s, 'next', r);
         }
       }
     } catch (e) {
@@ -952,11 +1011,20 @@
       el['lobby-hint'].innerHTML = 'Allenamento personale: la patata scotta lo stesso. 🫠';
     } else {
       el['btn-start-solo'].classList.add('hidden');
+      el['lobby-status'].classList.remove('hidden');
       if (pronti >= tot) {
         el['lobby-status-text'].textContent = 'Tutti pronti: inizio immediato!';
       } else {
-        el['lobby-status'].classList.remove('hidden');
-        el['lobby-status-text'].textContent = 'In attesa di tutti (' + pronti + '/' + tot + ' pronti)…';
+        // Nomi espliciti: cosi' "in attesa" non resta un mistero quando
+        // qualcuno non ha ancora aperto la pagina della partita.
+        const manca = s.partecipanti.filter((p) => s.pronti.indexOf(p) === -1);
+        el['lobby-status-text'].textContent =
+          'In attesa di ' + manca.map((p) => p.toUpperCase()).join(', ') +
+          ' (' + pronti + '/' + tot + ' pronti)…';
+      }
+      if (G.rateLimited) {
+        el['lobby-status-text'].textContent +=
+          ' · Connessione limitata dal server: nuovo tentativo automatico in corso.';
       }
     }
   }
@@ -1109,7 +1177,7 @@
     el['recap-body'].querySelectorAll('.flag-btn').forEach((btn) => {
       btn.addEventListener('click', async () => {
         const word = btn.getAttribute('data-word');
-        const r = await G.backend.transact((st) => mutFlag(st, { word, me: G.me }));
+        const r = await G.backend.applyAtomic((st) => mutFlag(st, { word, me: G.me }));
         if (r && r.ok) toast('🚩 Contestazione inviata per "' + word + '"');
       });
     });
@@ -1204,8 +1272,6 @@
 
     if (iWon && s.partecipanti.length > 1) {
       confetti();
-      SFX.win();
-      vibrate([60, 40, 120]);
     }
 
     // Rivincita (multiplayer)
@@ -1273,7 +1339,6 @@
     const FV = fieldValue();
     if (!G.backend || !FV) return;
     G.backend.ref.update({ rivincitaAccettataDa: FV.arrayUnion(G.me) }).catch(() => {});
-    SFX.confirm();
   }
   function rifiutaRivincita() {
     const FV = fieldValue();
@@ -1357,7 +1422,6 @@
     el['screen-game'].classList.toggle('hidden', !showGame);
     el['overlay-recap'].classList.toggle('hidden', !(showGame && s.roundData && s.roundData.fase === 'recap'));
     el['overlay-fine'].classList.toggle('hidden', s.stato !== 'conclusa');
-    el['btn-suono'].textContent = G.soundOn ? '🔊' : '🔇';
 
     if (showLobby) {
       hideBanner();
@@ -1376,7 +1440,7 @@
       G.prevTurn = null;
       G.prevUltimoTs = 0;
       G.lastWholeSec = -1;
-      G.actionSince = {};
+      gate.reset();
       el.feedback.className = 'feedback';
       el.feedback.textContent = '';
       el['word-input'].value = '';
@@ -1403,8 +1467,6 @@
         const wasMyTurn = G.prevTurn === G.me;
         G.prevTurn = s.turno.giocatore;
         if (!wasMyTurn && s.turno.giocatore === G.me && G.prevRound === s.round) {
-          SFX.turn();
-          vibrate([40, 40, 40]);
           el['turn-banner'].classList.remove('flash');
           void el['turn-banner'].offsetWidth;
           el['turn-banner'].classList.add('flash');
@@ -1421,15 +1483,11 @@
   function onUltimo(ultimo, s) {
     if (ultimo.ok) {
       showFeedback('ok', '✅ ' + ultimo.w + '  +' + ultimo.p + ' pt — passa a ' + nextPlayer(s, ultimo.nome).toUpperCase());
-      SFX.ok();
       el['word-input'].value = '';
     } else if (ultimo.patata) {
       showFeedback('err', '💥 SCOTTATURA: ' + ultimo.nome.toUpperCase() + ' −' + PATATA_PENALTY + ' pt');
-      SFX.patata();
-      vibrate([120, 60, 120]);
     } else if (ultimo.nome === G.me) {
       showFeedback('err', '❌ ' + ultimo.w + ' — parola non valida (−5 s)');
-      SFX.err();
     }
   }
 
@@ -1463,7 +1521,6 @@
       if (sec !== G.lastWholeSec) {
         G.lastWholeSec = sec;
         el['timer-sec'].textContent = String(sec);
-        if (danger && sec > 0) SFX.tick();
       }
     } else if (s && s.stato === 'in_corso') {
       el['timer-sec'].textContent = '—';
@@ -1493,12 +1550,9 @@
       if (v.err === 'EMPTY') { toast('Scrivi una parola…'); return; }
       if (v.err === 'USED') {
         showFeedback('err', '❌ Parola già usata in questa partita');
-        SFX.err();
         return;
       }
       showFeedback('err', msgForErr(v));
-      SFX.err();
-      vibrate([60]);
       const r = await G.backend.transact((st) => mutWrongWord(st, ctx));
       if (r && r.error && r.error.code === 'NOT_YOUR_TURN') toast('È già passato il turno!');
       return;
@@ -1521,14 +1575,12 @@
       }
       return;
     }
-    SFX.ok();
   }
 
   /* ---------------- CONFERMA RECAP ---------------- */
   async function confermaTurno() {
-    const r = await G.backend.transact(mutConferma);
+    const r = await G.backend.applyAtomic(mutConferma);
     if (r && r.ok) {
-      SFX.confirm();
       toast('✔ Turno confermato');
     }
   }
@@ -1547,13 +1599,6 @@
   }
 
   async function boot() {
-    // Suono toggle
-    el['btn-suono'].addEventListener('click', () => {
-      G.soundOn = !G.soundOn;
-      localStorage.setItem('patata_suono', G.soundOn ? 'on' : 'off');
-      el['btn-suono'].textContent = G.soundOn ? '🔊' : '🔇';
-      if (G.soundOn) SFX.confirm();
-    });
     // Input
     el['word-input'].addEventListener('keydown', (e) => {
       if (e.key === 'Enter') { e.preventDefault(); inviaParola(); }
@@ -1631,7 +1676,17 @@
       };
       G.backend.onRateLimit = (msWait) => {
         const sec = Math.max(1, Math.ceil(msWait / 1000));
+        if (!G.rateLimited) {
+          G.rateLimited = true;
+          if (G.state) render(G.state);
+        }
         toast('⏳ Server sovraccarico (limite richieste): riprovo automaticamente tra ' + sec + ' s', 'err');
+      };
+      G.backend.onRecover = () => {
+        if (G.rateLimited) {
+          G.rateLimited = false;
+          if (G.state) render(G.state);
+        }
       };
       G.backend.start();
     }

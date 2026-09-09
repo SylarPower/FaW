@@ -57,6 +57,15 @@
   --faw-fast: 140ms;
   --faw-med: 220ms;
 
+  /* --- Area di sicurezza del pulsante HOME ---
+     .fixed-home-btn e' fisso in alto a sinistra (16px/16px, ~116x42px).
+     Ogni gioco deve riservargli questo spazio, cosi' il pulsante non finisce
+     mai sopra testo o controlli: usa var(--faw-home-safe-x) come padding-left
+     della barra in alto, oppure var(--faw-home-safe-y) come scostamento
+     verticale del primo contenuto. */
+  --faw-home-safe-x: 148px;
+  --faw-home-safe-y: 72px;
+
   color-scheme: light;
 }
 
@@ -242,7 +251,25 @@ a:hover { text-decoration: underline; }
   box-shadow: var(--faw-shadow-3);
 }
 .fixed-home-btn:active { transform: scale(0.97); }
+
+/* ==========================================================================
+   SPAZIO PER I BANNER DI STATO ANCORATI IN CIMA
+   I giochi usano banner `position: fixed` in alto (attesa, verifica, fine
+   turno). `games/shared/faw-layout.js` pubblica la loro altezza reale in
+   --faw-banner-h; qui la riserviamo con uno spacer in flusso, cosi' header e
+   testo scendono invece di finire nascosti sotto il banner.
+   ========================================================================== */
+body.faw-has-banner::before {
+  content: '';
+  display: block;
+  flex: 0 0 auto;
+  height: var(--faw-banner-h, 0px);
+}
 @media (max-width: 480px) {
+  :root {
+    --faw-home-safe-x: 116px;
+    --faw-home-safe-y: 60px;
+  }
   .fixed-home-btn {
     top: 10px;
     left: 10px;

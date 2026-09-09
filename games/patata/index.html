@@ -17,6 +17,8 @@
   <script src="https://www.gstatic.com/firebasejs/9.1.1/firebase-firestore-compat.js"></script>
   <!-- Config Firebase condivisa (PRIMA dello script che inizializza Firebase) -->
   <script src="../shared/firebase-config.js"></script>
+  <!-- Spazio per i banner di stato fissi in cima (evita che coprano il testo) -->
+  <script src="../shared/faw-layout.js" defer></script>
 </head>
 <body>
   <!-- Pulsante HOME condiviso (come in tutti i giochi FaW) -->
@@ -47,7 +49,6 @@
       </div>
       <div class="topbar-right">
         <span id="round-badge" class="badge-round hidden"></span>
-        <button id="btn-suono" class="icon-btn" title="Audio on/off" aria-label="Audio">🔊</button>
       </div>
     </header>
 

@@ -8,6 +8,8 @@
 		<script src="https://www.gstatic.com/firebasejs/9.1.1/firebase-firestore-compat.js"></script>
 		<!-- Config Firebase condivisa (prima dello script che inizializza Firebase) -->
 		<script src="../shared/firebase-config.js"></script>
+		<!-- Spazio per i banner di stato fissi in cima (evita che coprano il testo) -->
+		<script src="../shared/faw-layout.js" defer></script>
 		<link rel="preconnect" href="https://fonts.googleapis.com">
 		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 		<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
@@ -293,7 +295,8 @@
 			align-items: center;
 			width: 100%;
 			margin-bottom: 14px;
-			padding: 10px 16px;
+			/* padding-left = area di sicurezza del pulsante HOME condiviso */
+			padding: 10px 16px 10px var(--faw-home-safe-x);
 			border-radius: 16px;
 			background: var(--panel-bg);
 			border: 1px solid var(--line-soft);
@@ -1256,16 +1259,12 @@
 			box-shadow: 0 24px 70px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(34, 211, 238, 0.15);
 			}
 			/* HOME: pulsante condiviso .fixed-home-btn (faw-ui.css), sempre visibile.
-			   Lasciamo spazio in alto a sinistra a header e banner. */
-			@media (max-width: 1140px) {
-			.header-bar { padding-left: 128px; }
-			}
+			   Header e banner usano l'area di sicurezza definita in faw-ui.css. */
 			@media (max-width: 480px) {
-			.header-bar { padding-left: 100px; }
 			.header-bar h1 { font-size: 0.95rem; letter-spacing: 0.8px; }
 			}
 			@media (min-width: 601px) {
-			.game-banner { padding-left: 148px; }
+			.game-banner { padding-left: var(--faw-home-safe-x); }
 			}
 			.game-banner {
 			position: fixed;
@@ -1767,6 +1766,10 @@
 			let pendingEliminazioni = new Map(); // parola -> dati proposta in corso
 			let currentWinner = null;
 			let currentBannerPriority = 0; // 0=nessuno, 1=stato, 10=votazione
+			/* La verifica parole e' automatica: quando l'ultimo giocatore finisce,
+			   ogni client si conferma da solo. Questi flag evitano che il listener
+			   (che si risveglia a ogni modifica del documento) riscriva in loop. */
+			let verificaAutoInviata = false;
 			// --- TRIE ---
 			class TrieNode {
 			  constructor() {
@@ -3891,6 +3894,7 @@ if (data.stato === "in_corso") {
     if (!finito.includes(mioNome)) {
         // === NON HO ANCORA FINITO ===
         removeGameBanner();
+        verificaAutoInviata = false;   // finche' gioco, la verifica non e' ancora dovuta
         
         // Se non sto già giocando, mostra overlay VIA
         if (!isGameActive && !isAnalysisPhase && !isPaused) {
@@ -3953,16 +3957,22 @@ if (data.stato === "in_corso") {
                 spinner: true
             });
         } else {
-            // Tutti hanno finito
+            // Tutti hanno finito → la verifica parte DA SOLA, senza pulsanti
             showGameBanner({
                 icon: '✅',
                 title: 'TUTTI HANNO FINITO!',
-                subtitle: 'Procedi alla verifica delle parole',
+                subtitle: 'Verifica parole in corso…',
                 color: '#27ae60',
-                buttons: [
-                    { text: '🏁 VERIFICA PAROLE', onclick: 'avviaVerificaUnificata()' }
-                ]
+                buttons: [],
+                spinner: true
             });
+            if (!verificaAutoInviata) {
+                verificaAutoInviata = true;
+                avviaVerificaUnificata().catch(e => {
+                    verificaAutoInviata = false;   // si riprova al prossimo snapshot
+                    console.error('Verifica automatica non riuscita:', e);
+                });
+            }
         }
     }
 }
@@ -3982,23 +3992,28 @@ if (data.stato === "in_corso") {
 			        if (rotateBtn) rotateBtn.style.display = 'block';
 			      }
 			      if (!conferma.includes(mioNome)) {
-			        // Non ho ancora cliccato VERIFICA
+			        // Nessuna conferma manuale: il client si allinea da solo
 			        showGameBanner({
 			          icon: '🏁',
 			          title: 'VERIFICA PAROLE',
-			          subtitle: 'Clicca per confermare e calcolare i risultati',
+			          subtitle: 'Calcolo dei risultati in corso…',
 			          color: '#27ae60',
-			          buttons: [{
-			            text: '✔️ VERIFICA PAROLE',
-			            onclick: 'avviaVerificaUnificata()'
-			          }]
+			          buttons: [],
+			          spinner: true
 			        });
+			        if (!verificaAutoInviata) {
+			          verificaAutoInviata = true;
+			          avviaVerificaUnificata().catch(e => {
+			            verificaAutoInviata = false;
+			            console.error('Verifica automatica non riuscita:', e);
+			          });
+			        }
 			      } else {
 			        // Ho già confermato, attendo altri
 			        showGameBanner({
 			          icon: '⏳',
 			          title: `ATTESA VERIFICA (${conferma.length}/${data.partecipanti.length})`,
-			          subtitle: 'Hai confermato. Attendi gli altri giocatori...',
+			          subtitle: 'Verifica automatica: attendi gli altri giocatori...',
 			          color: '#8e44ad',
 			          buttons: [],
 			          spinner: true
