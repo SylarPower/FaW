@@ -550,12 +550,12 @@
 				left: 50%;
 				transform: translateX(-50%);
 				z-index: 9999;
-				width: min(1180px, 96vw);
+				width: min(1280px, 96vw);
 				display: flex;
 				align-items: center;
 				justify-content: space-between;
-				gap: 16px;
-				padding: 12px 18px;
+				gap: 14px;
+				padding: 10px 16px;
 				border-radius: 0 0 16px 16px;
 				border: 1px solid var(--faw-border);
 				border-top: none;
@@ -568,39 +568,68 @@
 				from { opacity: 0; transform: translate(-50%, -12px); }
 				to { opacity: 1; transform: translate(-50%, 0); }
 			}
-			.banner-left { display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1 1 auto; }
+			.banner-left {
+				display: flex;
+				align-items: center;
+				gap: 10px;
+				min-width: 0;
+				flex: 0 1 auto;
+				max-width: 36%;
+			}
 			.banner-left .b-ico { font-size: 1.4rem; flex-shrink: 0; }
-			.banner-left .b-title { font-weight: 700; font-size: 0.92rem; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-			.banner-left .b-sub { font-size: 0.78rem; color: var(--faw-text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-			.banner-right { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; justify-content: flex-end; flex-shrink: 0; }
-			.banner-opt { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; }
+			.banner-left > div { min-width: 0; overflow: hidden; }
+			.banner-left .b-title {
+				font-weight: 800;
+				font-size: 0.88rem;
+				letter-spacing: -0.01em;
+				white-space: nowrap;
+				overflow: hidden;
+				text-overflow: ellipsis;
+			}
+			.banner-left .b-sub {
+				font-size: 0.76rem;
+				color: var(--faw-text-2);
+				white-space: nowrap;
+				overflow: hidden;
+				text-overflow: ellipsis;
+			}
+			.banner-right {
+				display: flex;
+				align-items: center;
+				gap: 6px;
+				flex-wrap: wrap;
+				justify-content: flex-end;
+				flex: 1 1 auto;
+				min-width: 0;
+			}
+			.banner-opt { display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; }
 			.banner-opt > span {
-				font-size: 0.68rem;
+				font-size: 0.65rem;
 				font-weight: 700;
-				letter-spacing: 0.06em;
+				letter-spacing: 0.05em;
 				text-transform: uppercase;
 				color: var(--faw-text-3);
 				white-space: nowrap;
 			}
 			.banner-right select {
-				padding: 7px 11px;
-				border-radius: 9px;
+				padding: 6px 8px;
+				border-radius: 8px;
 				border: 1px solid var(--faw-border-2);
 				background: var(--faw-panel-2);
 				color: var(--faw-text);
 				font-family: var(--faw-font-body);
 				font-weight: 600;
-				font-size: 0.82rem;
+				font-size: 0.78rem;
 				cursor: pointer;
 				white-space: nowrap;
 			}
 			.btn-banner {
-				padding: 8px 14px;
+				padding: 7px 11px;
 				border: 1px solid var(--faw-border);
-				border-radius: 9px;
+				border-radius: 8px;
 				font-family: var(--faw-font-body);
 				font-weight: 700;
-				font-size: 0.78rem;
+				font-size: 0.76rem;
 				letter-spacing: 0.02em;
 				cursor: pointer;
 				box-shadow: var(--faw-shadow-1);
@@ -613,8 +642,8 @@
 			.btn-cancel-banner {
 				background: var(--faw-panel-2);
 				color: var(--faw-text-2);
-				width: 34px;
-				height: 34px;
+				width: 32px;
+				height: 32px;
 				padding: 0;
 				border-radius: 50%;
 				display: inline-flex;
@@ -2094,8 +2123,8 @@ function renderPartitaPictionary(p, div) {
 										<div class="banner-left">
 											<span class="b-ico">${config.icona}</span>
 											<div>
-												<div class="b-title">SFIDA ${config.nome.toUpperCase()} — ${nomiSelezionati}</div>
-												<div class="b-sub">Scegli opzioni e modalità</div>
+												<div class="b-title">SFIDA ${config.nome.toUpperCase()}</div>
+												<div class="b-sub" title="${nomiSelezionati}">👥 <b>${nomiSelezionati}</b></div>
 											</div>
 										</div>
 										<div class="banner-right">
