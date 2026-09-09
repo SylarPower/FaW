@@ -19,8 +19,7 @@ FaW/
     ├── pictionary/index.html
     ├── gameof15/index.html
     ├── neonwar/index.html
-    ├── palestra/            # UI mobile + logica + stili (vedi README dedicato)
-    └── Pong/                 # index.html + css/ + js/
+    └── palestra/            # UI mobile + logica + stili (vedi README dedicato)
 ```
 
 Ogni gioco vive nella propria cartella. L'hub punta a `games/<nome>/index.html`.
@@ -51,15 +50,13 @@ Dalla pagina del gioco, il ritorno alla home è `../../index.html`.
 
 ## Design system (faw-ui.css)
 
-`games/shared/faw-ui.css` è il layer visivo premium condiviso: token (colori, font
-Tektur/Inter/JetBrains Mono, shadow, radius) e componenti (`.faw-*`, `.fixed-home-btn`).
+`games/shared/faw-ui.css` è il layer visivo condiviso: token (colori, font Nunito,
+shadow, radius) e componenti (`.faw-*`, `.fixed-home-btn`).
 
 - L'**hub** (`index.html`) e i giochi **ruzzle, patata, pictionary, gameof15, neonwar** la
   caricano *prima* dei loro `<style>`/`css`, così le regole locali restano a governare
   l'identità del singolo gioco.
-- **Pong** mantiene il proprio sistema (Tektur/Outfit + palette dedicata) perché è già
-  allineato al linguaggio premium.
-- **Palestra** è mobile-first e non la usa.
+- **Palestra** è mobile-first e non la usa (ha i propri stili dedicati).
 
 Quando aggiungi un gioco, linka `../shared/faw-ui.css` nel `<head>` (dopo i font, prima
 dei tuoi stili) per ereditare la base e il pulsante HOME standard.
@@ -69,12 +66,9 @@ dei tuoi stili) per ereditare la base e il pulsante HOME standard.
 La config Firebase sta in **un solo file**: `games/shared/firebase-config.js`.
 È uno script browser classico (non un modulo ES) che espone `window.FAW_FIREBASE_CONFIG`.
 
-- Pagine **compat** (`index.html`, ruzzle, pictionary, gameof15, palestra):
-  includono `games/shared/firebase-config.js` (o `../shared/firebase-config.js`)
+- Pagine **compat** (`index.html`, ruzzle, patata, pictionary, gameof15, neonwar,
+  palestra): includono `games/shared/firebase-config.js` (o `../shared/firebase-config.js`)
   **prima** dello script che chiama `firebase.initializeApp(firebaseConfig)`.
-- **Pong** (Firebase modulare): `games/Pong/index.html` carica lo stesso file prima di
-  `js/main.js`; `games/Pong/js/firebase-config.js` è solo un adapter che ri-esporta
-  la config come modulo ES e fornisce `isFirebaseConfigured()`.
 
 Per cambiare progetto Firebase basta modificare `games/shared/firebase-config.js`.
 

@@ -2,10 +2,8 @@
  * Configurazione Firebase condivisa di FaW (Fun at Work).
  *
  * Questo file e' volutamente uno script browser "classico" (NON un modulo ES),
- * cosi' puo' essere incluso sia dalle pagine legacy che usano Firebase compat
- * (index.html, ruzzle, pictionary, gameof15, palestra) sia da Pong, che carica
- * Firebase in versione modulare e legge la config da qui tramite un piccolo
- * adapter (games/Pong/js/firebase-config.js).
+ * cosi' puo' essere incluso da tutte le pagine che usano Firebase compat
+ * (index.html, ruzzle, patata, pictionary, gameof15, neonwar, palestra).
  *
  * Uso nelle pagine compat:
  *   <script src="games/shared/firebase-config.js"></script>   (dalla root)
@@ -13,8 +11,8 @@
  *   ...
  *   firebase.initializeApp(window.FAW_FIREBASE_CONFIG);
  *
- * NOTA: `databaseURL` serve al Realtime Database usato dalle stanze online di
- * Pong. Le pagine che usano solo Firestore lo ignorano senza effetti.
+ * NOTA: `databaseURL` e' un retaggio del Realtime Database (ex-stanze online):
+ * le pagine che usano solo Firestore lo ignorano senza effetti.
  */
 (function (global) {
   "use strict";

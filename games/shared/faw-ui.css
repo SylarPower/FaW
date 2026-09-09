@@ -7,11 +7,11 @@
    ========================================================================== */
 
 :root {
-  /* --- Tipografia --- */
-  --faw-font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  --faw-font-display: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  --faw-font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  --faw-font-mono: ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, Consolas, monospace;
+  /* --- Tipografia (font unico di piattaforma: Nunito) --- */
+  --faw-font-sans: 'Nunito', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --faw-font-display: 'Nunito', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --faw-font-body: 'Nunito', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --faw-font-mono: 'Nunito', ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, Consolas, monospace;
 
   /* --- Accento (override per pagina) --- */
   --faw-acc: #4f46e5;
@@ -210,31 +210,45 @@ a:hover { text-decoration: underline; }
 }
 .faw-btn--block { width: 100%; }
 
-/* Pulsante casa condiviso */
+/* Pulsante casa condiviso — identico in TUTTI i giochi:
+   pillola fissa in alto a sinistra, sempre visibile. */
 .fixed-home-btn {
   position: fixed;
   top: 16px;
   left: 16px;
-  z-index: 9990;
+  z-index: 10010;
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 9px 15px;
+  padding: 10px 16px;
   border-radius: 999px;
   border: 1px solid var(--faw-border);
   background: var(--faw-panel-solid);
   color: var(--faw-text);
   font-family: var(--faw-font-body);
-  font-weight: 600;
+  font-weight: 800;
   font-size: 0.84rem;
+  letter-spacing: 0.02em;
+  text-decoration: none;
   cursor: pointer;
+  white-space: nowrap;
   box-shadow: var(--faw-shadow-2);
   transition: border-color var(--faw-fast) var(--faw-ease),
-    box-shadow var(--faw-fast) var(--faw-ease);
+    box-shadow var(--faw-fast) var(--faw-ease),
+    transform var(--faw-fast) var(--faw-ease);
 }
 .fixed-home-btn:hover {
   border-color: var(--faw-border-2);
   box-shadow: var(--faw-shadow-3);
+}
+.fixed-home-btn:active { transform: scale(0.97); }
+@media (max-width: 480px) {
+  .fixed-home-btn {
+    top: 10px;
+    left: 10px;
+    padding: 8px 12px;
+    font-size: 0.78rem;
+  }
 }
 
 /* ==========================================================================

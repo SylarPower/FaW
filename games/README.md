@@ -10,20 +10,10 @@ games/<nome>/
 ├── README.md
 ├── css/style.css
 └── js/
-    ├── ai.js
-    ├── arenas.js
-        ├── engine.js
     ├── game.js
-    ├── input.js
-    ├── main.js
-    ├── models.js
-    ├── particles.js
-    ├── physics.js
-    ├── powerups.js
-    ├── save.js
-    └── ui.js
+    └── ...
 ```
 
-Esempio già collegato: `games/Pong/`.
+Esempio già collegato: `games/patata/`.
 
 Collega il gioco dall'hub (`../../index.html` → `GAME_PATHS` + card + `GIOCHI_CONFIG`).

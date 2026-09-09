@@ -16,10 +16,10 @@
 				} catch (e) { /* noop */ }
 			})();
 		</script>
-		<!-- Tipografia piattaforma -->
+		<!-- Tipografia piattaforma (font unico: Nunito) -->
 		<link rel="preconnect" href="https://fonts.googleapis.com">
 		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-		<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+		<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
 		<!-- ✅ PRECONNECT per velocità -->
 		<link rel="preconnect" href="https://www.gstatic.com">
 		<link rel="preconnect" href="https://firestore.googleapis.com">
@@ -620,6 +620,80 @@
 			}
 			@keyframes faw-spin { to { transform: rotate(360deg); } }
 
+			/* ---------------- INVITO SFIDA (popup evidente) ---------------- */
+			#invite-popup {
+				position: fixed;
+				top: 0;
+				left: 50%;
+				transform: translateX(-50%);
+				z-index: 9998;
+				width: min(560px, 94vw);
+				padding: 20px 22px 18px;
+				border-radius: 0 0 22px 22px;
+				border: 2px solid #f59e0b;
+				border-top: none;
+				background: var(--faw-panel-solid);
+				box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+				animation: faw-invite-in 340ms var(--faw-ease);
+			}
+			@keyframes faw-invite-in {
+				from { transform: translate(-50%, -110%); }
+				to { transform: translate(-50%, 0); }
+			}
+			@keyframes faw-invite-ring {
+				0%, 100% { box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35), 0 0 0 0 rgba(245, 158, 11, 0.55); }
+				55% { box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35), 0 0 0 16px rgba(245, 158, 11, 0); }
+			}
+			#invite-popup.invite-live { animation: faw-invite-in 340ms var(--faw-ease), faw-invite-ring 1.7s ease-out infinite; }
+			.invite-head { display: flex; align-items: center; gap: 14px; min-width: 0; }
+			.invite-icon { font-size: 2.1rem; animation: faw-pulse 1.1s infinite; flex-shrink: 0; }
+			.invite-title {
+				font-weight: 800;
+				font-size: 1.05rem;
+				letter-spacing: -0.01em;
+				overflow-wrap: anywhere;
+			}
+			.invite-sub { font-size: 0.84rem; color: var(--faw-text-2); margin-top: 3px; overflow-wrap: anywhere; }
+			.invite-actions { display: flex; gap: 10px; margin-top: 16px; }
+			.invite-btn {
+				flex: 1;
+				padding: 13px 16px;
+				border: none;
+				border-radius: 12px;
+				font-family: var(--faw-font-body);
+				font-weight: 800;
+				font-size: 0.9rem;
+				letter-spacing: 0.03em;
+				cursor: pointer;
+				box-shadow: var(--faw-shadow-1);
+				transition: filter var(--faw-fast) var(--faw-ease), transform var(--faw-fast) var(--faw-ease);
+			}
+			.invite-btn:hover { filter: brightness(1.08); }
+			.invite-btn:active { transform: scale(0.97); }
+			.invite-btn--acc { background: #16a34a; color: #fff; }
+			.invite-btn--acc:hover { background: #15803d; filter: none; }
+			.invite-btn--rif { background: var(--faw-panel-2); color: var(--faw-danger); border: 1px solid #fecaca; }
+			.invite-close {
+				position: absolute;
+				top: 8px;
+				right: 10px;
+				width: 30px;
+				height: 30px;
+				border-radius: 50%;
+				border: 1px solid var(--faw-border);
+				background: var(--faw-panel-2);
+				color: var(--faw-text-2);
+				font-size: 0.8rem;
+				cursor: pointer;
+			}
+			.invite-close:hover { color: var(--faw-danger); border-color: var(--faw-danger); }
+			/* Riga sfida in evidenza nella lista partite */
+			.user-item.u-row--challenge { animation: faw-challenge-ring 1.7s ease-out infinite; }
+			@keyframes faw-challenge-ring {
+				0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.45); }
+				55% { box-shadow: 0 0 0 10px rgba(245, 158, 11, 0); }
+			}
+
 			/* ---------------- RESPONSIVE (fallback, desktop-first) ---------------- */
 			@media (max-width: 760px) {
 				.hub-header__in { flex-wrap: wrap; }
@@ -627,11 +701,29 @@
 				.game-grid { grid-template-columns: repeat(2, 1fr); }
 				.game-banner { flex-direction: column; align-items: stretch; }
 				.banner-right { justify-content: center; }
+				#invite-popup { border-radius: 0 0 18px 18px; padding: 16px 16px 14px; }
+				.invite-title { font-size: 0.95rem; }
 			}
 		</style>
 	</head>
 	<body>
 		<div class="faw-stage" aria-hidden="true"></div>
+
+		<!-- ============ POPUP INVITO SFIDA (evidente) ============ -->
+		<div id="invite-popup" style="display:none;" role="alertdialog" aria-live="assertive" aria-label="Invito a una sfida">
+			<button id="invite-close" class="invite-close" onclick="chiudiInvito()" title="Ignora: la sfida resta nella lista Partite in Corso">✖</button>
+			<div class="invite-head">
+				<span class="invite-icon">⚔️</span>
+				<div style="min-width:0;">
+					<div class="invite-title" id="invite-title">Nuova sfida!</div>
+					<div class="invite-sub" id="invite-sub"></div>
+				</div>
+			</div>
+			<div class="invite-actions">
+				<button id="invite-acc" class="invite-btn invite-btn--acc">✅ ACCETTA</button>
+				<button id="invite-rif" class="invite-btn invite-btn--rif">✖ RIFIUTA</button>
+			</div>
+		</div>
 
 		<!-- ============ LOGIN ============ -->
 		<div id="login-div">
@@ -697,19 +789,13 @@
 								<div class="g-tag">Disegna e indovina</div>
 								<div class="game-badge online">ONLINE</div>
 							</div>
-							<div class="game-card" onclick="selezionaGioco('gameof15', this)" id="game-gameof15" style="--g1:#fbbf24; --g2:#f59e0b;">
-								<div class="g-tile">🧩</div>
-								<div class="g-name">Gioco del 15</div>
-								<div class="g-tag">Puzzle di velocità</div>
-								<div class="game-badge online">SFIDA</div>
-							</div>
-							<div class="game-card" onclick="selezionaGioco('pong', this)" id="game-pong" style="--g1:#3dffd1; --g2:#38bdf8;">
-								<div class="g-tile">🏓</div>
-								<div class="g-name">Pong</div>
-								<div class="g-tag">Duello a racchette 3D</div>
-								<div class="game-badge online">ONLINE</div>
-							</div>
-							<div class="game-card" onclick="selezionaGioco('palestra', this)" id="game-palestra" style="--g1:#34d399; --g2:#10b981;">
+						<div class="game-card" onclick="selezionaGioco('gameof15', this)" id="game-gameof15" style="--g1:#fbbf24; --g2:#f59e0b;">
+							<div class="g-tile">🧩</div>
+							<div class="g-name">Gioco del 15</div>
+							<div class="g-tag">Puzzle di velocità</div>
+							<div class="game-badge online">SFIDA</div>
+						</div>
+						<div class="game-card" onclick="selezionaGioco('palestra', this)" id="game-palestra" style="--g1:#34d399; --g2:#10b981;">
 								<div class="g-tile">🏋️</div>
 								<div class="g-name">Palestra</div>
 								<div class="g-tag">Allenamento fitness</div>
@@ -928,9 +1014,8 @@
 			    pictionary: 'games/pictionary/index.html',
 			    gameof15: 'games/gameof15/index.html',
 			    neonwar: 'games/neonwar/index.html',
-			    palestra: 'games/palestra/index.html',
-			    pong: 'games/Pong/index.html'
-			};
+			    palestra: 'games/palestra/index.html'
+		    };
 			function gameHref(gioco, query) {
 			    const base = GAME_PATHS[gioco] || ('games/' + gioco + '/index.html');
 			    return query ? (base + '?' + query) : base;
@@ -943,9 +1028,8 @@
 			    patata: [],
 			    pictionary: [],
 			    neonwar: [],
-			    gameof15: [],
-			    pong: []
-			};
+			    gameof15: []
+		    };
 			// ✅ CONFIGURAZIONE GIOCHI (aggiungi qui nuovi giochi)
 			const GIOCHI_CONFIG = {
 			  ruzzle: {
@@ -1158,42 +1242,6 @@ gameof15: {
     minGiocatori: 1,
     maxGiocatori: 8
 },
-pong: {
-    nome: "Pong",
-    icona: "🏓",
-    opzioni: [
-        {
-            id: "target",
-            label: "Punti",
-            default: "7",
-            valori: [
-                { value: "5", label: "5 punti" },
-                { value: "7", label: "7 punti" },
-                { value: "11", label: "11 punti" }
-            ]
-        },
-        {
-            id: "arena",
-            label: "Arena",
-            default: "classic",
-            valori: [
-                { value: "classic", label: "Pong Classico" },
-                { value: "walled", label: "Muro Spezzato" },
-                { value: "soccer", label: "Calcio Stelle" },
-                { value: "penguin", label: "Pinguini sul Ghiaccio" },
-                { value: "beach", label: "Festa in Spiaggia" }
-            ]
-        }
-    ],
-    modalita: [
-        { id: "classic", label: "CLASSICA 🏓", colore: "#00ffc8", testo: "#000" },
-        { id: "power", label: "POWER-UP ⚡", colore: "#ffd166", testo: "#000" },
-        { id: "hardcore", label: "HARDCORE", colore: "#ff2bd6", testo: "white" }
-    ],
-    minGiocatori: 2,
-    maxGiocatori: 2
-},
-
 palestra: {
     nome: "Palestra",
     icona: "🏋️",
@@ -1368,13 +1416,11 @@ partiteCache.ruzzle = [];
 partiteCache.patata = [];
 partiteCache.neonwar = [];
 partiteCache.gameof15 = [];
-partiteCache.pong = [];
 
 	snap.forEach(doc => {
 	    const data = { id: doc.id, ...doc.data() };
 	    if (data.gioco === 'neonwar') partiteCache.neonwar.push(data);
 	    else if (data.gioco === 'gameof15') partiteCache.gameof15.push(data);
-	    else if (data.gioco === 'pong') partiteCache.pong.push(data);
 	    else if (data.gioco === 'patata') partiteCache.patata.push(data);
 	    else if (data.gioco !== 'pictionary') partiteCache.ruzzle.push(data);
 	});
@@ -1411,6 +1457,135 @@ async function caricaPartitePictionary() {
 }
 
 // ========================================
+// ⚔️ INVITI SFIDA — popup evidente
+// ========================================
+const invitiNotificati = new Set();   // id già segnalati con popup/suono in questa sessione
+const invitiIgnorati = new Set();     // id chiusi con ✖ (restano nella lista partite)
+let inviteFlashTimer = null;
+let inviteTitleOriginale = null;
+
+function suonoInvito() {
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    if (!window.__inviteAudioCtx) window.__inviteAudioCtx = new AC();
+    const a = window.__inviteAudioCtx;
+    if (a.state === 'suspended') a.resume();
+    [660, 880].forEach((f, i) => {
+      const o = a.createOscillator();
+      const g = a.createGain();
+      const t0 = a.currentTime + i * 0.17;
+      o.type = 'sine';
+      o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(0.18, t0 + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.3);
+      o.connect(g).connect(a.destination);
+      o.start(t0);
+      o.stop(t0 + 0.32);
+    });
+  } catch (e) { /* audio non disponibile: ok */ }
+}
+
+function avviaFlashTitolo(msg) {
+  if (inviteFlashTimer) return; // già attivo
+  inviteTitleOriginale = document.title;
+  let on = false;
+  inviteFlashTimer = setInterval(() => {
+    document.title = on ? inviteTitleOriginale : ('⚔️ ' + msg);
+    on = !on;
+  }, 1300);
+}
+function fermaFlashTitolo() {
+  if (inviteFlashTimer) { clearInterval(inviteFlashTimer); inviteFlashTimer = null; }
+  if (inviteTitleOriginale) { document.title = inviteTitleOriginale; inviteTitleOriginale = null; }
+}
+
+// Tutti gli inviti a me pendenti (partite + room pictionary)
+function invitiPendenti() {
+  const out = [];
+  const partite = [].concat(partiteCache.ruzzle || [], partiteCache.patata || [],
+    partiteCache.neonwar || [], partiteCache.gameof15 || []);
+  partite.forEach(p => {
+    if (!p || p.stato !== 'attesa') return;
+    if (!(p.partecipanti || []).includes(mioNome)) return;
+    if (p.partecipanti[0] === mioNome) return; // sono io il creatore
+    if ((p.rivincitaRifiutataDa || []).length > 0) return;
+    if ((p.rivincitaAccettataDa || []).includes(mioNome)) return; // già accettata
+    out.push({ id: p.id, gioco: p.gioco, da: p.partecipanti[0], tipo: 'partita', num: p.partecipanti.length });
+  });
+  (partiteCache.pictionary || []).forEach(p => {
+    if (!p || p.stato !== 'lobby') return;
+    if (!(p.players || []).includes(mioNome)) return;
+    if (p.host === mioNome) return;
+    out.push({ id: p.id, gioco: 'pictionary', da: p.host, tipo: 'pictionary', num: p.players.length });
+  });
+  return out;
+}
+
+function aggiornaInviti() {
+  const popup = document.getElementById('invite-popup');
+  if (!popup || !mioNome) return;
+  const pendenti = invitiPendenti().filter(inv => !invitiIgnorati.has(inv.id));
+  let nuovoArrivo = false;
+  pendenti.forEach(inv => {
+    if (!invitiNotificati.has(inv.id)) {
+      invitiNotificati.add(inv.id);
+      nuovoArrivo = true;
+    }
+  });
+  const inv = pendenti.length ? pendenti[pendenti.length - 1] : null;
+  if (inv) {
+    const cfg = GIOCHI_CONFIG[inv.gioco] || { nome: inv.gioco, icona: '🎮' };
+    document.getElementById('invite-title').textContent = `⚔️ ${inv.da} ti sfida!`;
+    document.getElementById('invite-sub').textContent =
+      `${cfg.icona} ${cfg.nome} · sfida a ${inv.num} giocatori`;
+    document.getElementById('invite-acc').onclick = () => accettaInvito(inv);
+    document.getElementById('invite-rif').onclick = () => rifiutaInvito(inv);
+    popup.style.display = 'block';
+    popup.classList.add('invite-live');
+    if (nuovoArrivo) {
+      suonoInvito();
+      try { if (navigator.vibrate) navigator.vibrate([80, 60, 80]); } catch (e) { /* noop */ }
+      avviaFlashTitolo(`${inv.da} ti sfida a ${cfg.nome}!`);
+    }
+  } else {
+    popup.style.display = 'none';
+    popup.classList.remove('invite-live');
+    fermaFlashTitolo();
+  }
+}
+
+function accettaInvito(inv) {
+  if (inv.tipo === 'pictionary') {
+    window.location.href = gameHref('pictionary', 'room=' + inv.id);
+    return;
+  }
+  invitiNotificati.add(inv.id);
+  accettaSfida(inv.id);
+}
+function rifiutaInvito(inv) {
+  invitiNotificati.add(inv.id);
+  if (inv.tipo === 'pictionary') {
+    // pictionary non ha stato "rifiutato": chiudi e resta raggiungibile dalla lista
+    invitiIgnorati.add(inv.id);
+    aggiornaInviti();
+    return;
+  }
+  rifiutaSfida(inv.id);
+}
+function chiudiInvito() {
+  const popup = document.getElementById('invite-popup');
+  if (!popup) return;
+  popup.style.display = 'none';
+  popup.classList.remove('invite-live');
+  fermaFlashTitolo();
+  // segna l'invito corrente come ignorato (resta nella lista Partite in Corso)
+  const pendenti = invitiPendenti().filter(i => !invitiIgnorati.has(i.id));
+  if (pendenti.length) invitiIgnorati.add(pendenti[pendenti.length - 1].id);
+}
+
+// ========================================
 // ✅ RENDER UNIFICATO
 // ========================================
 function renderTutteLePartite() {
@@ -1436,10 +1611,12 @@ function renderTutteLePartite() {
 
 // Render Gioco del 15
 partiteCache.gameof15.forEach(p => renderPartitaRuzzle(p, div));
-partiteCache.pong.forEach(p => renderPartitaRuzzle(p, div));
 
 // Render Pictionary
 partiteCache.pictionary.forEach(p => renderPartitaPictionary(p, div));
+
+// ⚔️ Popup inviti (evidente, con suono e flash del titolo)
+aggiornaInviti();
 }
 
 // ========================================

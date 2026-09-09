@@ -10,7 +10,7 @@
     <script src="../shared/firebase-config.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Tektur:wght@500;600;700;800&family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="../shared/faw-ui.css">
     <style>
         /* Font piattaforma caricati via <link> nel <head> */
@@ -19,13 +19,13 @@
             --bg: #0b0e1c; --panel: #121832; --primary: #ff4d7d; --accent: #1d2848;
             --text: #eef1fa; --border: rgba(148, 163, 255, 0.16); --danger: #ff5a6e; --success: #2fd6c8;
             --gold: #ffc93c; --silver: #b8c2d9; --bronze: #c98a4b;
-            --font-display: 'Tektur', 'Inter', sans-serif;
+            --font-display: 'Nunito', system-ui, sans-serif;
         }
 
         * { box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; }
 
         body {
-            font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text);
+            font-family: 'Nunito', system-ui, sans-serif; background: var(--bg); color: var(--text);
             margin: 0; padding: 0; min-height: 100vh; display: flex; flex-direction: column;
             position: relative;
         }
@@ -72,7 +72,7 @@
 
         .header-left { display: flex; align-items: center; gap: 15px; }
         .room-tag {
-            font-family: var(--font-mono, 'JetBrains Mono', monospace);
+            font-family: 'Nunito', ui-monospace, monospace;
             font-size: 0.68rem; color: var(--primary); font-weight: 700;
             letter-spacing: 3px; text-transform: uppercase;
             background: rgba(255, 77, 125, 0.14);
@@ -267,7 +267,7 @@
         
         input, select, textarea {
             width: 100%; padding: 14px; border-radius: 12px; border: 1px solid var(--border);
-            background: rgba(11, 14, 28, 0.7); font-family: 'JetBrains Mono', monospace; font-size: 1rem;
+            background: rgba(11, 14, 28, 0.7); font-family: 'Nunito', ui-monospace, monospace; font-size: 1rem;
             outline: none; color: var(--text);
             transition: border-color 0.15s ease, box-shadow 0.15s ease;
         }
@@ -468,6 +468,8 @@
         .full-ranking {
             background: var(--panel); border-radius: 15px; padding: 20px;
             margin-top: 20px;
+            max-height: 32vh;
+            overflow-y: auto;
         }
 
         .ranking-row {
@@ -534,42 +536,9 @@
             opacity: 0.85;
         }
 
-        /* === PULSANTE HOME FISSO === */
-#fixed-home-btn {
-    position: fixed;
-    bottom: 20px;
-    left: 20px;  /* ✅ Spostato a sinistra */
-    z-index: 99999;
-    display: none;
-}
-
-/* ✅ In GuessIt, sposta ancora più a sinistra */
-#guessit-screen ~ #fixed-home-btn,
-body:has(#guessit-screen:not(.hidden)) #fixed-home-btn {
-    left: 110px;
-    bottom: 20px;
-}
-
-        #fixed-home-btn button {
-            background: rgba(18, 24, 50, 0.88);
-            backdrop-filter: blur(14px);
-            -webkit-backdrop-filter: blur(14px);
-            color: var(--text);
-            border: 1px solid rgba(255, 77, 125, 0.5);
-            padding: 12px 22px;
-            border-radius: 50px;
-            font-weight: 800;
-            font-size: 0.92rem;
-            letter-spacing: 0.6px;
-            cursor: pointer;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-            transition: all 0.2s ease;
-        }
-
-        #fixed-home-btn button:hover {
-            transform: scale(1.06) translateY(-2px);
-            border-color: var(--primary);
-            box-shadow: 0 14px 36px rgba(0, 0, 0, 0.55), 0 0 24px rgba(255, 77, 125, 0.35);
+        /* === PULSANTE HOME: classe condivisa .fixed-home-btn (faw-ui.css), sempre visibile === */
+        @media (min-width: 601px) {
+            .game-banner { padding-left: 148px; }
         }
 
         /* === RESPONSIVE === */
@@ -619,7 +588,8 @@ body:has(#guessit-screen:not(.hidden)) #fixed-home-btn {
     border-right: 1px solid var(--border);
     display: flex;
     flex-direction: column;
-    padding: 15px 10px;
+    /* spazio per il pulsante HOME condiviso in alto a sinistra */
+    padding: 72px 10px 15px;
     gap: 20px;
     overflow-y: auto;
     z-index: 100;
@@ -981,7 +951,7 @@ body:has(#guessit-screen:not(.hidden)) #fixed-home-btn {
 }
 
 .round-info {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: 'Nunito', ui-monospace, monospace;
     font-size: 0.68rem;
     font-weight: 700;
     letter-spacing: 2px;
@@ -1409,9 +1379,7 @@ body:has(#guessit-screen:not(.hidden)) #fixed-home-btn {
         
     </div>
 </div>
-<div id="fixed-home-btn">
-    <button onclick="tornaHome()">🏠 HOME</button>
-</div>
+<button id="fixed-home-btn" class="fixed-home-btn" onclick="tornaHome()" title="Torna alla home di FaW">🏠 HOME</button>
 
 <script>
 // ========================================
@@ -3480,13 +3448,11 @@ function tornaHome() {
 }
 
 function showHomeButton() {
-    const btn = document.getElementById('fixed-home-btn');
-    if (btn) btn.style.display = 'block';
+    // Il pulsante HOME condiviso è sempre visibile: no-op (mantenuto per compatibilità).
 }
 
 function hideHomeButton() {
-    const btn = document.getElementById('fixed-home-btn');
-    if (btn) btn.style.display = 'none';
+    // Il pulsante HOME condiviso è sempre visibile: no-op (mantenuto per compatibilità).
 }
 // ========================================
 // MODALITÀ GUESS IT! - VERSIONE CORRETTA

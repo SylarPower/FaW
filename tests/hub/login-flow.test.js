@@ -20,7 +20,8 @@ const sha256 = (s) => crypto.createHash('sha256').update(s).digest('hex');
 // hash passato come parametro: la funzione viene serializzata nella pagina
 function mockDb(hash) {
   const snapEmpty = { forEach: () => {} };
-  const coll = () => ({
+  const partiteSubs = [];
+  const coll = (name) => ({
     where() { return this; },
     doc(id) {
       return {
@@ -28,16 +29,20 @@ function mockDb(hash) {
           exists: id === 'TEST',
           data: () => ({ passwordHash: hash })
         }),
-        set: async () => {}
+        set: async () => {},
+        update: async () => {}
       };
     },
     get: async () => snapEmpty,
     onSnapshot(cb) {
+      if (name === 'partite') partiteSubs.push(cb);
       queueMicrotask(() => cb(snapEmpty));
       return () => {};
     }
   });
-  return { collection: coll };
+  const db = { collection: coll };
+  db.__partiteSubs = partiteSubs;
+  return db;
 }
 
 (async () => {
@@ -48,6 +53,7 @@ function mockDb(hash) {
 window.__makeDb__ = ${mockDb.toString()};
 window.__MOCK_DB__ = window.__makeDb__('${sha256('test123')}');
 window.firebase = { initializeApp: function(){ return {}; }, firestore: function(){ return window.__MOCK_DB__; } };
+window.firebase.firestore.FieldValue = { arrayUnion: function(){ return {}; } };
 window.FAW_FIREBASE_CONFIG = { apiKey: 'test-key-123', projectId: 'test' };
 window.FAW_REQUIRE_FIREBASE_CONFIG = function(){ return window.FAW_FIREBASE_CONFIG; };
 `;
@@ -96,7 +102,7 @@ window.FAW_REQUIRE_FIREBASE_CONFIG = function(){ return window.FAW_FIREBASE_CONF
 
   console.log('\n[C] Dashboard premium');
   const cards = window.document.querySelectorAll('.game-card');
-  ok(cards.length === 7, '7 card giochi (trovate: ' + cards.length + ')');
+  ok(cards.length === 6, '6 card giochi (trovate: ' + cards.length + ')'); // ruzzle, patata, neonwar, pictionary, gameof15, palestra (Pong rimosso)
   ok(!!window.document.querySelector('#game-patata .g-tag'), 'card patata con tagline');
   ok(window.document.querySelector('#game-ruzzle').classList.contains('selected'), 'ruzzle selezionato di default');
   ok(!!window.document.getElementById('online-count'), 'pill online nell\u2019header');
@@ -115,6 +121,42 @@ window.FAW_REQUIRE_FIREBASE_CONFIG = function(){ return window.FAW_FIREBASE_CONF
   ok(saved === after, 'tema persistito in localStorage');
   const btn = window.document.getElementById('theme-toggle');
   ok(btn.textContent.length > 0, 'icona toggle aggiornata: ' + btn.textContent);
+
+  console.log('\n[E] Invito sfida: popup evidente');
+  const emitPartite = (docs) => {
+    window.__MOCK_DB__.__partiteSubs.forEach((cb) => cb({ forEach: (fn) => docs.forEach(fn) }));
+  };
+  // arriva una sfida Patata da COLLEGA
+  const sfida = () => ({
+    id: 'match-123',
+    data: () => ({
+      gioco: 'patata', stato: 'attesa',
+      partecipanti: ['COLLEGA', 'TEST'],
+      punteggi: { COLLEGA: 0, TEST: 0 },
+      rivincitaAccettataDa: [], rivincitaRifiutataDa: [],
+      dataOra: '09/09 14:00', timestamp: Date.now()
+    })
+  });
+  emitPartite([sfida()]);
+  await sleep(150);
+  const popup = window.document.getElementById('invite-popup');
+  ok(popup && popup.style.display === 'block', 'popup invito visibile');
+  ok(popup.classList.contains('invite-live'), 'popup con animazione pulsante');
+  const inviteTitle = window.document.getElementById('invite-title').textContent;
+  ok(inviteTitle.includes('COLLEGA'), 'titolo invito con nome sfidante: ' + inviteTitle);
+  ok(window.document.getElementById('invite-sub').textContent.toLowerCase().includes('patata'), 'sottotitolo con nome gioco');
+  const lista = window.document.getElementById('lista-partite').textContent;
+  ok(lista.includes('SFIDA DA COLLEGA'), 'riga sfida ancora in lista partite');
+  // accetto dal popup → la sfida non è più pendente → popup si chiude
+  window.document.getElementById('invite-acc').click();
+  await sleep(50);
+  emitPartite([{
+    id: 'match-123',
+    data: () => Object.assign(sfida().data(), { rivincitaAccettataDa: ['TEST'] })
+  }]);
+  await sleep(150);
+  ok(popup.style.display === 'none', 'popup chiuso dopo accettazione');
+  ok(errors.length === 0, 'nessun errore uncaught: ' + errors.join('; '));
 
   console.log('\n=================');
   console.log('PASSATI: ' + passed + '  FALLITI: ' + failed);
