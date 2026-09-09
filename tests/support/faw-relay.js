@@ -100,7 +100,7 @@ function notify() {
     let touched = false;
     for (const p of w.paths) {
       const cur = docs.get(p);
-      const v = cur ? cur.version : 0;
+      const v = cur ? cur.version : -1;
       if (v !== w.seenVersion.get(p)) {
         w.seenVersion.set(p, v);
         touched = true;
@@ -141,14 +141,6 @@ function readBody(req) {
 const server = http.createServer(async (req, res) => {
   const u = new URL(req.url, "http://x");
   const p = u.pathname;
-  if (p === "/" && process.env.FAW_PREVIEW_PATH) {
-    res.writeHead(302, { location: process.env.FAW_PREVIEW_PATH });
-    return res.end();
-  }
-  if (p === "/" && process.env.FAW_PREVIEW_GAME) {
-    res.writeHead(302, { location: "/games/" + process.env.FAW_PREVIEW_GAME + "/index.html?net=fake" });
-    return res.end();
-  }
 
   if (req.method === "OPTIONS") {
     res.writeHead(204, {
@@ -217,10 +209,12 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (p === "/api/watch") {
-    let versions;
-    try { versions = JSON.parse(u.searchParams.get("versions") || "{}"); } catch (_) { return json(res, 400, { error: "versions" }); }
-    const paths = Object.keys(versions);
-    const w = { res, paths: new Set(paths), seenVersion: new Map(paths.map(p => [p, versions[p]])), timer: null };
+    const paths = (u.searchParams.get("paths") || "").split(",").filter(Boolean);
+    const since = parseInt(u.searchParams.get("since") || "0", 10);
+    const w = { res, paths: new Set(paths), out: {}, seenVersion: new Map(), timer: null };
+    // si registrano SOLO i cambiamenti successivi a `since`: lo stato corrente
+    // il client lo ha già letto con /api/get
+    for (const path of paths) w.seenVersion.set(path, docs.get(path) ? docs.get(path).version : -1);
     watchers.add(w);
     w.timer = setTimeout(() => {
       if (!watchers.has(w)) return;
@@ -229,19 +223,12 @@ const server = http.createServer(async (req, res) => {
     }, 12000);
     w.timer.unref && w.timer.unref();
     // se nel frattempo qualcosa è già cambiato rispetto a `since`, risponde subito
-    notify();
-    res.on("close", () => { watchers.delete(w); clearTimeout(w.timer); });
+    if (seq !== since) notify();
     return;
   }
 
   if (p === "/api/write" && req.method === "POST") {
     const body = await readBody(req);
-    if (body.atomic) {
-      const checks = (body.checks || []).concat(body.ops || []);
-      const failed = checks.find(c => typeof c.ifVersion === "number" && (docs.get(c.path)?.version || 0) !== c.ifVersion);
-      if (failed) return json(res, 200, { conflict: true, results: [{ error: "conflict" }], seq, serverNow: Date.now() });
-      if ((body.ops || []).some(op => !op || !op.path)) return json(res, 400, { error: "bad-op" });
-    }
     const results = [];
     for (const op of body.ops || []) {
       if (!op || !op.path) { results.push({ error: "bad-op" }); continue; }
@@ -272,9 +259,9 @@ const server = http.createServer(async (req, res) => {
   // --------------------------- static ---------------------------
   if (req.method !== "GET") return json(res, 405, { error: "method" });
   let file = decodeURIComponent(p);
-  if (file.endsWith("/") || file === "") file += "index.html";
+  if (file === "/" || file === "") file = "/index.html";
   const abs = path.join(ROOT, file);
-  if (!abs.startsWith(ROOT + path.sep)) { res.writeHead(403); return res.end("forbidden"); }
+  if (!abs.startsWith(ROOT)) { res.writeHead(403); return res.end("forbidden"); }
   fs.readFile(abs, (err, buf) => {
     if (err) { res.writeHead(404, { "content-type": "text/plain" }); return res.end("not found: " + file); }
     res.writeHead(200, { "content-type": MIME[path.extname(abs)] || "application/octet-stream", "cache-control": "no-store", "connection": "close" });

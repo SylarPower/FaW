@@ -100,6 +100,7 @@ body[data-theme="light"] {
 }
 
 /* identità cromatica per modulo: stesso sistema, personalità diversa */
+body[data-game="arena"] { --faw-acc: #4ad9c0; --faw-acc-ink: #04231f; --faw-acc-soft: #143430; }
 body[data-game="rush"] { --faw-acc: #f0a5ff; --faw-acc-ink: #2a0d33; --faw-acc-soft: #33173c; }
 body[data-game="bomba"] { --faw-acc: #ff9a3d; --faw-acc-ink: #2b1301; --faw-acc-soft: #3a2310; }
 body[data-game="ruzzle"] { --faw-acc: #ffd166; --faw-acc-ink: #2b1f01; --faw-acc-soft: #3a2c0d; }
@@ -109,6 +110,7 @@ body[data-game="neonwar"] { --faw-acc: #a06bff; --faw-acc-ink: #17062e; --faw-ac
 body[data-game="pong"] { --faw-acc: #5ef0c8; --faw-acc-ink: #04241d; --faw-acc-soft: #0f3229; }
 body[data-game="hub"] { --faw-acc: #4ad9c0; --faw-acc-ink: #04231f; --faw-acc-soft: #143430; }
 
+body[data-game="arena"][data-theme="light"],
 body[data-game="hub"][data-game="hub"][data-theme="light"] { --faw-acc: #0f8a76; }
 body[data-game="rush"][data-theme="light"] { --faw-acc: #8a2fa0; }
 body[data-game="bomba"][data-theme="light"] { --faw-acc: #a3520a; }
@@ -137,9 +139,9 @@ body.faw-scope *,
 body.faw-scope *::before,
 body.faw-scope *::after { box-sizing: border-box; }
 body.faw-scope :where(h1, h2, h3, h4, p, figure, ul, ol) { margin: 0; }
-:where(body.faw-scope) h1 { font-size: var(--faw-fs-2xl); font-weight: 800; letter-spacing: -0.01em; line-height: 1.15; }
-:where(body.faw-scope) h2 { font-size: var(--faw-fs-xl); font-weight: 750; line-height: 1.2; }
-:where(body.faw-scope) h3 { font-size: var(--faw-fs-lg); font-weight: 700; }
+body.faw-scope h1 { font-size: var(--faw-fs-2xl); font-weight: 800; letter-spacing: -0.01em; line-height: 1.15; }
+body.faw-scope h2 { font-size: var(--faw-fs-xl); font-weight: 750; line-height: 1.2; }
+body.faw-scope h3 { font-size: var(--faw-fs-lg); font-weight: 700; }
 body.faw-scope img, body.faw-scope svg, body.faw-scope canvas { max-width: 100%; display: block; }
 body.faw-scope button,
 body.faw-scope a,
@@ -237,7 +239,7 @@ body.faw-scope [hidden] { display: none !important; }
 }
 
 /* -------------------------------- Bottoni --------------------------------- */
-:where(body.faw-scope) .faw-btn {
+body.faw-scope .faw-btn {
   appearance: none;
   display: inline-flex; align-items: center; justify-content: center; gap: var(--faw-s2x);
   min-height: var(--faw-tap);
@@ -254,9 +256,9 @@ body.faw-scope [hidden] { display: none !important; }
               transform var(--faw-dur) var(--faw-ease),
               opacity var(--faw-dur) linear;
 }
-:where(body.faw-scope) .faw-btn:hover { background: var(--faw-s4); }
-:where(body.faw-scope) .faw-btn:active { transform: translateY(1px); }
-:where(body.faw-scope) .faw-btn[disabled], :where(body.faw-scope) .faw-btn[aria-disabled="true"] {
+body.faw-scope .faw-btn:hover { background: var(--faw-s4); }
+body.faw-scope .faw-btn:active { transform: translateY(1px); }
+body.faw-scope .faw-btn[disabled], body.faw-scope .faw-btn[aria-disabled="true"] {
   opacity: 0.45; cursor: not-allowed; transform: none;
 }
 .faw-btn--primary { background: var(--faw-acc); color: var(--faw-acc-ink); border-color: transparent; font-weight: 800; }
@@ -279,9 +281,9 @@ body.faw-scope [hidden] { display: none !important; }
 /* -------------------------------- Form ------------------------------------ */
 .faw-field { display: flex; flex-direction: column; gap: 6px; }
 .faw-field__label { font-size: var(--faw-fs-sm); font-weight: 700; color: var(--faw-tx2); }
-:where(body.faw-scope) .faw-input,
-:where(body.faw-scope) .faw-select,
-:where(body.faw-scope) .faw-textarea {
+body.faw-scope .faw-input,
+body.faw-scope .faw-select,
+body.faw-scope .faw-textarea {
   width: 100%;
   min-height: var(--faw-tap);
   padding: 12px var(--faw-s3x);
@@ -292,11 +294,11 @@ body.faw-scope [hidden] { display: none !important; }
   font: inherit; font-size: 16px; /* 16px evita lo zoom iOS */
   transition: border-color var(--faw-dur) linear, background-color var(--faw-dur) linear;
 }
-:where(body.faw-scope) .faw-input:focus, :where(body.faw-scope) .faw-select:focus, :where(body.faw-scope) .faw-textarea:focus {
+body.faw-scope .faw-input:focus, body.faw-scope .faw-select:focus, body.faw-scope .faw-textarea:focus {
   border-color: var(--faw-acc); outline: none; background: var(--faw-s1);
 }
-:where(body.faw-scope) .faw-input:focus-visible, :where(body.faw-scope) .faw-select:focus-visible { outline: 3px solid var(--faw-acc); outline-offset: 2px; }
-:where(body.faw-scope) .faw-input[aria-invalid="true"] { border-color: var(--faw-bad); }
+body.faw-scope .faw-input:focus-visible, body.faw-scope .faw-select:focus-visible { outline: 3px solid var(--faw-acc); outline-offset: 2px; }
+body.faw-scope .faw-input[aria-invalid="true"] { border-color: var(--faw-bad); }
 .faw-field__hint { font-size: var(--faw-fs-xs); color: var(--faw-tx3); }
 .faw-field__err { font-size: var(--faw-fs-sm); color: var(--faw-bad); font-weight: 650; }
 .faw-select { appearance: none; background-image: none; padding-right: var(--faw-s5x); }
@@ -561,7 +563,3 @@ body.faw-scope dialog.faw-dialog::backdrop { background: rgba(3, 6, 8, 0.72); }
 @media (prefers-reduced-motion: reduce) {
   .faw-feed-item { animation: none; }
 }
-
-/* Accesso al catalogo, discreto: non occupa timer/controlli del gioco. */
-.faw-lessico-link { display: block; width: fit-content; max-width: 100%; margin: 0 0 12px auto; padding: 10px 12px; min-height: 44px; box-sizing: border-box; color: inherit; font-size: .85rem; text-underline-offset: 4px; overflow-wrap: anywhere; }
-.faw-lessico-link:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }

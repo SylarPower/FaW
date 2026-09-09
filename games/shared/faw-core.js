@@ -9,7 +9,7 @@
  *  - chiavi localStorage namespace per utente (niente `localStorage.clear()`)
  *  - RNG deterministica seedata (stessa famiglia usata da Ruzzle)
  *  - formattazione tempo / numeri / escaping HTML
- *  - toast, dialoghi accessibili, preferenze movimento, tema
+ *  - toast, dialoghi accessibili, preferenze audio/movimento, tema
  */
 (function (root, factory) {
   var mod = factory(root);
@@ -179,9 +179,59 @@
   var mqReduce = HAS_DOM && global.matchMedia ? global.matchMedia("(prefers-reduced-motion: reduce)") : null;
   function reducedMotion() { return !!(mqReduce && mqReduce.matches); }
 
+  function soundOn() { return readRaw(key("ui", "sound"), "1") === "1"; }
+  function setSoundOn(v) { writeRaw(key("ui", "sound"), v ? "1" : "0"); }
+
+  var audioCtx = null;
+  var gesti = 0;
+  /**
+   * Suoni e vibrazioni partono solo dopo il primo gesto dell'utente: i browser
+   * bloccano AudioContext e navigator.vibrate prima, e riempiono la console di
+   * errori che sembrano guasti del gioco.
+   */
+  function armaSuoni() {
+    if (!HAS_DOM || gesti > 0) return;
+    var segna = function () { gesti++; };
+    document.addEventListener("pointerdown", segna, { once: true, passive: true });
+    document.addEventListener("keydown", segna, { once: true });
+  }
+  function suoniArmati() { return gesti > 0; }
+
+  /** Biped breve generato via WebAudio: niente file, niente download. */
+  function beep(kind) {
+    if (!soundOn() || !HAS_DOM || gesti === 0) return;
+    try {
+      var AC = global.AudioContext || global.webkitAudioContext;
+      if (!AC) return;
+      audioCtx = audioCtx || new AC();
+      if (audioCtx.state === "suspended") audioCtx.resume();
+      var presets = {
+        ok: [[660, 0.06], [880, 0.08]],
+        bad: [[220, 0.12]],
+        tick: [[1100, 0.03]],
+        boom: [[120, 0.28], [80, 0.3]],
+        start: [[520, 0.07], [700, 0.07], [900, 0.12]],
+        ping: [[900, 0.05]]
+      };
+      var notes = presets[kind] || presets.ping;
+      var t = audioCtx.currentTime;
+      notes.forEach(function (n, i) {
+        var osc = audioCtx.createOscillator();
+        var g = audioCtx.createGain();
+        osc.type = kind === "boom" ? "sawtooth" : "sine";
+        osc.frequency.setValueAtTime(n[0], t + i * 0.07);
+        g.gain.setValueAtTime(0.0001, t + i * 0.07);
+        g.gain.exponentialRampToValueAtTime(0.16, t + i * 0.07 + 0.012);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + i * 0.07 + n[1]);
+        osc.connect(g); g.connect(audioCtx.destination);
+        osc.start(t + i * 0.07); osc.stop(t + i * 0.07 + n[1] + 0.02);
+      });
+    } catch (e) { /* audio facoltativo: mai bloccare il gioco */ }
+  }
+
   function vibrate(pattern) {
     try {
-      if (HAS_DOM && global.navigator && navigator.vibrate && (!navigator.userActivation || navigator.userActivation.hasBeenActive) && !reducedMotion()) navigator.vibrate(pattern);
+      if (HAS_DOM && gesti > 0 && global.navigator && navigator.vibrate && !reducedMotion()) navigator.vibrate(pattern);
     } catch (e) {}
   }
 
@@ -391,7 +441,8 @@
     shortId: shortId, hash32: hash32, rngFrom: rngFrom, pick: pick, shuffle: shuffle,
     normText: normText, normWord: normWord, hashKey: hashKey,
     fmtTime: fmtTime, fmtDateTime: fmtDateTime, escapeHtml: escapeHtml, initials: initials, clamp: clamp,
-    reducedMotion: reducedMotion, vibrate: vibrate,
+    reducedMotion: reducedMotion, soundOn: soundOn, setSoundOn: setSoundOn, beep: beep, vibrate: vibrate,
+    armaSuoni: armaSuoni, suoniArmati: suoniArmati,
     initTheme: initTheme, toggleTheme: toggleTheme, applyTheme: applyTheme,
     toast: toast, showDialog: showDialog, closeDialog: closeDialog, confirmDialog: confirmDialog,
     keepInputVisible: keepInputVisible,
