@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#ffffff">
+  <title>Nomi, Cose, Città — FaW</title>
+  <meta name="description" content="Nomi, Cose, Città: una lettera, sei categorie, tutti scrivono insieme. Poi revisione all'unanimità e punti 0/5/10/20.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E📝%3C/text%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../shared/faw-ui.css">
+  <link rel="stylesheet" href="css/style.css">
+  <!-- Firebase (compat, come negli altri giochi FaW) -->
+  <script src="https://www.gstatic.com/firebasejs/9.1.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.1.1/firebase-firestore-compat.js"></script>
+  <!-- Config Firebase condivisa (PRIMA dello script che inizializza Firebase) -->
+  <script src="../shared/firebase-config.js"></script>
+  <!-- Spazio per i banner di stato fissi in cima (evita che coprano il testo) -->
+  <script src="../shared/faw-layout.js" defer></script>
+</head>
+<body>
+  <!-- Pulsante HOME condiviso (come in tutti i giochi FaW) -->
+  <a id="fixed-home-btn" class="fixed-home-btn" href="../../index.html" title="Torna alla home di FaW">🏠 HOME</a>
+
+  <!-- ============ LOADING DIZIONARIO ============ -->
+  <div id="screen-loading" class="screen">
+    <div class="load-card">
+      <div class="load-emoji">📝</div>
+      <h1 class="game-title">NOMI <span>COSE CITTÀ</span></h1>
+      <div id="load-status" class="load-status">Caricamento dizionario…</div>
+      <div id="load-count" class="load-count"></div>
+    </div>
+  </div>
+
+  <div id="app" class="hidden">
+    <header class="topbar">
+      <div class="topbar-left">
+        <span class="topbar-logo">📝</span>
+        <span class="topbar-title">NOMI&nbsp;COSE&nbsp;CITTÀ</span>
+      </div>
+      <div class="topbar-right">
+        <span id="dict-badge" class="badge-dict hidden" title="Versione del dizionario effettivo usato per validare"></span>
+        <span id="round-badge" class="badge-round hidden"></span>
+      </div>
+    </header>
+
+    <!-- ============ LOBBY ============ -->
+    <section id="screen-lobby" class="screen-inner">
+      <div class="card lobby">
+        <div class="lobby-head">
+          <div class="lobby-emoji">📝</div>
+          <h2>NOMI, COSE, CITTÀ</h2>
+          <p class="lobby-sub">
+            Una <b>lettera</b> uguale per tutti e una risposta per ogni <b>categoria</b>.
+            Scrivi più in fretta che puoi e premi <b class="gold">STOP</b>: la revisione si apre subito.
+            Il gioco <b>non giudica il significato</b> di una parola: se la ritieni fuori posto,
+            contestala — ma serve il voto di <b class="red">tutti, autore incluso</b>.
+          </p>
+        </div>
+
+        <div class="config-grid">
+          <div class="config"><span class="config-label">ROUND</span><span class="config-value" id="cfg-round">—</span></div>
+          <div class="config"><span class="config-label">COMPILAZIONE</span><span class="config-value" id="cfg-tempo">—</span></div>
+          <div class="config"><span class="config-label">REVISIONE</span><span class="config-value" id="cfg-revisione">—</span></div>
+          <div class="config"><span class="config-label">MODALITÀ</span><span class="config-value" id="cfg-mode">CLASSICA</span></div>
+        </div>
+
+        <div class="lobby-label">CATEGORIE DI QUESTA PARTITA</div>
+        <div class="cats" id="lobby-cats"></div>
+
+        <div class="lobby-label">PUNTEGGIO (per categoria)</div>
+        <ul class="punti-regola">
+          <li><b class="p20">20</b> unica risposta valida della categoria</li>
+          <li><b class="p10">10</b> risposta valida non ripetuta, con altre valide</li>
+          <li><b class="p5">5</b> risposta valida uguale a quella di un altro</li>
+          <li><b class="p0">0</b> risposta vuota o annullata all’unanimità</li>
+        </ul>
+
+        <div class="lobby-label">GIOCATORI</div>
+        <div class="players" id="lobby-players"></div>
+
+        <div class="lobby-status" id="lobby-status">
+          <span class="spinner"></span><span id="lobby-status-text">In attesa che tutti siano pronti…</span>
+        </div>
+        <button id="btn-start-solo" class="btn btn-fire hidden">📝 INIZIA ALLENAMENTO</button>
+
+        <p class="lobby-hint" id="lobby-hint">
+          Dizionario ufficiale Ruzzle · una parola è valida se esiste e inizia con la lettera del round
+        </p>
+      </div>
+    </section>
+
+    <!-- ============ GIOCO ============ -->
+    <section id="screen-gioco" class="screen-inner hidden">
+      <div class="gioco-grid">
+        <div class="play-col">
+          <div class="card lettera-card">
+            <div class="card-label">LETTERA DEL ROUND</div>
+            <div class="lettera-row">
+              <div class="lettera-tile" id="lettera-tile">—</div>
+              <div class="timer-block">
+                <div class="timer-num" id="timer-num">—</div>
+                <div class="timer-label" id="timer-label">SECONDI</div>
+                <div class="timer-bar"><i id="timer-fill"></i></div>
+              </div>
+            </div>
+            <div class="fase-chip" id="fase-chip">COMPILAZIONE</div>
+          </div>
+
+          <div class="card risposte-card" id="risposte-card">
+            <div class="card-label">LE TUE RISPOSTE <span id="risposte-progress" class="feed-count"></span></div>
+            <div id="campi" class="campi"></div>
+            <div class="azioni-risposte">
+              <span class="save-state" id="save-state" aria-live="polite">—</span>
+              <button id="btn-stop" class="btn btn-fire">⏹ STOP</button>
+            </div>
+            <div class="hint" id="risposte-hint"></div>
+          </div>
+        </div>
+
+        <aside class="side-col">
+          <div class="card">
+            <div class="card-label">GIOCATORI</div>
+            <div id="giocatori" class="players"></div>
+          </div>
+          <div class="card">
+            <div class="card-label">PUNTEGGI</div>
+            <div id="punteggi" class="scoreboard"></div>
+          </div>
+          <div class="card">
+            <div class="card-label">ROUND PRECEDENTI</div>
+            <div id="storico" class="storico"></div>
+          </div>
+        </aside>
+      </div>
+    </section>
+  </div>
+
+  <!-- ============ REVISIONE ============ -->
+  <div id="overlay-revisione" class="overlay hidden" role="dialog" aria-modal="true" aria-label="Revisione delle risposte">
+    <div class="card revisione">
+      <div class="rev-head">
+        <span class="rev-emoji">🔎</span>
+        <div>
+          <h3>REVISIONE — ROUND <span id="rev-round">1</span> · LETTERA <b id="rev-lettera">—</b></h3>
+          <p>
+            Una risposta è annullata <b>solo se tutti</b> i partecipanti del round votano “Non valida”,
+            <b>autore incluso</b>. Alla scadenza, una contestazione non unanime <b>lascia valida</b> la risposta.
+          </p>
+        </div>
+      </div>
+      <div class="rev-timer"><span id="rev-timer-num">—</span> s alla chiusura <i id="rev-timer-fill"></i></div>
+      <div id="rev-body" class="rev-body"></div>
+      <div class="rev-foot">
+        <div id="conf-progress" class="conf-progress"></div>
+        <button id="btn-conferma" class="btn btn-fire">✔ REVISIONE CONCLUSA</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ RISULTATI DEL ROUND ============ -->
+  <div id="overlay-risultati" class="overlay hidden" role="dialog" aria-modal="true" aria-label="Risultati del round">
+    <div class="card risultati">
+      <div class="res-head">
+        <span class="res-emoji">🧮</span>
+        <div>
+          <h3>ROUND <span id="res-round">1</span> CHIUSO</h3>
+          <p>Punti definitivi, calcolati sull’esito congelato della revisione.</p>
+        </div>
+      </div>
+      <div id="res-body" class="res-body"></div>
+      <div class="res-foot">
+        <span id="res-countdown" class="res-countdown">Prossimo round tra …</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ FINE PARTITA ============ -->
+  <div id="overlay-fine" class="overlay hidden" role="dialog" aria-modal="true" aria-label="Risultati finali">
+    <div class="card fine">
+      <div class="fine-top">
+        <div class="fine-emoji" id="fine-emoji">🏆</div>
+        <h2 id="fine-title">PARTITA FINITA</h2>
+        <p id="fine-sub"></p>
+      </div>
+      <div id="podio" class="podio"></div>
+      <div class="lobby-label">DETTAGLIO PER ROUND E CATEGORIA</div>
+      <div id="fine-dettaglio" class="fine-dettaglio"></div>
+      <div id="fine-stats" class="fine-stats"></div>
+      <div class="fine-actions">
+        <button id="btn-rivincita" class="btn btn-fire">🔁 RIVINCITA</button>
+        <a class="btn btn-ghost" href="../../index.html">🏠 HOME</a>
+      </div>
+    </div>
+  </div>
+
+  <div id="banner" class="banner hidden"></div>
+  <div id="toast" class="toast hidden" aria-live="assertive"></div>
+
+  <script src="js/core.js"></script>
+  <script src="js/backend.js"></script>
+  <script src="js/ui.js"></script>
+</body>
+</html>

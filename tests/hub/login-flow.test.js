@@ -109,8 +109,9 @@ window.FAW_REQUIRE_FIREBASE_CONFIG = function(){ return window.FAW_FIREBASE_CONF
 
   console.log('\n[C] Dashboard premium');
   const cards = window.document.querySelectorAll('.game-card');
-  ok(cards.length === 6, '6 card giochi (trovate: ' + cards.length + ')');
+  ok(cards.length === 7, '7 card giochi (trovate: ' + cards.length + ')');
   ok(!!window.document.querySelector('#game-patata .g-tag'), 'card patata con tagline');
+  ok(!!window.document.querySelector('#game-nomi-cose-citta .g-tag'), 'card nomi-cose-citta con tagline');
   ok(window.document.querySelector('#game-ruzzle').classList.contains('selected'), 'ruzzle selezionato di default');
   ok(!!window.document.getElementById('online-count'), 'pill online nell\u2019header');
   ok(!!window.document.getElementById('theme-toggle'), 'toggle tema');
@@ -251,6 +252,18 @@ window.FAW_REQUIRE_FIREBASE_CONFIG = function(){ return window.FAW_FIREBASE_CONF
   ok(!!window.document.getElementById('opt-lettere-banner'), 'opzione lettere di Patata presente');
   ok(!window.document.getElementById('opt-griglia-banner'), 'opzione griglia di Ruzzle rimossa');
 
+  // cambio gioco -> Nomi, Cose, Città: opzioni di round/tempo/revisione/categorie
+  window.eval("selezionaGioco('nomi-cose-citta', document.getElementById('game-nomi-cose-citta'));");
+  await sleep(30);
+  banner = window.document.getElementById('game-banner');
+  ok(!!banner && banner.textContent.includes('NOMI, COSE'), 'barra aggiornata a Nomi, Cose, Città');
+  ok(!!window.document.getElementById('opt-round-banner'), 'opzione round di NCC presente');
+  ok(!!window.document.getElementById('opt-categorie-banner'), 'opzione categorie di NCC presente');
+  ok(banner.textContent.includes('CLASSICA'), "modalita' classica di NCC presente");
+  ok(!window.document.getElementById('opt-turni-banner'), 'opzione turni di Patata rimossa');
+  ok(window.eval("GIOCHI_CONFIG['nomi-cose-citta'].minGiocatori") === 2, 'minimo 2 giocatori');
+  ok(window.eval("GIOCHI_CONFIG['nomi-cose-citta'].maxGiocatori") === 8, 'massimo 8 giocatori');
+
   // cambio gioco -> gioco solo allenamento: la barra sparisce
   window.eval("selezionaGioco('neonwar', document.getElementById('game-neonwar'));");
   await sleep(30);
@@ -276,6 +289,40 @@ window.FAW_REQUIRE_FIREBASE_CONFIG = function(){ return window.FAW_FIREBASE_CONF
   ok(window.__nav.length === 1, 'redirect immediato dopo la creazione');
   ok(/^games\/patata\/index\.html\?matchId=NUOVA-1$/.test(window.__nav[0] || ''),
     'redirect alla lobby della nuova partita: ' + window.__nav[0]);
+
+  console.log('\n[N] Una partita di Nomi, Cose, Città in "Partite in Corso"');
+  window.eval(`__MOCK_DB__.__docs.partite.push({
+    id: 'NCC-1',
+    data: () => ({
+      gioco: 'nomi-cose-citta',
+      partecipanti: ['TEST', 'COLLEGA'],
+      stato: 'in_corso', round: 1, punteggi: { TEST: 0, COLLEGA: 0 },
+      opzioni: { round: '3', tempo: '120', revisione: '90', categorie: 'classic' },
+      dataOra: '2026-09-09 09:00:00'
+    })
+  });`);
+  await window.eval('refreshPartite(true)');
+  await sleep(120);
+  ok(window.eval('partiteCache.ncc.length') === 1, 'partita NCC nel bucket dedicato');
+  ok(window.eval('partiteCache.ruzzle.length') === 0, 'non finisce nel bucket di Ruzzle');
+  window.eval('renderTutteLePartite(true)');
+  await sleep(80);
+  ok(window.document.getElementById('lista-partite').textContent.includes('Nomi, Cose, Città'),
+    'nome del gioco nella lista partite');
+  ok(window.eval("gameHref('nomi-cose-citta', 'matchId=NCC-1')") ===
+     'games/nomi-cose-citta/index.html?matchId=NCC-1', 'link alla lobby della partita NCC');
+  // invito pendente per chi non ha ancora accettato
+  window.eval(`__MOCK_DB__.__docs.partite.push({
+    id: 'NCC-2',
+    data: () => ({
+      gioco: 'nomi-cose-citta', partecipanti: ['ALTRO', 'TEST'],
+      stato: 'attesa', opzioni: { round: '3' }, dataOra: '2026-09-09 09:05:00'
+    })
+  });`);
+  await window.eval('refreshPartite(true)');
+  await sleep(120);
+  ok(window.eval("invitiPendenti().some(p => p.gioco === 'nomi-cose-citta')"),
+    'invito NCC riconosciuto tra quelli pendenti');
 
   ok(errors.length === 0, 'nessun errore uncaught finale: ' + errors.join('; '));
 

@@ -17,6 +17,7 @@ FaW/
     ├── shared/faw-layout.js        # Riserva lo spazio dei banner fissi in cima
     ├── ruzzle/index.html
     ├── patata/                  # Patata Bollente (index.html + css/ + js/)
+    ├── nomi-cose-citta/         # Nomi, Cose, Città (index.html + css/ + js/, README dedicato)
     ├── pictionary/index.html
     ├── gameof15/index.html
     ├── neonwar/index.html
@@ -54,7 +55,7 @@ Dalla pagina del gioco, il ritorno alla home è `../../index.html`.
 `games/shared/faw-ui.css` è il layer visivo condiviso: token (colori, font Nunito,
 shadow, radius) e componenti (`.faw-*`, `.fixed-home-btn`).
 
-- L'**hub** (`index.html`) e i giochi **ruzzle, patata, pictionary, gameof15, neonwar** la
+- L'**hub** (`index.html`) e i giochi **ruzzle, patata, nomi-cose-citta, pictionary, gameof15, neonwar** la
   caricano *prima* dei loro `<style>`/`css`, così le regole locali restano a governare
   l'identità del singolo gioco.
 - **Palestra** è mobile-first e non la usa (ha i propri stili dedicati, ma definisce gli
@@ -103,8 +104,8 @@ feedback tattile sul tocco, mai come notifica.
 La config Firebase sta in **un solo file**: `games/shared/firebase-config.js`.
 È uno script browser classico (non un modulo ES) che espone `window.FAW_FIREBASE_CONFIG`.
 
-- Pagine **compat** (`index.html`, ruzzle, patata, pictionary, gameof15, neonwar,
-  palestra): includono `games/shared/firebase-config.js` (o `../shared/firebase-config.js`)
+- Pagine **compat** (`index.html`, ruzzle, patata, nomi-cose-citta, pictionary, gameof15,
+  neonwar, palestra): includono `games/shared/firebase-config.js` (o `../shared/firebase-config.js`)
   **prima** dello script che chiama `firebase.initializeApp(firebaseConfig)`.
 
 Per cambiare progetto Firebase basta modificare `games/shared/firebase-config.js`.
@@ -126,7 +127,20 @@ Firestore con **429 Too Many Requests** e il gioco resta bloccato in lobby. Per 
   (o a mano con il pulsante ⟳), e la presenza ogni 30 secondi.
 
 `tests/patata/quota.test.js` misura letture e scritture reali di una lobby a 3 client e
-blocca le regressioni.
+blocca le regressioni. `tests/ncc/quota.test.js` fa lo stesso per Nomi, Cose, Città:
+una partita completa a 3 giocatori e 2 round costa 0 letture `get`/transazioni, 21
+letture da listener e 22 scritture; l'allenamento solo scrive zero.
+
+## Nomi, Cose, Città
+
+Gioco di parole a round: lettera e categorie condivise, una risposta per giocatore
+per categoria, revisione collettiva in cui una risposta si annulla **solo
+all'unanimità** (autore incluso). Schema dati, regole Firestore proposte,
+compromesso privacy/letture, limiti noti e verifiche:
+[games/nomi-cose-citta/README.md](games/nomi-cose-citta/README.md).
+
+Senza `matchId` nella URL si apre l'**allenamento solo**: stessa UI e stessa logica,
+zero scritture Firestore.
 
 ## Palestra mobile
 
