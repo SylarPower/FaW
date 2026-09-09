@@ -817,6 +817,12 @@
 								<div class="g-tag">Parole a staffetta contro il tempo</div>
 								<div class="game-badge online">SFIDA</div>
 							</div>
+							<div class="game-card" onclick="selezionaGioco('nomi-cose-citta', this)" id="game-nomi-cose-citta" style="--g1:#818cf8; --g2:#7c3aed;">
+								<div class="g-tile">📝</div>
+								<div class="g-name">Nomi, Cose, Città</div>
+								<div class="g-tag">Una lettera, tante categorie</div>
+								<div class="game-badge online">SFIDA</div>
+							</div>
 							<div class="game-card" onclick="selezionaGioco('neonwar', this)" id="game-neonwar" style="--g1:#ff3d7f; --g2:#a855f7;">
 								<div class="g-tile">🚀</div>
 								<div class="g-name">Neon War</div>
@@ -1096,6 +1102,7 @@
 			const GAME_PATHS = {
 			    ruzzle: 'games/ruzzle/index.html',
 			    patata: 'games/patata/index.html',
+			    'nomi-cose-citta': 'games/nomi-cose-citta/index.html',
 			    pictionary: 'games/pictionary/index.html',
 			    gameof15: 'games/gameof15/index.html',
 			    neonwar: 'games/neonwar/index.html',
@@ -1111,6 +1118,7 @@
 			let partiteCache = {
 			    ruzzle: [],
 			    patata: [],
+			    ncc: [],
 			    pictionary: [],
 			    neonwar: [],
 			    gameof15: []
@@ -1254,6 +1262,46 @@
 			    minGiocatori: 2,
 			    maxGiocatori: 8
 			  },
+				 'nomi-cose-citta': {
+					nome: "Nomi, Cose, Città",
+					icona: "📝",
+					opzioni: [{
+						id: "round", label: "Round", default: "3",
+						valori: [
+							{ value: "1", label: "1 round" },
+							{ value: "2", label: "2 round" },
+							{ value: "3", label: "3 round" },
+							{ value: "5", label: "5 round" }
+						]
+					}, {
+						id: "tempo", label: "Compilazione", default: "120",
+						valori: [
+							{ value: "60", label: "60s (Sprint)" },
+							{ value: "120", label: "120s (Standard)" },
+							{ value: "180", label: "180s (Relax)" }
+						]
+					}, {
+						id: "revisione", label: "Revisione", default: "90",
+						valori: [
+							{ value: "60", label: "60s" },
+							{ value: "90", label: "90s" },
+							{ value: "120", label: "120s" }
+						]
+					}, {
+						id: "categorie", label: "Categorie", default: "classic",
+						valori: [
+							{ value: "classic", label: "6 classiche" },
+							{ value: "light", label: "3 (Nomi, Cose, Città)" }
+						]
+					}],
+					/* Una sola modalità: prima una classica funzionante,
+						niente BONUS/CRAZY/MIX ereditati da altri giochi. */
+					modalita: [{
+						id: "classica", label: "CLASSICA 📝", colore: "#4f46e5", testo: "#ffffff"
+					}],
+					minGiocatori: 2,
+					maxGiocatori: 8
+				},
 				 neonwar: {
 			     nome: "Neon War",
 			     icona: "🚀",
@@ -1438,6 +1486,7 @@ if (mioNome && passwordHashSalvato) {
 			  let partitaId = null;
 			  const tutte = []
 			    .concat(partiteCache.ruzzle || [], partiteCache.patata || [],
+			          partiteCache.ncc || [],
 			          partiteCache.neonwar || [], partiteCache.gameof15 || [],
 			          partiteCache.pictionary || []);
 			  tutte.forEach(p => {
@@ -1526,6 +1575,7 @@ let ultimaFirmaPartite = '';
 function partiteInCache() {
     return [].concat(
         partiteCache.ruzzle || [], partiteCache.patata || [],
+        partiteCache.ncc || [],
         partiteCache.neonwar || [], partiteCache.gameof15 || [],
         partiteCache.pictionary || []
     );
@@ -1549,6 +1599,7 @@ async function refreshPartite(manuale = false) {
 
             partiteCache.ruzzle = [];
             partiteCache.patata = [];
+            partiteCache.ncc = [];
             partiteCache.neonwar = [];
             partiteCache.gameof15 = [];
             snapPartite.forEach(doc => {
@@ -1556,6 +1607,7 @@ async function refreshPartite(manuale = false) {
                 if (data.gioco === 'neonwar') partiteCache.neonwar.push(data);
                 else if (data.gioco === 'gameof15') partiteCache.gameof15.push(data);
                 else if (data.gioco === 'patata') partiteCache.patata.push(data);
+                else if (data.gioco === 'nomi-cose-citta') partiteCache.ncc.push(data);
                 else if (data.gioco !== 'pictionary') partiteCache.ruzzle.push(data);
             });
 
@@ -1635,6 +1687,7 @@ function fermaFlashTitolo() {
 function invitiPendenti() {
   const out = [];
   const partite = [].concat(partiteCache.ruzzle || [], partiteCache.patata || [],
+    partiteCache.ncc || [],
     partiteCache.neonwar || [], partiteCache.gameof15 || []);
   partite.forEach(p => {
     if (!p || p.stato !== 'attesa') return;
@@ -1754,6 +1807,9 @@ function renderTutteLePartite(forza = false) {
 
     // Render Patata Bollente
     partiteCache.patata.forEach(p => renderPartitaRuzzle(p, div));
+
+    // Render Nomi, Cose, Città
+    partiteCache.ncc.forEach(p => renderPartitaRuzzle(p, div));
 
     // Render NeonWar
     partiteCache.neonwar.forEach(p => renderPartitaRuzzle(p, div));

@@ -5,9 +5,10 @@
     "test:gym": "playwright test",
     "test:gym:chromium": "playwright test --project=chromium",
     "test:patata": "node tests/patata/core.test.js && node tests/patata/multiplayer.test.js && node tests/patata/quota.test.js && node tests/patata/browser.test.js",
+    "test:ncc": "node tests/ncc/core.test.js && node tests/ncc/multiplayer.test.js && node tests/ncc/quota.test.js && node tests/ncc/browser.test.js && node tests/ncc/browser-multiplayer.test.js",
     "test:hub": "node tests/hub/firebase-down.test.js && node tests/hub/login-flow.test.js",
     "test:static": "node tests/static/syntax.test.js",
-    "test": "npm run test:static && npm run test:patata && npm run test:hub"
+    "test": "npm run test:static && npm run test:ncc && npm run test:patata && npm run test:hub"
   },
   "devDependencies": {
     "@playwright/test": "1.58.2",

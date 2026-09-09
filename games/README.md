@@ -14,6 +14,6 @@ games/<nome>/
     └── ...
 ```
 
-Esempio già collegato: `games/patata/`.
+Esempi già collegati: `games/patata/`, `games/nomi-cose-citta/`.
 
 Collega il gioco dall'hub (`../../index.html` → `GAME_PATHS` + card + `GIOCHI_CONFIG`).

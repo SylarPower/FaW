@@ -17,6 +17,7 @@ const PAGINE = [
   'index.html',
   'games/ruzzle/index.html',
   'games/patata/index.html',
+  'games/nomi-cose-citta/index.html',
   'games/pictionary/index.html',
   'games/gameof15/index.html',
   'games/neonwar/index.html',
@@ -24,6 +25,9 @@ const PAGINE = [
 ];
 const JS = [
   'games/patata/js/game.js',
+  'games/nomi-cose-citta/js/core.js',
+  'games/nomi-cose-citta/js/backend.js',
+  'games/nomi-cose-citta/js/ui.js',
   'games/palestra/app.js',
   'games/palestra/premium.js',
   'games/palestra/workout-metrics.js',
@@ -33,6 +37,7 @@ const JS = [
 const GIOCHI = [
   { dir: 'games/ruzzle', cssInHtml: true },
   { dir: 'games/patata', cssInHtml: false },
+  { dir: 'games/nomi-cose-citta', cssInHtml: false },
   { dir: 'games/pictionary', cssInHtml: true },
   { dir: 'games/gameof15', cssInHtml: true },
   { dir: 'games/neonwar', cssInHtml: true },
@@ -125,11 +130,13 @@ console.log('\n[3b] Banner di stato fissi in cima: spazio riservato');
   ok(!/offsetParent/.test(layout), 'faw-layout.js non usa offsetParent (null sui fixed)');
   ok(/getComputedStyle/.test(layout), 'faw-layout.js usa getComputedStyle per la visibilita\'');
   // i giochi con un banner fisso in cima devono caricare lo script
-  ['games/ruzzle/index.html', 'games/pictionary/index.html', 'games/patata/index.html'].forEach((rel) => {
+  ['games/ruzzle/index.html', 'games/pictionary/index.html', 'games/patata/index.html',
+    'games/nomi-cose-citta/index.html'].forEach((rel) => {
     ok(/faw-layout\.js/.test(leggi(rel)), rel + ' carica faw-layout.js');
   });
   // e i banner non devono avere un padding-left hardcoded fuori token
-  ['games/ruzzle/index.html', 'games/pictionary/index.html', 'games/patata/css/style.css'].forEach((rel) => {
+  ['games/ruzzle/index.html', 'games/pictionary/index.html', 'games/patata/css/style.css',
+    'games/nomi-cose-citta/css/style.css'].forEach((rel) => {
     const src = leggi(rel);
     ok(!/padding-left:\s*148px/.test(src), rel + ' nessuna misura hardcoded per il HOME');
   });
@@ -167,6 +174,56 @@ console.log('\n[7] Patata Bollente: zero runTransaction (modello Ruzzle)');
   const patataSrc = leggi('games/patata/js/game.js');
   // Nessuna chiamata a runTransaction nel codice JS di Patata
   ok(!/\.runTransaction\s*\(/.test(patataSrc), 'games/patata/js/game.js non usa runTransaction');
+}
+
+console.log('\n[8] Nomi, Cose, Città: regole strutturali');
+{
+  const core = leggi('games/nomi-cose-citta/js/core.js');
+  const be = leggi('games/nomi-cose-citta/js/backend.js');
+  const ui = leggi('games/nomi-cose-citta/js/ui.js');
+  const pagina = leggi('games/nomi-cose-citta/index.html');
+  const tutto = core + be + ui;
+  /* Si tolgono i commenti: le note parlano di runTransaction/BatchGetDocuments
+     proprio per dire che NON vengono usati. */
+  const senzaCommenti = (src) => src
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/(^|[^:])\/\/.*$/gm, '$1');
+  const codice = senzaCommenti(tutto);
+
+  ok(!/\.runTransaction\s*\(/.test(codice), 'nessun runTransaction nel gioco');
+  ok(!/BatchGetDocuments/.test(codice), 'nessuna chiamata esplicita a BatchGetDocuments');
+  ok(/onSnapshot/.test(be), 'stato letto con onSnapshot');
+  ok(/applyAtomic/.test(be) && /\.update\(/.test(be), 'scritture parziali con update()');
+  ok(/ActionGate/.test(be) && /staggerMs/.test(be), 'ActionGate con referente e scaglionamento');
+  ok(/STUCK_FALLBACK_MS/.test(core), 'STUCK_FALLBACK_MS condiviso');
+  ok(/RATE_LIMIT_BACKOFF_MAX/.test(core) && /isRateLimitError/.test(core), 'backoff esponenziale sui 429');
+
+  /* Unanimità obbligatoria: niente maggioranze */
+  ok(/quorum\.every/.test(core), 'annullamento solo con voto di TUTTI i partecipanti');
+  ok(!/flagThreshold|Math\.ceil\(\s*\(.*length\s*-\s*1\)\s*\/\s*2/.test(core), 'nessuna regola di maggioranza');
+
+  /* Punteggi dichiarati */
+  ['PUNTI_DUPLICATO = 5', 'PUNTI_DISTINTA = 10', 'PUNTI_SOLO_VALIDA = 20', 'PUNTI_ALLENAMENTO = 10']
+    .forEach((k) => ok(core.indexOf(k) !== -1, 'costante punteggio: ' + k));
+
+  /* Riservatezza: risposte in sottocollezione, listener separati */
+  ok(/collection\('risposte'\)|collection\("risposte"\)|\.collection\('risposte'\)/.test(be) ||
+     /ref\.collection\('risposte'\)/.test(be), 'risposte in una sottocollezione dedicata');
+  ok(/apriMieRisposte/.test(be) && /apriRisposte/.test(be), 'listener proprio in compilazione, query solo in revisione');
+  ok(/chiudiRisposte/.test(be), 'cleanup dei listener quando non servono');
+  ok(/hasPendingWrites/.test(be), 'gestione di hasPendingWrites (persistence)');
+
+  /* Identità e chiavi sicure */
+  ok(/safeId/.test(core) && /docIdRisposta/.test(core), 'ID documento e chiavi sanificati');
+  ok(/localStorage\.getItem\('mioNome'\)/.test(ui), 'identità FaW esistente (nessun login separato)');
+
+  /* Home e risorse condivise */
+  ok(/class="fixed-home-btn" href="\.\.\/\.\.\/index\.html"/.test(pagina), 'pulsante HOME verso ../../index.html');
+  ok(/shared\/faw-ui\.css/.test(pagina) && /shared\/faw-layout\.js/.test(pagina), 'risorse condivise collegate');
+  ok(/shared\/firebase-config\.js/.test(pagina), 'config Firebase condivisa');
+  ok(/9\.1\.1\/firebase-firestore-compat/.test(pagina), 'SDK compat 9.1.1');
+  ok(!AUDIO_RE.test(codice), 'nessun costrutto audio');
+  ok(!/navigator\.vibrate/.test(codice), 'nessuna vibrazione');
 }
 
 console.log('\n=================');
