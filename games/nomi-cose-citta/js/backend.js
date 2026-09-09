@@ -400,21 +400,29 @@
     var ref = this.collRisposte.doc(docId);
     // Chiavi `c0`,`c1`… : gli id categoria personalizzati potrebbero non
     // essere sicuri in un dot-path, gli indici lo sono sempre.
-    var payload = {};
+    //
+    // Le celle vanno in una MAPPA ANNIDATA `risposte: {c0: …}`, non con chiavi
+    // "risposte.c0": nell'SDK Firestore 9.1.1 solo update() interpreta le
+    // chiavi come dot-path, mentre con set(..., {merge:true}) "risposte.c0"
+    // diventerebbe un campo letterale e le risposte sarebbero illeggibili in
+    // revisione. Il merge di una mappa annidata è profondo, quindi le celle
+    // già salvate non vengono perse.
+    var celle = {};
     (rd.categorie || []).forEach(function (catId, ci) {
       var r = (risposte && risposte[catId]) || null;
-      payload['risposte.' + C.catKey(ci)] = r
+      celle[C.catKey(ci)] = r
         ? { raw: String(r.raw == null ? '' : r.raw).slice(0, 60), norm: C.normalizeWord(r.raw) }
         : null;
     });
-    var update = Object.assign({
+    var update = {
       round: rd.round,
       roundId: rd.id,
       giocatore: this.me,
       indice: idx,
       categorie: (rd.categorie || []).slice(),
-      aggiornato: Date.now()
-    }, payload);
+      aggiornato: Date.now(),
+      risposte: celle
+    };
     this._setSalvataggio('salvo');
     this._salvataggiInVolo++;
     return ref.set(update, { merge: true })
