@@ -42,6 +42,26 @@
   };
 
   /**
+   * Abilita la cache offline di Firestore (IndexedDB persistence) su compat SDK.
+   * Se fallisce (es. piu' schede aperte o browser senza supporto), degrada dolcemente.
+   */
+  global.FAW_ENABLE_PERSISTENCE = function (db) {
+    if (!db || typeof db.enableIndexedDbPersistence !== 'function') return Promise.resolve(false);
+    return db.enableIndexedDbPersistence({ synchronizeTabs: true })
+      .then(function () { return true; })
+      .catch(function (err) {
+        if (err && err.code === 'failed-precondition') {
+          console.warn('[FaW] Persistenza offline non abilitata: piu schede aperte contemporaneamente.');
+        } else if (err && err.code === 'unimplemented') {
+          console.warn('[FaW] Persistenza offline non supportata dal browser.');
+        } else {
+          console.warn('[FaW] Persistenza offline:', err ? (err.message || err.code) : err);
+        }
+        return false;
+      });
+  };
+
+  /**
    * Restituisce la config condivisa, loggando un errore chiaro se manca
    * (tipicamente perche' questo file non e' stato incluso prima dello script
    * che inizializza Firebase, oppure il path relativo e' sbagliato).

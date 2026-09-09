@@ -162,6 +162,13 @@ console.log('\n[6] Ruzzle: verifica parole automatica');
     'auto-verifica sia a fine tempo sia nello stato verifica');
 }
 
+console.log('\n[7] Patata Bollente: zero runTransaction (modello Ruzzle)');
+{
+  const patataSrc = leggi('games/patata/js/game.js');
+  // Nessuna chiamata a runTransaction nel codice JS di Patata
+  ok(!/\.runTransaction\s*\(/.test(patataSrc), 'games/patata/js/game.js non usa runTransaction');
+}
+
 console.log('\n=================');
 console.log('PASSATI: ' + passed + '  FALLITI: ' + failed);
 process.exit(failed ? 1 : 0);

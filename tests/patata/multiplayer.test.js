@@ -1,5 +1,5 @@
 /* Test multi-client Patata Bollente: 3 "client" su un mock Firestore
-   (transazioni, arrayUnion/delete, abort su stato cambiato). */
+   (applyAtomic, arrayUnion/delete, rate limit 429 backoff). */
 'use strict';
 const path = require('path');
 const C = require(path.join(__dirname, '../../games/patata/js/game.js'));
@@ -82,35 +82,7 @@ const MockFS = {
       subs.forEach((cb) => queueMicrotask(() => cb(snap)));
     }
   },
-  runTransaction(fn) {
-    // serializzazione: una transazione alla volta (come Firestore)
-    MockFS.txQueue = (MockFS.txQueue || Promise.resolve()).then(async () => {
-      const staged = [];
-      const t = {
-        get: async (ref) => {
-          const doc = this.store.get(ref._key());
-          return { exists: () => !!doc, data: () => doc };
-        },
-        update: (ref, patch) => { staged.push([ref._key(), patch]); },
-        set: (ref, data) => { staged.push([ref._key(), { __set: data }]); }
-      };
-      let result;
-      try {
-        result = await fn(t);
-      } catch (e) {
-        return { aborted: true, error: { code: 'TX', message: e.message } };
-      }
-      // commit
-      for (const [key, patch] of staged) {
-        if (patch && patch.__set) this.setDoc(key, patch.__set);
-        else this.applyPatch(key, patch);
-      }
-      return result;
-    });
-    return MockFS.txQueue;
-  },
   collection(name) {
-    const self = this;
     return {
       doc: (id) => new MockDocRef(name, id || 'doc' + Math.random().toString(36).slice(2))
     };
@@ -121,7 +93,6 @@ const mockFieldValues = {
   delete: () => ({ __mockDelete: true })
 };
 function makeFsMod() {
-  // come firebase.firestore (compat): funzione che restituisce l'istanza db + statiche
   const fsMod = () => MockFS;
   fsMod.FieldValue = mockFieldValues;
   return fsMod;
@@ -148,7 +119,7 @@ for (const name of ['ALFA', 'BETA', 'GAMMA']) {
   const be = new C.FirebaseBackend(makeFsMod(), MATCH_ID, name);
   be.start();
   clients[name] = be;
-  be.subscribe(() => {}); // forza il primo snapshot
+  be.subscribe(() => {});
 }
 
 const waitSnap = async (name, pred, what, timeout = 5000) => {
@@ -163,6 +134,8 @@ const waitSnap = async (name, pred, what, timeout = 5000) => {
 
 (async () => {
   try {
+    await sleep(30); // Attesa snapshot iniziale
+
     console.log('\n[1] Lobby: ready + start');
     await Promise.all(['ALFA', 'BETA', 'GAMMA'].map((n) => clients[n].transact(C.mutReady)));
     await waitSnap('ALFA', (s) => s.pronti.length === 3, 'tutti pronti');
@@ -171,8 +144,8 @@ const waitSnap = async (name, pred, what, timeout = 5000) => {
     ok(true, 'tutti i client vedono in_corso/round 1');
 
     // determinismo lettere su tutti i client
-    const lA = C.pickLetters(SEED, 1, 2, FAKE_IDX);
-    const lB = C.pickLetters(SEED, 1, 2, FAKE_IDX);
+    const lA = C.pickLetters(SEED, 1, 2, FAKE_IDX, 'classic');
+    const lB = C.pickLetters(SEED, 1, 2, FAKE_IDX, 'classic');
     eq(lA, lB, 'lettere deterministiche (stesse su ogni client)');
     console.log('   lettere turno 1:', lA.join(''));
 
@@ -180,37 +153,30 @@ const waitSnap = async (name, pred, what, timeout = 5000) => {
     const w1 = findWord(lA);
     const d0 = clients['ALFA'].state.turno.deadline;
     await clients['ALFA'].transact((st) => C.mutSubmitWord(st, {
-      me: 'ALFA', now: Date.now(), letters: lA, used: C.usedWords(st), dict: FAKE_SET, word: w1
+      me: 'ALFA', now: Date.now(), letters: lA, used: C.usedWords(st), dict: FAKE_SET, word: w1, rule: 'classic'
     }));
     await waitSnap('BETA', (s) => s.turno.giocatore === 'BETA', 'patata a BETA');
     ok(clients['BETA'].state.turno.deadline >= d0 + 5000, 'deadline +5s sincronizzata');
     eq(clients['GAMMA'].state.punteggi.ALFA, C.pointsFor(w1.length), 'punti ALFA visibili a GAMMA');
 
-    // BETA fuori turno (gara simulata): rifiutato
+    // BETA prova a sottomettere per conto di ALFA: rifiutato
     const rOff = await clients['BETA'].transact((st) => C.mutSubmitWord(st, {
-      me: 'ALFA', now: Date.now(), letters: lA, used: C.usedWords(st), dict: FAKE_SET, word: findWord(lA, [w1])
+      me: 'ALFA', now: Date.now(), letters: lA, used: C.usedWords(st), dict: FAKE_SET, word: findWord(lA, [w1]), rule: 'classic'
     }));
     ok(rOff.aborted && rOff.error && rOff.error.code === 'NOT_YOUR_TURN', 'submit fuori turno abortito');
 
-    console.log('\n[3] Timeout contestato da 2 client (solo una scottatura)');
-    // simula il passare del tempo: sposta il deadline nel passato
+    console.log('\n[3] Timeout da parte dei client');
+    // simula il passare del tempo: sposta la deadline nel passato
     MockFS.applyPatch('partite/' + MATCH_ID, { 'turno.deadline': Date.now() - 3000 });
     await waitSnap('ALFA', (s) => s.turno.deadline < Date.now(), 'deadline scaduta locale');
-    // due client tentano in parallelo la scottatura
-    const [t1, t2] = await Promise.all([
-      clients['ALFA'].transact(C.mutTimeout),
-      clients['GAMMA'].transact(C.mutTimeout)
-    ]);
-    const wonTimeout = [t1, t2].filter((r) => r && r.ok).length;
-    ok(wonTimeout === 1, 'esattamente una transazione di timeout ha vinto (got ' + wonTimeout + ')');
+    const t1 = await clients['ALFA'].transact(C.mutTimeout);
+    ok(t1 && t1.ok, 'mutTimeout eseguito con successo');
     await waitSnap('BETA', (s) => s.roundData.fase === 'recap', 'recap per tutti');
     const doc = MockFS.store.get('partite/' + MATCH_ID);
     eq(doc.patate, { ALFA: 0, BETA: 1, GAMMA: 0 }, 'una sola scottatura per BETA');
     eq(doc.punteggi.BETA, -C.PATATA_PENALTY, 'penale −10 una sola volta');
 
     console.log('\n[4] Recap: contestazioni + conferme in parallelo');
-    // ALFA contesta la parola di… BETA non ha parole; usa quella di ALFA? no: l'autore non può contare.
-    // Facciamo giocare BETA prima? BETA ha solo sbagliato. Contestiamo la parola di ALFA con GAMMA.
     const rFlag = await clients['GAMMA'].transact((st) => C.mutFlag(st, { word: w1, me: 'GAMMA' }));
     ok(rFlag && rFlag.ok, 'GAMMA contesta ' + w1);
     await waitSnap('ALFA', (s) => (s.roundData.flags || {})[w1] && s.roundData.flags[w1].length === 1, 'flag visibile');
@@ -227,13 +193,8 @@ const waitSnap = async (name, pred, what, timeout = 5000) => {
     // conferme tutte in parallelo
     await Promise.all(['ALFA', 'BETA', 'GAMMA'].map((n) => clients[n].transact(C.mutConferma)));
     await waitSnap('GAMMA', (s) => s.confermaTurno.length === 3, '3 conferme');
-    // 2 client tentano il next round in parallelo
-    const [n1, n2] = await Promise.all([
-      clients['ALFA'].transact(C.mutNextRound),
-      clients['BETA'].transact(C.mutNextRound)
-    ]);
-    const wonNext = [n1, n2].filter((r) => r && r.ok).length;
-    ok(wonNext === 1, 'esattamente una transazione next-round ha vinto (got ' + wonNext + ')');
+    const n1 = await clients['ALFA'].transact(C.mutNextRound);
+    ok(n1 && n1.ok, 'next-round eseguito con successo');
     await waitSnap('GAMMA', (s) => s.round === 2, 'round 2 per tutti');
     const doc2 = MockFS.store.get('partite/' + MATCH_ID);
     eq(doc2.roundData.patata, null, 'round 2: patata pulita');
@@ -241,10 +202,10 @@ const waitSnap = async (name, pred, what, timeout = 5000) => {
     ok(doc2.confermaTurno.length === 0, 'conferme resettate');
 
     console.log('\n[5] Round 2 completo → conclusa');
-    const l2 = C.pickLetters(SEED, 2, 2, FAKE_IDX);
+    const l2 = C.pickLetters(SEED, 2, 2, FAKE_IDX, 'classic');
     const w2 = findWord(l2);
     await clients['BETA'].transact((st) => C.mutSubmitWord(st, {
-      me: 'BETA', now: Date.now(), letters: l2, used: C.usedWords(st), dict: FAKE_SET, word: w2
+      me: 'BETA', now: Date.now(), letters: l2, used: C.usedWords(st), dict: FAKE_SET, word: w2, rule: 'classic'
     }));
     await waitSnap('ALFA', (s) => s.turno.giocatore === 'GAMMA', 'round2: patata a GAMMA');
     MockFS.applyPatch('partite/' + MATCH_ID, { 'turno.deadline': Date.now() - 3000 });
@@ -262,22 +223,26 @@ const waitSnap = async (name, pred, what, timeout = 5000) => {
     ok(doc3.storia.length === 2, 'storia: 2 parole valide totali');
     eq(doc3.patate, { ALFA: 0, BETA: 1, GAMMA: 1 }, 'scottature: BETA e GAMMA');
 
-    console.log('\n=================');
-
-    console.log('\n[7] Rate limit 429: backoff + flag rateLimited (anti-flood)');
+    console.log('\n[6] Rate limit 429: backoff + flag rateLimited (anti-flood)');
     let failsLeft = 0;
-    const rlFsMod = () => ({
-      collection: MockFS.collection.bind(MockFS),
-      runTransaction(fn) {
+    const rlDocRef = {
+      key: 'partite/' + MATCH_ID,
+      onSnapshot(cb) {
+        return MockFS.collection('partite').doc(MATCH_ID).onSnapshot(cb);
+      },
+      update(patch) {
         if (failsLeft > 0) {
           failsLeft--;
-          // come l'SDK compat 9.x: code "unknown" + messaggio con 429
           const err = new Error('Server responded with status 429');
           err.code = 'unknown';
           return Promise.reject(err);
         }
-        return MockFS.runTransaction(fn);
+        MockFS.applyPatch('partite/' + MATCH_ID, patch);
+        return Promise.resolve();
       }
+    };
+    const rlFsMod = () => ({
+      collection: () => ({ doc: () => rlDocRef })
     });
     rlFsMod.FieldValue = mockFieldValues;
     const rlClient = new C.FirebaseBackend(rlFsMod, MATCH_ID, 'ALFA');
@@ -291,25 +256,25 @@ const waitSnap = async (name, pred, what, timeout = 5000) => {
     ok(!C.isRateLimitError(new Error('permession denied')), 'altri errori NON sono rate limit');
 
     failsLeft = 2;
-    const r1 = await rlClient.transact(C.mutConferma);
+    const r1 = await rlClient.transact((st) => ({ 'testField': 1 }));
     ok(r1 && r1.failed && r1.rateLimited === true && r1.error.code === 'RATE_LIMIT', 'transazione 429 → {failed, rateLimited}');
     ok(notified === 1, 'onRateLimit notificato una sola volta per episodio (got ' + notified + ')');
     ok(rlClient.rateLimitedUntil > Date.now(), 'backoff attivo: rateLimitedUntil nel futuro');
     ok(rlClient.rateLimitBackoff === 8000, 'backoff raddoppiato 4s → 8s (got ' + rlClient.rateLimitBackoff + 'ms)');
 
-    const r2 = await rlClient.transact(C.mutConferma);
+    const r2 = await rlClient.transact((st) => ({ 'testField': 2 }));
     ok(r2 && r2.rateLimited === true, 'secondo 429 consecutivo → di nuovo rateLimited');
     ok(notified === 1, 'nessuna nuova notifica nello stesso episodio');
     ok(rlClient.rateLimitBackoff === 16000, 'backoff raddoppiato ancora 8s → 16s');
 
     // connessione tornata sana: round trip ok → reset backoff ed episodio
-    const r3 = await rlClient.transact(C.mutConferma); // stato conclusa → aborted (ma round trip riuscito)
-    ok(r3 && r3.aborted === true, 'transazione successiva torna a funzionare (aborted: stato conclusa)');
+    const r3 = await rlClient.transact((st) => ({ 'testField': 3 }));
+    ok(r3 && r3.ok === true, 'scrittura successiva torna a funzionare');
     ok(rlClient.rateLimitBackoff === 4000, 'backoff resettato a 4s');
     ok(rlClient.rateLimitEpisode === false, 'episodio rate limit chiuso');
 
     failsLeft = 1;
-    await rlClient.transact(C.mutConferma);
+    await rlClient.transact((st) => ({ 'testField': 4 }));
     ok(notified === 2, 'nuovo episodio 429 → nuova notifica (got ' + notified + ')');
     rlClient.stop();
 

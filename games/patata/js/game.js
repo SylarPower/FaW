@@ -5,24 +5,27 @@
    Regole:
    - Ogni turno (round) estrae N lettere casuali (sempre "risolvibili":
      il dizionario deve contenere abbastanza parole che le includono).
+   - Tre modalità:
+     * CLASSICA  → lettere anche staccate (comportamento base)
+     * SEQUENZA  → lettere consecutive (sottostringa)
+     * MIX       → alternanza deterministica round per round
    - Chi sta giocando deve scrivere una parola (min 4 lettere, presente
-     nel dizionario Ruzzle) che CONTENGA tutte le lettere richieste.
+     nel dizionario Ruzzle) che rispetti la regola del turno.
    - Parola corretta  → +5 secondi al timer e la patata passa al prossimo.
-   - Parola sbagliata → −5 secondi (stesso giocatore).
+   - Parola sbagliata → feedback di errore, tempo invariato (nessuna penalità).
    - Tempo a zero     → chi tiene la patata "si scotta" (−10 pt) e si
      apre il recap: tutte le parole del turno, tutti confermano e si
      passa al turno successivo (nuove lettere).
    - A fine partita  → classifica finale.
 
-   Backend:
-   - Multiplayer: Firebase Firestore, collezione `partite` (stesse
-     convenzioni di Ruzzle: matchId, stato attesa→in_corso→conclusa,
-     rivincitaAccettataDa/RifiutataDa). Le transazioni rendono gli
-     passaggi di turno atomici.
+   Backend (Zero runTransaction):
+   - Multiplayer: Firebase Firestore, modello Ruzzle (onSnapshot per
+     lo stato + blind update()/applyAtomic() per scrivere). Nessuna
+     lettura nelle mutazioni di gioco, zero BatchGetDocuments.
    - Allenamento: apri la pagina senza ?matchId → backend locale.
 
    Dizionario: lo stesso di Ruzzle — ../../dizionario.txt più gli
-   override condivisi in Firestore (config/dizionario).
+   override condivisi in Firestore (config/dizionario) con cache locale.
    ========================================================= */
 (function (global) {
   'use strict';
@@ -30,7 +33,7 @@
   /* ---------------- COSTANTI ---------------- */
   const MIN_WORD_LENGTH = 4;
   const TIME_BONUS = 5000;        // +5 s per parola corretta
-  const WRONG_PENALTY = 5000;     // −5 s per parola sbagliata
+  const WRONG_PENALTY = 0;        // La parola sbagliata non toglie tempo
   const PATATA_PENALTY = 10;      // −10 pt per la scottatura
   const TIMEOUT_GRACE = 2500;     // tolleranza prima di dichiarare la scottatura
   const LETTER_THRESHOLD = 12;    // min parole nel dizionario per una combo valida
@@ -40,6 +43,8 @@
   const RATE_LIMIT_BACKOFF_MAX = 60000;  // tetto del backoff anti-429
   const ACTION_RETRY_MIN = 2000;         // primo retry di un'azione fallita
   const ACTION_RETRY_MAX = 30000;        // tetto dei retry: mai martellare Firestore
+  const DICT_CACHE_KEY = 'faw_patata_dict_override';
+  const DICT_CACHE_TTL = 24 * 60 * 60 * 1000; // TTL cache dizionario: 24 ore
 
   // Frequenza (approssimativa) delle lettere italiane, senza Q (→ QU)
   const LETTER_WEIGHTS = {
@@ -108,15 +113,16 @@
    */
   class LetterIndex {
     constructor(words) {
-      this.n = words.length;
+      this.words = Array.isArray(words) ? words : Array.from(words || []);
+      this.n = this.words.length;
       this.wordsPer = Math.ceil(this.n / 32) || 1;
       this.bits = {};
       for (const l of Object.keys(LETTER_WEIGHTS)) {
         this.bits[l] = new Uint32Array(this.wordsPer);
       }
       const seen = new Int32Array(26);
-      for (let i = 0; i < words.length; i++) {
-        const w = words[i];
+      for (let i = 0; i < this.n; i++) {
+        const w = this.words[i];
         seen.fill(-1);
         for (let j = 0; j < w.length; j++) {
           const ci = w.charCodeAt(j) - 65;
@@ -127,7 +133,7 @@
         }
       }
     }
-    /** Numero di parole che contengono tutte le lettere in `letters`. */
+    /** Numero di parole che contengono tutte le lettere in `letters` (anche staccate). */
     countFor(letters) {
       const sets = [];
       for (const l of letters) {
@@ -148,6 +154,17 @@
       }
       return pop(acc);
     }
+    /** Numero di parole che contengono la sequenza consecutiva `seq`. */
+    countSequence(seq) {
+      if (!this.words || !seq) return 0;
+      const s = normalizeWord(seq);
+      if (!s) return 0;
+      let c = 0;
+      for (let i = 0; i < this.words.length; i++) {
+        if (this.words[i].indexOf(s) !== -1) c++;
+      }
+      return c;
+    }
   }
 
   function weightedLetter(rand) {
@@ -163,13 +180,69 @@
   }
 
   /**
-   * Estrae DETERMINISTICAMENTE le lettere di un round (stesso seed + round
-   → stessa combinazione su tutti i client, senza scritture extra).
-   * Garantisce "non impossibili": la combo deve avere >= LETTER_THRESHOLD
-   * parole valide nel dizionario; in caso contrario (quasi mai) usa la
-   * combinazione più ricca incontrata.
+   * Determina la regola del turno in modo deterministico:
+   * - 'classic': lettere anche staccate
+   * - 'sequenza': lettere consecutive (sottostringa)
+   * - 'mix': alternanza deterministica per round
    */
-  function pickLetters(seed, round, nLetters, index) {
+  function ruleFor(stateOrMode, round, seed) {
+    let mode = 'classic';
+    let rnd = 1;
+    let s = 'SEED';
+    if (typeof stateOrMode === 'object' && stateOrMode !== null) {
+      const op = stateOrMode.opzioni || {};
+      mode = op.mode || 'classic';
+      rnd = stateOrMode.round || 1;
+      s = op.seed || 'SEED';
+    } else if (typeof stateOrMode === 'string') {
+      mode = stateOrMode;
+      rnd = round || 1;
+      s = seed || 'SEED';
+    }
+    if (mode === 'sequenza') return 'sequenza';
+    if (mode === 'mix') {
+      const rand = sfc32(...cyrb128(s + '::patata-rule::' + rnd))();
+      return rand < 0.5 ? 'classic' : 'sequenza';
+    }
+    return 'classic';
+  }
+
+  /**
+   * Estrae DETERMINISTICAMENTE le lettere di un round (stesso seed + round
+   * → stessa combinazione su tutti i client, senza scritture extra).
+   * In modalità 'classic': estrae lettere distinte con countFor >= LETTER_THRESHOLD.
+   * In modalità 'sequenza': estrae una sequenza consecutiva con countSequence >= LETTER_THRESHOLD.
+   */
+  function pickLetters(seed, round, nLetters, index, rule = 'classic') {
+    const isSeq = rule === 'sequenza';
+    if (isSeq) {
+      const rand = sfc32(...cyrb128(seed + '::patata-seq::' + round));
+      let best = null;
+      let bestCount = -1;
+      if (index && index.words && index.words.length > 0) {
+        const words = index.words;
+        for (let attempt = 0; attempt < 120; attempt++) {
+          const wIdx = Math.floor(rand() * words.length);
+          const w = words[wIdx];
+          if (w.length < nLetters) continue;
+          const maxStart = w.length - nLetters;
+          const start = Math.floor(rand() * (maxStart + 1));
+          const cand = w.slice(start, start + nLetters);
+          const count = index.countSequence(cand);
+          if (count > bestCount) {
+            bestCount = count;
+            best = cand.split('');
+          }
+          if (count >= LETTER_THRESHOLD) return cand.split('');
+        }
+      }
+      if (best && best.length === nLetters) return best;
+      const candLetters = [];
+      for (let i = 0; i < nLetters; i++) candLetters.push(weightedLetter(rand));
+      return candLetters;
+    }
+
+    // Modalità classica (anche staccate)
     const rand = sfc32(...cyrb128(seed + '::patata::' + round));
     const chosen = [];
     let best = null;
@@ -300,15 +373,56 @@
     return flagsByOthers(state, word).length >= flagThreshold(state);
   }
 
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, (c) => (
+      { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+    ));
+  }
+
+  function highlightWord(word, letters, rule = 'classic') {
+    if (!word) return '';
+    const norm = normalizeWord(word);
+    if (rule === 'sequenza') {
+      const seq = Array.isArray(letters) ? letters.join('') : (letters || '');
+      const idx = norm.indexOf(seq);
+      if (idx !== -1) {
+        return esc(norm.slice(0, idx)) + '<mark>' + esc(norm.slice(idx, idx + seq.length)) + '</mark>' + esc(norm.slice(idx + seq.length));
+      }
+    }
+    const marks = new Array(norm.length).fill(false);
+    (Array.isArray(letters) ? letters : [letters]).forEach((l) => {
+      const i = norm.indexOf(l);
+      if (i >= 0) marks[i] = true;
+    });
+    let html = '';
+    let inMark = false;
+    for (let i = 0; i < norm.length; i++) {
+      if (marks[i]) {
+        if (!inMark) { html += '<mark>'; inMark = true; }
+        html += esc(norm[i]);
+      } else {
+        if (inMark) { html += '</mark>'; inMark = false; }
+        html += esc(norm[i]);
+      }
+    }
+    if (inMark) html += '</mark>';
+    return html;
+  }
+
   /* ---------------- VALIDAZIONE PAROLA (pura) ---------------- */
-  function validateWord(raw, letters, used, dict) {
+  function validateWord(raw, letters, used, dict, rule = 'classic') {
     const w = normalizeWord(raw);
     if (w.length === 0) return { ok: false, err: 'EMPTY' };
     if (w.length < MIN_WORD_LENGTH) return { ok: false, err: 'SHORT' };
-    const missing = letters.filter((l) => w.indexOf(l) === -1);
-    if (missing.length) return { ok: false, err: 'MISSING', missing };
-    if (used.has(w)) return { ok: false, err: 'USED' };
-    if (!dict.has(w)) return { ok: false, err: 'NOT_FOUND' };
+    if (rule === 'sequenza') {
+      const seq = Array.isArray(letters) ? letters.join('') : (letters || '');
+      if (w.indexOf(seq) === -1) return { ok: false, err: 'NOT_SEQUENCE', seq };
+    } else {
+      const missing = letters.filter((l) => w.indexOf(l) === -1);
+      if (missing.length) return { ok: false, err: 'MISSING', missing };
+    }
+    if (used && used.has(w)) return { ok: false, err: 'USED' };
+    if (dict && !dict.has(w)) return { ok: false, err: 'NOT_FOUND' };
     return { ok: true, w, p: pointsFor(w.length) };
   }
 
@@ -353,7 +467,8 @@
     if (state.stato !== 'in_corso' || !state.roundData || !state.turno) return null;
     if (state.roundData.fase !== 'giochi') return { __error: { code: 'NOT_PLAYING' } };
     if (state.turno.giocatore !== ctx.me) return { __error: { code: 'NOT_YOUR_TURN' } };
-    const v = validateWord(ctx.word, ctx.letters, ctx.used, ctx.dict);
+    const rule = ctx.rule || ruleFor(state);
+    const v = validateWord(ctx.word, ctx.letters, ctx.used, ctx.dict, rule);
     if (!v.ok) return { __error: { code: 'INVALID', detail: v.err } };
     const next = nextPlayer(state, ctx.me);
     return {
@@ -376,7 +491,7 @@
     const w = normalizeWord(ctx.word);
     if (!w) return null;
     return {
-      'turno.deadline': Math.max(state.turno.deadline, ctx.now) - WRONG_PENALTY,
+      // Parola sbagliata: tempo invariato (nessuna penalità in secondi)
       'turno.riferimento': ctx.now,
       'turno.ultimo': { nome: ctx.me, w, ok: false, ts: ctx.now }
     };
@@ -502,20 +617,19 @@
     _ctx(extra) {
       return Object.assign({ me: this.me, now: this.clock() }, extra || {});
     }
-    transact(mutator) {
-      const up = mutator(this.state, this._ctx());
-      if (!up) return { aborted: true };
-      if (up.__error) return { aborted: true, error: up.__error };
+    applyAtomic(mutator, extraCtx = {}) {
+      const up = mutator(this.state, this._ctx(extraCtx));
+      if (!up) return Promise.resolve({ aborted: true });
+      if (up.__error) return Promise.resolve({ aborted: true, error: up.__error });
       applyPartial(this.state, up);
       this._emit();
-      return { ok: true };
+      return Promise.resolve({ ok: true });
     }
-    // In solo non c'e' rete: il contratto resta identico al backend Firebase
-    applyAtomic(mutator) { return this.transact(mutator); }
+    transact(mutator, extraCtx) { return this.applyAtomic(mutator, extraCtx); }
     stop() {}
   }
 
-  /* ---------------- BACKEND FIREBASE (multiplayer) ---------------- */
+  /* ---------------- BACKEND FIREBASE (multiplayer — Zero runTransaction) ---------------- */
   class FirebaseBackend {
     // fsMod: modulo compat firebase.firestore (per FieldValue); il db deriva da fsMod()
     constructor(fsMod, matchId, me) {
@@ -529,13 +643,16 @@
       this.onDead = null; // doc rimosso → callback (redirect)
       this.onError = null;
       // Backoff anti-429: quando Firestore risponde "too many requests"
-      // (quota giornaliera o traffico eccessivo) sospendiamo le transazioni
+      // (quota giornaliera o traffico eccessivo) sospendiamo le azioni
       // automatiche e rallentiamo progressivamente i tentativi.
       this.rateLimitedUntil = 0;
       this.rateLimitBackoff = RATE_LIMIT_BACKOFF_MIN;
       this.rateLimitEpisode = false;
       this.onRateLimit = null; // callback UI (una volta per "episodio")
       this.onRecover = null;   // callback UI quando la connessione torna sana
+    }
+    isRateLimited() {
+      return Date.now() < this.rateLimitedUntil;
     }
     start() {
       this.unsub = this.ref.onSnapshot(
@@ -544,15 +661,30 @@
             if (this.onDead) this.onDead();
             return;
           }
+          this._rateLimitOk();
           this.state = normState(snap.data());
           this._subs.forEach((cb) => cb(this.state));
         },
         (err) => {
+          if (isRateLimitError(err)) {
+            const now = Date.now();
+            this.rateLimitedUntil = now + this.rateLimitBackoff;
+            this.rateLimitBackoff = Math.min(this.rateLimitBackoff * 2, RATE_LIMIT_BACKOFF_MAX);
+            if (!this.rateLimitEpisode) {
+              this.rateLimitEpisode = true;
+              console.warn('[Patata] Firestore listener limitato (429): backoff attivo');
+              if (this.onRateLimit) this.onRateLimit(this.rateLimitedUntil - now);
+            }
+          }
           console.error('[Patata] errore listener:', err);
           if (this.onError) this.onError(err);
         }
       );
       return this;
+    }
+    stop() {
+      if (this.unsub) { this.unsub(); this.unsub = null; }
+      this._subs.clear();
     }
     subscribe(cb) {
       this._subs.add(cb);
@@ -563,30 +695,14 @@
       if (!this.state) return;
       this._subs.forEach((cb) => cb(this.state));
     }
-    transact(mutator) {
-      return this.db.runTransaction(async (t) => {
-        const snap = await t.get(this.ref);
-        if (!docExists(snap)) return { aborted: true };
-        const state = normState(snap.data());
-        const up = mutator(state, { me: this.me, now: Date.now() });
-        if (!up) return { aborted: true };
-        if (up.__error) return { aborted: true, error: up.__error };
-        t.update(this.ref, toFirestoreUpdate(up, this.fs));
-        return { ok: true };
-      }).then((res) => {
-        // Round trip completato (anche con "aborted"): la connessione è sana.
-        this._rateLimitOk();
-        return res;
-      }).catch((e) => this._writeError(e, 'transazione'));
-    }
-    /* Scrittura "atomica" senza lettura: per i campi che usano arrayUnion
-       (pronti / confermaTurno / flags) la transazione non serve. Ogni
-       transazione Firestore costa una BatchGetDocuments (lettura) in piu':
-       toglierla da qui e' il taglio piu' grosso sui consumi di quota. */
-    applyAtomic(mutator) {
+    /* Scrittura atomica senza lettura (modello Ruzzle):
+       riceve lo stato già in cache da onSnapshot e invia una scrittura cieca (update).
+       Zero BatchGetDocuments = zero letture consumate. */
+    applyAtomic(mutator, extraCtx = {}) {
       const state = this.state;
       if (!state) return Promise.resolve({ aborted: true });
-      const up = mutator(state, { me: this.me, now: Date.now() });
+      const ctx = Object.assign({ me: this.me, now: Date.now() }, extraCtx);
+      const up = mutator(state, ctx);
       if (!up) return Promise.resolve({ aborted: true });
       if (up.__error) return Promise.resolve({ aborted: true, error: up.__error });
       applyPartial(state, up);   // UI aggiornata subito, senza attendere il server
@@ -595,7 +711,11 @@
         .then(() => { this._rateLimitOk(); return { ok: true }; })
         .catch((e) => this._writeError(e, 'update'));
     }
+    transact(mutator, extraCtx) {
+      return this.applyAtomic(mutator, extraCtx);
+    }
     _rateLimitOk() {
+      this.rateLimitedUntil = 0;
       this.rateLimitBackoff = RATE_LIMIT_BACKOFF_MIN;
       if (this.rateLimitEpisode) {
         this.rateLimitEpisode = false;
@@ -624,7 +744,7 @@
     }
   }
 
-  /* ---------------- CHI AGISCE (anti "transaction storm") ----------------
+  /* ---------------- CHI AGISCE (anti-storm) ----------------
      Le azioni di avanzamento (start, timeout, risoluzione contestazioni,
      prossimo turno) vengono tentate da UN solo client per volta:
      - il "referente" dell'azione (chi tiene la patata per il timeout,
@@ -632,9 +752,7 @@
      - gli altri subentrano solo se la condizione resta bloccata troppo a
        lungo (referente offline), scaglionati per evitare picchi;
      - ogni tentativo fallito allunga l'attesa del singolo client
-       (2s → 4s → 8s … fino a 30s): nessuno martella piu' Firestore.
-     Senza queste regole N client sparano la STESSA transazione a ogni tick:
-     è la causa principale dei 429 "Too Many Requests" di Firestore. */
+       (2s → 4s → 8s … fino a 30s): nessuno martella più Firestore. */
   class ActionGate {
     constructor(opts) {
       const o = opts || {};
@@ -661,7 +779,7 @@
       if (b) { b.retry = this.minRetry; b.visti = 0; }
     }
     /** Solo i fallimenti veri allungano l'attesa: un "aborted" significa che
-        un altro client ha gia' fatto il lavoro, quindi non e' un errore. */
+        un altro client ha già fatto il lavoro, quindi non è un errore. */
     failed(key, res) {
       if (res && (res.ok || res.aborted)) return;
       const b = this.book[key] || (this.book[key] = { visti: 0, next: 0, retry: this.minRetry });
@@ -678,6 +796,7 @@
     cyrb128, sfc32, normalizeWord, LetterIndex, pickLetters, weightedLetter,
     pointsFor, applyPartial, setPath, roundOrderFor, nextPlayer, usedWords,
     findWordAuthor, flagThreshold, flagsByOthers, flagResolved, validateWord,
+    highlightWord, ruleFor,
     mutReady, mutStart, mutSubmitWord, mutWrongWord, mutTimeout, mutConferma,
     mutFlag, mutResolveFlag, mutNextRound, normState, SoloBackend, FirebaseBackend,
     toFirestoreUpdate, docExists, isRateLimitError, ActionGate,
@@ -726,9 +845,9 @@
   /* ---------------- ELEMENTI DOM ---------------- */
   const el = {};
   ['screen-loading', 'load-status', 'load-count', 'app', 'round-badge',
-   'screen-lobby', 'cfg-tempo', 'cfg-turni', 'cfg-lettere', 'lobby-players',
+   'screen-lobby', 'cfg-tempo', 'cfg-turni', 'cfg-lettere', 'cfg-mode', 'lobby-players',
    'lobby-status', 'lobby-status-text', 'btn-start-solo', 'lobby-hint',
-   'screen-game', 'letter-tiles', 'letters-avail', 'ring-fill', 'timer-sec',
+   'screen-game', 'letter-tiles', 'letters-rule-badge', 'letters-avail', 'ring-fill', 'timer-sec',
    'turn-banner', 'game-players', 'input-card', 'word-input', 'btn-invia',
    'input-hint', 'feedback', 'scoreboard', 'feed', 'feed-count',
    'overlay-recap', 'recap-round', 'recap-patata', 'recap-body',
@@ -745,23 +864,7 @@
     for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
     return AVATAR_COLORS[h % AVATAR_COLORS.length];
   }
-  function esc(s) {
-    return String(s).replace(/[&<>"']/g, (c) => (
-      { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
-    ));
-  }
-  function highlightWord(word, letters) {
-    const marks = new Array(word.length).fill(false);
-    letters.forEach((l) => {
-      const i = word.indexOf(l);
-      if (i >= 0) marks[i] = true;
-    });
-    let html = '';
-    for (let i = 0; i < word.length; i++) {
-      html += marks[i] ? '<mark>' + esc(word[i]) + '</mark>' : esc(word[i]);
-    }
-    return html;
-  }
+
   function toast(msg, kind) {
     el.toast.textContent = msg;
     el.toast.className = 'toast' + (kind ? ' ' + kind : '');
@@ -793,7 +896,7 @@
     el.banner.classList.add('hidden');
   }
 
-  /* Nessun audio in FaW: il feedback di gioco e' solo visivo/tattile. */
+  /* Nessun audio in FaW: il feedback di gioco è solo visivo/tattile. */
 
   /* ---------------- CONFETTI ---------------- */
   function confetti() {
@@ -831,6 +934,49 @@
       new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout di rete')), timeout))
     ]);
   }
+
+  async function getSharedDictionaryOverrides(fb) {
+    // 1. Controlla localStorage (TTL 24 ore)
+    try {
+      const cached = localStorage.getItem(DICT_CACHE_KEY);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed && parsed.ts && (Date.now() - parsed.ts < DICT_CACHE_TTL)) {
+          return { extra: parsed.extra || [], excluded: parsed.excluded || [] };
+        }
+      }
+    } catch (e) { /* noop */ }
+
+    // 2. Se non in cache o scaduto, leggi da Firestore (best-effort)
+    if (!fb) return { extra: [], excluded: [] };
+    try {
+      const doc = await Promise.race([
+        fb.collection('config').doc('dizionario').get(),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('fb timeout')), 5000))
+      ]);
+      if (docExists(doc)) {
+        const d = doc.data() || {};
+        const extra = d.extra || [];
+        const excluded = d.excluded || [];
+        try {
+          localStorage.setItem(DICT_CACHE_KEY, JSON.stringify({ ts: Date.now(), extra, excluded }));
+        } catch (e) { /* noop */ }
+        return { extra, excluded };
+      }
+    } catch (e) {
+      console.warn('[Patata] override dizionario Firebase non disponibili:', e.message);
+      // Se la fetch fallisce ma avevamo una vecchia cache, riusala
+      try {
+        const cached = localStorage.getItem(DICT_CACHE_KEY);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed) return { extra: parsed.extra || [], excluded: parsed.excluded || [] };
+        }
+      } catch (e2) { /* noop */ }
+    }
+    return { extra: [], excluded: [] };
+  }
+
   async function loadDictionary() {
     setLoadStatus('Scarico il dizionario…');
     let text;
@@ -854,26 +1000,13 @@
     el['load-count'].textContent = words.size.toLocaleString('it-IT') + ' parole nel dizionario';
     setLoadStatus('Carico le parole condivise…');
 
-    // Override Firebase (extra/excluded) — stessi dati di Ruzzle, best effort
-    if (G.db) {
-      try {
-        const fb = G.db;
-        const doc = await Promise.race([
-          fb.collection('config').doc('dizionario').get(),
-          new Promise((_, rej) => setTimeout(() => rej(new Error('fb timeout')), 5000))
-        ]);
-        if (docExists(doc)) {
-          const d = doc.data() || {};
-          (d.extra || []).forEach((w) => {
-            const n = normalizeWord(w);
-            if (n.length >= MIN_WORD_LENGTH) words.add(n);
-          });
-          (d.excluded || []).forEach((w) => words.delete(normalizeWord(w)));
-        }
-      } catch (e) {
-        console.warn('[Patata] override dizionario Firebase non disponibili:', e.message);
-      }
-    }
+    // Override Firebase (extra/excluded) con cache in localStorage
+    const overrides = await getSharedDictionaryOverrides(G.db);
+    (overrides.extra || []).forEach((w) => {
+      const n = normalizeWord(w);
+      if (n.length >= MIN_WORD_LENGTH) words.add(n);
+    });
+    (overrides.excluded || []).forEach((w) => words.delete(normalizeWord(w)));
 
     G.dict = words;
     G.index = new LetterIndex(Array.from(words));
@@ -882,22 +1015,31 @@
 
   /* ---------------- DERIVATI ---------------- */
   function lettersFor(state) {
-    const key = state.opzioni.seed + ':' + state.round;
+    if (!state || !state.opzioni) return ['A', 'E'];
+    const rule = ruleFor(state);
+    const key = (state.opzioni.seed || 'SEED') + ':' + (state.round || 1) + ':' + (state.opzioni.lettere || 3) + ':' + rule;
     if (!G.letterCache.has(key)) {
-      G.letterCache.set(key, pickLetters(state.opzioni.seed, state.round, state.opzioni.lettere, G.index));
+      G.letterCache.set(key, pickLetters(state.opzioni.seed, state.round, state.opzioni.lettere, G.index, rule));
     }
     return G.letterCache.get(key);
   }
-  function availFor(letters) {
-    return G.index ? G.index.countFor(letters) : 0;
+  function availFor(letters, rule = 'classic') {
+    if (!G.index) return 0;
+    if (rule === 'sequenza') {
+      const seq = Array.isArray(letters) ? letters.join('') : letters;
+      return G.index.countSequence ? G.index.countSequence(seq) : 0;
+    }
+    return G.index.countFor(letters);
   }
 
   /* ---------------- LOGICA (tick) ---------------- */
   function ctxFor(extra) {
     const s = G.state;
+    const rule = s ? ruleFor(s) : 'classic';
     return Object.assign({
       me: G.me,
       now: Date.now(),
+      rule,
       letters: s ? lettersFor(s) : [],
       used: s ? usedWords(s) : new Set(),
       dict: G.dict
@@ -930,7 +1072,7 @@
     try {
       if (s.stato === 'attesa') {
         if (G.solo) return;
-        // Segnarsi pronti e' un arrayUnion: scrittura diretta, nessuna lettura.
+        // Segnarsi pronti è un arrayUnion: scrittura diretta, nessuna lettura.
         if (s.pronti.indexOf(G.me) === -1) {
           if (mayAct(s, 'ready:' + G.me, G.me)) {
             const r = await G.backend.applyAtomic(mutReady);
@@ -939,8 +1081,9 @@
           }
           return;
         }
+        // Avvio partita con blind update: 0 letture
         if (s.pronti.length >= s.partecipanti.length && mayAct(s, 'start', s.partecipanti[0])) {
-          const r = await G.backend.transact(mutStart);
+          const r = await G.backend.applyAtomic(mutStart);
           if (r && r.ok) actionOk(s, 'start');
           else actionFailed(s, 'start', r);
         }
@@ -952,7 +1095,7 @@
         if (Date.now() > s.turno.deadline + TIMEOUT_GRACE) {
           // Agisce chi tiene la patata; se è offline subentrano gli altri.
           if (mayAct(s, 'timeout', s.turno.giocatore)) {
-            const r = await G.backend.transact(mutTimeout);
+            const r = await G.backend.applyAtomic(mutTimeout);
             if (r && r.ok) actionOk(s, 'timeout');
             else actionFailed(s, 'timeout', r);
           }
@@ -965,7 +1108,7 @@
         const flags = s.roundData.flags || {};
         for (const word of Object.keys(flags)) {
           if (flagResolved(s, word) && mayAct(s, 'flag:' + word, s.partecipanti[0])) {
-            const r = await G.backend.transact((st) => mutResolveFlag(st, { word }));
+            const r = await G.backend.applyAtomic((st) => mutResolveFlag(st, { word }));
             if (r && r.ok) {
               actionOk(s, 'flag:' + word);
               toast('🚩 "' + word + '" contestata: punti rimossi', 'ok');
@@ -976,7 +1119,7 @@
           }
         }
         if (s.confermaTurno.length >= s.partecipanti.length && mayAct(s, 'next', s.partecipanti[0])) {
-          const r = await G.backend.transact(mutNextRound);
+          const r = await G.backend.applyAtomic(mutNextRound);
           if (r && r.ok) actionOk(s, 'next');
           else actionFailed(s, 'next', r);
         }
@@ -994,6 +1137,10 @@
     el['cfg-tempo'].textContent = op.tempo + 's';
     el['cfg-turni'].textContent = op.turni;
     el['cfg-lettere'].textContent = op.lettere;
+    if (el['cfg-mode']) {
+      const m = op.mode || 'classic';
+      el['cfg-mode'].textContent = m === 'sequenza' ? 'SEQUENZA' : m === 'mix' ? 'MIX' : 'CLASSICA';
+    }
 
     el['lobby-players'].innerHTML = s.partecipanti.map((p) =>
       '<span class="pchip">' +
@@ -1015,7 +1162,7 @@
       if (pronti >= tot) {
         el['lobby-status-text'].textContent = 'Tutti pronti: inizio immediato!';
       } else {
-        // Nomi espliciti: cosi' "in attesa" non resta un mistero quando
+        // Nomi espliciti: così "in attesa" non resta un mistero quando
         // qualcuno non ha ancora aperto la pagina della partita.
         const manca = s.partecipanti.filter((p) => s.pronti.indexOf(p) === -1);
         el['lobby-status-text'].textContent =
@@ -1033,8 +1180,21 @@
   function renderLetters(s) {
     if (!s.roundData) return;
     const letters = lettersFor(s);
+    const rule = ruleFor(s);
     el['letter-tiles'].innerHTML = letters.map((l) => '<span class="ltile">' + esc(l) + '</span>').join('');
-    const n = availFor(letters);
+
+    const ruleBadge = el['letters-rule-badge'];
+    if (ruleBadge) {
+      if (rule === 'sequenza') {
+        ruleBadge.textContent = '— di seguito (consecutive)';
+        ruleBadge.className = 'letters-rule-badge badge-seq';
+      } else {
+        ruleBadge.textContent = '— anche staccate';
+        ruleBadge.className = 'letters-rule-badge badge-classic';
+      }
+    }
+
+    const n = availFor(letters, rule);
     el['letters-avail'].innerHTML =
       n > 0 ? '<b>' + n.toLocaleString('it-IT') + '</b> parole valide nel dizionario per questo turno' : '…';
     updateInputHint();
@@ -1085,12 +1245,24 @@
     const s = G.state;
     if (!s || !s.roundData) return;
     const letters = lettersFor(s);
+    const rule = ruleFor(s);
     const val = el['word-input'].value ? normalizeWord(el['word-input'].value) : '';
-    el['input-hint'].innerHTML =
-      '<span>deve contenere:</span>' +
-      letters.map((l) =>
-        '<span class="mini-letter' + (val.indexOf(l) !== -1 ? ' hit' : '') + '">' + esc(l) + '</span>'
-      ).join('');
+
+    if (rule === 'sequenza') {
+      const seq = letters.join('');
+      const hit = val.indexOf(seq) !== -1;
+      el['input-hint'].innerHTML =
+        '<span>sequenza:</span>' +
+        '<span class="mini-seq' + (hit ? ' hit' : '') + '">' + esc(seq) + '</span>' +
+        '<span class="hint-mode-tag">(di seguito)</span>';
+    } else {
+      el['input-hint'].innerHTML =
+        '<span>deve contenere:</span>' +
+        letters.map((l) =>
+          '<span class="mini-letter' + (val.indexOf(l) !== -1 ? ' hit' : '') + '">' + esc(l) + '</span>'
+        ).join('') +
+        '<span class="hint-mode-tag">(anche staccate)</span>';
+    }
   }
 
   function renderFeed(s) {
@@ -1103,11 +1275,12 @@
       return;
     }
     const letters = lettersFor(s);
+    const rule = ruleFor(s);
     el.feed.innerHTML = entries.map((e) =>
       '<div class="feed-item' + (rimosse.indexOf(e.w) !== -1 ? ' removed' : '') + '">' +
       '<span class="avatar" style="background:' + avatarColor(e.nome) + '">' + esc(e.nome.slice(0, 2).toUpperCase()) + '</span>' +
       '<span class="fname">' + esc(e.nome) + '</span>' +
-      '<span class="fword">' + highlightWord(e.w, letters) + '</span>' +
+      '<span class="fword">' + highlightWord(e.w, letters, rule) + '</span>' +
       '<span class="fpts">' + (rimosse.indexOf(e.w) !== -1 ? '0' : '+' + e.p) + '</span>' +
       '</div>'
     ).join('');
@@ -1138,6 +1311,7 @@
       '<span class="rp-penalty">−' + PATATA_PENALTY + ' pt</span>';
 
     const letters = lettersFor(s);
+    const rule = ruleFor(s);
     const rimosse = rd.rimosse || [];
     const flags = rd.flags || {};
 
@@ -1154,7 +1328,7 @@
             const threshold = flagThreshold(s);
             const iFlagged = (flags[x.w] || []).indexOf(G.me) !== -1;
             return '<span class="rp-word' + (removed ? ' removed' : '') + '">' +
-              highlightWord(x.w, letters) +
+              highlightWord(x.w, letters, rule) +
               ' <span class="rw-pts">' + (removed ? '0' : '+' + x.p) + '</span>' +
               '<button class="flag-btn" data-word="' + esc(x.w) + '"' +
                 (iFlagged || removed ? ' disabled' : '') +
@@ -1256,7 +1430,7 @@
       '<div class="fs-item"><div class="fs-val">' + (longest ? esc(longest.w) + ' (' + longest.w.length + ')' : '—') + '</div><div class="fs-lab">PAROLA PIÙ LUNGA</div></div>' +
       '<div class="fs-item"><div class="fs-val">' + totalPatate + (totalPatate > 1 && worst ? ' · peggior: ' + esc(worst) : '') + '</div><div class="fs-lab">SCOTTATURE TOTALI</div></div>';
 
-    // Statistiche giornalieri (stesso store dell'hub)
+    // Statistiche giornaliere (stesso store dell'hub)
     if (!G.statsSaved) {
       G.statsSaved = true;
       try {
@@ -1279,51 +1453,42 @@
     renderRematch(s);
   }
 
-  /* ---------------- RIVINCITA ---------------- */
+  /* ---------------- RIVINCITA (Zero runTransaction) ---------------- */
   async function creaRivincita() {
     const s = G.state;
     if (!s || s.stato !== 'conclusa') return;
     if (G.solo || !G.db) { toast('Rivincita disponibile solo in sfida'); return; }
     if (s.prossimaPartita) { toast('Rivincita già creata, in attesa…'); return; }
     try {
-      const newId = await G.db.runTransaction(async (t) => {
-        const snap = await t.get(G.backend.ref);
-        if (!docExists(snap)) return null;
-        const st = normState(snap.data());
-        if (st.stato !== 'conclusa') return null;
-        if (st.prossimaPartita) return st.prossimaPartita;
-        const ref = G.db.collection('partite').doc();
-        const punteggi = {};
-        const parole = {};
-        st.partecipanti.forEach((p) => { punteggi[p] = 0; parole[p] = []; });
-        t.set(ref, {
-          gioco: 'patata',
-          partecipanti: st.partecipanti,
-          punteggi,
-          parole,
-          pronti: [],
-          stato: 'attesa',
-          rivincitaAccettataDa: [],
-          rivincitaRifiutataDa: [],
-          dataOra: new Date().toLocaleString('it-IT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }),
-          timestamp: Date.now(),
-          opzioni: {
-            tempo: String(st.opzioni.tempo),
-            turni: String(st.opzioni.turni),
-            lettere: String(st.opzioni.lettere),
-            mode: st.opzioni.mode,
-            seed: Math.random().toString(36).substring(7).toUpperCase()
-          }
-        });
-        t.update(G.backend.ref, {
-          prossimaPartita: ref.id,
-          prossimaPartitaCreataDa: G.me,
-          rivincitaAccettataDa: [],
-          rivincitaRifiutataDa: []
-        });
-        return ref.id;
+      const newRef = G.db.collection('partite').doc();
+      const punteggi = {};
+      const parole = {};
+      s.partecipanti.forEach((p) => { punteggi[p] = 0; parole[p] = []; });
+      await newRef.set({
+        gioco: 'patata',
+        partecipanti: s.partecipanti,
+        punteggi,
+        parole,
+        pronti: [],
+        stato: 'attesa',
+        rivincitaAccettataDa: [],
+        rivincitaRifiutataDa: [],
+        dataOra: new Date().toLocaleString('it-IT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }),
+        timestamp: Date.now(),
+        opzioni: {
+          tempo: String(s.opzioni.tempo),
+          turni: String(s.opzioni.turni),
+          lettere: String(s.opzioni.lettere),
+          mode: s.opzioni.mode,
+          seed: Math.random().toString(36).substring(7).toUpperCase()
+        }
       });
-      if (!newId) { toast('Non è più possibile creare la rivincita'); return; }
+      await G.backend.ref.update({
+        prossimaPartita: newRef.id,
+        prossimaPartitaCreataDa: G.me,
+        rivincitaAccettataDa: [],
+        rivincitaRifiutataDa: []
+      });
       hideBanner();
     } catch (e) {
       console.error('[Patata] rivincita:', e);
@@ -1487,7 +1652,7 @@
     } else if (ultimo.patata) {
       showFeedback('err', '💥 SCOTTATURA: ' + ultimo.nome.toUpperCase() + ' −' + PATATA_PENALTY + ' pt');
     } else if (ultimo.nome === G.me) {
-      showFeedback('err', '❌ ' + ultimo.w + ' — parola non valida (−5 s)');
+      showFeedback('err', '❌ ' + ultimo.w + ' — parola non valida');
     }
   }
 
@@ -1531,9 +1696,10 @@
 
   /* ---------------- INVIATA PAROLA ---------------- */
   function msgForErr(v) {
-    if (v.err === 'SHORT') return '❌ Minimo ' + MIN_WORD_LENGTH + ' lettere (−5 s)';
-    if (v.err === 'MISSING') return '❌ Manca: ' + v.missing.join(' + ') + ' (−5 s)';
-    return '❌ Non è nel dizionario (−5 s)';
+    if (v.err === 'SHORT') return '❌ Minimo ' + MIN_WORD_LENGTH + ' lettere';
+    if (v.err === 'MISSING') return '❌ Manca: ' + (v.missing || []).join(' + ');
+    if (v.err === 'NOT_SEQUENCE') return '❌ Lettere non consecutive: ' + (v.seq || '');
+    return '❌ Non è nel dizionario';
   }
   async function inviaParola() {
     const s = G.state;
@@ -1544,8 +1710,9 @@
       return;
     }
     const raw = el['word-input'].value;
-    const ctx = ctxFor({ word: raw });
-    const v = validateWord(raw, ctx.letters, ctx.used, ctx.dict);
+    const rule = ruleFor(s);
+    const ctx = ctxFor({ word: raw, rule });
+    const v = validateWord(raw, ctx.letters, ctx.used, ctx.dict, rule);
     if (!v.ok) {
       if (v.err === 'EMPTY') { toast('Scrivi una parola…'); return; }
       if (v.err === 'USED') {
@@ -1553,13 +1720,13 @@
         return;
       }
       showFeedback('err', msgForErr(v));
-      const r = await G.backend.transact((st) => mutWrongWord(st, ctx));
+      const r = await G.backend.applyAtomic((st) => mutWrongWord(st, ctx));
       if (r && r.error && r.error.code === 'NOT_YOUR_TURN') toast('È già passato il turno!');
       return;
     }
     el['word-input'].value = '';
     updateInputHint();
-    const r = await G.backend.transact((st) => mutSubmitWord(st, ctx));
+    const r = await G.backend.applyAtomic((st) => mutSubmitWord(st, ctx));
     if (!r) return;
     if (r.error) {
       if (r.error.code === 'NOT_YOUR_TURN') { toast('È già passato il turno!'); showFeedback('err', '⏳ Il turno è già passato'); }
@@ -1590,12 +1757,13 @@
     get state() { return G.state; },
     get dict() { return G.dict; },
     lettersFor,
-    validate: (w) => validateWord(w, lettersFor(G.state), usedWords(G.state), G.dict)
+    ruleFor: () => ruleFor(G.state),
+    validate: (w) => validateWord(w, lettersFor(G.state), usedWords(G.state), G.dict, ruleFor(G.state))
   };
 
   /* ---------------- BOOT ---------------- */
   function startSolo() {
-    G.backend.transact(mutStart);
+    G.backend.applyAtomic(mutStart);
   }
 
   async function boot() {
@@ -1630,6 +1798,11 @@
             }
             G.fs = firebase.firestore;
             G.db = firebase.firestore();
+            if (window.FAW_ENABLE_PERSISTENCE) {
+              window.FAW_ENABLE_PERSISTENCE(G.db);
+            } else if (G.db && typeof G.db.enableIndexedDbPersistence === 'function') {
+              G.db.enableIndexedDbPersistence({ synchronizeTabs: true }).catch(() => {});
+            }
           }
         }
       } catch (e) {
@@ -1651,12 +1824,14 @@
     el['screen-loading'].classList.add('hidden');
 
     if (G.solo) {
-      // Allenamento: opzioni personalizzabili via URL (?tempo=60&turni=3&lettere=3)
+      // Allenamento: opzioni personalizzabili via URL (?tempo=60&turni=3&lettere=3&mode=classic)
+      const modeParam = urlParams.get('mode') || urlParams.get('modalita') || 'classic';
+      const validMode = (modeParam === 'sequenza' || modeParam === 'mix') ? modeParam : 'classic';
       G.backend = new SoloBackend(G.me, {
         tempo: Math.max(5, parseInt(urlParams.get('tempo'), 10) || 60),
         turni: Math.min(10, Math.max(1, parseInt(urlParams.get('turni'), 10) || 3)),
         lettere: Math.min(4, Math.max(2, parseInt(urlParams.get('lettere'), 10) || 3)),
-        mode: 'classic',
+        mode: validMode,
         seed: 'SOLO' + Math.random().toString(36).slice(2, 9).toUpperCase()
       });
     } else {
