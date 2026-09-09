@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0a0c10">
+  <title>Patata Bollente — FaW</title>
+  <meta name="description" content="Patata bollente: il gioco delle parole a staffetta. Chi tiene la patata quando scade il tempo, si scotta.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🥔%3C/text%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Tektur:wght@500;600;700;800&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../shared/faw-ui.css">
+  <link rel="stylesheet" href="css/style.css">
+  <!-- Firebase (compat, come negli altri giochi FaW) -->
+  <script src="https://www.gstatic.com/firebasejs/9.1.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.1.1/firebase-firestore-compat.js"></script>
+  <!-- Config Firebase condivisa (PRIMA dello script che inizializza Firebase) -->
+  <script src="../shared/firebase-config.js"></script>
+</head>
+<body>
+  <!-- Particelle "braci" di sfondo -->
+  <div class="embers" aria-hidden="true">
+    <span></span><span></span><span></span><span></span><span></span><span></span>
+    <span></span><span></span><span></span><span></span><span></span><span></span>
+    <span></span><span></span>
+  </div>
+
+  <!-- ============ LOADING DIZIONARIO ============ -->
+  <div id="screen-loading" class="screen">
+    <div class="load-card">
+      <div class="load-potato">🥔</div>
+      <h1 class="game-title">PATATA <span>BOLLENTE</span></h1>
+      <div id="load-status" class="load-status">Caricamento dizionario…</div>
+      <div id="load-count" class="load-count"></div>
+    </div>
+  </div>
+
+  <div id="app" class="hidden">
+    <header class="topbar">
+      <div class="topbar-left">
+        <span class="topbar-logo">🥔</span>
+        <span class="topbar-title">PATATA&nbsp;BOLLENTE</span>
+      </div>
+      <div class="topbar-right">
+        <span id="round-badge" class="badge-round hidden"></span>
+        <button id="btn-suono" class="icon-btn" title="Audio on/off" aria-label="Audio">🔊</button>
+        <a id="btn-home" class="icon-btn" href="../../index.html" title="Torna all'hub">🏠</a>
+      </div>
+    </header>
+
+    <!-- ============ LOBBY ============ -->
+    <section id="screen-lobby" class="screen-inner">
+      <div class="card lobby">
+        <div class="lobby-head">
+          <div class="lobby-emoji">🥔🔥</div>
+          <h2>PATATA BOLLENTE</h2>
+          <p class="lobby-sub">
+            A turno, scrivi una parola che <b>contenga tutte le lettere richieste</b> prima che scada
+            il tempo. Ogni parola valida: <b class="gold">+5 secondi</b> e la patata passa al prossimo.
+            Chi tiene la patata quando arriva a zero… <b class="red">si scotta (−10 pt)</b>. 🫠
+          </p>
+        </div>
+
+        <div class="config-grid">
+          <div class="config"><span class="config-label">COUNTDOWN</span><span class="config-value" id="cfg-tempo">—</span></div>
+          <div class="config"><span class="config-label">TURNI</span><span class="config-value" id="cfg-turni">—</span></div>
+          <div class="config"><span class="config-label">LETTERE</span><span class="config-value" id="cfg-lettere">—</span></div>
+          <div class="config"><span class="config-label">SBAGLIO</span><span class="config-value negative">−5 s</span></div>
+        </div>
+
+        <div class="lobby-label">GIOCATORI</div>
+        <div class="players" id="lobby-players"></div>
+
+        <div class="lobby-status" id="lobby-status">
+          <span class="spinner"></span><span id="lobby-status-text">In attesa che tutti siano pronti…</span>
+        </div>
+        <button id="btn-start-solo" class="btn btn-fire hidden">🔥 INIZIA ALLENAMENTO</button>
+
+        <p class="lobby-hint" id="lobby-hint">Premi <b>INVIO</b> per confermare le parole · Dizionario ufficiale Ruzzle</p>
+      </div>
+    </section>
+
+    <!-- ============ GIOCO ============ -->
+    <section id="screen-game" class="screen-inner hidden">
+      <div class="game-grid">
+        <div class="play-col">
+          <div class="card letters-card">
+            <div class="card-label">LA PAROLA DEVE CONTENERE</div>
+            <div class="letter-tiles" id="letter-tiles"></div>
+            <div class="letters-avail" id="letters-avail">…</div>
+          </div>
+
+          <div class="timer-block">
+            <div class="timer-wrap">
+              <svg class="ring" viewBox="0 0 200 200" aria-hidden="true">
+                <defs>
+                  <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#ffd166"/>
+                    <stop offset="55%" stop-color="#ff9e2c"/>
+                    <stop offset="100%" stop-color="#ff5f1f"/>
+                  </linearGradient>
+                  <linearGradient id="ringGradDanger" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#ff9e2c"/>
+                    <stop offset="100%" stop-color="#ff3b30"/>
+                  </linearGradient>
+                </defs>
+                <circle class="ring-track" cx="100" cy="100" r="88"></circle>
+                <circle class="ring-fill" id="ring-fill" cx="100" cy="100" r="88"></circle>
+              </svg>
+              <div class="timer-center">
+                <div class="timer-sec" id="timer-sec">—</div>
+                <div class="timer-label">SECONDI</div>
+              </div>
+            </div>
+            <div id="turn-banner" class="turn-banner hidden"></div>
+          </div>
+
+          <div class="players players-compact" id="game-players"></div>
+
+          <div class="card input-card" id="input-card">
+            <div class="input-row">
+              <input id="word-input" type="text" maxlength="20"
+                     placeholder="Scrivi la parola…" autocomplete="off" autocorrect="off"
+                     autocapitalize="characters" spellcheck="false" aria-label="Parola">
+              <button id="btn-invia" class="btn btn-fire">INVIA</button>
+            </div>
+            <div class="input-hint" id="input-hint"></div>
+            <div class="feedback" id="feedback" aria-live="polite"></div>
+          </div>
+        </div>
+
+        <aside class="side-col">
+          <div class="card score-card">
+            <div class="card-label">PUNTEGGI</div>
+            <div id="scoreboard" class="scoreboard"></div>
+          </div>
+          <div class="card feed-card">
+            <div class="card-label">PAROLE DI QUESTO TURNO <span id="feed-count" class="feed-count"></span></div>
+            <div id="feed" class="feed"></div>
+          </div>
+        </aside>
+      </div>
+    </section>
+  </div>
+
+  <!-- ============ RECAP FINE TURNO ============ -->
+  <div id="overlay-recap" class="overlay hidden" role="dialog" aria-modal="true" aria-label="Recap turno">
+    <div class="card recap">
+      <div class="recap-head">
+        <span class="recap-emoji">🥔</span>
+        <div>
+          <h3>RECAP TURNO <span id="recap-round">1</span></h3>
+          <p>Controllate le parole: potete <b>contestare</b> una parola con il 🚩. Poi tutti confermano.</p>
+        </div>
+      </div>
+      <div id="recap-patata" class="recap-patata"></div>
+      <div id="recap-body" class="recap-body"></div>
+      <div class="recap-foot">
+        <div id="conf-progress" class="conf-progress"></div>
+        <button id="btn-conferma" class="btn btn-fire">✔ CONFERMA E PROSEGUI</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ FINE PARTITA ============ -->
+  <div id="overlay-fine" class="overlay hidden" role="dialog" aria-modal="true" aria-label="Risultati finali">
+    <div class="card fine">
+      <div class="fine-top">
+        <div class="fine-emoji" id="fine-emoji">🏆</div>
+        <h2 id="fine-title">PARTITA FINITA</h2>
+        <p id="fine-sub"></p>
+      </div>
+      <div id="podio" class="podio"></div>
+      <div id="fine-stats" class="fine-stats"></div>
+      <div class="fine-actions">
+        <button id="btn-rivincita" class="btn btn-fire">🔁 RIVINCITA</button>
+        <a class="btn btn-ghost" href="../../index.html">🏠 HOME</a>
+      </div>
+    </div>
+  </div>
+
+  <div id="banner" class="banner hidden"></div>
+  <div id="toast" class="toast hidden" aria-live="assertive"></div>
+
+  <script src="js/game.js"></script>
+</body>
+</html>

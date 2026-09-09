@@ -3,663 +3,926 @@
 	<head>
 		<meta charset="UTF-8">
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
-		<meta name="theme-color" content="#121212">
-		<meta name="description" content="Portale Focus at Work">
-		<link rel="icon" href="data:image/svg+xml,
-			<svg
-			xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'>
-👨🏼‍💻</text>
-			</svg>">
+		<meta name="theme-color" content="#0a0c14">
+		<meta name="description" content="FaW — Focus at Work: la piattaforma premium di giochi e sfide tra colleghi.">
+		<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%236366f1'/%3E%3Cstop offset='1' stop-color='%23a855f7'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='14' fill='%230a0c14'/%3E%3Crect x='4.5' y='4.5' width='55' height='55' rx='12' fill='none' stroke='url(%23g)' stroke-width='3'/%3E%3Ctext x='32' y='43' font-family='Arial, sans-serif' font-size='32' font-weight='900' fill='url(%23g)' text-anchor='middle'%3EF%3C/text%3E%3C/svg%3E">
+		<!-- Tema prima del paint (evita flash) -->
+		<script>
+			(function () {
+				try {
+					var t = localStorage.getItem('faw-theme') ||
+						(window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+					document.documentElement.setAttribute('data-theme', t);
+				} catch (e) { /* noop */ }
+			})();
+		</script>
+		<!-- Tipografia piattaforma -->
+		<link rel="preconnect" href="https://fonts.googleapis.com">
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+		<link href="https://fonts.googleapis.com/css2?family=Tektur:wght@500;600;700;800&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
 		<!-- ✅ PRECONNECT per velocità -->
 		<link rel="preconnect" href="https://www.gstatic.com">
 		<link rel="preconnect" href="https://firestore.googleapis.com">
-		<title>Portale FaW</title>
+		<title>FaW — Focus at Work</title>
 		<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 		<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 		<!-- <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-check-compat.js"></script> -->
 		<!-- Config Firebase condivisa (deve stare prima dello script che inizializza Firebase) -->
 		<script src="games/shared/firebase-config.js"></script>
+		<!-- Design system FaW -->
+		<link rel="stylesheet" href="games/shared/faw-ui.css">
 		<style>
-			/* ✅ RESET E BASE */
-			* {
-			box-sizing: border-box;
-			-webkit-tap-highlight-color: transparent;
+			/* ==========================================================================
+			   HUB FaW — tema "Obsidian" (desktop-first)
+			   ========================================================================== */
+			:root {
+				--faw-acc: #6366f1;
+				--faw-acc-2: #a855f7;
+				--faw-acc-soft: rgba(99, 102, 241, 0.16);
+				--faw-acc-glow: rgba(99, 102, 241, 0.45);
+				--hub-max: 1440px;
 			}
-			html {
-			scroll-behavior: smooth;
+			html, body { min-height: 100%; }
+			body { overflow-x: hidden; }
+
+			/* ---------------- LOGIN ---------------- */
+			#login-div {
+				position: fixed;
+				inset: 0;
+				z-index: 50;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				padding: 24px;
 			}
-			body {
-			font-family: 'Segoe UI', sans-serif;
-			background: #121212;
-			color: #eee;
-			padding: 20px;
-			margin: 0;
-			min-height: 100vh;
+			.login-card {
+				width: min(440px, 100%);
+				background: var(--faw-panel-solid);
+				border: 1px solid var(--faw-border-2);
+				border-radius: 28px;
+				padding: 40px 36px 34px;
+				box-shadow: var(--faw-shadow-3), 0 0 80px var(--faw-acc-soft);
+				animation: faw-pop 420ms var(--faw-ease) both;
+				position: relative;
+				overflow: hidden;
 			}
-			.container {
-			max-width: 800px;
-			margin: auto;
+			.login-card::before {
+				content: '';
+				position: absolute;
+				inset: -40% -40% auto auto;
+				width: 70%;
+				height: 70%;
+				background: radial-gradient(circle, var(--faw-acc-soft), transparent 65%);
+				pointer-events: none;
 			}
-			.box {
-			background: #1e1e1e;
-			padding: 20px;
-			border-radius: 12px;
-			margin-bottom: 20px;
-			border: 1px solid #333;
+			.login-logo {
+				width: 56px;
+				height: 56px;
+				border-radius: 16px;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				background: linear-gradient(135deg, var(--faw-acc), var(--faw-acc-2));
+				box-shadow: 0 10px 26px var(--faw-acc-glow), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+				margin-bottom: 18px;
+				position: relative;
 			}
-			h1,
-			h3 {
-			color: #03dac6;
-			margin-top: 0;
+			.login-logo span {
+				font-family: var(--faw-font-display);
+				font-size: 1.7rem;
+				font-weight: 800;
+				color: #fff;
 			}
-			/* ========================================
-			🎮 PULSANTI - STILE RUZZLE (Semplici e Leggeri)
-			======================================== */
-			button {
-			padding: 10px 20px;
-			border-radius: 6px;
-			border: 1px solid #555;
-			background: #1e1e1e;
-			color: #eee;
-			cursor: pointer;
-			font-weight: 500;
-			font-size: 0.9rem;
-			transition: background 0.15s ease, transform 0.1s ease;
+			#login-div h1 {
+				font-size: 1.55rem;
+				font-weight: 800;
+				letter-spacing: 0.3px;
 			}
-			button:hover {
-			background: #2d2d2d;
+			.login-sub {
+				margin: 6px 0 26px;
+				color: var(--faw-text-2);
+				font-size: 0.92rem;
 			}
-			button:active {
-			transform: scale(0.97);
+			#username, #password {
+				width: 100%;
+				padding: 14px 18px;
+				margin-bottom: 12px;
+				border-radius: var(--faw-r-md);
+				border: 1px solid var(--faw-border);
+				background: var(--faw-panel);
+				color: var(--faw-text);
+				font-family: var(--faw-font-body);
+				font-size: 0.95rem;
+				font-weight: 600;
+				letter-spacing: 0.4px;
+				transition: border-color var(--faw-fast) var(--faw-ease), box-shadow var(--faw-fast) var(--faw-ease);
 			}
-			/* Pulsante primario (verde acqua) */
-			.btn-primary {
-			background: #03dac6 !important;
-			color: #000 !important;
-			border-color: #018786 !important;
-			font-weight: bold;
+			#username::placeholder, #password::placeholder { color: var(--faw-text-3); letter-spacing: 1px; }
+			#username:focus, #password:focus {
+				outline: none;
+				border-color: var(--faw-acc);
+				box-shadow: 0 0 0 3px var(--faw-acc-soft);
 			}
-			.btn-primary:hover {
-			background: #00c4b0 !important;
+			.login-cta {
+				width: 100%;
+				min-height: 54px;
+				margin-top: 6px;
 			}
-			/* Pulsante pericolo (rosso) */
-			.btn-danger {
-			background: #cf6679 !important;
-			color: white !important;
-			border-color: #b00020 !important;
+			.login-foot {
+				margin: 18px 0 0;
+				text-align: center;
+				font-size: 0.76rem;
+				color: var(--faw-text-3);
 			}
-			/* Pulsante secondario (grigio) */
-			.btn-secondary {
-			background: #444 !important;
-			color: #eee !important;
+
+			/* ---------------- HEADER ---------------- */
+			.hub-header {
+				position: sticky;
+				top: 0;
+				z-index: 40;
+				background: color-mix(in srgb, var(--faw-bg) 72%, transparent);
+				backdrop-filter: blur(18px);
+				-webkit-backdrop-filter: blur(18px);
+				border-bottom: 1px solid var(--faw-border);
 			}
-			@keyframes fadeInOut {
-			0% {
-			opacity: 0;
-			transform: translateX(-50%) translateY(20px);
+			.hub-header__in {
+				max-width: var(--hub-max);
+				margin: 0 auto;
+				padding: 13px 24px;
+				display: flex;
+				align-items: center;
+				gap: 14px;
 			}
-			15% {
-			opacity: 1;
-			transform: translateX(-50%) translateY(0);
+			.brand { display: flex; align-items: center; gap: 11px; }
+			.brand-mark {
+				width: 38px;
+				height: 38px;
+				border-radius: 12px;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				background: linear-gradient(135deg, var(--faw-acc), var(--faw-acc-2));
+				box-shadow: 0 6px 18px var(--faw-acc-glow), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+				font-family: var(--faw-font-display);
+				font-weight: 800;
+				font-size: 1.15rem;
+				color: #fff;
 			}
-			85% {
-			opacity: 1;
-			transform: translateX(-50%) translateY(0);
+			.brand b {
+				font-family: var(--faw-font-display);
+				font-size: 1.08rem;
+				font-weight: 800;
+				letter-spacing: 0.6px;
+				display: block;
+				line-height: 1.15;
 			}
-			100% {
-			opacity: 0;
-			transform: translateX(-50%) translateY(-20px);
+			.brand small {
+				display: block;
+				font-size: 0.62rem;
+				font-weight: 700;
+				letter-spacing: 2.2px;
+				text-transform: uppercase;
+				color: var(--faw-text-3);
 			}
+			.header-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+			.user-chip {
+				display: flex;
+				align-items: center;
+				gap: 9px;
+				padding: 5px 14px 5px 6px;
+				border-radius: 999px;
+				border: 1px solid var(--faw-border);
+				background: var(--faw-panel-2);
 			}
-			/* ========================================
-			📝 INPUT E SELECT
-			======================================== */
-			input,
-			select {
-			width: 100%;
-			padding: 12px;
-			margin: 10px 0;
-			background: #2c2c2c;
-			color: white;
-			border: 1px solid #444;
-			border-radius: 6px;
-			font-size: 1rem;
+			#user-display { font-weight: 700; font-size: 0.9rem; white-space: nowrap; }
+
+			/* Disponibilità (verde = disponibile, rosso = non disturbare) */
+			#btn-disponibilita {
+				display: inline-flex;
+				align-items: center;
+				gap: 7px;
+				padding: 8px 15px;
+				border-radius: 999px;
+				border: 1px solid var(--faw-border);
+				background: var(--faw-panel-2);
+				color: var(--faw-text);
+				font-weight: 700;
+				font-size: 0.8rem;
+				cursor: pointer;
+				transition: all var(--faw-fast) var(--faw-ease);
 			}
-			input:focus,
-			select:focus {
-			outline: none;
-			border-color: #03dac6;
+			#btn-disponibilita:hover { transform: translateY(-1px); border-color: var(--faw-border-2); }
+			#btn-disponibilita.is-on { background: var(--faw-ok-soft); border-color: rgba(47, 214, 123, 0.4); color: var(--faw-ok); }
+			#btn-disponibilita.is-off { background: var(--faw-danger-soft); border-color: rgba(255, 90, 110, 0.4); color: var(--faw-danger); }
+
+			/* ---------------- LAYOUT ---------------- */
+			#main-app { position: relative; z-index: 1; }
+			.hub-main {
+				max-width: var(--hub-max);
+				margin: 0 auto;
+				padding: 22px 24px 70px;
+				display: grid;
+				grid-template-columns: minmax(0, 1fr) 396px;
+				gap: 20px;
+				align-items: start;
 			}
-			/* ========================================
-			👤 LISTA UTENTI/AMICI
-			======================================== */
-			.user-item {
-			display: flex;
-			justify-content: space-between;
-			align-items: center;
-			background: #252525;
-			padding: 12px;
-			margin: 8px 0;
-			border-radius: 8px;
-			cursor: pointer;
-			border: 1px solid transparent;
-			transition: all 0.2s;
+			.hub-col-main { display: grid; gap: 20px; min-width: 0; }
+			.hub-col-side { display: grid; gap: 20px; position: sticky; top: 86px; }
+			@media (max-width: 1100px) {
+				.hub-main { grid-template-columns: 1fr; }
+				.hub-col-side { position: static; }
 			}
-			.user-item:hover {
-			border-color: #444;
-			background: #2a2a2a;
+
+			/* ---------------- GRID GIOCHI ---------------- */
+			.game-grid {
+				display: grid;
+				grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+				gap: 12px;
 			}
-			.user-item.selected {
-			background: #03dac6 !important;
-			color: #000 !important;
-			border-color: white;
-			}
-			/* ✅ Forza tutti i testi interni a nero quando selezionato */
-			.user-item.selected * {
-			color: #000 !important;
-			}
-			/* Pulsante sfida multipla */
-			.btn-sfida-multi {
-			background: #f1c40f !important;
-			color: #000 !important;
-			border: none !important;
-			width: 100%;
-			height: 50px;
-			font-size: 1.1rem;
-			margin-bottom: 15px;
-			display: none;
-			font-weight: bold;
-			}
-			/* Pulsante elimina piccolo */
-			.btn-del {
-			background: #cf6679 !important;
-			color: white !important;
-			padding: 5px 10px;
-			font-size: 0.8rem;
-			border: none !important;
-			}
-			/* ========================================
-			🎮 PARTITE LIVE E STORICO
-			======================================== */
-			.live-match {
-			border-left: 5px solid #f1c40f;
-			}
-			.history-item {
-			font-size: 0.85rem;
-			border-bottom: 1px solid #333;
-			padding: 8px 0;
-			display: flex;
-			justify-content: space-between;
-			}
-			/* ========================================
-			👤 USER DISPLAY
-			======================================== */
-			#user-display {
-			background: #03dac6;
-			color: #000;
-			padding: 5px 15px;
-			border-radius: 20px;
-			display: inline-block;
-			font-weight: bold;
-			}
-			/* ========================================
-			🎮 GAME CARDS
-			======================================== */
 			.game-card {
-			min-width: 100px;
-			padding: 15px;
-			background: #252525;
-			border-radius: 10px;
-			text-align: center;
-			cursor: pointer;
-			border: 2px solid transparent;
-			transition: 0.3s;
+				--g1: var(--faw-acc);
+				--g2: var(--faw-acc-2);
+				position: relative;
+				padding: 16px 14px 14px;
+				border-radius: 18px;
+				border: 1px solid var(--faw-border);
+				background: var(--faw-panel);
+				cursor: pointer;
+				transition: transform var(--faw-med) var(--faw-ease), box-shadow var(--faw-med) var(--faw-ease),
+					border-color var(--faw-med) var(--faw-ease), background var(--faw-med) var(--faw-ease);
 			}
+			.game-card .g-tile {
+				width: 46px;
+				height: 46px;
+				border-radius: 14px;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				font-size: 1.5rem;
+				background: linear-gradient(135deg, var(--g1), var(--g2));
+				box-shadow: 0 6px 16px color-mix(in srgb, var(--g1) 40%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+				transition: transform var(--faw-med) var(--faw-ease);
+			}
+			.game-card .g-name {
+				margin-top: 11px;
+				font-family: var(--faw-font-display);
+				font-size: 0.99rem;
+				font-weight: 700;
+				letter-spacing: 0.2px;
+			}
+			.game-card .g-tag { margin-top: 2px; font-size: 0.72rem; color: var(--faw-text-3); font-weight: 500; }
+			.game-card .game-badge {
+				position: absolute;
+				top: 10px;
+				right: 10px;
+				background: var(--faw-panel-2);
+				border-color: var(--faw-border);
+				color: var(--faw-text-2);
+			}
+			.game-card .game-badge.online { background: var(--faw-ok-soft); border-color: rgba(47, 214, 123, 0.3); color: var(--faw-ok); }
 			.game-card:hover {
-			border-color: #444;
+				transform: translateY(-4px);
+				border-color: color-mix(in srgb, var(--g1) 55%, var(--faw-border));
+				box-shadow: var(--faw-shadow-2);
 			}
+			.game-card:hover .g-tile { transform: scale(1.09) rotate(-4deg); }
 			.game-card.selected {
-			border-color: #03dac6;
-			background: #1a3a3a;
+				border-color: var(--g1);
+				background: color-mix(in srgb, var(--g1) 12%, var(--faw-panel));
+				box-shadow: 0 0 0 1px var(--g1), 0 10px 30px color-mix(in srgb, var(--g1) 35%, transparent);
 			}
-			.game-badge {
-			display: inline-block;
-			margin-top: 6px;
-			padding: 2px 7px;
-			border-radius: 999px;
-			font-size: 0.65rem;
-			font-weight: 800;
-			letter-spacing: 0.03em;
-			background: #03dac6;
-			color: #000;
-			white-space: nowrap;
+			.game-card.selected::after {
+				content: '✓';
+				position: absolute;
+				top: 10px;
+				left: 10px;
+				width: 21px;
+				height: 21px;
+				border-radius: 50%;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				background: linear-gradient(135deg, var(--g1), var(--g2));
+				color: #fff;
+				font-size: 0.72rem;
+				font-weight: 800;
+				box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+				animation: faw-pop 200ms var(--faw-ease);
 			}
-			.game-badge.solo {
-			background: #f1c40f;
+
+			/* ---------------- RIGHE UTENTI (dinamiche) ---------------- */
+			#lista-partite .user-item, #lista-amici .user-item, #lista-global .user-item {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				gap: 12px;
+				padding: 12px 14px;
+				margin-bottom: 10px;
+				border-radius: 14px;
+				border: 1px solid var(--faw-border);
+				background: var(--faw-panel);
+				transition: border-color var(--faw-fast) var(--faw-ease), background var(--faw-fast) var(--faw-ease),
+					transform var(--faw-fast) var(--faw-ease);
+				animation: faw-rise 340ms var(--faw-ease) both;
 			}
-			.game-badge.online {
-			background: #9b59b6;
-			color: #fff;
+			#lista-partite .user-item:last-child, #lista-amici .user-item:last-child, #lista-global .user-item:last-child { margin-bottom: 0; }
+			.user-item > span { font-weight: 600; font-size: 0.9rem; line-height: 1.35; }
+			.user-item > div { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+			.user-item button {
+				padding: 7px 13px;
+				border-radius: 9px;
+				border: 1px solid transparent;
+				background: var(--faw-panel-2);
+				color: var(--faw-text);
+				font-family: var(--faw-font-body);
+				font-size: 0.78rem;
+				font-weight: 800;
+				letter-spacing: 0.4px;
+				cursor: pointer;
+				transition: all var(--faw-fast) var(--faw-ease);
+				white-space: nowrap;
 			}
-			/* ========================================
-			🎯 MODAL
-			======================================== */
-			.modal {
-			display: none;
-			position: fixed;
-			top: 0;
-			left: 0;
-			width: 100%;
-			height: 100%;
-			background: rgba(0, 0, 0, 0.9);
-			z-index: 10000;
-			justify-content: center;
-			align-items: center;
+			.user-item button:hover { transform: translateY(-1px); filter: brightness(1.08); }
+			.user-item button:active { transform: scale(0.97); }
+			.u-btn--enter { background: linear-gradient(135deg, var(--faw-acc), var(--faw-acc-2)); color: #fff; box-shadow: 0 4px 14px var(--faw-acc-glow); }
+			.u-btn--join { background: linear-gradient(135deg, #2fd67b, #17a35a); color: #04150b; }
+			.u-btn--accept { background: linear-gradient(135deg, #2fd67b, #17a35a); color: #04150b; }
+			.u-btn--decline { background: linear-gradient(135deg, #ff5a6e, #d63650); color: #fff; }
+			.u-btn--del { background: transparent; border-color: var(--faw-border); color: var(--faw-text-3); padding: 7px 10px; }
+			.u-btn--del:hover { color: var(--faw-danger); border-color: rgba(255, 90, 110, 0.45); }
+			.u-btn--ghost { background: rgba(255, 255, 255, 0.92); color: #10131f; }
+			/* Stati riga */
+			.user-item.u-row--solo {
+				background: color-mix(in srgb, var(--faw-acc) 10%, var(--faw-panel));
+				border-color: var(--faw-acc-soft);
+				cursor: pointer;
 			}
-			.modal-content {
-			background: #1e1e1e;
-			padding: 30px;
-			border-radius: 15px;
-			width: 90%;
-			max-width: 450px;
-			border: 2px solid #333;
+			.user-item.u-row--solo:hover { border-color: var(--faw-acc); transform: translateX(3px); }
+			.user-item.u-row--live { border-color: rgba(47, 214, 123, 0.4); }
+			.user-item.u-row--live:hover { transform: translateX(3px); }
+			.user-item.u-row--wait { background: var(--faw-info-soft); border-color: rgba(56, 189, 248, 0.32); }
+			.user-item.u-row--accepted { background: var(--faw-ok-soft); border-color: rgba(47, 214, 123, 0.32); }
+			.user-item.u-row--challenge {
+				background: var(--faw-warn-soft);
+				border-color: rgba(255, 176, 32, 0.5);
+				box-shadow: 0 0 22px rgba(255, 176, 32, 0.14);
 			}
-			.modal-content h2 {
-			color: #03dac6;
-			margin-top: 0;
-			text-align: center;
+			.user-item.u-row--challenge > span { font-weight: 800; }
+			.user-item.u-row--canceled { background: var(--faw-danger-soft); opacity: 0.8; }
+			.user-item.u-row--declined { opacity: 0.55; }
+			/* Amici: selezionabili */
+			#lista-amici .user-item { cursor: pointer; }
+			#lista-amici .user-item.selected {
+				border-color: var(--faw-acc);
+				background: var(--faw-acc-soft);
+				box-shadow: 0 0 0 1px var(--faw-acc);
 			}
-			/* ========================================
-			🎮 PULSANTI MODALITÀ GIOCO (Come Ruzzle)
-			======================================== */
-			.mode-buttons {
-			display: flex;
-			gap: 8px;
-			justify-content: center;
-			flex-wrap: wrap;
-			margin-top: 15px;
+			#lista-amici .user-item .friend-main { display: flex; align-items: center; gap: 10px; min-width: 0; }
+			#lista-amici .user-item .friend-main .f-name { font-weight: 700; font-size: 0.9rem; }
+			#lista-amici .user-item .friend-main .f-status { font-size: 0.7rem; font-weight: 600; }
+			#lista-amici .user-item .btn-del {
+				padding: 5px 9px;
+				border-radius: 8px;
+				border: 1px solid var(--faw-border);
+				background: transparent;
+				color: var(--faw-text-3);
+				font-weight: 800;
+				font-size: 0.75rem;
+				cursor: pointer;
+				transition: all var(--faw-fast) var(--faw-ease);
 			}
-			.btn-mode {
-			flex: 1;
-			min-width: 80px;
-			padding: 12px 15px;
-			border: 1px solid #555;
-			border-radius: 6px;
-			background: #1e1e1e;
-			color: #eee;
-			cursor: pointer;
-			font-weight: 500;
-			font-size: 0.85rem;
-			transition: all 0.15s ease;
+			#lista-amici .user-item .btn-del:hover { color: var(--faw-danger); border-color: rgba(255, 90, 110, 0.45); }
+			.live-dot {
+				display: inline-block;
+				width: 8px;
+				height: 8px;
+				border-radius: 50%;
+				background: var(--faw-ok);
+				margin-right: 8px;
+				vertical-align: middle;
+				animation: faw-pulse 2s infinite;
 			}
-			.btn-mode:hover {
-			background: #2d2d2d;
-			border-color: #777;
+
+			/* ---------------- CTA GRUPPO ---------------- */
+			#testo-selezione-amici { font-size: 0.8rem; color: var(--faw-text-3); margin: 0 0 12px; }
+			.btn-sfida-multi {
+				width: 100%;
+				margin-bottom: 14px;
+				padding: 13px 18px;
+				border: none;
+				border-radius: var(--faw-r-md);
+				background: linear-gradient(135deg, #ffd166, #ffb020);
+				color: #241500;
+				font-family: var(--faw-font-body);
+				font-weight: 800;
+				font-size: 0.92rem;
+				letter-spacing: 0.8px;
+				cursor: pointer;
+				box-shadow: 0 6px 22px rgba(255, 176, 32, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+				transition: transform var(--faw-fast) var(--faw-ease), filter var(--faw-fast) var(--faw-ease);
 			}
-			.btn-mode:active {
-			transform: scale(0.97);
+			.btn-sfida-multi:hover { transform: translateY(-2px); filter: brightness(1.06); }
+			.btn-sfida-multi:active { transform: scale(0.98); }
+			.btn-sfida-multi:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+
+			/* ---------------- STORICO ---------------- */
+			.history-item {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				gap: 10px;
+				padding: 10px 14px;
+				margin-bottom: 8px;
+				border-radius: 12px;
+				border: 1px solid var(--faw-border);
+				background: var(--faw-panel);
+				font-size: 0.85rem;
+				color: var(--faw-text-2);
 			}
-			/* Annulla nel modal */
-			.btn-cancel {
-			background: none !important;
-			border: none !important;
-			color: #777 !important;
-			margin-top: 15px;
-			font-size: 0.9rem;
-			}
-			.btn-cancel:hover {
-			color: #aaa !important;
-			}
-			/* ========================================
-			📊 STATISTICHE HOMEPAGE
-			======================================== */
+			.history-item b { color: var(--faw-ok); font-weight: 800; }
+			.history-item span:first-child { color: var(--faw-text-3); font-size: 0.78rem; font-family: var(--faw-font-mono); }
+
+			/* ---------------- STATISTICHE ---------------- */
 			.stats-tabs {
-			display: flex;
-			gap: 5px;
-			margin-bottom: 15px;
-			border-bottom: 2px solid #333;
-			padding-bottom: 10px;
+				display: inline-flex;
+				gap: 4px;
+				padding: 4px;
+				margin-bottom: 18px;
+				border-radius: 12px;
+				background: var(--faw-panel-2);
+				border: 1px solid var(--faw-border);
 			}
 			.stats-tab {
-			flex: 1;
-			padding: 8px 12px;
-			background: #2c2c2c;
-			border: 1px solid #444;
-			border-radius: 6px 6px 0 0;
-			color: #888;
-			cursor: pointer;
-			font-weight: bold;
-			transition: all 0.2s;
+				padding: 8px 18px;
+				border: none;
+				border-radius: 9px;
+				background: transparent;
+				color: var(--faw-text-2);
+				font-family: var(--faw-font-body);
+				font-weight: 700;
+				font-size: 0.82rem;
+				letter-spacing: 0.4px;
+				cursor: pointer;
+				transition: all var(--faw-fast) var(--faw-ease);
 			}
+			.stats-tab:hover { color: var(--faw-text); }
 			.stats-tab.active {
-			background: #03dac6;
-			color: #000;
-			border-color: #03dac6;
+				background: linear-gradient(135deg, var(--faw-acc), var(--faw-acc-2));
+				color: #fff;
+				box-shadow: 0 4px 14px var(--faw-acc-glow);
 			}
-			.stats-tab:hover:not(.active) {
-			background: #3c3c3c;
-			color: #fff;
-			}
-			.stats-grid-home {
-			display: grid;
-			grid-template-columns: repeat(2, 1fr);
-			gap: 10px;
-			}
-			@media (min-width: 500px) {
-			.stats-grid-home {
-			grid-template-columns: repeat(4, 1fr);
-			}
-			}
+			.stats-grid-home { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+			@media (max-width: 900px) { .stats-grid-home { grid-template-columns: repeat(2, 1fr); } }
 			.stat-box {
-			background: #252525;
-			padding: 15px 10px;
-			border-radius: 10px;
-			text-align: center;
-			border: 1px solid #333;
-			transition: transform 0.2s;
+				padding: 18px 12px;
+				border-radius: 16px;
+				border: 1px solid var(--faw-border);
+				background: var(--faw-panel);
+				text-align: center;
+				transition: transform var(--faw-fast) var(--faw-ease), border-color var(--faw-fast) var(--faw-ease);
 			}
-			.stat-box:hover {
-			transform: scale(1.03);
+			.stat-box:hover { transform: translateY(-3px); border-color: var(--faw-border-2); }
+			.stat-box .stat-number {
+				font-family: var(--faw-font-display);
+				font-size: 2rem;
+				font-weight: 800;
+				font-variant-numeric: tabular-nums;
+				line-height: 1.1;
+			}
+			.stat-box .stat-desc {
+				margin-top: 5px;
+				font-size: 0.7rem;
+				font-weight: 700;
+				letter-spacing: 1.2px;
+				text-transform: uppercase;
+				color: var(--faw-text-3);
 			}
 			.stat-box.highlight {
-			background: linear-gradient(135deg, #1a3a3a 0%, #0d2626 100%);
-			border-color: #03dac6;
+				background: var(--faw-acc-soft);
+				border-color: var(--faw-acc-soft);
 			}
-			.stat-number {
-			font-size: 1.8rem;
-			font-weight: 900;
-			color: #03dac6;
-			line-height: 1.2;
-			}
-			.stat-desc {
-			font-size: 0.75rem;
-			color: #888;
-			margin-top: 5px;
-			text-transform: uppercase;
-			letter-spacing: 0.5px;
+			.stat-box.highlight .stat-number {
+				background: linear-gradient(135deg, var(--faw-acc), var(--faw-acc-2));
+				-webkit-background-clip: text;
+				background-clip: text;
+				-webkit-text-fill-color: transparent;
 			}
 			/* Grafico settimanale */
-			.weekly-bars {
-			display: flex;
-			justify-content: space-between;
-			align-items: flex-end;
-			height: 100px;
-			padding: 10px;
-			background: #1a1a1a;
-			border-radius: 8px;
-			gap: 5px;
-			}
+			.weekly-bars { display: flex; gap: 10px; align-items: flex-end; height: 158px; padding-top: 8px; }
 			.day-bar {
-			flex: 1;
-			display: flex;
-			flex-direction: column;
-			align-items: center;
-			gap: 5px;
+				flex: 1;
+				height: 100%;
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				justify-content: flex-end;
+				gap: 6px;
 			}
+			.day-bar .count { font-size: 0.72rem; font-weight: 800; color: var(--faw-text-2); font-variant-numeric: tabular-nums; }
 			.day-bar .bar {
-			width: 100%;
-			max-width: 30px;
-			background: linear-gradient(to top, #03dac6, #018786);
-			border-radius: 4px 4px 0 0;
-			min-height: 5px;
-			transition: height 0.5s ease;
+				width: 100%;
+				max-width: 48px;
+				min-height: 5px;
+				border-radius: 9px 9px 5px 5px;
+				background: var(--faw-panel-2);
+				border: 1px solid var(--faw-border);
+				transition: height 550ms var(--faw-ease);
 			}
 			.day-bar .bar.today {
-			background: linear-gradient(to top, #f1c40f, #e67e22);
-			box-shadow: 0 0 10px rgba(241, 196, 15, 0.5);
+				background: linear-gradient(180deg, var(--faw-acc), var(--faw-acc-2));
+				border-color: transparent;
+				box-shadow: 0 4px 16px var(--faw-acc-glow);
 			}
-			.day-bar .label {
-			font-size: 0.65rem;
-			color: #666;
-			text-transform: uppercase;
+			.day-bar .label { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.6px; color: var(--faw-text-3); text-transform: uppercase; }
+			.btn-danger {
+				padding: 8px 16px;
+				border-radius: 10px;
+				border: 1px solid rgba(255, 90, 110, 0.3);
+				background: var(--faw-danger-soft);
+				color: var(--faw-danger);
+				font-weight: 700;
+				cursor: pointer;
+				transition: all var(--faw-fast) var(--faw-ease);
 			}
-			.day-bar .count {
-			font-size: 0.7rem;
-			color: #03dac6;
-			font-weight: bold;
-			}
-			/* ========================================
-			📱 RESPONSIVE
-			======================================== */
-			@media (max-width: 400px) {
-			.mode-buttons {
-			flex-direction: column;
-			}
-			.btn-mode {
-			width: 100%;
-			}
-			}
-			/* Nascondi badge reCAPTCHA (opzionale) */
-			.grecaptcha-badge {
-			visibility: hidden;
-			}
-			/* ========================================
-			🎮 GAME BANNER (come in Ruzzle)
-			======================================== */
+			.btn-danger:hover { background: rgba(255, 90, 110, 0.22); border-color: rgba(255, 90, 110, 0.55); }
+			.hub-footer-note { margin-top: 8px; font-size: 0.7rem; color: var(--faw-text-3); text-align: center; }
+
+			/* ---------------- BANNER SFIDA (top) ---------------- */
 			.game-banner {
-			position: fixed;
-			top: 0;
-			left: 0;
-			right: 0;
-			padding: 15px 20px;
-			display: flex;
-			justify-content: space-between;
-			align-items: center;
-			z-index: 99999;
-			box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
-			animation: slideDown 0.3s ease;
-			color: white;
-			flex-wrap: wrap;
-			gap: 10px;
+				position: fixed;
+				top: 0;
+				left: 50%;
+				transform: translateX(-50%);
+				z-index: 9999;
+				width: min(880px, 94vw);
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				gap: 16px;
+				padding: 13px 18px;
+				border-radius: 0 0 20px 20px;
+				border: 1px solid var(--faw-border-2);
+				border-top: none;
+				box-shadow: var(--faw-shadow-3);
+				backdrop-filter: blur(18px);
+				-webkit-backdrop-filter: blur(18px);
+				animation: faw-banner-in 380ms var(--faw-ease);
 			}
-			@keyframes slideDown {
-			from {
-			transform: translateY(-100%);
+			@keyframes faw-banner-in {
+				from { opacity: 0; transform: translate(-50%, -18px); }
+				to { opacity: 1; transform: translate(-50%, 0); }
 			}
-			to {
-			transform: translateY(0);
+			.banner-left { display: flex; align-items: center; gap: 13px; min-width: 0; }
+			.banner-left .b-ico { font-size: 1.5rem; }
+			.banner-left .b-title { font-weight: 800; font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+			.banner-left .b-sub { font-size: 0.76rem; opacity: 0.85; }
+			.banner-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+			.banner-right select {
+				padding: 9px 12px;
+				border-radius: 10px;
+				border: 1px solid rgba(255, 255, 255, 0.35);
+				background: rgba(255, 255, 255, 0.16);
+				color: inherit;
+				font-family: var(--faw-font-body);
+				font-weight: 700;
+				font-size: 0.82rem;
+				cursor: pointer;
 			}
+			.banner-right select option { color: #10131f; background: #fff; }
+			.btn-banner {
+				padding: 9px 16px;
+				border: none;
+				border-radius: 10px;
+				font-family: var(--faw-font-body);
+				font-weight: 800;
+				font-size: 0.8rem;
+				letter-spacing: 0.5px;
+				cursor: pointer;
+				transition: transform var(--faw-fast) var(--faw-ease), filter var(--faw-fast) var(--faw-ease);
+				box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.25);
 			}
-			.game-banner .banner-left {
-			display: flex;
-			align-items: center;
-			gap: 10px;
+			.btn-banner:hover { transform: translateY(-2px); filter: brightness(1.07); }
+			.btn-banner:active { transform: scale(0.97); }
+			.btn-cancel-banner {
+				background: rgba(255, 255, 255, 0.18);
+				color: inherit;
+				width: 34px;
+				height: 34px;
+				padding: 0;
+				border-radius: 50%;
+				display: inline-flex;
+				align-items: center;
+				justify-content: center;
 			}
-			.game-banner .banner-right {
-			display: flex;
-			align-items: center;
-			gap: 8px;
-			flex-wrap: wrap;
+			.banner-spinner {
+				width: 20px;
+				height: 20px;
+				border: 3px solid rgba(255, 255, 255, 0.9);
+				border-top-color: transparent;
+				border-radius: 50%;
+				animation: faw-spin 1s linear infinite;
 			}
-			.game-banner select {
-			padding: 6px 10px;
-			border-radius: 4px;
-			border: none;
-			font-size: 0.85rem;
-			background: white;
-			color: #333;
-			margin: 0;
-			width: auto;
-			}
-			.game-banner .btn-banner {
-			padding: 8px 14px;
-			border: none;
-			border-radius: 4px;
-			cursor: pointer;
-			font-weight: bold;
-			font-size: 0.85rem;
-			transition: transform 0.1s;
-			}
-			.game-banner .btn-banner:active {
-			transform: scale(0.95);
-			}
-			.game-banner .btn-cancel-banner {
-			background: rgba(255, 255, 255, 0.2);
-			color: white;
-			border: 1px solid rgba(255, 255, 255, 0.3);
-			}
-			.game-banner .btn-cancel-banner:hover {
-			background: rgba(255, 255, 255, 0.3);
-			}
-			@media (max-width: 600px) {
-			.game-banner {
-			flex-direction: column;
-			text-align: center;
-			padding: 15px;
-			}
-			.game-banner .banner-left,
-			.game-banner .banner-right {
-			justify-content: center;
-			width: 100%;
-			}
-			.game-banner .banner-right {
-			margin-top: 10px;
-			}
+			@keyframes faw-spin { to { transform: rotate(360deg); } }
+
+			/* ---------------- TEMI: aggiustamenti light ---------------- */
+			:root[data-theme='light'] .login-card { box-shadow: var(--faw-shadow-3), 0 0 80px var(--faw-acc-soft); }
+			:root[data-theme='light'] .hub-header { background: color-mix(in srgb, var(--faw-bg) 78%, transparent); }
+
+			/* ---------------- RESPONSIVE (fallback, desktop-first) ---------------- */
+			@media (max-width: 760px) {
+				.hub-header__in { flex-wrap: wrap; }
+				.header-right { width: 100%; justify-content: space-between; }
+				.game-grid { grid-template-columns: repeat(2, 1fr); }
+				.game-banner { flex-direction: column; align-items: stretch; }
+				.banner-right { justify-content: center; }
 			}
 		</style>
 	</head>
 	<body>
-		<div class="container">
-			<!-- LOGIN -->
-			<div id="login-div" class="box">
-				<h1>Login</h1>
-				<input type="text" id="username" placeholder="IL TUO NOME">
-				<input type="password" id="password" placeholder="PASSWORD">
-				<button onclick="entra()" class="btn-primary" style="width:100%; height:50px; font-size:1rem;">ENTRA</button>
-			</div>
-			<!-- DASHBOARD -->
-			<div id="main-app" style="display:none;">
-				<div style="display:flex; align-items:center; gap:15px; margin-bottom:20px;">
-					<div id="user-display"></div>
-					<button id="btn-disponibilita" onclick="toggleDisponibilita()" style="padding:8px 15px; border-radius:20px; border:none; cursor:pointer; font-weight:bold; font-size:0.85rem;"></button>
-				</div>
-				<div class="box">
-					<h3>🎮 Partite In Corso</h3>
-					<div id="lista-partite"></div>
-				</div>
-				<div class="box">
-					<h3>🎮 Scegli il Gioco</h3>
-					<div style="display:flex; gap:10px; overflow-x:auto; padding-bottom:10px;">
-						<div class="game-card selected" onclick="selezionaGioco('ruzzle', this)" id="game-ruzzle">
-							<span style="font-size:2rem;">🔠</span>
-							<br>Ruzzle
-							<div class="game-badge online">SFIDA</div>
-						</div>
-						<div class="game-card" onclick="selezionaGioco('neonwar', this)" id="game-neonwar">
-						    <span style="font-size:2rem;">🚀</span><br>Neon War
-						    <div class="game-badge solo">SOLO</div>
-						</div>
-						<div class="game-card" onclick="selezionaGioco('pictionary', this)" id="game-pictionary">
-						    <span style="font-size:2rem;">🎨</span><br>Pictionary
-						    <div class="game-badge online">ONLINE</div>
-						</div>
-						<div class="game-card" onclick="selezionaGioco('gameof15', this)" id="game-gameof15">
-						    <span style="font-size:2rem;">🧩</span><br>Gioco del 15
-						    <div class="game-badge online">SFIDA</div>
-						</div>
-						<div class="game-card" onclick="selezionaGioco('pong', this)" id="game-pong">
-						    <span style="font-size:2rem;">🏓</span><br>Pong
-						    <div class="game-badge online">ONLINE</div>
-						</div>
-						<div class="game-card" onclick="selezionaGioco('palestra', this)" id="game-palestra">
-						    <span style="font-size:2rem;">🏋️</span><br>Palestra
-						    <div class="game-badge solo">SOLO</div>
-						</div>
-						<!-- Aggiungi nuovi giochi in games/<nome>/ (index.html + css/ + js/) -->
-					</div>
-				</div>
-				<div class="box">
-					<h3>⭐ I tuoi Amici</h3>
-					<p id="testo-selezione-amici" style="font-size:0.8rem; opacity:0.6;">Clicca sui nomi per selezionare più amici e sfidarli insieme!</p>
-					<button id="btn-sfida-multipla" class="btn-sfida-multi" onclick="apriModalSfida()">SFIDA IL GRUPPO ⚔️</button>
-					<div id="lista-amici"></div>
-				</div>
-				<div class="box">
-					<h3>🌍 Altri Colleghi Online</h3>
-					<div id="lista-global"></div>
-				</div>
-				<!-- BOX STATISTICHE GIORNALIERE -->
-				<div class="box">
-					<h3>📊 Le Tue Statistiche</h3>
-					<!-- Tab per cambiare vista -->
-					<div class="stats-tabs">
-						<button class="stats-tab active" onclick="showStatsTab('oggi')">Oggi</button>
-						<button class="stats-tab" onclick="showStatsTab('settimana')">Settimana</button>
-						<button class="stats-tab" onclick="showStatsTab('sempre')">Sempre</button>
-					</div>
-					<!-- Contenuto statistiche -->
-					<div id="stats-content">
-						<div class="stats-grid-home">
-							<div class="stat-box">
-								<div class="stat-number" id="stat-oggi-totale">0</div>
-								<div class="stat-desc">Partite Oggi</div>
-							</div>
-							<div class="stat-box">
-								<div class="stat-number" id="stat-oggi-ruzzle">0</div>
-								<div class="stat-desc">🎲 Ruzzle</div>
-							</div>
-							<div class="stat-box">
-								<div class="stat-number" id="stat-media">0</div>
-								<div class="stat-desc">Media/Giorno</div>
-							</div>
-							<div class="stat-box highlight">
-								<div class="stat-number" id="stat-top-day">-</div>
-								<div class="stat-desc">🏆 Giorno Top</div>
-							</div>
-						</div>
-						<!-- Dettaglio ultimi 7 giorni -->
-						<div id="stats-weekly-chart" style="margin-top:15px; display:none;">
-							<div class="weekly-bars" id="weekly-bars"></div>
-						</div>
-						<!-- Statistiche totali -->
-						<div id="stats-sempre" style="display:none;">
-							<div class="stats-grid-home">
-								<div class="stat-box">
-									<div class="stat-number" id="stat-totale-partite">0</div>
-									<div class="stat-desc">Partite Totali</div>
-								</div>
-								<div class="stat-box">
-									<div class="stat-number" id="stat-giorni-attivi">0</div>
-									<div class="stat-desc">Giorni Attivi</div>
-								</div>
-								<div class="stat-box">
-									<div class="stat-number" id="stat-streak">0</div>
-									<div class="stat-desc">🔥 Streak Attuale</div>
-								</div>
-								<div class="stat-box">
-									<div class="stat-number" id="stat-best-streak">0</div>
-									<div class="stat-desc">⚡ Best Streak</div>
-								</div>
-							</div>
-						</div>
-						<div style="margin-top:20px; text-align:center; border-top:1px solid #333; padding-top:15px;">
-							<button onclick="resetTutteLeStatistiche()" class="btn-danger" style="font-size:0.8rem; opacity:0.7;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.7"> 🗑️ Azzera Statistiche </button>
-						</div>
-					</div>
-				</div>
-				<div class="box">
-					<h3>📜 Storico Partite</h3>
-					<div id="lista-storico"></div>
-				</div>
-				<button onclick="logout()" class="btn-secondary" style="width:100%; margin-top:20px;">ESCI (LOGOUT)</button>
+		<div class="faw-stage" aria-hidden="true"></div>
+
+		<!-- ============ LOGIN ============ -->
+		<div id="login-div">
+			<div class="login-card">
+				<div class="login-logo"><span>F</span></div>
+				<h1>Focus at Work</h1>
+				<p class="login-sub">Entra nella piattaforma e sfida i tuoi colleghi.</p>
+				<input type="text" id="username" placeholder="IL TUO NOME" autocomplete="username" spellcheck="false">
+				<input type="password" id="password" placeholder="PASSWORD" autocomplete="current-password">
+				<button onclick="entra()" class="faw-btn faw-btn--primary faw-btn--lg faw-breathe login-cta">ENTRA <span class="arr">→</span></button>
+				<p class="login-foot">Accesso riservato ai membri del team FaW</p>
 			</div>
 		</div>
+
+		<!-- ============ DASHBOARD ============ -->
+		<div id="main-app" style="display:none;">
+			<header class="hub-header">
+				<div class="hub-header__in">
+					<div class="brand">
+						<div class="brand-mark">F</div>
+						<div><b>FaW</b><small>Focus at Work</small></div>
+					</div>
+					<div class="header-right">
+						<div class="faw-pill faw-pill--live" title="Giocatori attivi negli ultimi 60s"><span class="faw-dot"></span><b id="online-count">0</b>&nbsp;online</div>
+						<button id="theme-toggle" class="faw-btn faw-btn--icon" onclick="fawToggleTheme()" title="Cambia tema chiaro/scuro" aria-label="Cambia tema">🌙</button>
+						<div class="user-chip"><span class="faw-avatar" id="user-avatar">FA</span><span id="user-display"></span></div>
+						<button id="btn-disponibilita" onclick="toggleDisponibilita()" title="Disponibilità per le sfide"></button>
+						<button class="faw-btn faw-btn--ghost faw-btn--sm" onclick="logout()" title="Esci">Esci ⏻</button>
+					</div>
+				</div>
+			</header>
+
+			<main class="hub-main">
+				<!-- -------- COLONNA PRINCIPALE -------- -->
+				<div class="hub-col-main">
+					<div class="faw-card faw-stagger">
+						<div class="faw-card__head">
+							<h2>🎮 Scegli il Gioco</h2>
+							<span class="faw-card__hint">Crea una sfida o allena ti in Solo</span>
+						</div>
+						<div class="game-grid">
+							<div class="game-card selected" onclick="selezionaGioco('ruzzle', this)" id="game-ruzzle" style="--g1:#22d3ee; --g2:#0284c7;">
+								<div class="g-tile">🔠</div>
+								<div class="g-name">Ruzzle</div>
+								<div class="g-tag">Parole sulla griglia</div>
+								<div class="game-badge online">SFIDA</div>
+							</div>
+							<div class="game-card" onclick="selezionaGioco('patata', this)" id="game-patata" style="--g1:#ffb020; --g2:#ff5722;">
+								<div class="g-tile">🥔</div>
+								<div class="g-name">Patata Bollente</div>
+								<div class="g-tag">Parole a staffetta contro il tempo</div>
+								<div class="game-badge online">SFIDA</div>
+							</div>
+							<div class="game-card" onclick="selezionaGioco('neonwar', this)" id="game-neonwar" style="--g1:#ff3d7f; --g2:#a855f7;">
+								<div class="g-tile">🚀</div>
+								<div class="g-name">Neon War</div>
+								<div class="g-tag">Arena shooter</div>
+								<div class="game-badge solo">SOLO</div>
+							</div>
+							<div class="game-card" onclick="selezionaGioco('pictionary', this)" id="game-pictionary" style="--g1:#ec4899; --g2:#a855f7;">
+								<div class="g-tile">🎨</div>
+								<div class="g-name">Pictionary</div>
+								<div class="g-tag">Disegna e indovina</div>
+								<div class="game-badge online">ONLINE</div>
+							</div>
+							<div class="game-card" onclick="selezionaGioco('gameof15', this)" id="game-gameof15" style="--g1:#fbbf24; --g2:#f59e0b;">
+								<div class="g-tile">🧩</div>
+								<div class="g-name">Gioco del 15</div>
+								<div class="g-tag">Puzzle di velocità</div>
+								<div class="game-badge online">SFIDA</div>
+							</div>
+							<div class="game-card" onclick="selezionaGioco('pong', this)" id="game-pong" style="--g1:#3dffd1; --g2:#38bdf8;">
+								<div class="g-tile">🏓</div>
+								<div class="g-name">Pong</div>
+								<div class="g-tag">Duello a racchette 3D</div>
+								<div class="game-badge online">ONLINE</div>
+							</div>
+							<div class="game-card" onclick="selezionaGioco('palestra', this)" id="game-palestra" style="--g1:#34d399; --g2:#10b981;">
+								<div class="g-tile">🏋️</div>
+								<div class="g-name">Palestra</div>
+								<div class="g-tag">Allenamento fitness</div>
+								<div class="game-badge solo">SOLO</div>
+							</div>
+							<!-- Aggiungi nuovi giochi in games/<nome>/ (index.html + css/ + js/) -->
+						</div>
+					</div>
+
+					<div class="faw-card">
+						<div class="faw-card__head">
+							<h2>⚡ Partite in Corso</h2>
+							<span class="faw-pill faw-pill--live"><span class="faw-dot"></span>LIVE</span>
+						</div>
+						<div id="lista-partite"></div>
+					</div>
+
+					<div class="faw-card">
+						<div class="faw-card__head">
+							<h2>📊 Le Tue Statistiche</h2>
+						</div>
+						<div class="stats-tabs">
+							<button class="stats-tab active" onclick="showStatsTab('oggi')">Oggi</button>
+							<button class="stats-tab" onclick="showStatsTab('settimana')">Settimana</button>
+							<button class="stats-tab" onclick="showStatsTab('sempre')">Sempre</button>
+						</div>
+						<div id="stats-content">
+							<div class="stats-grid-home">
+								<div class="stat-box">
+									<div class="stat-number" id="stat-oggi-totale">0</div>
+									<div class="stat-desc">Partite Oggi</div>
+								</div>
+								<div class="stat-box">
+									<div class="stat-number" id="stat-oggi-ruzzle">0</div>
+									<div class="stat-desc">🎲 Ruzzle</div>
+								</div>
+								<div class="stat-box">
+									<div class="stat-number" id="stat-media">0</div>
+									<div class="stat-desc">Media/Giorno</div>
+								</div>
+								<div class="stat-box highlight">
+									<div class="stat-number" id="stat-top-day">-</div>
+									<div class="stat-desc">🏆 Giorno Top</div>
+								</div>
+							</div>
+							<div id="stats-weekly-chart" style="margin-top:15px; display:none;">
+								<div class="weekly-bars" id="weekly-bars"></div>
+							</div>
+							<div id="stats-sempre" style="display:none;">
+								<div class="stats-grid-home">
+									<div class="stat-box">
+										<div class="stat-number" id="stat-totale-partite">0</div>
+										<div class="stat-desc">Partite Totali</div>
+									</div>
+									<div class="stat-box">
+										<div class="stat-number" id="stat-giorni-attivi">0</div>
+										<div class="stat-desc">Giorni Attivi</div>
+									</div>
+									<div class="stat-box">
+										<div class="stat-number" id="stat-streak">0</div>
+										<div class="stat-desc">🔥 Streak Attuale</div>
+									</div>
+									<div class="stat-box">
+										<div class="stat-number" id="stat-best-streak">0</div>
+										<div class="stat-desc">⚡ Best Streak</div>
+									</div>
+								</div>
+							</div>
+							<div style="margin-top:20px; text-align:center; border-top:1px solid var(--faw-border); padding-top:15px;">
+								<button onclick="resetTutteLeStatistiche()" class="btn-danger" style="font-size:0.8rem; opacity:0.7;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.7"> 🗑️ Azzera Statistiche </button>
+							</div>
+						</div>
+					</div>
+
+					<div class="faw-card">
+						<div class="faw-card__head">
+							<h2>📜 Storico Partite</h2>
+						</div>
+						<div id="lista-storico"></div>
+						<p class="hub-footer-note">Le ultime 10 partite concluse</p>
+					</div>
+				</div>
+
+				<!-- -------- COLONNA LATERALE -------- -->
+				<aside class="hub-col-side faw-stagger">
+					<div class="faw-card">
+						<div class="faw-card__head">
+							<h2>⭐ I Tuoi Amici</h2>
+						</div>
+						<p id="testo-selezione-amici">Clicca sui nomi per selezionare più amici e sfidarli insieme!</p>
+						<button id="btn-sfida-multipla" class="btn-sfida-multi" onclick="apriModalSfida()">SFIDA IL GRUPPO ⚔️</button>
+						<div id="lista-amici"></div>
+					</div>
+					<div class="faw-card">
+						<div class="faw-card__head">
+							<h2>🌍 Colleghi Online</h2>
+						</div>
+						<div id="lista-global"></div>
+					</div>
+				</aside>
+			</main>
+		</div>
+
 		<script>
 			// --- 1. CONFIGURAZIONE FIREBASE ---
 			// La config vive in games/shared/firebase-config.js (script caricato nell'head).
-			const firebaseConfig = window.FAW_REQUIRE_FIREBASE_CONFIG
-				? window.FAW_REQUIRE_FIREBASE_CONFIG()
-				: window.FAW_FIREBASE_CONFIG;
-			if (!firebaseConfig) {
-				console.error("[FaW] Impossibile inizializzare Firebase: config condivisa non caricata.");
+			// Inizializzazione difensiva: se CDN o config falliscono, la pagina resta
+			// utilizzabile e mostra un avviso chiaro invece di morire in silenzio
+			// (che prima causava "Cannot access db before initialization" al login).
+			let db = null;
+			let firebaseErr = null;
+			try {
+				if (typeof firebase === 'undefined') {
+					throw new Error('script Firebase non caricati (CDN gstatic.com irraggiungibile?). Verifica la connessione / eventuali ad-blocker e ricarica la pagina.');
+				}
+				const firebaseConfig = window.FAW_REQUIRE_FIREBASE_CONFIG
+					? window.FAW_REQUIRE_FIREBASE_CONFIG()
+					: window.FAW_FIREBASE_CONFIG;
+				if (!firebaseConfig) {
+					throw new Error('config Firebase condivisa mancante (games/shared/firebase-config.js non caricato).');
+				}
+				firebase.initializeApp(firebaseConfig);
+				/*const appCheck = firebase.appCheck();
+				appCheck.activate(
+					    '6Lcm8XcsAAAAAM0hTFXbGRLHYZAW9ZPcZkKbxGIR', // 👈 LA TUA CHIAVE
+					    true
+				);*/
+				db = firebase.firestore();
+			} catch (e) {
+				firebaseErr = (e && e.message) ? e.message : String(e);
+				console.error('[FaW] Firebase non inizializzato:', e);
 			}
-			firebase.initializeApp(firebaseConfig);
-			/*const appCheck = firebase.appCheck();
-			appCheck.activate(
-			    '6Lcm8XcsAAAAAM0hTFXbGRLHYZAW9ZPcZkKbxGIR', // 👈 LA TUA CHIAVE
-			    true
-			);*/
-			const db = firebase.firestore();
+			function avvisaFirebaseDown() {
+				if (!firebaseErr) return;
+				['login-div', 'main-app'].forEach(id => {
+					const box = document.getElementById(id);
+					if (!box || box.querySelector('.faw-fb-down')) return;
+					const div = document.createElement('div');
+					div.className = 'faw-fb-down';
+					div.style.cssText = 'background:#5a1d1d;border:1px solid #ff6b6b;color:#ffd7d7;border-radius:8px;padding:10px 14px;margin:10px 0;font-size:0.85rem;';
+					div.textContent = '⚠️ Firebase non disponibile: ' + firebaseErr;
+					box.insertBefore(div, box.firstChild);
+				});
+			}
+			if (!db) avvisaFirebaseDown();
+
+// --- TEMA CHIARO/SCURO (persistito) ---
+			function fawGetTheme() {
+			  try {
+			    return localStorage.getItem('faw-theme') ||
+			      (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+			  } catch (e) { return 'dark'; }
+			}
+			function fawApplyTheme(t) {
+			  document.documentElement.setAttribute('data-theme', t);
+			  const btn = document.getElementById('theme-toggle');
+			  if (btn) {
+			    btn.textContent = (t === 'light') ? '\u{1F319}' : '\u2600\uFE0F';
+			    btn.title = (t === 'light') ? 'Passa al tema scuro' : 'Passa al tema chiaro';
+			  }
+			}
+			function fawToggleTheme() {
+			  const t = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+			  try { localStorage.setItem('faw-theme', t); } catch (e) { /* noop */ }
+			  fawApplyTheme(t);
+			}
+			fawApplyTheme(fawGetTheme());
+
+// --- CHIP UTENTE (avatar con tinta deterministica dal nome) ---
+			function fawSyncUserChip() {
+			  const el = document.getElementById('user-display');
+			  const av = document.getElementById('user-avatar');
+			  if (!el || !av) return;
+			  const nome = (el.textContent || '').replace(/^👤\s*/, '').trim() || 'FAW';
+			  av.textContent = nome.slice(0, 2).toUpperCase();
+			  let h = 0;
+			  for (const c of nome) h = (h * 31 + c.charCodeAt(0)) % 360;
+			  av.style.setProperty('--h', h);
+			}
+
+// --- CONTEGGIO ONLINE (social proof nell'header) ---
+			function aggiornaOnlineCount(n) {
+			  const el = document.getElementById('online-count');
+			  if (el) el.textContent = n;
+			}
+
+// --- CONFETTI (micro-reward al successo) ---
+			function fawConfetti(n = 28) {
+			  try {
+			    const box = document.createElement('div');
+			    box.className = 'faw-confetti';
+			    const colors = ['#6366f1', '#a855f7', '#38bdf8', '#2fd67b', '#ffd166', '#ff5a6e'];
+			    for (let i = 0; i < n; i++) {
+			      const p = document.createElement('i');
+			      p.style.left = (4 + Math.random() * 92) + 'vw';
+			      p.style.background = colors[i % colors.length];
+			      p.style.animationDuration = (1.4 + Math.random() * 1.2) + 's';
+			      p.style.animationDelay = (Math.random() * 0.35) + 's';
+			      p.style.transform = 'rotate(' + (Math.random() * 360).toFixed(0) + 'deg)';
+			      box.appendChild(p);
+			    }
+			    document.body.appendChild(box);
+			    setTimeout(() => box.remove(), 3200);
+			  } catch (e) { /* noop */ }
+			}
 			// Debug: verifica che App Check sia attivo
 			/*console.log('✅ Firebase inizializzato');
 			console.log('✅ App Check attivato');*/
@@ -669,6 +932,7 @@
 			let giocoSelezionato = "ruzzle";
 			const GAME_PATHS = {
 			    ruzzle: 'games/ruzzle/index.html',
+			    patata: 'games/patata/index.html',
 			    pictionary: 'games/pictionary/index.html',
 			    gameof15: 'games/gameof15/index.html',
 			    neonwar: 'games/neonwar/index.html',
@@ -684,6 +948,7 @@
 			}
 			let partiteCache = {
 			    ruzzle: [],
+			    patata: [],
 			    pictionary: [],
 			    neonwar: [],
 			    gameof15: [],
@@ -761,6 +1026,67 @@
 			    }],
 			    minGiocatori: 1,
 			    maxGiocatori: 10
+			  },
+				 patata: {
+			    nome: "Patata Bollente",
+			    icona: "🥔",
+			    opzioni: [{
+			      id: "tempo",
+			      label: "Countdown",
+			      default: "60",
+			      valori: [{
+			        value: "30",
+			        label: "30s (Fulmine)"
+			      }, {
+			        value: "60",
+			        label: "60s (Standard)"
+			      }, {
+			        value: "120",
+			        label: "120s (Relax)"
+			      }]
+			    }, {
+			      id: "turni",
+			      label: "Turni",
+			      default: "3",
+			      valori: [{
+			        value: "1",
+			        label: "1 turno"
+			      }, {
+			        value: "2",
+			        label: "2 turni"
+			      }, {
+			        value: "3",
+			        label: "3 turni"
+			      }, {
+			        value: "4",
+			        label: "4 turni"
+			      }, {
+			        value: "5",
+			        label: "5 turni"
+			      }]
+			    }, {
+			      id: "lettere",
+			      label: "Lettere",
+			      default: "3",
+			      valori: [{
+			        value: "2",
+			        label: "2 lettere"
+			      }, {
+			        value: "3",
+			        label: "3 lettere"
+			      }, {
+			        value: "4",
+			        label: "4 lettere"
+			      }]
+			    }],
+			    modalita: [{
+			      id: "classic",
+			      label: "CLASSICA 🥔",
+			      colore: "#ff9e2c",
+			      testo: "#1a0d02"
+			    }],
+			    minGiocatori: 2,
+			    maxGiocatori: 8
 			  },
 				 neonwar: {
 			     nome: "Neon War",
@@ -899,12 +1225,14 @@ palestra: {
 // ✅ AUTO-LOGIN se già autenticato
 if (mioNome && passwordHashSalvato) {
     window.onload = () => {
+        if (!db) { avvisaFirebaseDown(); return; }
         document.getElementById('username').value = mioNome;
         document.getElementById('password').value = '***'; // placeholder
         // Esegui login automatico
         document.getElementById('login-div').style.display = 'none';
         document.getElementById('main-app').style.display = 'block';
         document.getElementById('user-display').textContent = "👤 " + mioNome;
+        fawSyncUserChip();
         aggiornaUIDisponibilita();
         aggiornaPresenza();
         setInterval(aggiornaPresenza, 20000);
@@ -921,6 +1249,11 @@ if (mioNome && passwordHashSalvato) {
 			  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 			}
 			async function entra(isAuto = false) {
+			  if (!db) {
+			    avvisaFirebaseDown();
+			    if (!isAuto) alert('\u274c Firebase non disponibile:\n' + firebaseErr + '\n\nRicarica la pagina; se il problema persiste apri il console (F12) per i dettagli.');
+			    return;
+			  }
 			  const n = document.getElementById('username').value.trim().toUpperCase();
 			  const p = document.getElementById('password').value.trim();
 			  if (n.length < 2 || p.length < 3) {
@@ -952,6 +1285,7 @@ if (mioNome && passwordHashSalvato) {
 			    document.getElementById('login-div').style.display = 'none';
 			    document.getElementById('main-app').style.display = 'block';
 			    document.getElementById('user-display').textContent = "👤 " + mioNome;
+			    fawSyncUserChip();
 			    aggiornaUIDisponibilita();
 			    aggiornaPresenza();
 			    setInterval(aggiornaPresenza, 20000);
@@ -1011,6 +1345,7 @@ if (mioNome && passwordHashSalvato) {
 			}
 
 function listen() {
+    if (!db) { console.warn('[FaW] listen(): Firebase non disponibile, listener non avviati.'); return; }
     let presenzeData = {};
     let amicizieSnapshot = null;
 
@@ -1024,6 +1359,7 @@ function listen() {
             }
         });
         window.presenzeDataGlobal = presenzeData;
+        aggiornaOnlineCount(Object.keys(presenzeData).length);
         if (amicizieSnapshot) {
             aggiornaListaAmici(amicizieSnapshot, presenzeData);
         }
@@ -1042,6 +1378,7 @@ function listen() {
         .where("partecipanti", "array-contains", mioNome)
         .onSnapshot(snap => {
 partiteCache.ruzzle = [];
+partiteCache.patata = [];
 partiteCache.neonwar = [];
 partiteCache.gameof15 = [];
 partiteCache.pong = [];
@@ -1051,6 +1388,7 @@ partiteCache.pong = [];
 	    if (data.gioco === 'neonwar') partiteCache.neonwar.push(data);
 	    else if (data.gioco === 'gameof15') partiteCache.gameof15.push(data);
 	    else if (data.gioco === 'pong') partiteCache.pong.push(data);
+	    else if (data.gioco === 'patata') partiteCache.patata.push(data);
 	    else if (data.gioco !== 'pictionary') partiteCache.ruzzle.push(data);
 	});
 
@@ -1095,13 +1433,16 @@ function renderTutteLePartite() {
     // Reset completo
     const soloHref = gameHref(giocoSelezionato);
     div.innerHTML = `
-        <div class="user-item" style="background:#34495e;" onclick="window.location.href='${soloHref}'">
+        <div class="user-item u-row--solo" onclick="window.location.href='${soloHref}'">
             <span>🎯 Allenamento Solo (${configGioco.nome})</span>
-            <button>GIOCA</button>
+            <button class="u-btn--enter">GIOCA →</button>
         </div>`;
 
     // Render Ruzzle
     partiteCache.ruzzle.forEach(p => renderPartitaRuzzle(p, div));
+
+    // Render Patata Bollente
+    partiteCache.patata.forEach(p => renderPartitaRuzzle(p, div));
 
     // Render NeonWar
     partiteCache.neonwar.forEach(p => renderPartitaRuzzle(p, div));
@@ -1119,6 +1460,7 @@ partiteCache.pictionary.forEach(p => renderPartitaPictionary(p, div));
 // ========================================
 function renderPartitaRuzzle(p, div) {
     const partitaId = p.id;
+    const nomeGioco = (GIOCHI_CONFIG[p.gioco] || {}).nome || p.gioco;
 
     if (p.stato === "conclusa") return;
 
@@ -1126,21 +1468,21 @@ function renderPartitaRuzzle(p, div) {
     const accettanti = p.rivincitaAccettataDa || [];
     const creatore = p.partecipanti[0];
     const altriGiocatori = p.partecipanti.filter(x => x !== creatore);
+    const delBtn = `<button class="u-btn--del" title="Elimina" onclick="event.stopPropagation(); if(confirm('Eliminare?')) db.collection('partite').doc('${partitaId}').delete()">🗑️</button>`;
 
-    // Rifiuti
+    // Rifiuti / annullata
     if (rifiutanti.length > 0) {
-        const ioHoRifiutato = rifiutanti.includes(mioNome);
-        if (ioHoRifiutato) {
+        if (rifiutanti.includes(mioNome)) {
             div.innerHTML += `
-                <div class="user-item" style="background:#7f8c8d; color:white; opacity:0.7;">
+                <div class="user-item u-row--declined">
                     <span>👋 Hai rifiutato la sfida di ${creatore}</span>
-                    <button onclick="event.stopPropagation(); if(confirm('Eliminare?')) db.collection('partite').doc('${partitaId}').delete()">🗑️</button>
+                    ${delBtn}
                 </div>`;
         } else {
             div.innerHTML += `
-                <div class="user-item" style="background:#cf6679; color:white;">
+                <div class="user-item u-row--canceled">
                     <span>😔 Sfida annullata: ${rifiutanti.join(', ')} ha rifiutato</span>
-                    <button onclick="event.stopPropagation(); if(confirm('Eliminare?')) db.collection('partite').doc('${partitaId}').delete()">🗑️</button>
+                    ${delBtn}
                 </div>`;
         }
         return;
@@ -1153,20 +1495,20 @@ function renderPartitaRuzzle(p, div) {
             const totale = p.partecipanti.length;
             if (numAccettanti < totale) {
                 div.innerHTML += `
-                    <div class="user-item" style="background:#9b59b6; color:white;">
+                    <div class="user-item u-row--wait">
                         <span>⏳ Sfida creata: in attesa (${numAccettanti}/${totale})</span>
                         <div>
-                            <button onclick="event.stopPropagation(); window.location.href='${gameHref(p.gioco, 'matchId=' + partitaId)}'" style="background:#03dac6; color:#000;">ENTRA</button>
-                            <button onclick="event.stopPropagation(); annullaSfida('${partitaId}')" style="background:#cf6679; margin-left:5px;">🚫 ANNULLA</button>
+                            <button class="u-btn--ghost" onclick="event.stopPropagation(); window.location.href='${gameHref(p.gioco, 'matchId=' + partitaId)}'">APRI</button>
+                            <button class="u-btn--decline" onclick="event.stopPropagation(); annullaSfida('${partitaId}')">🚫 ANNULLA</button>
                         </div>
                     </div>`;
             } else {
                 div.innerHTML += `
-                    <div class="user-item live-match">
-                        <span>✅ Sfida vs ${altriGiocatori.join(', ')} (${p.gioco})</span>
+                    <div class="user-item u-row--live">
+                        <span><i class="live-dot"></i>Pronta vs ${altriGiocatori.join(', ')} (${nomeGioco})</span>
                         <div>
-                            <button onclick="window.location.href='${gameHref(p.gioco, 'matchId=' + partitaId)}'" style="background:#03dac6; color:#000;">ENTRA</button>
-                            <button onclick="event.stopPropagation(); if(confirm('Eliminare?')) db.collection('partite').doc('${partitaId}').delete()" style="background:#cf6679; margin-left:5px;">🗑️</button>
+                            <button class="u-btn--enter" onclick="window.location.href='${gameHref(p.gioco, 'matchId=' + partitaId)}'">ENTRA →</button>
+                            ${delBtn}
                         </div>
                     </div>`;
             }
@@ -1175,17 +1517,17 @@ function renderPartitaRuzzle(p, div) {
                 const numAccettanti = accettanti.length + 1;
                 const totale = p.partecipanti.length;
                 div.innerHTML += `
-                    <div class="user-item" style="background:#2ecc71; color:white;">
-                        <span>✅ Hai accettato: attesa altri (${numAccettanti}/${totale})</span>
-                        <button onclick="window.location.href='${gameHref(p.gioco, 'matchId=' + partitaId)}'" style="background:#fff; color:#000;">ENTRA</button>
+                    <div class="user-item u-row--accepted">
+                        <span>✅ Hai accettato: in attesa degli altri (${numAccettanti}/${totale})</span>
+                        <button class="u-btn--enter" onclick="window.location.href='${gameHref(p.gioco, 'matchId=' + partitaId)}'">ENTRA →</button>
                     </div>`;
             } else {
                 div.innerHTML += `
-                    <div class="user-item" style="background:#f1c40f; color:black; border:3px solid #e67e22;">
-                        <span style="font-weight:bold;">⚔️ SFIDA DA ${creatore}</span>
+                    <div class="user-item u-row--challenge">
+                        <span>⚔️ SFIDA DA ${creatore.toUpperCase()} — ${nomeGioco}</span>
                         <div>
-                            <button onclick="event.stopPropagation(); accettaSfida('${partitaId}')" style="background:#2ecc71; color:white;">✅ ACCETTA</button>
-                            <button onclick="event.stopPropagation(); rifiutaSfida('${partitaId}')" style="background:#cf6679; color:white; margin-left:5px;">❌ RIFIUTA</button>
+                            <button class="u-btn--accept" onclick="event.stopPropagation(); accettaSfida('${partitaId}')">✅ ACCETTA</button>
+                            <button class="u-btn--decline" onclick="event.stopPropagation(); rifiutaSfida('${partitaId}')">✖️</button>
                         </div>
                     </div>`;
             }
@@ -1194,19 +1536,16 @@ function renderPartitaRuzzle(p, div) {
         // In corso
         const altri = p.partecipanti.filter(n => n !== mioNome).join(", ");
         div.innerHTML += `
-            <div class="user-item live-match">
-                <span>vs ${altri} (${p.gioco})</span>
+            <div class="user-item u-row--live">
+                <span><i class="live-dot"></i>In gioco con ${altri} (${nomeGioco})</span>
                 <div>
-                    <button onclick="window.location.href='${gameHref(p.gioco, 'matchId=' + partitaId)}'" style="background:#03dac6; color:#000;">ENTRA</button>
-                    <button onclick="event.stopPropagation(); if(confirm('Eliminare?')) db.collection('partite').doc('${partitaId}').delete()" style="background:#cf6679; margin-left:5px;">🗑️</button>
+                    <button class="u-btn--enter" onclick="window.location.href='${gameHref(p.gioco, 'matchId=' + partitaId)}'">ENTRA →</button>
+                    ${delBtn}
                 </div>
             </div>`;
     }
 }
 
-// ========================================
-// 🎨 RENDER PICTIONARY
-// ========================================
 function renderPartitaPictionary(p, div) {
     // ✅ VALIDA I DATI PRIMA DI RENDERIZZARE
     if (!p || !p.id || !p.players || !Array.isArray(p.players)) {
@@ -1225,11 +1564,11 @@ function renderPartitaPictionary(p, div) {
                      p.stato === 'voting' ? 'Votazione' : 'In corso';
 
     div.innerHTML += `
-        <div class="user-item live-match" style="border-left-color: #e94560;">
-            <span>🎨 ${altri.length > 0 ? `vs ${altri}` : 'Pictionary'} (${statoText})</span>
+        <div class="user-item u-row--live">
+            <span><i class="live-dot"></i>🎨 ${altri.length > 0 ? `vs ${altri}` : 'Pictionary'} — ${statoText}</span>
             <div>
-                <button onclick="window.location.href='${gameHref('pictionary', 'room=' + roomId)}'" style="background:#e94560; color:white;">ENTRA</button>
-                <button onclick="event.stopPropagation(); eliminaPictionary('${roomId}')" style="background:#cf6679; margin-left:5px;">🗑️</button>
+                <button class="u-btn--enter" onclick="window.location.href='${gameHref('pictionary', 'room=' + roomId)}'">ENTRA →</button>
+                <button class="u-btn--del" title="Elimina" onclick="event.stopPropagation(); eliminaPictionary('${roomId}')">🗑️</button>
             </div>
         </div>`;
 }
@@ -1239,7 +1578,7 @@ function renderPartitaPictionary(p, div) {
 			  if (isGiocoSolo()) {
 			    const nome = GIOCHI_CONFIG[giocoSelezionato]?.nome || 'questo gioco';
 			    testo.textContent = `${nome} è solo allenamento: seleziona il gioco e poi clicca “Gioca” in Allenamento Solo.`;
-			    testo.style.color = '#f1c40f';
+			    testo.style.color = 'var(--faw-warn)';
 			    return;
 			  }
 			  testo.textContent = 'Clicca sui nomi per selezionare più amici e sfidarli insieme!';
@@ -1264,9 +1603,9 @@ function renderPartitaPictionary(p, div) {
 			    // Richieste pendenti
 			    if (d.a === mioNome && d.stato === 'pendente') {
 			      div.innerHTML += `
-											<div class="user-item" style="background:#3700b3; color:white;">
-												<span>🤝 Richiesta da: ${d.da}</span>
-												<button onclick="db.collection('amicizie').doc('${doc.id}').update({stato:'amici'})">ACCETTA</button>
+											<div class="user-item u-row--wait">
+												<span>🤝 Richiesta di amicizia da: ${d.da}</span>
+												<button class="u-btn--accept" onclick="db.collection('amicizie').doc('${doc.id}').update({stato:'amici'})">ACCETTA</button>
 											</div>`;
 			      return;
 			    }
@@ -1313,11 +1652,11 @@ function renderPartitaPictionary(p, div) {
 											<div class="user-item ${isSel ? 'selected' : ''}"
 			           onclick="${isSelezionabile ? `toggleAmico('${nomeAmico}', this)` : 'mostraMessaggioNonDisponibile()'}"
 			           style="opacity: ${isSelezionabile ? 1 : 0.5}; cursor: ${isSelezionabile ? 'pointer' : 'not-allowed'};">
-												<div style="display:flex; align-items:center; gap:10px;">
-													<span style="font-size:1.2rem;">${statoIcon}</span>
+												<div class="friend-main">
+													<span style="font-size:1.1rem;">${statoIcon}</span>
 													<div>
-														<span style="font-weight:bold;">${nomeAmico}</span>
-														<div style="font-size:0.7rem; color:${statoColor};">${statoText}</div>
+														<span class="f-name">${nomeAmico}</span>
+														<div class="f-status" style="color:${statoColor};">${statoText}</div>
 													</div>
 												</div>
 												<button class="btn-del" onclick="event.stopPropagation(); if(confirm('Rimuovere?')) db.collection('amicizie').doc('${doc.id}').delete()">X</button>
@@ -1336,7 +1675,7 @@ function renderPartitaPictionary(p, div) {
 			      div.innerHTML += `
 											<div class="user-item">
 												<span>${u.nome}</span>
-												<button onclick="addFriend('${u.nome}')">+AMICO</button>
+												<button class="u-btn--ghost" onclick="addFriend('${u.nome}')">+ AMICO</button>
 											</div>`;
 			    }
 			  });
@@ -1375,24 +1714,7 @@ function renderPartitaPictionary(p, div) {
 			}
 			// ✅ NUOVA FUNZIONE: Messaggio quando clicchi su giocatore non disponibile
 			function mostraMessaggioNonDisponibile() {
-			  // Toast leggero invece di alert fastidioso
-			  const toast = document.createElement('div');
-			  toast.textContent = isGiocoSolo() ? '🎯 Questo gioco è disponibile solo in Allenamento Solo' : '❌ Giocatore non disponibile';
-			  toast.style.cssText = `
-			  position: fixed;
-			  bottom: 20px;
-			  left: 50%;
-			  transform: translateX(-50%);
-			  background: #cf6679;
-			  color: white;
-			  padding: 12px 24px;
-			  border-radius: 25px;
-			  font-weight: bold;
-			  z-index: 99999;
-			  animation: fadeInOut 2s ease;
-			`;
-			  document.body.appendChild(toast);
-			  setTimeout(() => toast.remove(), 2000);
+			  mostraToast(isGiocoSolo() ? '\u{1F3AF} Questo gioco è disponibile solo in Allenamento Solo' : '\u274C Giocatore non disponibile', 'err');
 			}
 
 			function selezionaGioco(g, el) {
@@ -1415,7 +1737,7 @@ function renderPartitaPictionary(p, div) {
 			// ✅ Nuova funzione per aggiornare l'allenamento solo
 			function aggiornaAllenamentoSolo() {
 			  const config = GIOCHI_CONFIG[giocoSelezionato];
-			  const allenamentoDiv = document.querySelector('#lista-partite .user-item[style*="34495e"]');
+			  const allenamentoDiv = document.querySelector('#lista-partite .user-item.u-row--solo');
 			  if (allenamentoDiv && config) {
 			    allenamentoDiv.onclick = () => window.location.href = gameHref(giocoSelezionato);
 			    allenamentoDiv.querySelector('span').textContent = `🎯 Allenamento Solo (${config.nome})`;
@@ -1459,14 +1781,14 @@ function renderPartitaPictionary(p, div) {
 			  const banner = document.createElement('div');
 			  banner.id = 'game-banner';
 			  banner.className = 'game-banner';
-			  banner.style.background = 'linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%)';
+			  banner.style.background = 'linear-gradient(135deg, rgba(99,102,241,0.95), rgba(168,85,247,0.95))';
 			  banner.innerHTML = `
 
 											<div class="banner-left">
-												<span style="font-size:1.5rem;">${config.icona}</span>
+												<span class="b-ico">${config.icona}</span>
 												<div>
-													<div style="font-weight:bold;">SFIDA ${config.nome.toUpperCase()}: ${nomiSelezionati}</div>
-													<div style="font-size:0.8rem; opacity:0.9;">Scegli opzioni e modalità</div>
+													<div class="b-title">SFIDA ${config.nome.toUpperCase()} — ${nomiSelezionati}</div>
+													<div class="b-sub">Scegli opzioni e modalità</div>
 												</div>
 											</div>
 											<div class="banner-right">
@@ -1635,18 +1957,18 @@ if (giocoSelezionato === 'pictionary') {
 			  const banner = document.createElement('div');
 			  banner.id = 'game-banner';
 			  banner.className = 'game-banner';
-			  banner.style.background = 'linear-gradient(135deg, #3498db 0%, #2980b9 100%)';
+			  banner.style.background = 'linear-gradient(135deg, rgba(56,189,248,0.94), rgba(99,102,241,0.94))';
 			  banner.innerHTML = `
 
 											<div class="banner-left">
-												<span style="font-size:1.5rem;">⏳</span>
+												<span class="b-ico">⏳</span>
 												<div>
-													<div style="font-weight:bold;">${messaggio}</div>
-													<div style="font-size:0.8rem; opacity:0.9;">Attendi un momento</div>
+													<div class="b-title">${messaggio}</div>
+													<div class="b-sub">Attendi un momento</div>
 												</div>
 											</div>
 											<div class="banner-right">
-												<div style="width:20px; height:20px; border:3px solid white; border-top-color:transparent; border-radius:50%; animation: spin 1s linear infinite;"></div>
+												<div class="banner-spinner"></div>
 											</div>
 			`;
 			  document.body.appendChild(banner);
@@ -1657,14 +1979,14 @@ if (giocoSelezionato === 'pictionary') {
 			  const banner = document.createElement('div');
 			  banner.id = 'game-banner';
 			  banner.className = 'game-banner';
-			  banner.style.background = 'linear-gradient(135deg, #27ae60 0%, #1e8449 100%)';
+			  banner.style.background = 'linear-gradient(135deg, rgba(47,214,123,0.95), rgba(23,163,90,0.95))';
 			  banner.innerHTML = `
 
 											<div class="banner-left">
-												<span style="font-size:1.5rem;">✅</span>
+												<span class="b-ico">✅</span>
 												<div>
-													<div style="font-weight:bold;">Sfida creata!</div>
-													<div style="font-size:0.8rem; opacity:0.9;">In attesa che gli altri accettino</div>
+													<div class="b-title">Sfida creata!</div>
+													<div class="b-sub">In attesa che gli altri accettino</div>
 												</div>
 											</div>
 											<div class="banner-right">
@@ -1673,12 +1995,14 @@ if (giocoSelezionato === 'pictionary') {
 											</div>
 			`;
 			  document.body.appendChild(banner);
+			  fawConfetti(30);
 			  setTimeout(() => {
 			    const b = document.getElementById('game-banner');
 			    if (b && b.innerHTML.includes('Sfida creata')) removeGameBanner();
 			  }, 5000);
 			}
 			function caricaStorico() {
+			  if (!db) { console.warn('[FaW] caricaStorico(): Firebase non disponibile.'); return; }
 			  // Carico le partite e le ordino in JavaScript (evita errore indici Firebase)
 			  db.collection("partite").where("partecipanti", "array-contains", mioNome).where("stato", "==", "conclusa").onSnapshot(snap => {
 			    const div = document.getElementById('lista-storico');
@@ -1690,9 +2014,10 @@ if (giocoSelezionato === 'pictionary') {
 			    partite.slice(0, 10).forEach(p => {
 			      let classif = Object.entries(p.punteggi).sort((a, b) => b[1] - a[1]);
 			      let vincitore = classif[0][0];
+			      let nomeGiocoStorico = (GIOCHI_CONFIG[p.gioco] || {}).nome || p.gioco.toUpperCase();
 			      div.innerHTML += `
 											<div class="history-item">
-												<span>${p.dataOra} - ${p.gioco.toUpperCase()}</span>
+												<span>${p.dataOra} - ${nomeGiocoStorico}</span>
 												<span>Vinto da:
 													<b>${vincitore}</b>
 												</span>
@@ -1733,24 +2058,12 @@ if (giocoSelezionato === 'pictionary') {
 			  }
 			}
 
-			function mostraToast(messaggio) {
+			function mostraToast(messaggio, tipo) {
 			  const toast = document.createElement('div');
+			  toast.className = 'faw-toast' + (tipo === 'err' ? ' faw-toast--err' : tipo === 'ok' ? ' faw-toast--ok' : '');
 			  toast.textContent = messaggio;
-			  toast.style.cssText = `
-			  position: fixed;
-			  bottom: 20px;
-			  left: 50%;
-			  transform: translateX(-50%);
-			  background: #03dac6;
-			  color: #000;
-			  padding: 12px 24px;
-			  border-radius: 25px;
-			  font-weight: bold;
-			  z-index: 99999;
-			  animation: fadeInOut 2s ease;
-			`;
 			  document.body.appendChild(toast);
-			  setTimeout(() => toast.remove(), 2000);
+			  setTimeout(() => toast.remove(), 2400);
 			}
 
 			function logout() {
@@ -1996,19 +2309,14 @@ if (giocoSelezionato === 'pictionary') {
 			  aggiornaPresenza(); // Aggiorna Firebase
 			}
 
+
 			function aggiornaUIDisponibilita() {
 			  const disponibile = localStorage.getItem('disponibile') !== 'false';
 			  const btn = document.getElementById('btn-disponibilita');
 			  if (btn) {
-			    if (disponibile) {
-			      btn.textContent = '🟢 Disponibile';
-			      btn.style.background = '#2ecc71';
-			      btn.style.color = 'white';
-			    } else {
-			      btn.textContent = '🔴 Non disturbare';
-			      btn.style.background = '#e74c3c';
-			      btn.style.color = 'white';
-			    }
+			    btn.classList.toggle('is-on', disponibile);
+			    btn.classList.toggle('is-off', !disponibile);
+			    btn.textContent = disponibile ? '\u{1F7E2} Disponibile' : '\u{1F534} Non disturbare';
 			  }
 			}
 			async function eliminaPictionary(roomId) {

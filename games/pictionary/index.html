@@ -8,21 +8,38 @@
     <script src="https://www.gstatic.com/firebasejs/9.1.1/firebase-firestore-compat.js"></script>
     <!-- Config Firebase condivisa (prima dello script che inizializza Firebase) -->
     <script src="../shared/firebase-config.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Tektur:wght@500;600;700;800&family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../shared/faw-ui.css">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;900&family=JetBrains+Mono&display=swap');
+        /* Font piattaforma caricati via <link> nel <head> */
 
         :root {
-            --bg: #1a1a2e; --panel: #16213e; --primary: #e94560; --accent: #0f3460;
-            --text: #eaeaea; --border: #0f3460; --danger: #ff6b6b; --success: #4ecdc4;
-            --gold: #ffd700; --silver: #c0c0c0; --bronze: #cd7f32;
+            --bg: #0b0e1c; --panel: #121832; --primary: #ff4d7d; --accent: #1d2848;
+            --text: #eef1fa; --border: rgba(148, 163, 255, 0.16); --danger: #ff5a6e; --success: #2fd6c8;
+            --gold: #ffc93c; --silver: #b8c2d9; --bronze: #c98a4b;
+            --font-display: 'Tektur', 'Inter', sans-serif;
         }
 
         * { box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; }
 
         body {
-            font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text);
+            font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text);
             margin: 0; padding: 0; min-height: 100vh; display: flex; flex-direction: column;
+            position: relative;
         }
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
+            background:
+                radial-gradient(1100px 540px at 85% -10%, rgba(34, 211, 238, 0.09), transparent 60%),
+                radial-gradient(900px 560px at 8% 112%, rgba(255, 77, 125, 0.08), transparent 60%);
+        }
+        .app-container, #game-ui, #loading-screen, .overlay { position: relative; z-index: 1; }
 
         /* === ANIMAZIONI === */
         @keyframes slideDown { from { transform: translateY(-100%); } to { transform: translateY(0); } }
@@ -39,30 +56,38 @@
         .app-container {
             width: 100%; max-width: 1000px; margin: 0 auto; min-height: 100vh;
             background: var(--panel); display: flex; flex-direction: column;
-            box-shadow: 0 0 50px rgba(0,0,0,0.3); position: relative;
+            border-left: 1px solid var(--border);
+            border-right: 1px solid var(--border);
+            box-shadow: 0 0 70px rgba(0,0,0,0.45); position: relative;
         }
 
         header {
-            padding: 12px 20px; border-bottom: 2px solid var(--border);
+            padding: 13px 22px; border-bottom: 1px solid var(--border);
             display: flex; justify-content: space-between; align-items: center;
-            background: linear-gradient(135deg, var(--panel) 0%, var(--accent) 100%);
+            background: linear-gradient(135deg, rgba(255,255,255,0.055) 0%, rgba(34,211,238,0.07) 100%);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
             position: sticky; top: 0; z-index: 100;
         }
 
         .header-left { display: flex; align-items: center; gap: 15px; }
-        .room-tag { 
-            font-size: 0.7rem; color: var(--primary); font-weight: 700; 
-            letter-spacing: 2px; text-transform: uppercase;
-            background: rgba(233, 69, 96, 0.2); padding: 4px 10px; border-radius: 4px;
+        .room-tag {
+            font-family: var(--font-mono, 'JetBrains Mono', monospace);
+            font-size: 0.68rem; color: var(--primary); font-weight: 700;
+            letter-spacing: 3px; text-transform: uppercase;
+            background: rgba(255, 77, 125, 0.14);
+            border: 1px solid rgba(255, 77, 125, 0.3);
+            padding: 5px 11px; border-radius: 8px;
         }
         .player-name { font-weight: 900; color: var(--text); font-size: 1rem; }
         
         #timer { 
-            font-family: 'JetBrains Mono'; font-weight: bold; color: var(--danger); 
-            font-size: 2rem; min-width: 60px; text-align: center;
-            text-shadow: 0 0 20px var(--danger);
+            font-family: var(--font-display); font-weight: 800; color: var(--danger); 
+            font-size: 2rem; min-width: 64px; text-align: center;
+            font-variant-numeric: tabular-nums;
+            text-shadow: 0 0 24px rgba(255, 90, 110, 0.65);
         }
-        #timer.warning { animation: pulse 0.5s infinite; color: #ff0000; }
+        #timer.warning { animation: pulse 0.5s infinite; color: #ff3b52; }
 
         /* === CANVAS AREA === */
         #game-area {
@@ -188,27 +213,30 @@
         }
         .tool-btn:hover { background: var(--accent); }
         .tool-btn.active { 
-            background: var(--primary); color: white; 
-            box-shadow: 0 4px 15px rgba(233, 69, 96, 0.4);
+            background: linear-gradient(135deg, var(--primary) 0%, #ff87ab 100%); color: white; 
+            box-shadow: 0 4px 18px rgba(255, 77, 125, 0.45), inset 0 1px 0 rgba(255,255,255,0.3);
         }
 
         .btn {
-            padding: 12px 25px; border-radius: 10px; border: none; font-family: inherit; 
-            font-weight: 700; cursor: pointer; font-size: 0.9rem; transition: all 0.2s;
-            text-transform: uppercase; letter-spacing: 1px;
+            padding: 13px 26px; border-radius: 12px; border: none; font-family: inherit; 
+            font-weight: 800; cursor: pointer; font-size: 0.88rem; transition: all 0.2s;
+            text-transform: uppercase; letter-spacing: 1.4px;
         }
         .btn:active { transform: scale(0.95); }
         .btn-primary { 
-            background: linear-gradient(135deg, var(--primary) 0%, #ff6b9d 100%); 
-            color: white; box-shadow: 0 4px 20px rgba(233, 69, 96, 0.4); 
+            background: linear-gradient(135deg, var(--primary) 0%, #ff87ab 100%); 
+            color: white; box-shadow: 0 4px 20px rgba(255, 77, 125, 0.4); 
         }
-        .btn-primary:hover { box-shadow: 0 6px 30px rgba(233, 69, 96, 0.6); }
+        .btn-primary:hover { box-shadow: 0 6px 30px rgba(255, 77, 125, 0.6); transform: translateY(-1px); }
         .btn-success { 
             background: linear-gradient(135deg, var(--success) 0%, #26d0ce 100%); 
-            color: white; 
+            color: #06282a;
+            box-shadow: 0 4px 20px rgba(47, 214, 200, 0.35);
         }
-        .btn-secondary { background: var(--accent); color: var(--text); }
-        .btn-danger { background: var(--danger); color: white; }
+        .btn-success:hover { transform: translateY(-1px); box-shadow: 0 6px 28px rgba(47, 214, 200, 0.5); }
+        .btn-secondary { background: var(--accent); color: var(--text); border: 1px solid var(--border); }
+        .btn-secondary:hover { background: #243158; }
+        .btn-danger { background: linear-gradient(135deg, var(--danger) 0%, #d63650 100%); color: white; }
         .btn-gold { 
             background: linear-gradient(135deg, #ffd700 0%, #ffaa00 100%); 
             color: #1a1a2e; 
@@ -216,36 +244,46 @@
 
         /* === OVERLAYS === */
         .overlay {
-            position: fixed; inset: 0; background: var(--bg);
+            position: fixed; inset: 0;
+            background:
+                radial-gradient(900px 480px at 50% -10%, rgba(34, 211, 238, 0.08), transparent 60%),
+                var(--bg);
             display: flex; flex-direction: column; justify-content: center; align-items: center;
             z-index: 1000; text-align: center; padding: 20px; overflow-y: auto;
         }
         .hidden { display: none !important; }
 
         .card {
-            background: var(--panel); padding: 30px; border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.4); width: 100%; max-width: 500px;
+            background: linear-gradient(160deg, rgba(255,255,255,0.05), rgba(255,255,255,0.015)), var(--panel);
+            padding: 32px; border-radius: 24px;
+            box-shadow: 0 24px 70px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.07);
+            width: 100%; max-width: 500px;
             display: flex; flex-direction: column; gap: 15px; 
-            border: 2px solid var(--border); animation: fadeIn 0.3s ease;
+            border: 1px solid var(--border); animation: fadeIn 0.3s ease;
         }
 
-        h1 { font-size: 2rem; margin: 0; color: var(--primary); letter-spacing: -1px; }
-        h2 { font-size: 1.5rem; margin: 0; color: var(--text); }
+        h1 { font-family: var(--font-display); font-size: 2.1rem; font-weight: 800; margin: 0; color: var(--primary); letter-spacing: 0.5px; text-shadow: 0 0 30px rgba(255, 77, 125, 0.35); }
+        h2 { font-family: var(--font-display); font-size: 1.5rem; font-weight: 700; margin: 0; color: var(--text); }
         
         input, select, textarea {
-            width: 100%; padding: 14px; border-radius: 10px; border: 2px solid var(--border);
-            background: var(--bg); font-family: 'JetBrains Mono', monospace; font-size: 1rem;
+            width: 100%; padding: 14px; border-radius: 12px; border: 1px solid var(--border);
+            background: rgba(11, 14, 28, 0.7); font-family: 'JetBrains Mono', monospace; font-size: 1rem;
             outline: none; color: var(--text);
+            transition: border-color 0.15s ease, box-shadow 0.15s ease;
         }
-        input:focus, select:focus, textarea:focus { border-color: var(--primary); }
-        input::placeholder { color: #666; }
+        input:focus, select:focus, textarea:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(255, 77, 125, 0.18);
+        }
+        input::placeholder { color: rgba(238, 241, 250, 0.4); }
 
         .theme-box {
             background: linear-gradient(135deg, var(--primary) 0%, #ff6b9d 100%);
             padding: 25px; border-radius: 15px; margin: 15px 0;
             font-size: 1.8rem; font-weight: 900; color: white;
             text-transform: uppercase; letter-spacing: 2px;
-            box-shadow: 0 10px 30px rgba(233, 69, 96, 0.4);
+            border-radius: 18px;
+            box-shadow: 0 12px 34px rgba(255, 77, 125, 0.4);
             animation: pulse 2s infinite;
         }
 
@@ -256,13 +294,15 @@
         }
 
         .player-card {
-            background: var(--bg); padding: 15px 10px; border-radius: 10px;
-            text-align: center; border: 2px solid var(--border);
+            background: rgba(11, 14, 28, 0.6); padding: 16px 10px; border-radius: 14px;
+            text-align: center; border: 1px solid var(--border);
             transition: all 0.3s;
         }
+        .player-card:hover { transform: translateY(-2px); border-color: rgba(148, 163, 255, 0.4); }
         .player-card.ready { 
             border-color: var(--success); 
-            background: rgba(78, 205, 196, 0.1);
+            background: rgba(47, 214, 200, 0.09);
+            box-shadow: 0 0 18px rgba(47, 214, 200, 0.15);
         }
         .player-card.host::after { 
             content: '👑'; display: block; font-size: 1.2rem; margin-top: 5px;
@@ -280,14 +320,15 @@
         .banner-left { display: flex; align-items: center; gap: 12px; }
         .banner-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
         .banner-icon { font-size: 1.8rem; }
-        .banner-title { font-weight: 900; font-size: 1.1rem; color: white; }
+        .banner-title { font-family: var(--font-display); font-weight: 800; font-size: 1.1rem; color: white; letter-spacing: 0.6px; }
         .banner-subtitle { font-size: 0.8rem; opacity: 0.9; color: white; }
 
         /* ✅ TIMER NEL BANNER - SEMPRE VISIBILE */
         .banner-timer {
-            font-family: 'JetBrains Mono', monospace;
+            font-family: var(--font-display);
+            font-variant-numeric: tabular-nums;
             font-size: 2rem;
-            font-weight: 900;
+            font-weight: 800;
             color: white;
             background: rgba(0, 0, 0, 0.3);
             padding: 8px 16px;
@@ -336,7 +377,7 @@
             border: 2px solid var(--border); transition: all 0.3s;
             cursor: pointer;
         }
-        .chain-step:hover { border-color: var(--primary); transform: translateY(-5px); }
+        .chain-step:hover { border-color: var(--primary); transform: translateY(-5px); box-shadow: 0 10px 30px rgba(255, 77, 125, 0.25); }
         .chain-step.voted { border-color: var(--gold); box-shadow: 0 0 20px rgba(255, 215, 0, 0.3); }
 
         .step-canvas {
@@ -422,7 +463,7 @@
         .place-3 .podium-avatar { border-color: var(--bronze); }
 
         .podium-name { font-weight: 700; font-size: 0.8rem; margin-top: 5px; }
-        .podium-score { font-size: 1.2rem; font-weight: 900; color: #1a1a2e; }
+        .podium-score { font-family: var(--font-display); font-size: 1.25rem; font-weight: 800; color: #10131f; }
 
         .full-ranking {
             background: var(--panel); border-radius: 15px; padding: 20px;
@@ -431,16 +472,19 @@
 
         .ranking-row {
             display: flex; justify-content: space-between; align-items: center;
-            padding: 12px 15px; border-radius: 8px; margin-bottom: 8px;
-            background: var(--bg);
+            padding: 13px 16px; border-radius: 14px; margin-bottom: 8px;
+            background: rgba(11, 14, 28, 0.6);
+            border: 1px solid var(--border);
+            transition: border-color 0.2s ease;
         }
-        .ranking-row.me { border: 2px solid var(--primary); }
+        .ranking-row:hover { border-color: rgba(148, 163, 255, 0.4); }
+        .ranking-row.me { border: 1px solid var(--primary); box-shadow: 0 0 18px rgba(255, 77, 125, 0.2); }
 
         .ranking-position { 
             font-weight: 900; font-size: 1.1rem; min-width: 30px;
         }
         .ranking-name { flex: 1; margin-left: 15px; font-weight: 600; }
-        .ranking-score { font-weight: 900; color: var(--primary); }
+        .ranking-score { font-family: var(--font-display); font-weight: 800; color: var(--primary); }
 
         /* === SPINNER === */
         .spinner {
@@ -460,7 +504,9 @@
         #loading-screen {
             position: fixed;
             inset: 0;
-            background: var(--bg);
+            background:
+                radial-gradient(900px 480px at 50% 0%, rgba(34, 211, 238, 0.08), transparent 60%),
+                var(--bg);
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -469,19 +515,23 @@
         }
 
         #loading-screen .spinner-big {
-            width: 60px;
-            height: 60px;
+            width: 62px;
+            height: 62px;
             border: 4px solid var(--primary);
             border-top-color: transparent;
             border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin-bottom: 20px;
+            animation: spin 0.9s linear infinite;
+            margin-bottom: 22px;
+            box-shadow: 0 0 30px rgba(255, 77, 125, 0.35);
         }
 
         #loading-screen p {
             color: var(--text);
-            font-size: 1.1rem;
-            opacity: 0.8;
+            font-family: var(--font-display);
+            font-size: 1.15rem;
+            font-weight: 600;
+            letter-spacing: 1px;
+            opacity: 0.85;
         }
 
         /* === PULSANTE HOME FISSO === */
@@ -501,23 +551,25 @@ body:has(#guessit-screen:not(.hidden)) #fixed-home-btn {
 }
 
         #fixed-home-btn button {
-            background: var(--panel);
+            background: rgba(18, 24, 50, 0.88);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
             color: var(--text);
-            border: 2px solid var(--primary);
-            padding: 12px 20px;
+            border: 1px solid rgba(255, 77, 125, 0.5);
+            padding: 12px 22px;
             border-radius: 50px;
-            font-weight: bold;
-            font-size: 1rem;
+            font-weight: 800;
+            font-size: 0.92rem;
+            letter-spacing: 0.6px;
             cursor: pointer;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
             transition: all 0.2s ease;
         }
 
         #fixed-home-btn button:hover {
-            transform: scale(1.05);
-            background: var(--primary);
-            color: white;
-            box-shadow: 0 6px 25px rgba(233, 69, 96, 0.4);
+            transform: scale(1.06) translateY(-2px);
+            border-color: var(--primary);
+            box-shadow: 0 14px 36px rgba(0, 0, 0, 0.55), 0 0 24px rgba(255, 77, 125, 0.35);
         }
 
         /* === RESPONSIVE === */
@@ -561,10 +613,10 @@ body:has(#guessit-screen:not(.hidden)) #fixed-home-btn {
     display: none !important;
 }
 .toolbar-left {
-    width: 90px;
-    min-width: 90px;
-    background: var(--panel);
-    border-right: 2px solid var(--border);
+    width: 92px;
+    min-width: 92px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.015)), var(--panel);
+    border-right: 1px solid var(--border);
     display: flex;
     flex-direction: column;
     padding: 15px 10px;
@@ -589,11 +641,11 @@ body:has(#guessit-screen:not(.hidden)) #fixed-home-btn {
 }
 
 .tool-label {
-    font-size: 0.65rem;
-    font-weight: bold;
-    opacity: 0.7;
+    font-size: 0.62rem;
+    font-weight: 700;
+    opacity: 0.65;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 1.4px;
     text-align: center;
     margin-bottom: 5px;
 }
@@ -602,9 +654,9 @@ body:has(#guessit-screen:not(.hidden)) #fixed-home-btn {
     width: 50px;
     height: 50px;
     font-size: 1.3rem;
-    border: 2px solid var(--border);
-    border-radius: 10px;
-    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: rgba(11, 14, 28, 0.65);
     color: var(--text);
     cursor: pointer;
     transition: all 0.2s;
@@ -616,13 +668,14 @@ body:has(#guessit-screen:not(.hidden)) #fixed-home-btn {
 .toolbar-left .tool-btn:hover {
     background: var(--accent);
     border-color: var(--primary);
+    transform: translateY(-1px);
 }
 
 .toolbar-left .tool-btn.active {
-    background: var(--primary);
-    border-color: var(--primary);
+    background: linear-gradient(135deg, var(--primary) 0%, #ff87ab 100%);
+    border-color: transparent;
     color: white;
-    box-shadow: 0 0 15px rgba(233, 69, 96, 0.4);
+    box-shadow: 0 6px 18px rgba(255, 77, 125, 0.45), inset 0 1px 0 rgba(255,255,255,0.3);
 }
 
 /* Slider dimensione pennello */
@@ -636,10 +689,10 @@ body:has(#guessit-screen:not(.hidden)) #fixed-home-btn {
 
 .size-slider {
     width: 70px;
-    height: 8px;
+    height: 6px;
     -webkit-appearance: none;
     appearance: none;
-    background: var(--bg);
+    background: var(--accent);
     border-radius: 4px;
     outline: none;
     cursor: pointer;
@@ -650,19 +703,21 @@ body:has(#guessit-screen:not(.hidden)) #fixed-home-btn {
     appearance: none;
     width: 20px;
     height: 20px;
-    background: var(--primary);
+    background: linear-gradient(135deg, var(--primary) 0%, #ff87ab 100%);
     border-radius: 50%;
     cursor: pointer;
-    border: 2px solid white;
+    border: 2px solid #fff;
+    box-shadow: 0 0 12px rgba(255, 77, 125, 0.6);
 }
 
 .size-slider::-moz-range-thumb {
     width: 20px;
     height: 20px;
-    background: var(--primary);
+    background: linear-gradient(135deg, var(--primary) 0%, #ff87ab 100%);
     border-radius: 50%;
     cursor: pointer;
-    border: 2px solid white;
+    border: 2px solid #fff;
+    box-shadow: 0 0 12px rgba(255, 77, 125, 0.6);
 }
 
 .size-preview {
@@ -737,7 +792,7 @@ body:has(#guessit-screen:not(.hidden)) #fixed-home-btn {
 .qcolor {
     width: 100%;
     aspect-ratio: 1;
-    border-radius: 4px;
+    border-radius: 7px;
     cursor: pointer;
     border: 2px solid transparent;
     transition: all 0.15s;
@@ -779,7 +834,9 @@ body:has(#guessit-screen:not(.hidden)) #fixed-home-btn {
     align-items: center;
     justify-content: center;
     position: relative;
-    background: #1a1a2e;
+    background:
+        radial-gradient(800px 400px at 50% -5%, rgba(255, 77, 125, 0.06), transparent 60%),
+        var(--bg);
     overflow: hidden;
     padding: 20px;
 }
@@ -800,27 +857,28 @@ body:has(#guessit-screen:not(.hidden)) #fixed-home-btn {
     width: 100% !important;
     height: 100% !important;
     background: white;
-    border-radius: 12px;
-    border: 4px solid var(--primary);
-    box-shadow: 0 10px 50px rgba(0,0,0,0.5);
+    border-radius: 18px;
+    border: 3px solid var(--primary);
+    box-shadow: 0 18px 60px rgba(0,0,0,0.55), 0 0 30px rgba(255, 77, 125, 0.18);
     cursor: crosshair;
     touch-action: none;
 }
 
 .canvas-badge-fullscreen {
     position: absolute;
-    top: 10px;
+    top: 12px;
     left: 50%;
     transform: translateX(-50%);
-    background: linear-gradient(135deg, var(--primary) 0%, #ff6b9d 100%);
+    background: linear-gradient(135deg, var(--primary) 0%, #ff87ab 100%);
     color: white;
-    padding: 10px 25px;
-    border-radius: 25px;
-    font-size: 1rem;
-    font-weight: 900;
+    padding: 11px 26px;
+    border-radius: 30px;
+    font-family: var(--font-display);
+    font-size: 0.95rem;
+    font-weight: 800;
     text-transform: uppercase;
-    letter-spacing: 1px;
-    box-shadow: 0 5px 20px rgba(233, 69, 96, 0.5);
+    letter-spacing: 1.6px;
+    box-shadow: 0 8px 26px rgba(255, 77, 125, 0.45);
     z-index: 50;
     white-space: nowrap;
     max-width: 90%;
@@ -831,14 +889,14 @@ body:has(#guessit-screen:not(.hidden)) #fixed-home-btn {
 /* Miniatura riferimento */
 .reference-thumbnail-fullscreen {
     position: absolute;
-    top: 60px;
+    top: 64px;
     right: 20px;
     width: 120px;
     height: 120px;
     background: white;
     border: 3px solid var(--success);
-    border-radius: 10px;
-    box-shadow: 0 5px 25px rgba(0,0,0,0.4);
+    border-radius: 16px;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.45), 0 0 20px rgba(47, 214, 200, 0.2);
     z-index: 50;
     cursor: pointer;
     transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -907,11 +965,12 @@ body:has(#guessit-screen:not(.hidden)) #fixed-home-btn {
 }
 
 .timer-display {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 2.2rem;
-    font-weight: 900;
+    font-family: var(--font-display);
+    font-size: 2.4rem;
+    font-weight: 800;
     color: var(--success);
-    text-shadow: 0 0 20px var(--success);
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 26px rgba(47, 214, 200, 0.6);
     line-height: 1;
 }
 
@@ -922,13 +981,16 @@ body:has(#guessit-screen:not(.hidden)) #fixed-home-btn {
 }
 
 .round-info {
-    font-size: 0.7rem;
-    font-weight: bold;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 2px;
     color: var(--primary);
     text-align: center;
     padding: 10px 5px;
-    background: rgba(233, 69, 96, 0.15);
-    border-radius: 8px;
+    background: rgba(255, 77, 125, 0.12);
+    border: 1px solid rgba(255, 77, 125, 0.25);
+    border-radius: 10px;
     width: 100%;
     line-height: 1.3;
 }
@@ -1280,9 +1342,9 @@ body:has(#guessit-screen:not(.hidden)) #fixed-home-btn {
                 <canvas id="guessitCanvas" style="
                     position: absolute; top: 0; left: 0;
                     width: 100% !important; height: 100% !important;
-                    background: white; border-radius: 12px;
-                    border: 4px solid var(--primary);
-                    box-shadow: 0 10px 50px rgba(0,0,0,0.5);
+                    background: white; border-radius: 18px;
+                    border: 3px solid var(--primary);
+                    box-shadow: 0 18px 60px rgba(0,0,0,0.55), 0 0 30px rgba(255, 77, 125, 0.18);
                     touch-action: none;
                 "></canvas>
             </div>
