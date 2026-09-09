@@ -3,10 +3,12 @@
   "private": true,
   "scripts": {
     "test:gym": "playwright test",
-    "test:gym:chromium": "playwright test --project=chromium"
+    "test:gym:chromium": "playwright test --project=chromium",
+    "test:patata": "node tests/patata/core.test.js && node tests/patata/multiplayer.test.js && node tests/patata/browser.test.js"
   },
   "devDependencies": {
     "@playwright/test": "1.58.2",
-    "@axe-core/playwright": "4.11.1"
+    "@axe-core/playwright": "4.11.1",
+    "jsdom": "^30.0.1"
   }
 }

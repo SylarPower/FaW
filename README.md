@@ -14,6 +14,7 @@ FaW/
 └── games/
     ├── shared/firebase-config.js   # Config Firebase condivisa (unica fonte)
     ├── ruzzle/index.html
+    ├── patata/                  # Patata Bollente (index.html + css/ + js/)
     ├── pictionary/index.html
     ├── gameof15/index.html
     ├── neonwar/index.html

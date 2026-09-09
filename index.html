@@ -545,6 +545,11 @@
 							<br>Ruzzle
 							<div class="game-badge online">SFIDA</div>
 						</div>
+						<div class="game-card" onclick="selezionaGioco('patata', this)" id="game-patata">
+							<span style="font-size:2rem;">🥔</span>
+							<br>Patata Bollente
+							<div class="game-badge online">SFIDA</div>
+						</div>
 						<div class="game-card" onclick="selezionaGioco('neonwar', this)" id="game-neonwar">
 						    <span style="font-size:2rem;">🚀</span><br>Neon War
 						    <div class="game-badge solo">SOLO</div>
@@ -669,6 +674,7 @@
 			let giocoSelezionato = "ruzzle";
 			const GAME_PATHS = {
 			    ruzzle: 'games/ruzzle/index.html',
+			    patata: 'games/patata/index.html',
 			    pictionary: 'games/pictionary/index.html',
 			    gameof15: 'games/gameof15/index.html',
 			    neonwar: 'games/neonwar/index.html',
@@ -684,6 +690,7 @@
 			}
 			let partiteCache = {
 			    ruzzle: [],
+			    patata: [],
 			    pictionary: [],
 			    neonwar: [],
 			    gameof15: [],
@@ -761,6 +768,67 @@
 			    }],
 			    minGiocatori: 1,
 			    maxGiocatori: 10
+			  },
+				 patata: {
+			    nome: "Patata Bollente",
+			    icona: "🥔",
+			    opzioni: [{
+			      id: "tempo",
+			      label: "Countdown",
+			      default: "60",
+			      valori: [{
+			        value: "30",
+			        label: "30s (Fulmine)"
+			      }, {
+			        value: "60",
+			        label: "60s (Standard)"
+			      }, {
+			        value: "120",
+			        label: "120s (Relax)"
+			      }]
+			    }, {
+			      id: "turni",
+			      label: "Turni",
+			      default: "3",
+			      valori: [{
+			        value: "1",
+			        label: "1 turno"
+			      }, {
+			        value: "2",
+			        label: "2 turni"
+			      }, {
+			        value: "3",
+			        label: "3 turni"
+			      }, {
+			        value: "4",
+			        label: "4 turni"
+			      }, {
+			        value: "5",
+			        label: "5 turni"
+			      }]
+			    }, {
+			      id: "lettere",
+			      label: "Lettere",
+			      default: "3",
+			      valori: [{
+			        value: "2",
+			        label: "2 lettere"
+			      }, {
+			        value: "3",
+			        label: "3 lettere"
+			      }, {
+			        value: "4",
+			        label: "4 lettere"
+			      }]
+			    }],
+			    modalita: [{
+			      id: "classic",
+			      label: "CLASSICA 🥔",
+			      colore: "#ff9e2c",
+			      testo: "#1a0d02"
+			    }],
+			    minGiocatori: 2,
+			    maxGiocatori: 8
 			  },
 				 neonwar: {
 			     nome: "Neon War",
@@ -1042,6 +1110,7 @@ function listen() {
         .where("partecipanti", "array-contains", mioNome)
         .onSnapshot(snap => {
 partiteCache.ruzzle = [];
+partiteCache.patata = [];
 partiteCache.neonwar = [];
 partiteCache.gameof15 = [];
 partiteCache.pong = [];
@@ -1051,6 +1120,7 @@ partiteCache.pong = [];
 	    if (data.gioco === 'neonwar') partiteCache.neonwar.push(data);
 	    else if (data.gioco === 'gameof15') partiteCache.gameof15.push(data);
 	    else if (data.gioco === 'pong') partiteCache.pong.push(data);
+	    else if (data.gioco === 'patata') partiteCache.patata.push(data);
 	    else if (data.gioco !== 'pictionary') partiteCache.ruzzle.push(data);
 	});
 
@@ -1103,6 +1173,9 @@ function renderTutteLePartite() {
     // Render Ruzzle
     partiteCache.ruzzle.forEach(p => renderPartitaRuzzle(p, div));
 
+    // Render Patata Bollente
+    partiteCache.patata.forEach(p => renderPartitaRuzzle(p, div));
+
     // Render NeonWar
     partiteCache.neonwar.forEach(p => renderPartitaRuzzle(p, div));
 
@@ -1119,6 +1192,7 @@ partiteCache.pictionary.forEach(p => renderPartitaPictionary(p, div));
 // ========================================
 function renderPartitaRuzzle(p, div) {
     const partitaId = p.id;
+    const nomeGioco = (GIOCHI_CONFIG[p.gioco] || {}).nome || p.gioco;
 
     if (p.stato === "conclusa") return;
 
@@ -1163,7 +1237,7 @@ function renderPartitaRuzzle(p, div) {
             } else {
                 div.innerHTML += `
                     <div class="user-item live-match">
-                        <span>✅ Sfida vs ${altriGiocatori.join(', ')} (${p.gioco})</span>
+                        <span>✅ Sfida vs ${altriGiocatori.join(', ')} (${nomeGioco})</span>
                         <div>
                             <button onclick="window.location.href='${gameHref(p.gioco, 'matchId=' + partitaId)}'" style="background:#03dac6; color:#000;">ENTRA</button>
                             <button onclick="event.stopPropagation(); if(confirm('Eliminare?')) db.collection('partite').doc('${partitaId}').delete()" style="background:#cf6679; margin-left:5px;">🗑️</button>
@@ -1195,7 +1269,7 @@ function renderPartitaRuzzle(p, div) {
         const altri = p.partecipanti.filter(n => n !== mioNome).join(", ");
         div.innerHTML += `
             <div class="user-item live-match">
-                <span>vs ${altri} (${p.gioco})</span>
+                <span>vs ${altri} (${nomeGioco})</span>
                 <div>
                     <button onclick="window.location.href='${gameHref(p.gioco, 'matchId=' + partitaId)}'" style="background:#03dac6; color:#000;">ENTRA</button>
                     <button onclick="event.stopPropagation(); if(confirm('Eliminare?')) db.collection('partite').doc('${partitaId}').delete()" style="background:#cf6679; margin-left:5px;">🗑️</button>
@@ -1690,9 +1764,10 @@ if (giocoSelezionato === 'pictionary') {
 			    partite.slice(0, 10).forEach(p => {
 			      let classif = Object.entries(p.punteggi).sort((a, b) => b[1] - a[1]);
 			      let vincitore = classif[0][0];
+			      let nomeGiocoStorico = (GIOCHI_CONFIG[p.gioco] || {}).nome || p.gioco.toUpperCase();
 			      div.innerHTML += `
 											<div class="history-item">
-												<span>${p.dataOra} - ${p.gioco.toUpperCase()}</span>
+												<span>${p.dataOra} - ${nomeGiocoStorico}</span>
 												<span>Vinto da:
 													<b>${vincitore}</b>
 												</span>
