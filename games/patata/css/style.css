@@ -23,7 +23,8 @@
   --radius-sm: 12px;
   --shadow-card: 0 10px 40px rgba(0, 0, 0, 0.45);
   --shadow-fire: 0 8px 28px rgba(255, 95, 31, 0.35);
-  --font: 'Outfit', 'Segoe UI', system-ui, sans-serif;
+  --font: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font-display: 'Tektur', 'Inter', system-ui, sans-serif;
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -1034,4 +1035,21 @@ button { font-family: var(--font); }
 :focus-visible {
   outline: 2px solid var(--gold);
   outline-offset: 2px;
+}
+
+/* =========================================================
+   Piattaforma FaW — tipografia display (design system)
+   ========================================================= */
+.game-title,
+#screen-lobby h2,
+#fine-title,
+.ltile,
+.timer-sec,
+.config-value {
+  font-family: var(--font-display);
+  letter-spacing: 0.5px;
+}
+.srow .pts,
+.prow .pts {
+  font-family: var(--font-display);
 }

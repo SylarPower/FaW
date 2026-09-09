@@ -1,0 +1,544 @@
+/* ==========================================================================
+   FaW — Design System "Obsidian"
+   Piattaforma premium condivisa da hub e giochi (tranne palestra).
+   Caricare DOPO <head> fonts (Tektur / Inter / JetBrains Mono).
+   Ogni gioco imposta il proprio accento: --faw-acc / --faw-acc-2 / --faw-acc-soft
+   ========================================================================== */
+
+:root {
+  /* --- Tipografia --- */
+  --faw-font-display: 'Tektur', 'Inter', system-ui, sans-serif;
+  --faw-font-body: 'Inter', system-ui, -apple-system, sans-serif;
+  --faw-font-mono: 'JetBrains Mono', 'SFMono-Regular', Consolas, monospace;
+
+  /* --- Accento (override per pagina) --- */
+  --faw-acc: #6366f1;
+  --faw-acc-2: #a855f7;
+  --faw-acc-soft: rgba(99, 102, 241, 0.16);
+  --faw-acc-glow: rgba(99, 102, 241, 0.45);
+
+  /* --- Superfici (dark default) --- */
+  --faw-bg: #0a0c14;
+  --faw-bg-2: #0d1019;
+  --faw-bg-3: #121627;
+  --faw-panel: rgba(255, 255, 255, 0.035);
+  --faw-panel-2: rgba(255, 255, 255, 0.065);
+  --faw-panel-solid: #131829;
+  --faw-border: rgba(255, 255, 255, 0.085);
+  --faw-border-2: rgba(255, 255, 255, 0.16);
+  --faw-text: #f2f4fb;
+  --faw-text-2: #aab2cc;
+  --faw-text-3: #6d7594;
+
+  /* --- Semantica (costanti, neuromarketing: verde=azione/ok, rosso=pericolo) --- */
+  --faw-ok: #2fd67b;
+  --faw-ok-soft: rgba(47, 214, 123, 0.14);
+  --faw-warn: #ffb020;
+  --faw-warn-soft: rgba(255, 176, 32, 0.14);
+  --faw-danger: #ff5a6e;
+  --faw-danger-soft: rgba(255, 90, 110, 0.14);
+  --faw-info: #38bdf8;
+  --faw-info-soft: rgba(56, 189, 248, 0.14);
+
+  /* --- Forma --- */
+  --faw-r-sm: 10px;
+  --faw-r-md: 14px;
+  --faw-r-lg: 20px;
+  --faw-r-xl: 26px;
+  --faw-shadow-1: 0 2px 10px rgba(0, 0, 0, 0.28);
+  --faw-shadow-2: 0 10px 34px rgba(0, 0, 0, 0.42);
+  --faw-shadow-3: 0 24px 70px rgba(0, 0, 0, 0.55);
+  --faw-glow-acc: 0 0 0 1px var(--faw-acc-soft), 0 8px 30px var(--faw-acc-glow);
+
+  /* --- Movimento --- */
+  --faw-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --faw-fast: 140ms;
+  --faw-med: 240ms;
+
+  color-scheme: dark;
+}
+
+/* --- Tema chiaro (solo hub: <html data-theme="light">) --- */
+:root[data-theme='light'] {
+  color-scheme: light;
+  --faw-bg: #f3f5fb;
+  --faw-bg-2: #eef1f9;
+  --faw-bg-3: #e7ebf7;
+  --faw-panel: rgba(16, 20, 40, 0.032);
+  --faw-panel-2: rgba(16, 20, 40, 0.058);
+  --faw-panel-solid: #ffffff;
+  --faw-border: rgba(16, 20, 40, 0.10);
+  --faw-border-2: rgba(16, 20, 40, 0.20);
+  --faw-text: #171b2c;
+  --faw-text-2: #4c5570;
+  --faw-text-3: #8b93ad;
+  --faw-shadow-1: 0 2px 10px rgba(23, 30, 66, 0.08);
+  --faw-shadow-2: 0 10px 34px rgba(23, 30, 66, 0.12);
+  --faw-shadow-3: 0 24px 70px rgba(23, 30, 66, 0.16);
+}
+
+/* ==========================================================================
+   BASE
+   ========================================================================== */
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--faw-bg);
+  color: var(--faw-text);
+  font-family: var(--faw-font-body);
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+h1, h2, h3, h4 { font-family: var(--faw-font-display); letter-spacing: 0.2px; margin: 0; }
+a { color: var(--faw-acc); }
+::selection { background: var(--faw-acc-soft); }
+:focus-visible { outline: 2px solid var(--faw-acc); outline-offset: 2px; border-radius: 6px; }
+
+/* Scrollbar premium */
+* { scrollbar-width: thin; scrollbar-color: var(--faw-border-2) transparent; }
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-thumb {
+  background: var(--faw-border-2);
+  border-radius: 99px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-track { background: transparent; }
+
+/* ==========================================================================
+   SCENA AMBIENTALE (glow lenti + griglia sottile)
+   ========================================================================== */
+.faw-stage {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  background:
+    radial-gradient(1200px 700px at 85% -10%, var(--faw-acc-soft), transparent 60%),
+    radial-gradient(1000px 600px at -10% 110%, rgba(56, 189, 248, 0.08), transparent 60%),
+    linear-gradient(180deg, var(--faw-bg) 0%, var(--faw-bg-2) 100%);
+}
+:root[data-theme='light'] .faw-stage {
+  background:
+    radial-gradient(1200px 700px at 85% -10%, var(--faw-acc-soft), transparent 60%),
+    radial-gradient(1000px 600px at -10% 110%, rgba(56, 189, 248, 0.10), transparent 60%),
+    linear-gradient(180deg, #f6f8ff 0%, var(--faw-bg) 100%);
+}
+.faw-stage::before,
+.faw-stage::after {
+  content: '';
+  position: absolute;
+  width: 46vw; height: 46vw;
+  border-radius: 50%;
+  filter: blur(90px);
+  opacity: 0.5;
+}
+.faw-stage::before {
+  background: radial-gradient(circle, var(--faw-acc-soft), transparent 65%);
+  top: -18vw; right: -12vw;
+  animation: faw-drift 26s var(--faw-ease) infinite alternate;
+}
+.faw-stage::after {
+  background: radial-gradient(circle, rgba(56, 189, 248, 0.12), transparent 65%);
+  bottom: -20vw; left: -14vw;
+  animation: faw-drift 34s var(--faw-ease) infinite alternate-reverse;
+}
+@keyframes faw-drift {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to   { transform: translate3d(6vw, 4vh, 0) scale(1.12); }
+}
+
+/* ==========================================================================
+   BOTTONI
+   ========================================================================== */
+.faw-btn {
+  --btn-bg: var(--faw-panel-2);
+  --btn-fg: var(--faw-text);
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid var(--faw-border);
+  background: var(--btn-bg);
+  color: var(--btn-fg);
+  font-family: var(--faw-font-body);
+  font-weight: 600;
+  font-size: 0.92rem;
+  letter-spacing: 0.2px;
+  padding: 10px 18px;
+  border-radius: var(--faw-r-md);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  transition: transform var(--faw-fast) var(--faw-ease), box-shadow var(--faw-fast) var(--faw-ease),
+    background var(--faw-fast) var(--faw-ease), border-color var(--faw-fast) var(--faw-ease),
+    filter var(--faw-fast) var(--faw-ease);
+}
+.faw-btn:hover { transform: translateY(-1px); border-color: var(--faw-border-2); }
+.faw-btn:active { transform: translateY(0) scale(0.975); }
+.faw-btn:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
+
+/* CTA primaria: gradiente + glow + sheen (Von Restorff) */
+.faw-btn--primary {
+  --btn-fg: #0b0e18;
+  border: none;
+  background: linear-gradient(135deg, var(--faw-acc) 0%, var(--faw-acc-2) 100%);
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.22);
+  box-shadow: 0 6px 22px var(--faw-acc-glow), inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  font-weight: 700;
+  overflow: hidden;
+}
+.faw-btn--primary::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, 0.35) 50%, transparent 65%);
+  transform: translateX(-120%);
+  transition: transform 600ms var(--faw-ease);
+  pointer-events: none;
+}
+.faw-btn--primary:hover { box-shadow: 0 10px 30px var(--faw-acc-glow), inset 0 1px 0 rgba(255, 255, 255, 0.28); filter: brightness(1.06); }
+.faw-btn--primary:hover::after { transform: translateX(120%); }
+.faw-btn--primary .arr { transition: transform var(--faw-fast) var(--faw-ease); }
+.faw-btn--primary:hover .arr { transform: translateX(3px); }
+
+.faw-btn--gold {
+  border: none;
+  background: linear-gradient(135deg, #ffd166 0%, #ffb020 100%);
+  color: #241500;
+  box-shadow: 0 6px 22px rgba(255, 176, 32, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  font-weight: 700;
+}
+.faw-btn--gold:hover { filter: brightness(1.05); }
+
+.faw-btn--danger { background: var(--faw-danger-soft); color: var(--faw-danger); border-color: rgba(255, 90, 110, 0.3); }
+.faw-btn--danger:hover { background: rgba(255, 90, 110, 0.22); border-color: rgba(255, 90, 110, 0.5); }
+
+.faw-btn--ghost { background: transparent; }
+.faw-btn--ghost:hover { background: var(--faw-panel-2); }
+
+.faw-btn--lg { padding: 14px 26px; font-size: 1.02rem; border-radius: var(--faw-r-lg); }
+.faw-btn--sm { padding: 6px 12px; font-size: 0.8rem; border-radius: var(--faw-r-sm); }
+.faw-btn--icon {
+  padding: 9px 11px;
+  font-size: 1.05rem;
+  line-height: 1;
+  background: var(--faw-panel-2);
+}
+.faw-btn--block { width: 100%; }
+
+/* Pulsante casa condiviso (tutti i giochi: classe .fixed-home-btn) */
+.fixed-home-btn {
+  position: fixed;
+  top: 18px;
+  left: 18px;
+  z-index: 9990;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--faw-border-2);
+  background: color-mix(in srgb, var(--faw-panel-solid) 82%, transparent);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  color: var(--faw-text);
+  font-family: var(--faw-font-body);
+  font-weight: 700;
+  font-size: 0.85rem;
+  letter-spacing: 0.4px;
+  cursor: pointer;
+  box-shadow: var(--faw-shadow-2);
+  transition: transform var(--faw-fast) var(--faw-ease), box-shadow var(--faw-fast) var(--faw-ease), border-color var(--faw-fast) var(--faw-ease);
+}
+.fixed-home-btn:hover {
+  transform: translateY(-2px);
+  border-color: var(--faw-acc);
+  box-shadow: var(--faw-glow-acc);
+}
+
+/* ==========================================================================
+   CARD / PANNELLI
+   ========================================================================== */
+.faw-card {
+  position: relative;
+  background: var(--faw-panel);
+  border: 1px solid var(--faw-border);
+  border-radius: var(--faw-r-xl);
+  padding: 22px 24px;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: var(--faw-shadow-1);
+}
+.faw-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.14), transparent);
+  border-radius: var(--faw-r-xl) var(--faw-r-xl) 0 0;
+  pointer-events: none;
+}
+.faw-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.faw-card__head h2,
+.faw-card__head h3 {
+  font-size: 1.06rem;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+}
+.faw-card__hint { font-size: 0.8rem; color: var(--faw-text-3); font-weight: 500; }
+
+/* ==========================================================================
+   PILL / BADGE / DOT LIVE
+   ========================================================================== */
+.faw-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--faw-border);
+  background: var(--faw-panel-2);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  color: var(--faw-text-2);
+  text-transform: uppercase;
+}
+.faw-pill b { color: var(--faw-text); }
+.faw-pill--live { border-color: rgba(47, 214, 123, 0.35); background: var(--faw-ok-soft); color: var(--faw-ok); }
+.faw-pill--acc { border-color: var(--faw-acc-soft); background: var(--faw-acc-soft); color: var(--faw-text); }
+.faw-pill--warn { border-color: rgba(255, 176, 32, 0.35); background: var(--faw-warn-soft); color: var(--faw-warn); }
+
+.faw-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--faw-ok);
+  box-shadow: 0 0 0 0 rgba(47, 214, 123, 0.55);
+  animation: faw-pulse 2s infinite;
+}
+@keyframes faw-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(47, 214, 123, 0.5); }
+  70%  { box-shadow: 0 0 0 9px rgba(47, 214, 123, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(47, 214, 123, 0); }
+}
+.faw-dot--acc { background: var(--faw-acc); animation-name: faw-pulse-acc; }
+@keyframes faw-pulse-acc {
+  0%   { box-shadow: 0 0 0 0 var(--faw-acc-glow); }
+  70%  { box-shadow: 0 0 0 9px rgba(0, 0, 0, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(0, 0, 0, 0); }
+}
+
+.faw-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 7px;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 1.1px;
+  text-transform: uppercase;
+}
+.faw-badge--online { background: var(--faw-ok-soft); color: var(--faw-ok); border: 1px solid rgba(47, 214, 123, 0.3); }
+.faw-badge--solo { background: var(--faw-info-soft); color: var(--faw-info); border: 1px solid rgba(56, 189, 248, 0.3); }
+.faw-badge--hot { background: linear-gradient(135deg, #ff5a6e, #ffb020); color: #fff; }
+
+/* ==========================================================================
+   INPUT
+   ========================================================================== */
+.faw-input, .faw-select {
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: var(--faw-r-md);
+  border: 1px solid var(--faw-border);
+  background: var(--faw-panel);
+  color: var(--faw-text);
+  font-family: var(--faw-font-body);
+  font-size: 0.95rem;
+  font-weight: 500;
+  transition: border-color var(--faw-fast) var(--faw-ease), box-shadow var(--faw-fast) var(--faw-ease), background var(--faw-fast) var(--faw-ease);
+}
+.faw-input::placeholder { color: var(--faw-text-3); }
+.faw-input:focus, .faw-select:focus {
+  outline: none;
+  border-color: var(--faw-acc);
+  box-shadow: 0 0 0 3px var(--faw-acc-soft);
+  background: var(--faw-panel-2);
+}
+.faw-select { cursor: pointer; appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, var(--faw-text-2) 50%), linear-gradient(135deg, var(--faw-text-2) 50%, transparent 50%);
+  background-position: calc(100% - 18px) 55%, calc(100% - 13px) 55%;
+  background-size: 5px 5px;
+  background-repeat: no-repeat;
+}
+
+/* ==========================================================================
+   AVATAR (iniziali, tinta deterministica via --h)
+   ========================================================================== */
+.faw-avatar {
+  --h: 240;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  background: linear-gradient(135deg, hsl(var(--h) 70% 52%), hsl(calc(var(--h) + 40) 70% 42%));
+  color: #fff;
+  font-family: var(--faw-font-display);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 3px 10px rgba(0, 0, 0, 0.3);
+}
+.faw-avatar--sm { width: 26px; height: 26px; font-size: 0.66rem; }
+
+/* ==========================================================================
+   MODAL
+   ========================================================================== */
+.faw-modal__overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(5, 7, 14, 0.62);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  animation: faw-fade var(--faw-med) var(--faw-ease);
+}
+:root[data-theme='light'] .faw-modal__overlay { background: rgba(20, 26, 48, 0.4); }
+.faw-modal {
+  width: min(560px, 100%);
+  max-height: min(86vh, 900px);
+  overflow-y: auto;
+  background: var(--faw-panel-solid);
+  border: 1px solid var(--faw-border-2);
+  border-radius: var(--faw-r-xl);
+  box-shadow: var(--faw-shadow-3), var(--faw-glow-acc);
+  animation: faw-pop var(--faw-med) var(--faw-ease);
+}
+.faw-modal__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px 0;
+}
+.faw-modal__body { padding: 18px 24px 24px; }
+.faw-modal__close {
+  width: 34px; height: 34px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  border: 1px solid var(--faw-border);
+  background: var(--faw-panel-2);
+  color: var(--faw-text-2);
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all var(--faw-fast) var(--faw-ease);
+}
+.faw-modal__close:hover { color: var(--faw-danger); border-color: var(--faw-danger); transform: rotate(90deg); }
+
+/* ==========================================================================
+   TOAST
+   ========================================================================== */
+.faw-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 26px;
+  transform: translateX(-50%);
+  z-index: 10001;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 13px 24px;
+  border-radius: 999px;
+  border: 1px solid var(--faw-border-2);
+  background: color-mix(in srgb, var(--faw-panel-solid) 90%, transparent);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  color: var(--faw-text);
+  font-weight: 600;
+  font-size: 0.92rem;
+  box-shadow: var(--faw-shadow-3);
+  animation: faw-toast-in 260ms var(--faw-ease);
+  white-space: nowrap;
+  max-width: 92vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.faw-toast--err { border-color: rgba(255, 90, 110, 0.45); color: var(--faw-danger); }
+.faw-toast--ok { border-color: rgba(47, 214, 123, 0.45); }
+@keyframes faw-toast-in {
+  from { opacity: 0; transform: translate(-50%, 14px) scale(0.96); }
+  to   { opacity: 1; transform: translate(-50%, 0) scale(1); }
+}
+
+/* ==========================================================================
+   ANIMAZIONI & UTILITY
+   ========================================================================== */
+@keyframes faw-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes faw-rise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+@keyframes faw-pop { from { opacity: 0; transform: translateY(10px) scale(0.965); } to { opacity: 1; transform: none; } }
+@keyframes faw-shine { from { background-position: -200% 0; } to { background-position: 200% 0; } }
+@keyframes faw-breathe { 0%, 100% { box-shadow: 0 6px 22px var(--faw-acc-glow); } 50% { box-shadow: 0 6px 34px var(--faw-acc-glow), 0 0 0 4px var(--faw-acc-soft); } }
+
+/* CTA "respirante" (attenzione periferica, usata con parsimonia) */
+.faw-breathe { animation: faw-breathe 2.6s ease-in-out infinite; }
+
+/* Ingresso a cascata dei figli */
+.faw-stagger > * { animation: faw-rise 420ms var(--faw-ease) both; }
+.faw-stagger > *:nth-child(1) { animation-delay: 0ms; }
+.faw-stagger > *:nth-child(2) { animation-delay: 55ms; }
+.faw-stagger > *:nth-child(3) { animation-delay: 110ms; }
+.faw-stagger > *:nth-child(4) { animation-delay: 165ms; }
+.faw-stagger > *:nth-child(5) { animation-delay: 220ms; }
+.faw-stagger > *:nth-child(6) { animation-delay: 275ms; }
+.faw-stagger > *:nth-child(7) { animation-delay: 330ms; }
+.faw-stagger > *:nth-child(8) { animation-delay: 385ms; }
+.faw-stagger > *:nth-child(n + 9) { animation-delay: 440ms; }
+
+/* Numeri display (timer, punteggi) */
+.faw-num {
+  font-family: var(--faw-font-display);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.5px;
+}
+
+/* Confetti (particelle DOM lanciate da JS: .faw-confetti > i) */
+.faw-confetti { position: fixed; inset: 0; pointer-events: none; z-index: 10002; overflow: hidden; }
+.faw-confetti i {
+  position: absolute;
+  top: -3vh;
+  width: 9px; height: 14px;
+  border-radius: 2px;
+  opacity: 0.95;
+  animation: faw-confetti-fall linear both;
+}
+@keyframes faw-confetti-fall {
+  to { transform: translateY(106vh) rotate(660deg); opacity: 0.75; }
+}
+
+/* Utilità varie */
+.faw-hidden { display: none !important; }
+.faw-mono { font-family: var(--faw-font-mono); }
+.faw-text-2 { color: var(--faw-text-2); }
+.faw-text-3 { color: var(--faw-text-3); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+}

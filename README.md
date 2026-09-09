@@ -13,6 +13,7 @@ FaW/
 ├── esercizi/               # Asset legacy (non usati dalla palestra)
 └── games/
     ├── shared/firebase-config.js   # Config Firebase condivisa (unica fonte)
+    ├── shared/faw-ui.css           # Design system premium condivisa (token + componenti)
     ├── ruzzle/index.html
     ├── patata/                  # Patata Bollente (index.html + css/ + js/)
     ├── pictionary/index.html
@@ -47,6 +48,21 @@ Poi registra il gioco in `index.html`:
 3. Aggiungi la configurazione in `GIOCHI_CONFIG` (nome, icone, opzioni, modalità, min/max giocatori)
 
 Dalla pagina del gioco, il ritorno alla home è `../../index.html`.
+
+## Design system (faw-ui.css)
+
+`games/shared/faw-ui.css` è il layer visivo premium condiviso: token (colori, font
+Tektur/Inter/JetBrains Mono, shadow, radius) e componenti (`.faw-*`, `.fixed-home-btn`).
+
+- L'**hub** (`index.html`) e i giochi **ruzzle, patata, pictionary, gameof15, neonwar** la
+  caricano *prima* dei loro `<style>`/`css`, così le regole locali restano a governare
+  l'identità del singolo gioco.
+- **Pong** mantiene il proprio sistema (Tektur/Outfit + palette dedicata) perché è già
+  allineato al linguaggio premium.
+- **Palestra** è mobile-first e non la usa.
+
+Quando aggiungi un gioco, linka `../shared/faw-ui.css` nel `<head>` (dopo i font, prima
+dei tuoi stili) per ereditare la base e il pulsante HOME standard.
 
 ## Configurazione Firebase
 
