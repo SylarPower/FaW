@@ -206,14 +206,14 @@ test("rush: le categorie 'votazione' non hanno risposte ammesse (il dizionario n
 
 test("rush: guard unico sulla risposta (tardiva, duplicata, a round chiuso)", () => {
   const base = {
-    stato: "in_corso", startAt: 1000000, durata: 4 * R.CFG.roundMs, opzioni: {}, rush: {}
+    stato: "in_corso", partecipanti: ["ALICE", "BOB"], startAt: 1000000, durata: 4 * R.CFG.roundMs, opzioni: {}, rush: {}
   };
   const dentro = (ms) => 1000000 + ms;
   assert.equal(R.puoScrivere(base, "ALICE", { ora: dentro(3000) }).ok, true, "in tempo: sì");
   assert.equal(R.puoScrivere(base, "ALICE", { ora: dentro(27000) }).motivo, "ROUND_GIA_CHIUSO",
     "il round è chiuso: la risposta tardiva non recupera nulla");
   assert.equal(R.puoScrivere(base, "ALICE", { ora: dentro(31000) }).ok, true,
-    "round 2 aperto: la risposta va a quello, non a quello visto a schermo");
+    "round 2 aperto: il guard senza payload identifica il round corrente");
   assert.equal(R.puoScrivere(base, "ALICE", { ora: dentro(31000) }).indice, 1);
   assert.equal(R.puoScrivere(base, "ALICE", { ora: dentro(-1000) }).motivo, "COUNTDOWN_IN_CORSO",
     "countdown: troppo presto");
@@ -229,7 +229,7 @@ test("rush: guard unico sulla risposta (tardiva, duplicata, a round chiuso)", ()
 });
 
 test("rush: un round si chiude solo quando la finestra di scrittura è finita", () => {
-  const cur = { stato: "in_corso", startAt: 1000000, durata: 4 * R.CFG.roundMs, opzioni: {}, rush: {} };
+  const cur = { stato: "in_corso", partecipanti: ["ALICE", "BOB"], startAt: 1000000, durata: 4 * R.CFG.roundMs, opzioni: {}, rush: {} };
   const at = (ms) => 1000000 + ms;
   assert.equal(R.puoChiudere(cur, 0, { ora: at(20000) }), false, "la partita è ancora in corso: non si chiude");
   assert.equal(R.puoChiudere(cur, 0, { ora: at(R.CFG.inputMs + 500) }), true, "rivelazione iniziata: si chiude");

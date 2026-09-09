@@ -4,7 +4,7 @@
  * Usa LO STESSO dizionario di Ruzzle: `dizionario.txt` nella root del repo,
  * caricato con la stessa normalizzazione (`games/ruzzle/index.html`,
  * `loadDictionary()`), così le decisioni "parola valida / no" sono identiche
- * tra Ruzzle, Parole in Arena e La Bomba delle Parole.
+ * tra Ruzzle e La Bomba delle Parole.
  * Nessuna API esterna, nessun secondo dizionario.
  *
  * Perché un modulo condiviso: duplicare il parser del dizionario in tre giochi
@@ -37,91 +37,100 @@
 
   /* ------------------------------ dizionario ------------------------------ */
 
-  var words = null;      // Set<string>
-  var byLen = null;      // Map<number, string[]>
-  var tri = null;        // Map<string, number>  trigrammi -> n. parole
+  var words = null, baseWords = null, publicationKey = null;
+  var byLen = null;
   var trieRoot = null;
+  var loading = null;
+  var sequenceIndexes = new Map();
+  var sequencePools = new Map();
 
-  function addWordsFrom(text, set, minLen, excluded) {
-    var n = 0;
-    text.split("\n").forEach(function (line) {
-      var clean = norm(line);
-      if (clean.length >= (minLen || MIN_LEN) && /^[A-Z]+$/.test(clean) && !(excluded || []).includes(clean)) {
-        if (!set.has(clean)) { set.add(clean); n++; }
-      }
-    });
-    return n;
+  function resetIndexes() {
+    byLen = null; trieRoot = null;
+    sequenceIndexes.clear(); sequencePools.clear();
   }
 
-  function buildIndex() {
-    byLen = new Map();
-    tri = new Map();
-    words.forEach(function (w) {
-      if (!byLen.has(w.length)) byLen.set(w.length, []);
-      byLen.get(w.length).push(w);
-      for (var i = 0; i + 3 <= w.length; i++) {
-        var g = w.slice(i, i + 3);
-        tri.set(g, (tri.get(g) || 0) + 1);
-      }
-    });
+  function buildTrie() {
+    if (trieRoot || !words) return;
     trieRoot = Object.create(null);
     words.forEach(function (w) {
       var node = trieRoot;
-      for (var i = 0; i < w.length; i++) {
-        var c = w[i];
-        if (!node[c]) node = node[c] = Object.create(null);
-        else node = node[c];
-      }
+      for (var i = 0; i < w.length; i++) node = node[w[i]] || (node[w[i]] = Object.create(null));
       node.$ = true;
     });
   }
 
   function load(opts) {
     opts = opts || {};
+    if (isDictionaryReady() && !opts.urls) return Promise.resolve({ size: words.size });
+    if (loading) return loading;
     var urls = opts.urls || DICT_URLS;
-    var minLen = opts.minLen || MIN_LEN;
-    var set = new Set();
     function tryUrl(i) {
-      if (i >= urls.length) return Promise.reject(new Error("dizionario non raggiungibile"));
-      return fetch(urls[i]).then(function (r) {
+      if (i >= urls.length) return Promise.reject(new Error("Dizionario non raggiungibile. Controlla la connessione e riprova."));
+      var controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+      var timeout = setTimeout(function () { if (controller) controller.abort(); }, 12000);
+      return fetch(urls[i], controller ? { signal: controller.signal } : {}).then(function (r) {
         if (!r.ok) throw new Error("HTTP " + r.status);
         return r.text();
       }).then(function (text) {
-        addWordsFrom(text, set, minLen, opts.excluded);
-        return set;
-      }).catch(function (e) {
-        global.console && console.warn("[FAWWords] fallback", urls[i], e && e.message);
-        return tryUrl(i + 1);
-      });
+        // Alcuni hosting restituiscono index.html con HTTP 200 sui path mancanti.
+        if (/<(?:!doctype|html|body)\b/i.test(text)) throw new Error("Il file ricevuto non è un dizionario");
+        var list = text.split(/\r?\n/).map(norm).filter(function (w) { return w.length >= (opts.minLen || MIN_LEN); });
+        if (!list.length) throw new Error("Dizionario vuoto");
+        setWords(list, opts);
+        return setPublication(opts.publication || { extra: opts.extra || [], excluded: opts.excluded || [] });
+      }).catch(function () { return tryUrl(i + 1); })
+        .finally(function () { clearTimeout(timeout); });
     }
-    return tryUrl(0).then(function (s) {
-      words = s;
-      buildIndex();
-      (opts.extra || []).forEach(function (w) {
-        var c = norm(w);
-        if (c.length >= minLen) { words.add(c); buildIndex(); }
-      });
-      return { size: words.size };
-    });
+    loading = tryUrl(0).finally(function () { loading = null; });
+    return loading;
   }
 
-  /** Permette ai test (Node) di iniettare un dizionario minimo. */
   function setWords(list, opts) {
     words = new Set(list.map(norm).filter(function (w) { return w.length >= ((opts && opts.minLen) || MIN_LEN); }));
-    buildIndex();
+    baseWords = words; publicationKey = null;
+    resetIndexes();
     return { size: words.size };
   }
-
-  function isDictionaryReady() { return !!words; }
+  // Il corpus scaricato resta immutato: sostituzioni di uguale lunghezza,
+  // esclusioni revocate e ritorno al lessico base invalidano davvero gli indici.
+  function setPublication(snapshot) {
+    snapshot = snapshot || {};
+    var extra = Array.from(new Set((snapshot.extra || []).map(norm))).sort();
+    var excluded = Array.from(new Set((snapshot.excluded || []).map(norm))).sort();
+    var key = JSON.stringify([extra, excluded]);
+    if (publicationKey === key && words) return { size: words.size };
+    if (!baseWords) throw new Error("Carica prima il dizionario base");
+    words = new Set(baseWords);
+    extra.forEach(function (w) { if (w.length >= MIN_LEN) words.add(w); });
+    excluded.forEach(function (w) { words.delete(w); });
+    publicationKey = key; resetIndexes();
+    return { size: words.size };
+  }
+  function isBaseWord(w) { return !!baseWords && baseWords.has(norm(w)); }
+  function isDictionaryReady() { return !!baseWords && baseWords.size > 0; }
   function dictionarySize() { return words ? words.size : 0; }
-  function isWord(w) { return !!words && words.has(norm(w)); }
+  function isWord(w, snapshot) {
+    var n = norm(w);
+    if (snapshot) return (isBaseWord(n) || (snapshot.extra || []).indexOf(n) >= 0) && (snapshot.excluded || []).indexOf(n) < 0;
+    return !!words && words.has(n);
+  }
   function hasPrefix(p) {
+    buildTrie();
     if (!trieRoot) return false;
     var node = trieRoot, s = norm(p);
     for (var i = 0; i < s.length; i++) { if (!node[s[i]]) return false; node = node[s[i]]; }
     return true;
   }
-  function wordsOfLength(n) { return (byLen && byLen.get(n)) || []; }
+  function wordsOfLength(n) {
+    if (!byLen) {
+      byLen = new Map();
+      if (words) words.forEach(function (w) {
+        if (!byLen.has(w.length)) byLen.set(w.length, []);
+        byLen.get(w.length).push(w);
+      });
+    }
+    return byLen.get(n) || [];
+  }
 
   /* ------------------------------- punteggio ------------------------------ */
 
@@ -166,6 +175,7 @@
     var maxLen = opts.maxLen || 12;
     var timeBudget = opts.timeMs || 350;
     var out = [];
+    buildTrie();
     if (!trieRoot) return out;
     var t0 = Date.now();
     var n = letters.length;
@@ -214,59 +224,54 @@
 
   /* --------------------------- sequenze (Bomba) --------------------------- */
 
-  /** Numero di parole del dizionario che contengono la sequenza. */
-  function sequenceCount(seq) {
-    var s = norm(seq);
-    if (!tri) return 0;
-    if (s.length === 3) return tri.get(s) || 0;
-    // per lunghezze diverse si scorre il dizionario (usato raramente / cache)
-    var n = 0;
-    words.forEach(function (w) { if (w.indexOf(s) >= 0) n++; });
-    return n;
+  function sequenceIndex(len, minLen, maxLen) {
+    var key = len + ":" + minLen + ":" + maxLen;
+    if (sequenceIndexes.has(key)) return sequenceIndexes.get(key);
+    var index = new Map();
+    if (!words) return index; // non mettere in cache un dizionario ancora assente
+    words.forEach(function (w) {
+      if (w.length < minLen || w.length > maxLen) return;
+      var seen = new Set();
+      for (var i = 0; i + len <= w.length; i++) {
+        var g = w.slice(i, i + len);
+        if (!seen.has(g)) { seen.add(g); index.set(g, (index.get(g) || 0) + 1); }
+      }
+    });
+    sequenceIndexes.set(key, index);
+    return index;
   }
 
-  var seqCache = new Map();
+  /** Conta parole distinte, non le occorrenze della sillaba nella stessa parola. */
+  function sequenceCount(seq, opts) {
+    opts = opts || {};
+    var s = norm(seq);
+    if (!s) return 0;
+    return sequenceIndex(s.length, opts.minLen || MIN_LEN, opts.maxLen || Infinity).get(s) || 0;
+  }
 
-  /**
-   * Campione di sequenze giocabili (default trigrammi): richieste per la Bomba.
-   * `minWords` scarta le sequenze quasi impossibili; `maxWords` quelle banali.
-   */
   function sampleSequences(opts) {
     opts = opts || {};
-    var len = opts.len || 3;
-    var minWords = opts.minWords || 40;
-    var maxWords = opts.maxWords || 900;
-    var size = opts.size || 24;
-    var rng = opts.rng || Math.random;
-    var cacheKey = len + ":" + minWords + ":" + maxWords + ":" + size;
-    if (seqCache.get(cacheKey)) return seqCache.get(cacheKey);
-    var pool = [];
-    var keys;
-    if (len === 3 && tri) {
-      keys = tri;
-      keys.forEach(function (cnt, g) { if (cnt >= minWords && cnt <= maxWords) pool.push(g); });
-    } else {
-      // costruisce un indice ad-hoc scorrendo le parole
-      var m = new Map();
-      words.forEach(function (w) {
-        var seen = new Set();
-        for (var i = 0; i + len <= w.length; i++) {
-          var g = w.slice(i, i + len);
-          if (!seen.has(g)) { seen.add(g); m.set(g, (m.get(g) || 0) + 1); }
-        }
+    if (!words) return [];
+    var len = opts.len || 3, minWords = opts.minWords || 40, maxWords = opts.maxWords || 900;
+    var size = opts.size || 24, rng = opts.rng || Math.random;
+    var key = [len, minWords, maxWords, opts.minLen || MIN_LEN, opts.maxLen || Infinity].join(":");
+    var pool = sequencePools.get(key);
+    if (!pool) {
+      pool = [];
+      sequenceIndex(len, opts.minLen || MIN_LEN, opts.maxLen || Infinity).forEach(function (count, seq) {
+        if (count >= minWords && count <= maxWords) pool.push({ seq: seq, count: count });
       });
-      m.forEach(function (cnt, g) { if (cnt >= minWords && cnt <= maxWords) pool.push(g); });
+      pool.sort(function (a, b) { return a.seq < b.seq ? -1 : 1; });
+      sequencePools.set(key, pool);
     }
+    // Cache SOLO del pool. Il campione va rigenerato con il seed di questa partita,
+    // non ereditato dal primo allenamento aperto sul dispositivo.
+    var available = pool.filter(function (c) { return (opts.exclude || []).indexOf(c.seq) < 0; });
     var out = [];
-    var used = new Set();
-    var guard = 0;
-    while (out.length < size && pool.length && guard++ < size * 40) {
-      var g = pool[Math.floor(rng() * pool.length)];
-      if (used.has(g)) continue;
-      used.add(g);
-      out.push({ seq: g, count: (tri && tri.get(g)) || 0 });
+    while (out.length < size && available.length) {
+      var i = Math.floor(rng() * available.length);
+      out.push(available.splice(i, 1)[0]);
     }
-    seqCache.set(cacheKey, out);
     return out;
   }
 
@@ -299,7 +304,7 @@
 
   return {
     MIN_LEN: MIN_LEN, LETTER_POOL: LETTER_POOL, DICT_URLS: DICT_URLS,
-    norm: norm, load: load, setWords: setWords,
+    norm: norm, load: load, setWords: setWords, setPublication: setPublication, isBaseWord: isBaseWord,
     isDictionaryReady: isDictionaryReady, dictionarySize: dictionarySize,
     isWord: isWord, hasPrefix: hasPrefix, wordsOfLength: wordsOfLength,
     scoreForLength: scoreForLength, LEN_SCORE: LEN_SCORE,

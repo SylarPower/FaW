@@ -15,104 +15,15 @@ const A = require("./aiuti");
    `presenze/*` nello stesso relay, e i residui alterano i tempi dei test. */
 test.beforeEach(async () => { await A.resetRelay(); });
 
-/** shim firebase → relay (stesso store usato dai giochi) */
-function shimFirebase() {
-  const W = window;
-  const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-  async function post(url, body) {
-    const r = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body || {}) });
-    if (!r.ok) throw new Error("relay " + r.status);
-    return r.json();
-  }
-  const get1 = (path) => post("/api/get", { paths: [path] }).then((r) => (r.docs || {})[path] || null);
-
-  class DocSnap {
-    constructor(id, data) { this.id = id; this._data = data || null; this.exists = !!data; }
-    data() { return this._data; }
-  }
-  class QuerySnap {
-    constructor(docs) { this.docs = docs; this.size = docs.length; this.empty = docs.length === 0; }
-    forEach(fn) { this.docs.forEach(fn); }
-  }
-  class DocRef {
-    constructor(path) { this.path = path; this.id = path.split("/").pop(); }
-    get() { return get1(this.path).then((d) => new DocSnap(this.id, d && d.data)); }
-    set(data) { return post("/api/write", { ops: [{ path: this.path, set: data }] }).then(() => ({})); }
-    update(patch) { return post("/api/write", { ops: [{ path: this.path, patch: patch }] }).then(() => ({})); }
-    delete() { return post("/api/write", { ops: [{ path: this.path, delete: true }] }).then(() => ({})); }
-    onSnapshot(cb) { return aggiungiListener({ kind: "doc", path: this.path, cb: cb }); }
-  }
-  class ColRef {
-    constructor(name, filters) { this.name = name; this.filters = filters || []; }
-    where(field, op, value) {
-      const map = { "==": "==", "!=": "!=", "in": "in", "array-contains": "array-contains", ">": ">", "<": "<", ">=": ">", "<=": "<" };
-      return new ColRef(this.name, this.filters.concat([{ field: field, op: map[op] || "==", value: value }]));
-    }
-    orderBy(field, dir) { const c = new ColRef(this.name, this.filters); c.order = { field: field, dir: dir || "asc" }; return c; }
-    limit(n) { const c = new ColRef(this.name, this.filters); c.limit = n; c.order = this.order; return c; }
-    doc(id) { return new DocRef(this.name + "/" + (id || newId())); }
-    add(data) { const id = newId(); return this.doc(id).set(data).then(() => ({ id: id })); }
-    get() { return post("/api/query", { col: this.name, filters: this.filters, orderBy: this.order, limit: this.limit }).then((r) => new QuerySnap((r.docs || []).map((d) => new DocSnap(d.id, d.data)))); }
-    onSnapshot(cb) { return aggiungiListener({ kind: "col", name: this.name, filters: this.filters, order: this.order, limit: this.limit, cb: cb }); }
-  }
-  const listeners = new Set();
-  function aggiungiListener(l) {
-    l.vkey = null;
-    listeners.add(l);
-    const t = setInterval(() => scarica(l), 300);
-    l.stop = () => { clearInterval(t); listeners.delete(l); };
-    scarica(l);
-    return l.stop;
-  }
-  async function scarica(l) {
-    try {
-      if (l.kind === "doc") {
-        const d = await get1(l.path);
-        const vkey = (d ? d.version : -1) + "";
-        if (l.vkey === vkey) return;
-        l.vkey = vkey;
-        try { l.cb(new DocSnap(l.path.split("/").pop(), d && d.data)); }
-        catch (e) { (W.__shimErrors = W.__shimErrors || []).push("doc:" + l.path + " " + String(e && e.message)); }
-      } else {
-        const r = await post("/api/query", { col: l.name, filters: l.filters, orderBy: l.order, limit: l.limit });
-        const docs = r.docs || [];
-        const vkey = docs.map((d) => d.id + ":" + d.version).join(",");
-        if (l.vkey === vkey) return;
-        l.vkey = vkey;
-        try { l.cb(new QuerySnap(docs.map((d) => new DocSnap(d.id, d.data)))); }
-        catch (e) { (W.__shimErrors = W.__shimErrors || []).push("col:" + l.name + " " + String(e && e.message)); }
-      }
-    } catch (e) { /* relay giù: il prossimo giro riprova */ (W.__shimErrors = W.__shimErrors || []).push("rete:" + String(e && e.message)); }
-  }
-  function db() {
-    return {
-      collection: (name) => new ColRef(name),
-      batch: () => ({ set: () => {}, update: () => {}, delete: () => {}, commit: () => Promise.resolve() }),
-      runTransaction: (fn) => Promise.resolve()
-    };
-  }
-  const fs = function () { return db(); };
-  fs.FieldValue = {
-    arrayUnion: (v) => ({ __op: "arrayUnion", value: v }),
-    arrayRemove: (v) => ({ __op: "arrayRemove", value: v }),
-    increment: (v) => ({ __op: "increment", value: v }),
-    delete: () => ({ __op: "delete" })
-  };
-  fs.serverTimestamp = () => Date.now();
-  W.firebase = {
-    initializeApp: () => ({}),
-    firestore: fs,
-    appCheck: () => ({ activate: () => {}, setTokenAutoRefreshEnabled: () => {} }),
-    auth: () => ({ signInAnonymously: () => Promise.resolve({ user: { uid: "shim" } }), onAuthStateChanged: () => () => {} })
-  };
-}
+const { shimFirebase } = require("../support/firebase-compat");
 
 async function hub(browser, opts) {
   opts = opts || {};
   const ctx = await browser.newContext({
-    viewport: opts.viewport || { width: 390, height: 844 },
+    viewport: opts.viewport || test.info().project.use.viewport || { width: 390, height: 844 },
     hasTouch: !!opts.touch, isMobile: !!opts.touch
   });
+  await ctx.route(/https:\/\/(www\.gstatic\.com|fonts\.)/, route => route.abort());
   await ctx.addInitScript(shimFirebase);
   await ctx.addInitScript((n) => {
     window.localStorage.setItem("faw:net:backend", "fake");
@@ -129,37 +40,38 @@ async function hub(browser, opts) {
   return { ctx, page };
 }
 
-test("hub: i tre giochi sono configurati e raggiungibili", async ({ browser }) => {
+test("hub: Rush e Bomba sono raggiungibili, Parole in Arena non è più disponibile", async ({ browser }) => {
   const { ctx, page } = await hub(browser);
   const cfg = await page.evaluate(() => ({
     paths: GAME_PATHS,
-    arena: { min: GIOCHI_CONFIG["parole-arena"].minGiocatori, max: GIOCHI_CONFIG["parole-arena"].maxGiocatori, faw: !!GIOCHI_CONFIG["parole-arena"].faw, mode: GIOCHI_CONFIG["parole-arena"].modalita.map((m) => m.id), opt: GIOCHI_CONFIG["parole-arena"].opzioni.map((o) => o.id) },
+    arena: GIOCHI_CONFIG["parole-arena"] || null,
     rush: { mode: GIOCHI_CONFIG["categoria-rush"].modalita.map((m) => m.id), opt: GIOCHI_CONFIG["categoria-rush"].opzioni.map((o) => o.id), max: GIOCHI_CONFIG["categoria-rush"].maxGiocatori },
     bomba: { mode: GIOCHI_CONFIG["bomba-parole"].modalita.map((m) => m.id), opt: GIOCHI_CONFIG["bomba-parole"].opzioni.map((o) => o.id), min: GIOCHI_CONFIG["bomba-parole"].minGiocatori },
     gameof15: GIOCHI_CONFIG.gameof15.modalita.map((m) => m.id),
     href: { a: gameHref("parole-arena", "matchId=XX"), b: gameHref("bomba-parole"), g: gameHref("palestra") },
     nome: nomeGioco("bomba-parole")
   }));
-  expect(cfg.paths["parole-arena"]).toBe("games/parole-arena/index.html");
+  expect(cfg.paths["parole-arena"]).toBeUndefined();
   expect(cfg.paths["categoria-rush"]).toBe("games/categoria-rush/index.html");
   expect(cfg.paths["bomba-parole"]).toBe("games/bomba-parole/index.html");
-  expect(cfg.arena).toMatchObject({ min: 2, max: 6, faw: true });
-  expect(cfg.arena.mode).toEqual(["arena", "solo-parole"]);
-  expect(cfg.arena.opt).toEqual(["durata", "griglia"]);
-  expect(cfg.rush.mode).toEqual(["classiche", "creative"]);
+  expect(cfg.arena).toBeNull();
+  expect(cfg.rush.mode).toEqual(["classiche", "nomi-cose-citta", "creative"]);
+  expect(cfg.rush.opt).toEqual(["durata", "colonne"]);
   expect(cfg.rush.max).toBe(8);
   expect(cfg.bomba.opt).toEqual(["durata", "miccia"]);
   // nessuna modalità inventata: Bomba ha una sola modalità, e gameof15 non offre «emoji»
   expect(cfg.bomba.mode).toEqual([""]);
   expect(cfg.gameof15).toEqual(["numbers", "image"]);
-  expect(cfg.href.a).toBe("games/parole-arena/index.html?matchId=XX");
+  expect(cfg.href.a).toBe("index.html");
   expect(cfg.href.b).toBe("games/bomba-parole/index.html");
   expect(cfg.href.g, "palestra: percorso intatto").toBe("games/palestra/index.html");
   expect(cfg.nome).toBe("La Bomba delle Parole");
 
-  await expect(page.locator("#game-parole-arena")).toBeVisible();
+  await expect(page.locator("#game-parole-arena")).toHaveCount(0);
   await expect(page.locator("#game-categoria-rush")).toBeVisible();
   await expect(page.locator("#game-bomba-parole")).toBeVisible();
+  await page.evaluate(() => { giocoSelezionato = 'categoria-rush'; renderTutteLePartite(); });
+  await expect(page.locator('#lista-partite .user-item').first()).toHaveAttribute('onclick', /categoria-rush\/index.html\?solo=1/);
   await page.click("#game-bomba-parole");
   expect(await page.evaluate(() => giocoSelezionato)).toBe("bomba-parole");
   // la finestra delle sfide esiste anche per il nuovo gioco (stessa UI degli altri)
@@ -257,6 +169,7 @@ test("hub: la lista partite distingue i giochi shared-room (stato + link)", asyn
 
 test("hub: logout tiene i salvataggi, cancella la sessione", async ({ browser }) => {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  await ctx.route(/https:\/\/(www\.gstatic\.com|fonts\.)/, route => route.abort());
   await ctx.addInitScript(shimFirebase);
   await ctx.addInitScript(() => {
     // una sola volta per tab: dopo il logout la pagina si ricarica e non deve
@@ -307,4 +220,82 @@ test("hub: tab statistiche senza fare affidamento su `event` globale", async ({ 
   await page.evaluate(() => aggiornaStatsUI());
   expect(page.__errors, "errori di pagina: " + JSON.stringify(page.__errors)).toEqual([]);
   await ctx.close();
+});
+
+test("hub: aggiornamenti ripetuti, riavvio listener e cancellazione non moltiplicano gli inviti", async ({ browser }) => {
+  const { ctx, page } = await hub(browser);
+  try {
+    const ids = await page.evaluate(async () => {
+      const ids = [];
+      for (const gioco of ['categoria-rush', 'bomba-parole']) {
+        const d = FAWRoom.buildMatch({ gioco, giocatori: ['ALICE', 'BOB'] });
+        ids.push((await db.collection('partite').add(d)).id);
+      }
+      // Documenti ritirati o sconosciuti non devono riapparire come Ruzzle.
+      await db.collection('partite').doc('RETIRATO').set({ gioco: 'parole-arena', stato: 'attesa', partecipanti: ['ALICE', 'BOB'] });
+      await db.collection('partite').doc('SCONOSCIUTO').set({ gioco: 'non-esiste', stato: 'attesa', partecipanti: ['ALICE', 'BOB'] });
+      return ids;
+    });
+    for (let update = 0; update < 5; update++) {
+      await page.evaluate(async ({ ids, update }) => {
+        await Promise.all(ids.map(id => db.collection('partite').doc(id).update({ ['giocatori.BOB.visto']: Date.now(), revisioneTest: update })));
+      }, { ids, update });
+      await page.waitForFunction(({ ids, update }) => ids.every(id => Object.values(partiteCache).flat().find(p => p.id === id && p.revisioneTest === update)), { ids, update });
+      await expect(page.locator('#lista-partite [data-match-id]')).toHaveCount(2);
+      expect(await page.evaluate(() => partiteCache.ruzzle.length)).toBe(0);
+    }
+    const before = await page.evaluate(() => window.__firebaseListenerCount());
+    await page.evaluate(() => { listen(); listen(); caricaStorico(); caricaStorico(); });
+    expect(await page.evaluate(() => window.__firebaseListenerCount())).toBe(before);
+    await expect(page.locator('#lista-partite [data-match-id]')).toHaveCount(2);
+    await page.evaluate(id => db.collection('partite').doc(id).update({ stato: 'conclusa', risultati: { classifica: [{ nome: 'ALICE', punti: 10 }] } }), ids[0]);
+    await expect(page.locator(`[data-match-id="${ids[0]}"]`)).toContainText('RISULTATI');
+    await expect(page.locator(`[data-match-id="${ids[0]}"]`)).toHaveCount(1);
+    await page.evaluate(id => db.collection('partite').doc(id).delete(), ids[0]);
+    await expect(page.locator(`[data-match-id="${ids[0]}"]`)).toHaveCount(0);
+    await expect(page.locator('#lista-partite [data-match-id]')).toHaveCount(1);
+    expect(page.__errors || []).toEqual([]);
+  } finally { await ctx.close(); }
+});
+
+test("hub: doppio tap su crea sfida produce un solo documento", async ({ browser }) => {
+  const { ctx, page } = await hub(browser);
+  try {
+    await page.evaluate(async () => {
+      selezionaGioco('categoria-rush', document.getElementById('game-categoria-rush'));
+      amiciSelezionati.add('BOB'); apriModalSfida();
+      await Promise.all([creaPartitaDaBanner('classiche'), creaPartitaDaBanner('classiche')]);
+    });
+    const count = await page.evaluate(async () => (await db.collection('partite').where('gioco', '==', 'categoria-rush').get()).size);
+    expect(count).toBe(1);
+  } finally { await ctx.close(); }
+});
+
+
+test('hub: Nomi, Cose, Città crea una vera scheda da 3 categorie e 3 lettere', async ({ browser }) => {
+  const { ctx, page } = await hub(browser);
+  try {
+    await page.evaluate(() => {
+      selezionaGioco('categoria-rush', document.getElementById('game-categoria-rush'));
+      amiciSelezionati.add('BOB'); apriModalSfida();
+    });
+    await page.selectOption('#opt-durata-banner', '180');
+    await page.selectOption('#opt-colonne-banner', '3');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
+    await page.getByRole('button', { name: 'NOMI, COSE, CITTÀ ▦', exact: true }).click();
+    await expect(page.locator('#game-banner')).toContainText('Sfida creata');
+    const doc = await page.evaluate(async () => {
+      const snap = await db.collection('partite').where('gioco', '==', 'categoria-rush').get();
+      return { id: snap.docs[0].id, data: snap.docs[0].data() };
+    });
+    expect(doc.data.opzioni.mode).toBe('nomi-cose-citta');
+    expect(doc.data.opzioni.colonne).toBe('3');
+    await page.goto('games/categoria-rush/index.html?matchId=' + doc.id);
+    await page.waitForFunction(() => FAWRush.stato.data);
+    const qs = await page.evaluate(() => FAWRush.stato.rounds);
+    expect(qs).toHaveLength(3); expect(new Set(qs.map(q => q.lettera)).size).toBe(3);
+    expect(qs.every(q => q.scheda && q.categorie.join(',') === 'nomi,cose,citta')).toBe(true);
+    await expect(page.locator('#lobby-meta')).toContainText('Nomi, Cose, Città · 3 categorie');
+    expect(page.__errors || []).toEqual([]);
+  } finally { await ctx.close(); }
 });

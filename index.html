@@ -476,6 +476,9 @@
 			flex-wrap: wrap;
 			}
 			.game-banner select {
+            min-width: 0;
+            max-width: 100%;
+            min-height: 44px;
 			padding: 6px 10px;
 			border-radius: 4px;
 			border: none;
@@ -486,6 +489,7 @@
 			width: auto;
 			}
 			.game-banner .btn-banner {
+            min-height: 44px;
 			padding: 8px 14px;
 			border: none;
 			border-radius: 4px;
@@ -543,6 +547,7 @@
 				</div>
 				<div class="box">
 					<h3>🎮 Scegli il Gioco</h3>
+          <p style="margin:0 0 16px;line-height:1.5;"><a id="link-lessico" href="lessico/index.html" style="display:inline-block;padding:10px 0;color:inherit;text-underline-offset:4px;">📖 Lessico e proposte</a><br><small>Consulta parole e categorie, proponi aggiunte e vota con il tuo gruppo.</small></p>
 					<div style="display:flex; gap:10px; overflow-x:auto; padding-bottom:10px;">
 						<div class="game-card selected" onclick="selezionaGioco('ruzzle', this)" id="game-ruzzle">
 							<span style="font-size:2rem;">🔠</span>
@@ -568,10 +573,6 @@
 						<div class="game-card" onclick="selezionaGioco('palestra', this)" id="game-palestra">
 						    <span style="font-size:2rem;">🏋️</span><br>Palestra
 						    <div class="game-badge solo">SOLO</div>
-						</div>
-						<div class="game-card" onclick="selezionaGioco('parole-arena', this)" id="game-parole-arena">
-						    <span style="font-size:2rem;">🏟️</span><br>Parole in Arena
-						    <div class="game-badge online">SFIDA</div>
 						</div>
 						<div class="game-card" onclick="selezionaGioco('categoria-rush', this)" id="game-categoria-rush">
 						    <span style="font-size:2rem;">⏱️</span><br>Categoria Rush
@@ -690,7 +691,6 @@
 			    neonwar: 'games/neonwar/index.html',
 			    palestra: 'games/palestra/index.html',
 			    pong: 'games/Pong/index.html',
-			    'parole-arena': 'games/parole-arena/index.html',
 			    'categoria-rush': 'games/categoria-rush/index.html',
 			    'bomba-parole': 'games/bomba-parole/index.html'
 			};
@@ -698,12 +698,13 @@
 			const NOMI_GIOCHI = {
 			    ruzzle: 'Ruzzle', pictionary: 'Pictionary', gameof15: 'Gioco del 15',
 			    neonwar: 'Neon War', palestra: 'Palestra', pong: 'Pong',
-			    'parole-arena': 'Parole in Arena', 'categoria-rush': 'Categoria Rush',
+			    'categoria-rush': 'Categoria Rush',
 			    'bomba-parole': 'La Bomba delle Parole'
 			};
 			function nomeGioco(g) { return NOMI_GIOCHI[g] || g || 'partita'; }
 			function gameHref(gioco, query) {
-			    const base = GAME_PATHS[gioco] || ('games/' + gioco + '/index.html');
+			    const base = GAME_PATHS[gioco];
+                if (!base) return 'index.html';
 			    return query ? (base + '?' + query) : base;
 			}
 			function isGiocoSolo(gioco = giocoSelezionato) {
@@ -715,7 +716,6 @@
 			    neonwar: [],
 			    gameof15: [],
 			    pong: [],
-			    'parole-arena': [],
 			    'categoria-rush': [],
 			    'bomba-parole': []
 			};
@@ -921,40 +921,6 @@ palestra: {
     maxGiocatori: 1,
     soloOnly: true
 },
-			  'parole-arena': {
-			    nome: "Parole in Arena",
-			    icona: "🏟️",
-			    faw: true,
-			    durataDefault: "180",
-			    opzioni: [
-			      {
-			        id: "durata",
-			        label: "Durata",
-			        default: "180",
-			        valori: [
-			          { value: "120", label: "2 min" },
-			          { value: "180", label: "3 min" },
-			          { value: "240", label: "4 min" }
-			        ]
-			      },
-			      {
-			        id: "griglia",
-			        label: "Griglia",
-			        default: "5",
-			        valori: [
-			          { value: "4", label: "4×4 (veloce)" },
-			          { value: "5", label: "5×5 (standard)" },
-			          { value: "6", label: "6×6 (ampio)" }
-			        ]
-			      }
-			    ],
-			    modalita: [
-			      { id: "arena", label: "ARENA 🏟️", colore: "#f0a5ff", testo: "#000" },
-			      { id: "solo-parole", label: "SOLO PAROLE 🧺", colore: "#03dac6", testo: "#000" }
-			    ],
-			    minGiocatori: 2,
-			    maxGiocatori: 6
-			  },
 			  'categoria-rush': {
 			    nome: "Categoria Rush",
 			    icona: "⏱️",
@@ -963,18 +929,23 @@ palestra: {
 			    opzioni: [
 			      {
 			        id: "durata",
-			        label: "Durata",
+			        label: "Durata massima",
 			        default: "120",
 			        valori: [
-			          { value: "120", label: "2 min (4 round)" },
-			          { value: "180", label: "3 min (6 round)" }
+			          { value: "120", label: "Max 2 min · Sprint 4 / NCC 2 / Creativo 3 round" },
+			          { value: "180", label: "Max 3 min · Sprint 6 / NCC 3 / Creativo 4 round" }
 			        ]
-			      }
+			      },
+			      { id: "colonne", label: "Categorie NCC", default: "6", valori: [
+			        { value: "3", label: "NCC · Nomi, Cose, Città" },
+			        { value: "6", label: "NCC · 6 categorie (+ Animali, Mestieri, Frutta)" }
+			      ] }
 			    ],
 			    // «Creativo» è una modalità vera del gioco (voto tra pari), non una
 			    // etichetta decorativa: cambia punteggio e durata dei round.
 			    modalita: [
-			      { id: "classiche", label: "CLASSICHE 📚", colore: "#f0a5ff", testo: "#000" },
+			      { id: "classiche", label: "SPRINT ⚡", colore: "#f0a5ff", testo: "#000" },
+			      { id: "nomi-cose-citta", label: "NOMI, COSE, CITTÀ ▦", colore: "#c4b0ff", testo: "#211537" },
 			      { id: "creative", label: "CREATIVO 💭", colore: "#ffd166", testo: "#000" }
 			    ],
 			    minGiocatori: 2,
@@ -1031,10 +1002,7 @@ if (mioNome && passwordHashSalvato) {
         document.getElementById('main-app').style.display = 'block';
         document.getElementById('user-display').textContent = "👤 " + mioNome;
         aggiornaUIDisponibilita();
-        aggiornaPresenza();
-        setInterval(aggiornaPresenza, 20000);
-        listen();
-        caricaStorico();
+        avviaSessioneHub();
     };
 }
 			// Funzione per creare hash SHA-256 (sicuro lato client)
@@ -1078,10 +1046,7 @@ if (mioNome && passwordHashSalvato) {
 			    document.getElementById('main-app').style.display = 'block';
 			    document.getElementById('user-display').textContent = "👤 " + mioNome;
 			    aggiornaUIDisponibilita();
-			    aggiornaPresenza();
-			    setInterval(aggiornaPresenza, 20000);
-			    listen();
-			    caricaStorico();
+			    avviaSessioneHub();
 			  } catch (e) {
 			    console.error("❌ Errore login:", e);
 			    alert("❌ Errore di connessione. Verifica le regole Firestore:\n" + e.message);
@@ -1094,13 +1059,16 @@ if (mioNome && passwordHashSalvato) {
 			  }
 			}
 			async function aggiornaPresenza() {
+              const nome = mioNome, generation = sessionGeneration;
+              if (!nome) return;
 			  let inPartita = false;
 			  let partitaId = null;
 			  try {
-			    const snap = await db.collection("partite").where("partecipanti", "array-contains", mioNome).where("stato", "in", ["attesa", "in_corso"]).get();
+			    const snap = await db.collection("partite").where("partecipanti", "array-contains", nome).where("stato", "in", ["attesa", "in_corso"]).get();
 			    // ✅ Controlla ogni partita trovata
 			    snap.forEach(doc => {
 			      const p = doc.data();
+                      if (!GIOCHI_CONFIG[p.gioco || "ruzzle"]) return;
 			      const rifiutanti = p.rivincitaRifiutataDa || [];
 			      // ✅ Considera "in partita" SOLO se:
 			      // 1. Nessuno ha rifiutato
@@ -1113,8 +1081,8 @@ if (mioNome && passwordHashSalvato) {
 			        } else if (p.stato === "attesa") {
 			          // In attesa: sono "in partita" solo se ho accettato o sono il creatore
 			          const accettanti = p.rivincitaAccettataDa || [];
-			          const sonoCreatore = p.partecipanti[0] === mioNome;
-			          const hoAccettato = accettanti.includes(mioNome);
+			          const sonoCreatore = p.partecipanti[0] === nome;
+			          const hoAccettato = accettanti.includes(nome);
 			          if (sonoCreatore || hoAccettato) {
 			            inPartita = true;
 			            partitaId = doc.id;
@@ -1126,21 +1094,59 @@ if (mioNome && passwordHashSalvato) {
 			  } catch (e) {
 			    console.error("Errore aggiornaPresenza:", e);
 			  }
-			  db.collection("presenze").doc(mioNome).set({
-			    nome: mioNome,
+			  if (generation !== sessionGeneration || mioNome !== nome) return;
+              await db.collection("presenze").doc(nome).set({
+			    nome: nome,
 			    last: Date.now(),
 			    inPartita: inPartita,
 			    partitaId: partitaId,
 			    disponibile: localStorage.getItem('disponibile') !== 'false'
-			  });
+			  }).catch(e => console.warn('Presenza non aggiornata:', e.message));
 			}
 
+let sessionGeneration = 0;
+let hubListeners = [];
+let storicoListener = null;
+let presenzaTimer = null;
+let pictionaryTimer = null;
+let listenerGeneration = 0;
+let pictionaryInFlight = false;
+
+function fermaListenerHub() {
+    listenerGeneration++;
+    hubListeners.splice(0).forEach(stop => stop());
+    clearInterval(pictionaryTimer);
+    pictionaryTimer = null;
+    pictionaryInFlight = false;
+}
+function fermaSessioneHub() {
+    sessionGeneration++;
+    Object.keys(partiteCache).forEach(g => { partiteCache[g] = []; });
+    fermaListenerHub();
+    if (storicoListener) storicoListener();
+    storicoListener = null;
+    clearInterval(presenzaTimer);
+    presenzaTimer = null;
+}
+function avviaSessioneHub() {
+    fermaSessioneHub();
+    aggiornaPresenza();
+    presenzaTimer = setInterval(aggiornaPresenza, 20000);
+    listen();
+    caricaStorico();
+}
+window.addEventListener('pagehide', fermaSessioneHub);
+window.addEventListener('pageshow', e => { if (e.persisted && mioNome) avviaSessioneHub(); });
+
 function listen() {
+    fermaListenerHub();
+    const generation = listenerGeneration;
     let presenzeData = {};
     let amicizieSnapshot = null;
 
     // LISTENER 1: Presenze
-    db.collection("presenze").onSnapshot(presSnap => {
+    hubListeners.push(db.collection("presenze").onSnapshot(presSnap => {
+        if (generation !== listenerGeneration) return;
         presenzeData = {};
         presSnap.forEach(doc => {
             const u = doc.data();
@@ -1153,64 +1159,65 @@ function listen() {
             aggiornaListaAmici(amicizieSnapshot, presenzeData);
         }
         aggiornaListaGlobale(presenzeData);
-    });
+    }));
 
     // LISTENER 2: Amicizie
-    db.collection("amicizie").onSnapshot(snap => {
+    hubListeners.push(db.collection("amicizie").onSnapshot(snap => {
+        if (generation !== listenerGeneration) return;
         amicizieSnapshot = snap;
         window.amicizieSnapshotGlobal = snap;
         aggiornaListaAmici(snap, presenzeData);
-    });
+    }));
 
-    // LISTENER 3: Partite Ruzzle/NeonWar
-    db.collection("partite")
+    // Un solo listener per tutte le partite
+    hubListeners.push(db.collection("partite")
         .where("partecipanti", "array-contains", mioNome)
         .onSnapshot(snap => {
-partiteCache.ruzzle = [];
-partiteCache.neonwar = [];
-partiteCache.gameof15 = [];
-partiteCache.pong = [];
-
-	snap.forEach(doc => {
-	    const data = { id: doc.id, ...doc.data() };
-	    if (GIOCHI_CONFIG[data.gioco] && GIOCHI_CONFIG[data.gioco].faw) {
-	        // giochi con la shared room: bucket proprio, così la lista resta leggibile
-	        (partiteCache[data.gioco] = partiteCache[data.gioco] || []).push(data);
-	    }
-	    else if (data.gioco === 'neonwar') partiteCache.neonwar.push(data);
-	    else if (data.gioco === 'gameof15') partiteCache.gameof15.push(data);
-	    else if (data.gioco === 'pong') partiteCache.pong.push(data);
-	    else if (data.gioco !== 'pictionary') partiteCache.ruzzle.push(data);
-	});
+            if (generation !== listenerGeneration) return;
+            const nuovi = {};
+            Object.keys(partiteCache).forEach(g => { nuovi[g] = g === 'pictionary' ? partiteCache[g] : []; });
+            const visti = new Set();
+            snap.forEach(doc => {
+                if (visti.has(doc.id)) return;
+                visti.add(doc.id);
+                const data = { ...doc.data(), id: doc.id };
+                const gioco = data.gioco || 'ruzzle'; // compat con i documenti Ruzzle più vecchi
+                if (gioco !== 'pictionary' && nuovi[gioco] && GIOCHI_CONFIG[gioco]) nuovi[gioco].push(data);
+            });
+            partiteCache = nuovi;
 
             renderTutteLePartite();
-        });
+        }));
 
     // ✅ PICTIONARY: Caricamento manuale invece di listener (evita loop)
     caricaPartitePictionary();
-    setInterval(caricaPartitePictionary, 5000);
+    pictionaryTimer = setInterval(caricaPartitePictionary, 5000);
 }
 
 async function caricaPartitePictionary() {
-    if (!mioNome) return;
-
+    if (!mioNome || pictionaryInFlight) return;
+    const generation = listenerGeneration;
+    pictionaryInFlight = true;
     try {
         const snap = await db.collection("pictionary_rooms")
             .where("players", "array-contains", mioNome)
             .get();
 
+        if (generation !== listenerGeneration) return;
         partiteCache.pictionary = [];
 
         snap.forEach(doc => {
             const data = doc.data();
             if (data && data.players && Array.isArray(data.players) && data.stato !== 'results') {
-                partiteCache.pictionary.push({ id: doc.id, ...data });
+                partiteCache.pictionary.push({ ...data, id: doc.id });
             }
         });
 
         renderTutteLePartite();
     } catch (e) {
         console.warn("⚠️ Errore caricamento Pictionary:", e.message);
+    } finally {
+        if (generation === listenerGeneration) pictionaryInFlight = false;
     }
 }
 
@@ -1222,7 +1229,7 @@ function renderTutteLePartite() {
     const configGioco = GIOCHI_CONFIG[giocoSelezionato] || GIOCHI_CONFIG.ruzzle;
 
     // Reset completo
-    const soloHref = gameHref(giocoSelezionato);
+    const soloHref = gameHref(giocoSelezionato, configGioco.faw ? "solo=1" : "");
     div.innerHTML = `
         <div class="user-item" style="background:#34495e;" onclick="window.location.href='${soloHref}'">
             <span>🎯 Allenamento Solo (${configGioco.nome})</span>
@@ -1239,8 +1246,8 @@ function renderTutteLePartite() {
 partiteCache.gameof15.forEach(p => renderPartitaRuzzle(p, div));
 partiteCache.pong.forEach(p => renderPartitaRuzzle(p, div));
 
-// Render giochi con la shared room (Arena / Rush / Bomba)
-['parole-arena', 'categoria-rush', 'bomba-parole'].forEach(g => {
+// Render giochi con la shared room (Rush / Bomba)
+['categoria-rush', 'bomba-parole'].forEach(g => {
     (partiteCache[g] || []).forEach(p => renderPartitaFAW(p, div));
 });
 
@@ -1339,7 +1346,7 @@ function renderPartitaRuzzle(p, div) {
 }
 
 // ========================================
-// 🏟️ RENDER GIOCHI CON SHARED ROOM (Arena/Rush/Bomba)
+// 🏟️ RENDER GIOCHI CON SHARED ROOM (Rush/Bomba)
 // ========================================
 function renderPartitaFAW(p, div) {
     const id = p.id;
@@ -1350,13 +1357,13 @@ function renderPartitaFAW(p, div) {
     let statoText, bottoni;
     if (p.stato === 'attesa') {
         const pronti = (p.pronti || []).length;
-        statoText = 'in attesa (' + Math.max(1, pronti) + '/' + (p.partecipanti || []).length + ')';
+        statoText = 'in attesa (' + pronti + '/' + (p.partecipanti || []).length + ')';
         bottoni = `<button onclick="event.stopPropagation(); window.location.href='${url}'" style="background:#03dac6; color:#000;">ENTRA</button>
                    <button onclick="event.stopPropagation(); annullaSfida('${id}')" style="background:#cf6679; color:white; margin-left:5px;">🚫</button>`;
     } else if (p.stato === 'pronto') {
         statoText = 'sta per cominciare';
         bottoni = `<button onclick="window.location.href='${url}'" style="background:#03dac6; color:#000;">ENTRA</button>`;
-    } else if (p.stato === 'conclusa') {
+    } else if (p.stato === 'conclusa' || p.stato === 'risultati') {
         const cls = (p.risultati && p.risultati.classifica) || null;
         const posto = cls ? cls.findIndex(c => c.nome === mioNome) + 1 : 0;
         statoText = 'finita' + (posto === 1 ? ' · hai vinto 🏆' : (posto > 0 ? ' · ' + posto + '°' : ''));
@@ -1370,7 +1377,7 @@ function renderPartitaFAW(p, div) {
         bottoni = `<button onclick="window.location.href='${url}'" style="background:#03dac6; color:#000;">ENTRA</button>`;
     }
     div.innerHTML += `
-        <div class="user-item live-match" style="border-left-color:#f0a5ff;">
+        <div class="user-item live-match" data-match-id="${id}" style="border-left-color:#f0a5ff;">
             <span>${icona} ${nome}${altri.length ? ' vs ' + altri.join(', ') : ''} · ${statoText}</span>
             <div>${bottoni}</div>
         </div>`;
@@ -1614,7 +1621,7 @@ function renderPartitaPictionary(p, div) {
 			  config.opzioni.forEach(opt => {
 			    const salvato = localStorage.getItem(`ultimo_${giocoSelezionato}_${opt.id}`) || opt.default;
 			    let selectHtml = `
-											<select id="opt-${opt.id}-banner">`;
+											<select id="opt-${opt.id}-banner" aria-label="${opt.label}">`;
 			    opt.valori.forEach(v => {
 			      selectHtml += `
 												<option value="${v.value}" ${salvato === v.value ? 'selected' : ''}>${v.label}</option>`;
@@ -1663,8 +1670,16 @@ function renderPartitaPictionary(p, div) {
 			  document.querySelectorAll('.user-item.selected').forEach(el => el.classList.remove('selected'));
 			  aggiornaBottoneSfida();
 			}
-			async function creaPartitaDaBanner(modalitaId) {
-			    const config = GIOCHI_CONFIG[giocoSelezionato];
+			let creazioneSfidaInCorso = false;
+            async function creaPartitaDaBanner(modalitaId) {
+                if (creazioneSfidaInCorso) return;
+                creazioneSfidaInCorso = true;
+                try { return await eseguiCreazioneSfida(modalitaId); }
+                finally { creazioneSfidaInCorso = false; }
+            }
+            async function eseguiCreazioneSfida(modalitaId) {
+                const gioco = giocoSelezionato;
+			    const config = GIOCHI_CONFIG[gioco];
 			    if (!config) return;
 
 			    // Raccogli opzioni dinamicamente
@@ -1673,7 +1688,7 @@ function renderPartitaPictionary(p, div) {
 			        const el = document.getElementById(`opt-${opt.id}-banner`);
 			        if (el) {
 			            opzioni[opt.id] = el.value;
-			            localStorage.setItem(`ultimo_${giocoSelezionato}_${opt.id}`, el.value);
+			            localStorage.setItem(`ultimo_${gioco}_${opt.id}`, el.value);
 			        }
 			    });
 
@@ -1692,7 +1707,7 @@ function renderPartitaPictionary(p, div) {
 			        return;
 			    }
 // ✅ GESTIONE SPECIFICA PER PICTIONARY (CORRETTA)
-if (giocoSelezionato === 'pictionary') {
+if (gioco === 'pictionary') {
     showLoadingBanner('Creazione sfida Pictionary...');
 
     try {
@@ -1749,7 +1764,7 @@ if (giocoSelezionato === 'pictionary') {
     return;
 }
 
-    // ✅ GIOCHI CON SHARED ROOM (Parole in Arena / Categoria Rush / La Bomba):
+    // ✅ GIOCHI CON SHARED ROOM (Categoria Rush / La Bomba):
     // la forma del documento viene da FAWRoom.buildMatch, lo stesso modulo usato
     // dai giochi — così l'hub non può divergere (campi mancanti, seed, giocatori).
     if (config.faw) {
@@ -1757,7 +1772,7 @@ if (giocoSelezionato === 'pictionary') {
         const opzioniPulite = {};
         Object.keys(opzioni).forEach(k => { if (opzioni[k] !== undefined && opzioni[k] !== null && opzioni[k] !== '') opzioniPulite[k] = opzioni[k]; });
         const base = {
-            gioco: giocoSelezionato,
+            gioco: gioco,
             creator: mioNome,
             giocatori: partecipanti,
             durata: secondi * 1000,
@@ -1779,8 +1794,8 @@ if (giocoSelezionato === 'pictionary') {
             amiciSelezionati.clear();
             document.querySelectorAll('.user-item.selected').forEach(el => el.classList.remove('selected'));
             aggiornaBottoneSfida();
-            localStorage.setItem('ultimo_' + giocoSelezionato + '_mode', opzioniPulite.mode || '');
-            showSuccessBanner(docRif.id);
+            localStorage.setItem('ultimo_' + gioco + '_mode', opzioniPulite.mode || '');
+            showSuccessBanner(docRif.id, gioco);
         } catch (e) {
             console.error("Errore creazione partita shared-room:", e);
             removeGameBanner();
@@ -1801,7 +1816,7 @@ if (giocoSelezionato === 'pictionary') {
 
 			    try {
 			        const doc = await db.collection("partite").add({
-			            gioco: giocoSelezionato,
+			            gioco: gioco,
 			            partecipanti: partecipanti,
 			            punteggi: pIniziali,
 			            parole: paroleIniziali,
@@ -1827,7 +1842,7 @@ if (giocoSelezionato === 'pictionary') {
 			        aggiornaBottoneSfida();
 
 			        // Mostra conferma
-			        showSuccessBanner(doc.id);
+			        showSuccessBanner(doc.id, gioco);
 			    } catch (e) {
 			        console.error("Errore creazione partita:", e);
 			        removeGameBanner();
@@ -1864,7 +1879,7 @@ if (giocoSelezionato === 'pictionary') {
 			  document.body.appendChild(banner);
 			}
 
-			function showSuccessBanner(partitaId) {
+			function showSuccessBanner(partitaId, gioco = giocoSelezionato) {
 			  removeGameBanner();
 			  const banner = document.createElement('div');
 			  banner.id = 'game-banner';
@@ -1880,7 +1895,7 @@ if (giocoSelezionato === 'pictionary') {
 												</div>
 											</div>
 											<div class="banner-right">
-												<button class="btn-banner" style="background:white; color:#333;" onclick="window.location.href='${gameHref(giocoSelezionato, 'matchId=' + partitaId)}'">ENTRA SUBITO</button>
+												<button class="btn-banner" style="background:white; color:#333;" onclick="window.location.href='${gameHref(gioco, 'matchId=' + partitaId)}'">ENTRA SUBITO</button>
 												<button class="btn-banner btn-cancel-banner" onclick="removeGameBanner()">OK</button>
 											</div>
 			`;
@@ -1891,17 +1906,18 @@ if (giocoSelezionato === 'pictionary') {
 			  }, 5000);
 			}
 			function caricaStorico() {
-			  // Carico le partite e le ordino in JavaScript (evita errore indici Firebase)
-			  db.collection("partite").where("partecipanti", "array-contains", mioNome).where("stato", "==", "conclusa").onSnapshot(snap => {
+			  // Un solo listener dello storico, anche dopo un nuovo login.
+              if (storicoListener) storicoListener();
+			  storicoListener = db.collection("partite").where("partecipanti", "array-contains", mioNome).where("stato", "==", "conclusa").onSnapshot(snap => {
 			    const div = document.getElementById('lista-storico');
 			    div.innerHTML = "";
 			    let partite = [];
-			    snap.forEach(doc => partite.push(doc.data()));
+			    snap.forEach(doc => { const p = doc.data(); if (GIOCHI_CONFIG[p.gioco || "ruzzle"]) partite.push(p); });
 			    // Ordinamento JS per tempo decrescente
 			    partite.sort((a, b) => b.timestamp - a.timestamp);
 			    partite.slice(0, 10).forEach(p => {
-			      let classif = Object.entries(p.punteggi).sort((a, b) => b[1] - a[1]);
-			      let vincitore = classif[0][0];
+			      let classif = Object.entries(p.punteggi || {}).sort((a, b) => b[1] - a[1]);
+			      let vincitore = classif.length ? classif[0][0] : "—";
 			      div.innerHTML += `
 											<div class="history-item">
 												<span>${p.dataOra} - ${p.gioco.toUpperCase()}</span>
@@ -1966,6 +1982,7 @@ if (giocoSelezionato === 'pictionary') {
 			}
 
 			function logout() {
+              fermaSessioneHub();
 			  // Cancella SOLO la sessione: i salvataggi dei giochi e la cache della
 			  // palestra restano sul dispositivo (un logout non deve far perdere progressi).
 			  ['mioNome', 'passwordHash', 'ultimoGioco', 'disponibile', 'schermoSicuro', 'faw:net:backend', 'faw:net:relayUrl']

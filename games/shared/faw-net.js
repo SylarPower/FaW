@@ -21,6 +21,8 @@
  *   init({backend, relayUrl}) / ready()
  *   get(path) -> {id, exists, data, version}
  *   set(path, data) / update(path, patch) / del(path) / add(col, data) -> id
+ *   list(col, filters, opts) -> [{id,data}]
+ *   transactMany(paths, mutate) -> {applied,data}     data e patch indicizzati per percorso
  *   transact(path, mutate) -> {applied, data}         mutate(data|null) => patch|false
  *   onDoc(path, cb, opts) -> unsubscribe              cb(data, meta{id,version})
  *   onCol(col, filters, cb, opts) -> unsubscribe      filters:[{field,op,value}]
@@ -53,29 +55,29 @@
 
   function detectBackend() {
     if (cfg.backend !== "auto") return cfg.backend;
+    var q = global.location ? new URLSearchParams(global.location.search) : null;
+    var requested = q && q.get("net");
+    if (requested === "relay") requested = "fake";
     try {
-      if (global.localStorage) {
-        var forced = global.localStorage.getItem("faw:net:backend");
-        if (forced === "fake" || forced === "firebase") return forced;
-        if (!cfg.relayUrl) {
-          var u = global.localStorage.getItem("faw:net:relayUrl");
-          if (u) cfg.relayUrl = u;
-        }
+      if (requested === "fake" || requested === "firebase") {
+        // Conserva la scelta anche navigando su inviti/rivincite senza query.
+        global.localStorage.setItem("faw:net:backend", requested);
       }
-    } catch (e) {}
+      var forced = requested || global.localStorage.getItem("faw:net:backend");
+      if (forced === "fake" || forced === "firebase") {
+        if (forced === "fake" && !cfg.relayUrl) cfg.relayUrl = global.location ? global.location.origin : "";
+        return forced;
+      }
+    } catch (e) {
+      if (requested === "fake" || requested === "firebase") return requested;
+    }
     if (cfg.relayUrl) return "fake";
-    var q = global.location ? new URLSearchParams(location.search) : null;
-    if (q && q.get("net") === "fake") return "fake";
-    if (q && q.get("net") === "firebase") return "firebase";
-    // localhost/IP private = ambiente di sviluppo o relay di test: si usa il relay,
-    // così nessuna partita provata in locale scrive per errore sui dati reali.
-    // L'override esplicito ?net=firebase serve quando si vuole provare Firebase.
-    if (global.location && LOCALI.test(location.hostname)) {
-      cfg.relayUrl = location.origin;
-      try { if (global.localStorage) global.localStorage.setItem("faw:net:relayUrl", cfg.relayUrl); } catch (e) {}
+    if (global.location && LOCALI.test(global.location.hostname)) {
+      cfg.relayUrl = global.location.origin;
       return "fake";
     }
-    return (global.firebase && global.firebase.firestore) ? "firebase" : "fake";
+    // In produzione uno SDK mancante è un errore, NON un relay inesistente.
+    return "firebase";
   }
 
   /* ------------------------------- ops ------------------------------- */
@@ -177,7 +179,7 @@
   }
 
   /* ============================ backend: fake ============================ */
-  function relayFetch(path, body, method) {
+  function relayFetch(path, body, method, signal) {
     var base = (cfg.relayUrl || "").replace(/\/$/, "");
     var payload = body ? JSON.stringify(body) : undefined;
     function unaVolta() {
@@ -186,55 +188,63 @@
         method: method || (body ? "POST" : "GET"),
         headers: { "content-type": "application/json" },
         body: payload,
-        cache: "no-store"
+        cache: "no-store", signal: signal
       }).then(function (r) {
         if (!r.ok) throw new Error("relay " + r.status);
         return r.json();
       }).then(function (res) {
         var t1 = Date.now();
-        if (res && typeof res.serverNow === "number") sampleClock(res.serverNow, t0, t1);
+        // Un long-poll include attesa sul server: non è una misura del RTT.
+        if (res && typeof res.serverNow === "number" && path.indexOf("/api/watch") !== 0) sampleClock(res.serverNow, t0, t1);
         return res;
       });
     }
     // una ritentativa sulle scritture: una risposta persa non deve far sparire
     // una parola o un "pronto" (le operazioni sono idempotenti per progetto)
     return unaVolta().catch(function (e) {
+      if (signal && signal.aborted) throw e;
       if (/relay 4|relay 5/.test(String(e && e.message))) throw e;
       return new Promise(function (res) { setTimeout(res, 120); }).then(unaVolta);
     });
   }
 
   var fakeWatches = [];
-
+  var watchRunning = false;
+  var watchTimer = null;
+  var watchController = null;
+  function restartFakeWatch() {
+    clearTimeout(watchTimer);
+    // Un nuovo percorso non deve aspettare i 12 secondi del vecchio long-poll.
+    // Il finally della richiesta annullata avvia il prossimo giro: mai due loop.
+    if (watchController) watchController.abort();
+    else fakeWatchLoop();
+  }
   function fakeWatchLoop() {
-    if (!cfg.relayUrl) return;
-    var paths = {};
-    fakeWatches.forEach(function (w) { w.paths.forEach(function (p) { paths[p] = true; }); });
-    var list = Object.keys(paths);
-    if (!list.length) return;
-    relayFetch("/api/watch?since=" + relaySeq + "&paths=" + encodeURIComponent(list.join(",")))
+    if (watchRunning || !fakeWatches.length) return;
+    clearTimeout(watchTimer);
+    var seen = {};
+    fakeWatches.forEach(function (w) {
+      w.paths.forEach(function (p) { var v = w.seen[p] == null ? -1 : w.seen[p]; seen[p] = seen[p] == null ? v : Math.min(seen[p], v); });
+    });
+    if (!Object.keys(seen).length) return;
+    watchRunning = true;
+    var controller = watchController = new AbortController();
+    relayFetch("/api/watch?versions=" + encodeURIComponent(JSON.stringify(seen)), null, "GET", controller.signal)
       .then(function (res) {
-        relaySeq = res.seq || relaySeq;
         var docs = res.docs || {};
         fakeWatches.slice().forEach(function (w) {
-          var changed = false;
           w.paths.forEach(function (p) {
-            if (Object.prototype.hasOwnProperty.call(docs, p)) {
-              var rec = docs[p];
-              if (w.seen[p] !== (rec && rec.version)) {
-                w.seen[p] = rec && rec.version;
-                changed = true;
-                if (w.onDoc) w.onDoc(rec ? { id: p.split("/").pop(), exists: !!rec, data: rec ? rec.data : null, version: rec ? rec.version : 0 } : null);
-              }
-            }
+            if (!Object.prototype.hasOwnProperty.call(docs, p)) return;
+            var rec = docs[p], version = rec ? rec.version : 0;
+            if (w.seen[p] === version) return;
+            w.seen[p] = version;
+            w.onDoc({ id: p.split("/").pop(), exists: !!rec, data: rec ? rec.data : null, version: version });
           });
-          if (changed && w.onBatch) w.onBatch();
         });
-        setTimeout(fakeWatchLoop, 0);
-      })
-      .catch(function () {
-        setTimeout(fakeWatchLoop, 1200);
-      });
+        setStatus("online");
+        return 0;
+      }).catch(function () { if (controller.signal.aborted) return 0; setStatus("offline"); return 1200; })
+      .then(function (delay) { watchRunning = false; watchController = null; watchTimer = setTimeout(fakeWatchLoop, delay); });
   }
 
   var fake = {
@@ -270,41 +280,41 @@
       var id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
       return fake.set(col + "/" + id, data).then(function () { return id; });
     },
-    listenDoc: function (path, cb, opts) {
+    listenDoc: function (path, cb) {
       var w = {
         paths: [path], seen: {}, onDoc: function (snap) {
-          cb(snap.data || null, { id: path.split("/").pop(), version: snap.version });
+          cb(snap.data, { id: snap.id, version: snap.version, missing: !snap.exists });
         }
       };
       fakeWatches.push(w);
-      // primo stato corrente immediato
-      fake.get(path).then(function (snap) {
-        w.seen[path] = snap.version;
-        cb(snap.exists ? snap.data : null, { id: snap.id, version: snap.version, first: true });
-      }).catch(function () { cb(null, { id: path.split("/").pop(), error: true }); });
-      fakeWatchLoop();
+      restartFakeWatch();
       return function () {
         var i = fakeWatches.indexOf(w);
         if (i >= 0) fakeWatches.splice(i, 1);
+        restartFakeWatch();
       };
     },
-    listenCol: function (col, filters, cb) {
+    listenCol: function (col, filters, cb, opts) {
       var w = {
-        paths: [], col: col, filters: filters || [], seen: {}, onBatch: function () { w.pull(); }
+        active: true, pulling: false, paths: [], col: col, filters: filters || [], seen: {}, onBatch: function () { w.pull(); }
       };
       w.pull = function () {
-        relayFetch("/api/query", { col: col, filters: w.filters }).then(function (r) {
+        if (!w.active || w.pulling) return;
+        w.pulling = true;
+        relayFetch("/api/query", { col: col, filters: w.filters, limit: opts && opts.limit }).then(function (r) {
+          if (!w.active) return;
           var docs = r.docs || [];
           var versionKey = docs.map(function (d) { return d.id + ":" + d.version; }).join(",");
           if (w.vkey === versionKey) return;
           w.vkey = versionKey;
           cb(docs.map(function (d) { return { id: d.id, data: d.data }; }));
-        }).catch(function () {});
+        }).catch(function () { setStatus("offline"); if (w.active) cb([], { error: "unavailable" }); }).then(function () { w.pulling = false; });
       };
       fakeWatches.push(w);
       w.pull();
       w._t = setInterval(w.pull, 900);
       return function () {
+        w.active = false;
         clearInterval(w._t);
         var i = fakeWatches.indexOf(w);
         if (i >= 0) fakeWatches.splice(i, 1);
@@ -322,7 +332,7 @@
           return relayFetch("/api/write", { ops: [{ path: path, set: next, ifVersion: snap.version }] }).then(function (r) {
             relaySeq = r.seq;
             if (r.results[0] && r.results[0].error === "conflict") {
-              if (attempt >= 6) { var e = new Error("transazione fallita per conflitti ripetuti"); e.code = "aborted"; throw e; }
+              if (attempt >= 12) { var e = new Error("transazione fallita per conflitti ripetuti"); e.code = "aborted"; throw e; }
               return go();
             }
             return { applied: true, data: next, version: r.results[0].version };
@@ -331,6 +341,43 @@
       }
       return go();
     }
+  };
+
+  // Transazioni multi-documento: anche i documenti di sola lettura partecipano
+  // al controllo di versione. Serve per pubblicare lessico + voto + audit insieme.
+  function validateMany(paths, patches) {
+    if (!Array.isArray(paths) || !paths.length || paths.length > 8 || new Set(paths).size !== paths.length || paths.some(function (p) { return typeof p !== "string" || !/^[^/]+(?:\/[^/]+)+$/.test(p) || p.split("/").length % 2; })) throw new Error("Percorsi transazione non validi");
+    if (patches && Object.keys(patches).some(function (p) { return paths.indexOf(p) < 0; })) throw new Error("Scrittura non dichiarata nella transazione");
+  }
+  fake.transactMany = function (paths, mutate) {
+    validateMany(paths); var tries = 0;
+    function step() {
+      tries++;
+      return relayFetch("/api/get", { paths: paths }).then(function (result) {
+        var data = {}, checks = paths.map(function (path) {
+          var snap = result.docs[path]; data[path] = snap ? clone(snap.data) : null;
+          return { path: path, ifVersion: snap ? snap.version : 0 };
+        });
+        var patches = mutate(clone(data)); validateMany(paths, patches);
+        if (patches === false || !Object.keys(patches || {}).length) return { applied: false, data: data };
+        var writes = Object.keys(patches).map(function (path) {
+          data[path] = applyOpsOnPatch(clone(patches[path]), clone(data[path] || {}));
+          return { path: path, set: data[path] };
+        });
+        return relayFetch("/api/write", { atomic: true, checks: checks, ops: writes }).then(function (res) {
+          if (res.conflict || (res.results || []).some(function (r) { return r.error === "conflict"; })) {
+            if (tries < 12) return step();
+            var e = new Error("Conflitti ripetuti: riprova"); e.code = "aborted"; throw e;
+          }
+          if ((res.results || []).some(function (r) { return r.error; })) throw new Error("Scrittura non riuscita");
+          return { applied: true, data: data };
+        });
+      });
+    }
+    return step();
+  };
+  fake.list = function (col, filters, opts) {
+    return relayFetch("/api/query", { col: col, filters: filters || [], limit: opts && opts.limit }).then(function (r) { return r.docs || []; });
   };
 
   /* ============================ identità (opzionale) ====================== */
@@ -367,7 +414,7 @@
 
   function toFirestoreValue(v) {
     if (v && v.__op) {
-      var F = fs().FieldValue;
+      var F = global.firebase.firestore.FieldValue;
       if (v.__op === "arrayUnion") return F.arrayUnion.apply(F, Array.isArray(v.value) ? v.value : [v.value]);
       if (v.__op === "arrayRemove") return F.arrayRemove.apply(F, Array.isArray(v.value) ? v.value : [v.value]);
       if (v.__op === "increment") return F.increment(v.value);
@@ -386,6 +433,14 @@
     return o;
   }
 
+  function syncStamp(path) {
+    var stamp = { t0: Date.now(), token: Math.random().toString(36).slice(2) + Date.now().toString(36) };
+    if (path) fb._pendingSync[path] = stamp;
+    return stamp;
+  }
+  function syncFields(stamp) {
+    return { syncToken: stamp.token, syncAt: global.firebase.firestore.FieldValue.serverTimestamp() };
+  }
   var fb = {
     get: function (path) {
       return fs().doc(path).get().then(function (d) {
@@ -393,10 +448,10 @@
       });
     },
     set: function (path, data) {
-      var t0 = Date.now();
-      var withSync = Object.assign({}, data, { syncAt: fs().FieldValue.serverTimestamp() });
-      return fs().doc(path).set(withSync).then(function () {
-        return { version: 0, _t0: t0, _t1: Date.now() };
+      var db = fs(), stamp = syncStamp(path);
+      var withSync = Object.assign({}, data, syncFields(stamp));
+      return db.doc(path).set(withSync).then(function () {
+        return { version: 0 };
       });
     },
     update: function (path, patch, expectVersion) {
@@ -406,8 +461,9 @@
     },
     del: function (path) { return fs().doc(path).delete().then(function () { return {}; }); },
     add: function (col, data) {
-      var withSync = Object.assign({}, data, { syncAt: fs().FieldValue.serverTimestamp() });
-      return fs().collection(col).add(withSync).then(function (r) { return r.id; });
+      var db = fs(), stamp = syncStamp();
+      var withSync = Object.assign({}, data, syncFields(stamp));
+      return db.collection(col).add(withSync).then(function (r) { fb._pendingSync[col + "/" + r.id] = stamp; return r.id; });
     },
     listenDoc: function (path, cb, opts) {
       var dref = fs().doc(path);
@@ -417,7 +473,7 @@
         if (data && typeof data.syncAt === "number") {
           // stima offset con il round-trip dell'ultima scrittura nota
           var w = fb._pendingSync && fb._pendingSync[path];
-          if (w && data.syncAt > w.t0) { sampleClock(data.syncAt, w.t0, Date.now()); delete fb._pendingSync[path]; }
+          if (w && data.syncToken === w.token && !(snap.metadata && snap.metadata.hasPendingWrites)) { sampleClock(data.syncAt, w.t0, Date.now()); delete fb._pendingSync[path]; }
         }
         cb(data, { id: snap.id });
       }, function (err) {
@@ -428,6 +484,7 @@
     listenCol: function (col, filters, cb, opts) {
       var q = fs().collection(col);
       (filters || []).forEach(function (f) { q = q.where(f.field, f.op, f.value); });
+      if (opts && opts.limit) q = q.limit(opts.limit);
       var o = {};
       if (opts && opts.source === "cache") o.source = "cache";
       return q.onSnapshot(o, function (snap) {
@@ -438,25 +495,51 @@
     },
     _pendingSync: {},
     transact: function (path, mutate) {
-      fb._pendingSync[path] = { t0: Date.now() };
       var dref = fs().doc(path);
       return fs().runTransaction(function (t) {
         return t.get(dref).then(function (snap) {
           var cur = snap.exists ? unwrapData(snap.data()) : null;
           var patch = mutate(cur ? clone(cur) : null);
           if (patch === false) return { applied: false, data: cur };
-          // dentro la transazione si scrive il documento intero ricostruito a mano:
-          // niente FieldValue (non consentiti in set all'interno di runTransaction
-          // per arrayUnion su campi nuovi) e nessuna dipendenza dall'ordine degli update.
           var next = applyOpsOnPatch(clone(patch), clone(cur || {}));
-          t.set(dref, next);
+          var sync = syncFields(syncStamp(path));
+          if (snap.exists) {
+            var out = Object.assign({}, sync);
+            Object.keys(patch).forEach(function (k) { out[k] = toFirestoreValue(patch[k]); });
+            t.update(dref, out);
+          } else t.set(dref, Object.assign({}, next, sync));
           return { applied: true, data: next };
         });
-      }).catch(function (e) {
-        if (fb._pendingSync[path]) delete fb._pendingSync[path];
-        throw e;
-      });
+      }, { maxAttempts: 12 });
     }
+  };
+
+  fb.transactMany = function (paths, mutate) {
+    validateMany(paths); var db = fs();
+    return db.runTransaction(function (tx) {
+      return Promise.all(paths.map(function (p) { return tx.get(db.doc(p)); })).then(function (snaps) {
+        var data = {};
+        paths.forEach(function (p, i) { data[p] = snaps[i].exists ? unwrapData(snaps[i].data()) : null; });
+        var patches = mutate(clone(data)); validateMany(paths, patches);
+        if (patches === false || !Object.keys(patches || {}).length) return { applied: false, data: data };
+        Object.keys(patches).forEach(function (p) {
+          var exists = !!data[p], patch = patches[p], sync = syncFields(syncStamp(p));
+          data[p] = applyOpsOnPatch(clone(patch), clone(data[p] || {}));
+          if (exists) {
+            var out = Object.assign({}, sync);
+            Object.keys(patch).forEach(function (k) { out[k] = toFirestoreValue(patch[k]); });
+            tx.update(db.doc(p), out);
+          } else tx.set(db.doc(p), Object.assign({}, data[p], sync));
+        });
+        return { applied: true, data: data };
+      });
+    }, { maxAttempts: 12 });
+  };
+  fb.list = function (col, filters, opts) {
+    var q = fs().collection(col);
+    (filters || []).forEach(function (f) { q = q.where(f.field, f.op, f.value); });
+    if (opts && opts.limit) q = q.limit(opts.limit);
+    return q.get().then(function (snap) { var out = []; snap.forEach(function (d) { out.push({ id: d.id, data: unwrapData(d.data()) }); }); return out; });
   };
 
   /* ------------------------------- API pubblica ---------------------------- */
@@ -465,6 +548,14 @@
     return b === "firebase" ? fb : fake;
   }
 
+  // Tutte le API asincrone rigettano una Promise anche se lo SDK non è caricato:
+  // i controller devono poter ripristinare i pulsanti nei propri catch/finally.
+  function invoke(name, args) {
+    return Promise.resolve().then(function () {
+      var b = backend();
+      return b[name].apply(b, args);
+    });
+  }
   var api = {
     ops: ops,
     init: function (o) {
@@ -472,7 +563,7 @@
       Object.keys(o).forEach(function (k) { cfg[k] = o[k]; });
       if (detectBackend() === "fake" && !cfg.relayUrl) {
         // in test il relay è sulla stessa origine dei file
-        if (typeof location !== "undefined" && location.port) cfg.relayUrl = location.origin;
+        if (global.location) cfg.relayUrl = global.location.origin;
       }
       return api;
     },
@@ -495,22 +586,25 @@
       var esistente = auth.currentUser;
       var p = esistente ? Promise.resolve(esistente) : auth.signInAnonymously();
       return p.then(function (user) {
-        uidAttivo = user && user.uid ? user.uid : null;
+        var u = user && (user.user || user);
+        uidAttivo = u && u.uid ? u.uid : null;
         return uidAttivo;
       }).catch(function () { return null; });
     },
 
-    ready: function () { return Promise.resolve(true); },
+    ready: function () { return Promise.resolve().then(function () { if (detectBackend() === "firebase") fs(); return true; }); },
     /**
      * Ogni mutazione di gioco passa di qui: scrive e, su errore di rete,
      * rimanda in coda una volta sola (l'operazione è idempotente per progetto).
      */
-    get: function (path) { return backend().get(path); },
-    set: function (path, data) { return backend().set(path, data); },
-    update: function (path, patch) { return backend().update(path, patch); },
-    del: function (path) { return backend().del(path); },
-    add: function (col, data) { return backend().add(col, data); },
-    transact: function (path, mutate) { return backend().transact(path, mutate); },
+    get: function (path) { return invoke("get", [path]); },
+    set: function (path, data) { return invoke("set", [path, data]); },
+    update: function (path, patch) { return invoke("update", [path, patch]); },
+    del: function (path) { return invoke("del", [path]); },
+    add: function (col, data) { return invoke("add", [col, data]); },
+    transact: function (path, mutate) { return invoke("transact", [path, mutate]); },
+    transactMany: function (paths, mutate) { return invoke("transactMany", [paths, mutate]); },
+    list: function (col, filters, opts) { return invoke("list", [col, filters, opts]); },
     onDoc: function (path, cb, opts) { return backend().listenDoc(path, cb, opts); },
     onCol: function (col, filters, cb, opts) { return backend().listenCol(col, filters, cb, opts); },
     clock: clock,

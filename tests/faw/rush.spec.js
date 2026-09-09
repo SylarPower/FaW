@@ -42,7 +42,7 @@ test("rush solo: pannello opzioni, allenamento, risposta accettata e rifiutata",
   await apriRush(page);
   await expect(page.locator("#schermo-crea")).toBeVisible();
   // il pannello dice cosa succederà davvero (numero di round e durata effettiva)
-  await expect(page.locator("#crea-hint")).toContainText(/round da \d+ s/);
+  await expect(page.locator("#crea-hint")).toContainText(/round · fino a \d+ s/);
   await page.locator('[data-seg="durata"] [data-v="180"]').click();
   await expect(page.locator("#crea-hint")).toContainText("6 round");
   await page.locator("#btn-solo").click();
@@ -70,20 +70,23 @@ test("rush solo: pannello opzioni, allenamento, risposta accettata e rifiutata",
   expect(r.word, "il database locale deve offrire una risposta per la lettera del round").toBeTruthy();
   await page.fill("#inp-risposta", r.word);
   await page.click("#btn-invia");
-  await expect(page.locator("#receipt")).toBeVisible();
-  await expect(page.locator("#receipt")).toContainText("Accettata");
-  await expect(page.locator("#punti-solo")).not.toHaveText("0");
-  await expect(page.locator("#inp-risposta")).toBeDisabled();
+  await expect(page.locator("#rivela")).toBeVisible();
+  await expect(page.locator("#rivela-lista")).toContainText(r.word);
+  await expect(page.locator("#punti-solo")).not.toHaveText("0"); // ultimo (unico) giocatore: chiusura e punti immediati
+  await expect(page.locator("#inp-risposta")).toHaveJSProperty("readOnly", true);
 
   // secondo invio nello stesso round: no (risposta definitiva)
-  await page.evaluate(() => { document.getElementById("inp-risposta").disabled = false; });
-  await page.fill("#inp-risposta", "altra prova");
+  await page.evaluate(() => { document.getElementById("inp-risposta").disabled = false; document.getElementById("inp-risposta").readOnly = false; });
+  await page.evaluate(() => document.getElementById("inp-risposta").value = "altra prova");
   await page.evaluate(() => window.FAWRush.invia());
   await expect(page.locator("#feedback")).toContainText("definitiva");
 
   // in allenamento compaiono le altre risposte ammesse (ripasso)
   await expect(page.locator("#box-altre")).toBeVisible();
   await expect(page.locator("#altre")).toContainText(r.word);
+  await page.evaluate(() => { document.getElementById("inp-risposta").disabled = true; });
+  await expect(page.locator("#punti-solo")).not.toHaveText("0");
+  await expect(page.locator("#inp-risposta")).toBeDisabled();
 
   expect(page.__errors || [], "console errors: " + (page.__errors || []).join(" | ")).toEqual([]);
   await ctx.close();
@@ -113,18 +116,17 @@ test("rush multiplayer: stessa domanda, risposta unica, rivelazione, risultati, 
   const rb = await A.rispostaValida(b.page, { indice: 1, escludi: [ra.word] });
   expect(rb.word && rb.word !== ra.word, "servono due risposte diverse per testare l'unicità").toBe(true);
   await A.rispondi(a.page, ra.word);
+  // Finché B deve rispondere, la parola di A resta nascosta nella UI.
+  expect(await b.page.locator("#schermo-gioco").innerText()).not.toContain(ra.word.toLowerCase());
   await A.rispondi(b.page, rb.word);
-  await expect(a.page.locator("#round-avanzati")).toHaveText("2");
+  await expect(a.page.locator("#round-avanzati")).toHaveText("2/2");
 
-  // 3) durante la scrittura nessuno vede le parole altrui (solo il conteggio)
+  // 3) entrambe le risposte sono registrate nello stesso round
   const docGiu = await A.leggiDoc(b.page, matchId);
   const idx = (await a.page.evaluate(() => window.FAWRush.stato.idx));
   expect(Object.keys((((docGiu.data.rush || {}).risposte || {})[idx] || {})).sort()).toEqual(["ALICE", "BOB"]);
-  const testoB = await b.page.locator("#schermo-gioco").innerText();
-  expect(testoB).not.toContain(ra.word.toLowerCase());
 
-  // 4) si chiude il round e la rivelazione mostra tutti
-  await A.portaAvanti(a.page, matchId, INPUT + 900);
+  // 4) l’ultimo invio chiude subito il round: nessuno spostamento del tempo
   await a.page.waitForFunction((i) => !!(((window.FAWRush.stato.data || {}).rush || {}).punteggiRound || {})[i], idx, { timeout: 20000 });
   await expect(b.page.locator("#rivela")).toBeVisible({ timeout: 20000 });
   const rivelaText = await b.page.locator("#rivela-lista").innerText();
@@ -140,7 +142,7 @@ test("rush multiplayer: stessa domanda, risposta unica, rivelazione, risultati, 
 
   // 5) risposte uguali -> bonus ridotto, e un round in più giocato
   const idx2 = idx + 1;
-  await A.portaAvanti(a.page, matchId, CICLO * idx2 + 2000);
+  await A.portaFaseRush(a.page, matchId, idx2, "input");
   expect(await A.attendiRound(a.page), "A deve vedere il round 2 aperto").toBe(idx2);
   expect(await A.attendiRound(b.page), "B deve vedere lo stesso round").toBe(idx2);
   const ra2 = await A.rispostaValida(a.page, { indice: 0 });
@@ -148,7 +150,6 @@ test("rush multiplayer: stessa domanda, risposta unica, rivelazione, risultati, 
   expect(ra2.word).toBe(rb2.word, "stessa risposta per testare i duplicati");
   await A.rispondi(a.page, ra2.word);
   await A.rispondi(b.page, rb2.word);
-  await A.portaAvanti(a.page, matchId, CICLO * idx2 + INPUT + 900);
   await a.page.waitForFunction((i) => !!(((window.FAWRush.stato.data || {}).rush || {}).punteggiRound || {})[i], idx2, { timeout: 20000 });
   const doc2 = await A.leggiDoc(a.page, matchId);
   const r2 = doc2.data.rush.punteggiRound[idx2];
@@ -157,7 +158,7 @@ test("rush multiplayer: stessa domanda, risposta unica, rivelazione, risultati, 
   expect(rivela2.toUpperCase()).toContain("IN COMUNE");
 
   // 6) reload a round in corso: riprende lo stesso round, non riparte
-  await A.portaAvanti(a.page, matchId, CICLO * (idx2 + 1) + 1500);
+  await A.portaFaseRush(a.page, matchId, idx2 + 1, "input");
   await a.page.waitForTimeout(400);
   const primaDelReload = await a.page.evaluate(() => ({
     idx: window.FAWRush.stato.idx, cat: document.getElementById("round-categoria").textContent
@@ -174,13 +175,13 @@ test("rush multiplayer: stessa domanda, risposta unica, rivelazione, risultati, 
 
   // 7) risposta arrivata dopo la chiusura del round: non conta
   const idxChiuso = dopoReload.idx;
-  await A.portaAvanti(a.page, matchId, CICLO * idxChiuso + INPUT + 900);
+  await A.portaFaseRush(a.page, matchId, idxChiuso, "rivela");
   await a.page.waitForFunction((i) => !!(((window.FAWRush.stato.data || {}).rush || {}).punteggiRound || {})[i], idxChiuso, { timeout: 25000 });
   const prima = await A.leggiDoc(a.page, matchId);
   await a.page.evaluate(() => { const i = document.getElementById("inp-risposta"); i.disabled = false; document.getElementById("btn-invia").disabled = false; });
-  await a.page.fill("#inp-risposta", "recupero impossibile");
+  await a.page.evaluate(() => document.getElementById("inp-risposta").value = "recupero impossibile");
   await a.page.evaluate(() => window.FAWRush.invia());
-  await expect(a.page.locator("#feedback")).toContainText(/round è chiuso/i);
+  await expect(a.page.locator("#feedback")).toContainText(/tempo scaduto/i);
   // e una scrittura tardiva diretta sul documento non cambia i punteggi
   const roundPrecedente = Math.max(0, idxChiuso - 1);
   await A.scriviDoc(a.page, matchId, { ["rush.risposte." + roundPrecedente + ".TARDI"]: { parola: "tardo", ok: true, t: 0 } });
@@ -202,7 +203,7 @@ test("rush multiplayer: stessa domanda, risposta unica, rivelazione, risultati, 
   await expect(a.page.locator("#ris-rounds .roundo")).toHaveCount(n);
   const classifica = (await A.leggiDoc(a.page, matchId)).data.risultati.classifica;
   expect(classifica[0].punti).toBeGreaterThanOrEqual(classifica[1].punti);
-  expect(await a.page.locator("#ris-esito").textContent()).toMatch(/Pareggio|Hai vinto tu|Vinse /);
+  expect(await a.page.locator("#ris-esito").textContent()).toMatch(/Pareggio|vince con/i);
 
   await a.page.locator("#btn-rivincita").click();
   await b.page.waitForFunction(() => !document.getElementById("box-rivincita").hidden, null, { timeout: 25000 });
@@ -222,7 +223,7 @@ test("rush multiplayer: stessa domanda, risposta unica, rivelazione, risultati, 
 
 test("rush: 4 dispositivi — unica contro in-due, e il bonus non dipende dai tempi", async ({ browser }) => {
   const nomi = ["ALICE", "BOB", "CICE", "DINO"];
-  const { matchId } = await creaSala(browser, nomi);
+  const { boot, matchId } = await creaSala(browser, nomi);
   const giocator = [];
   for (const n of nomi) {
     const c = await A.contesto(browser, n);
@@ -256,10 +257,9 @@ test("rush: 4 dispositivi — unica contro in-due, e il bonus non dipende dai te
     await A.rispondi(giocator[1].page, wb.word);
     await A.rispondi(giocator[2].page, wb.word);
     await A.rispondi(giocator[3].page, wc.word);
-    await expect(giocator[0].page.locator("#round-avanzati")).toHaveText("4", "tutti e quattro hanno risposto");
+    await expect(giocator[0].page.locator("#round-avanzati")).toHaveText("4/4");
 
     // 3) chiusura del round e rivelazione: chi era solo porta a casa il bonus pieno
-    await A.portaAvanti(giocator[0].page, matchId, INPUT + 900);
     await giocator[0].page.waitForFunction((i) => !!(((window.FAWRush.stato.data || {}).rush || {}).punteggiRound || {})[i], idx, { timeout: 25000 });
     const doc = await A.leggiDoc(giocator[0].page, matchId);
     const punti = doc.data.rush.punteggiRound[idx];
@@ -276,7 +276,7 @@ test("rush: 4 dispositivi — unica contro in-due, e il bonus non dipende dai te
     expect(punti.BOB).toBeLessThan(160, "in due non si arriva mai al premio dell'unica");
     // e il punteggio cumulato non può essere sotto i punti del round chiuso
     for (const n of nomi) expect(doc.data.punteggi[n]).toBeGreaterThanOrEqual(punti[n]);
-  } finally { for (const g of giocator) { try { await g.ctx.close(); } catch (e) {} } }
+  } finally { await boot.ctx.close(); for (const g of giocator) { try { await g.ctx.close(); } catch (e) {} } }
 });
 
 test("rush: un giocatore inattivo non blocca i round e non li vince", async ({ browser }) => {
@@ -304,9 +304,8 @@ test("rush: un giocatore inattivo non blocca i round e non li vince", async ({ b
   expect(doc.data.punteggi.ALICE).toBeGreaterThan(0);
 
   // al secondo round a vuoto compare l'avviso discreto (non un blocco)
+  await A.portaFaseRush(a.page, matchId, 1, "input");
   const r2 = await A.rispostaValida(a.page, { indice: 1 });
-  await A.portaAvanti(a.page, matchId, CICLO + 2000);
-  await a.page.waitForTimeout(500);
   await A.rispondi(a.page, r2.word);
   await A.portaAvanti(a.page, matchId, CICLO + INPUT + 900);
   await a.page.waitForFunction((i) => !!(((window.FAWRush.stato.data || {}).rush || {}).punteggiRound || {})[i], 1, { timeout: 25000 });
@@ -329,16 +328,14 @@ test("rush creativo: voto tra pari dopo la rivelazione, senza toccare la modalit
   await expect(a.page.locator("#schermo-gioco")).toBeVisible({ timeout: 25000 });
 
   // in creativa non c'è la lettera-obbligo: la domanda è libera
-  expect(await a.page.locator("#round-lettera").textContent()).toBe("★");
+  expect(await a.page.locator("#round-lettera").textContent()).toBe("✳");
   await A.rispondi(a.page, "ho dimenticato il gatto nel forno");
   await A.rispondi(b.page, "mi si è rotta la lavastoviglie");
 
   // finestra di voto: si chiude il round solo dopo
-  await A.portaAvanti(a.page, matchId, INPUT + 1000);
   await a.page.waitForFunction(() => document.getElementById("box-voto") !== null, null, { timeout: 20000 });
   await expect(b.page.locator("#box-voto [data-voto]").first()).toBeVisible({ timeout: 20000 });
   await a.page.locator("#box-voto [data-voto]").first().click();
-  await b.page.locator("#box-voto [data-voto]").first().click();
   await a.page.waitForFunction(() => {
     const d = window.FAWRush.stato.data || {};
     return !!(((d.rush || {}).voti || {})["0"] || {}).ALICE;
@@ -348,7 +345,7 @@ test("rush creativo: voto tra pari dopo la rivelazione, senza toccare la modalit
   const primaDiChiudere = await A.leggiDoc(a.page, matchId);
   expect(primaDiChiudere.data.rush.punteggiRound && primaDiChiudere.data.rush.punteggiRound[0]).toBeFalsy();
 
-  await A.portaAvanti(a.page, matchId, INPUT + VOTO + 900);
+  await b.page.locator("#box-voto [data-voto]").first().click(); // ultimo voto: chiusura immediata
   await a.page.waitForFunction(() => {
     const d = window.FAWRush.stato.data || {};
     return !!(((d.rush || {}).punteggiRound || {})[0]);

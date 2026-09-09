@@ -7,35 +7,35 @@
 .bomba__join .faw-field { flex: 1; margin: 0; }
 .bomba__join .faw-btn { flex: 0 0 auto; }
 .bomba__lobby-head { display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: flex-start; }
-.bomba__code { display: grid; gap: 2px; justify-items: center; padding: 8px 12px; border: 1px dashed var(--faw-line-strong); border-radius: var(--faw-r-3); background: var(--faw-surface-2); }
-.bomba__code small { color: var(--faw-text-muted); text-transform: uppercase; letter-spacing: .1em; font-size: 10px; }
-.bomba__code strong { font-family: var(--faw-font-mono); font-size: 22px; letter-spacing: .12em; }
+.bomba__code { display: grid; gap: 2px; justify-items: center; padding: 8px 12px; border: 1px dashed var(--faw-line2); border-radius: var(--faw-r-lg); background: var(--faw-s2); }
+.bomba__code small { color: var(--faw-tx2); text-transform: uppercase; letter-spacing: .1em; font-size: 10px; }
+.bomba__code strong { font-family: var(--faw-font-num); font-size: 22px; letter-spacing: .12em; }
 
 /* Hero: il blocco bomba sta in cima, così la tastiera che si apre non sposta nulla di essenziale. */
-.bomba__hero { background: var(--faw-surface); border: 1px solid var(--faw-line); border-radius: var(--faw-r-4); padding: 14px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; margin: 12px 0; }
+.bomba__hero { background: var(--faw-s1); border: 1px solid var(--faw-line); border-radius: var(--faw-r-xl); padding: 14px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; margin: 12px 0; }
 .bomba__hero > * { min-width: 0; }   /* niente min-content che allarghi la colonna: zero overflow a 320px */
 .bomba__hero.trema { animation: bomba-trema .28s steps(2) 3; }
 @keyframes bomba-trema { 0% { transform: translate(0, 0); } 50% { transform: translate(-2px, 1px); } 100% { transform: translate(0, 0); } }
 .bomba__holder { display: flex; align-items: center; gap: 10px; }
-.bomba__holder-avatar { width: 42px; height: 42px; border-radius: 13px; display: grid; place-items: center; font-size: 20px; background: var(--faw-surface-3); border: 1px solid var(--faw-line); flex: 0 0 auto; }
+.bomba__holder-avatar { width: 42px; height: 42px; border-radius: 13px; display: grid; place-items: center; font-size: 20px; background: var(--faw-s3); border: 1px solid var(--faw-line); flex: 0 0 auto; }
 .bomba__holder-info { min-width: 0; }
 .bomba__holder-info .faw-title { margin: 0; }
 .bomba__holder-fx { margin-left: auto; font-size: 20px; }
 
 .bomba__seq { display: flex; gap: 8px; justify-content: center; }
-.bomba__seq b { font-family: var(--faw-font-display); font-size: clamp(28px, 12vw, 52px); line-height: 1; min-width: clamp(42px, 14vw, 62px); padding: 8px 0; text-align: center; border-radius: var(--faw-r-3); background: var(--faw-surface-3); border: 1px solid var(--faw-line-strong); color: var(--faw-game-accent); letter-spacing: .04em; }
+.bomba__seq b { font-family: var(--faw-font); font-size: clamp(28px, 12vw, 52px); line-height: 1; min-width: clamp(42px, 14vw, 62px); padding: 8px 0; text-align: center; border-radius: var(--faw-r-lg); background: var(--faw-s3); border: 1px solid var(--faw-line2); color: var(--faw-acc); letter-spacing: .04em; }
 .bomba__seq-k { text-align: center; margin: 0; }
 #seq-aiuto { text-align: center; margin: 0; }
 
 .bomba__fuse { display: grid; gap: 6px; }
-.bomba__fuse-bar { height: 12px; border-radius: 999px; background: var(--faw-surface-3); overflow: hidden; border: 1px solid var(--faw-line); }
-.bomba__fuse-bar > i { display: block; height: 100%; width: 0%; border-radius: 999px; background: var(--faw-game-accent); transition: width .12s linear; }
-.bomba__fuse-lab { margin: 0; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--faw-text-muted); text-align: right; font-family: var(--faw-font-mono); }
+.bomba__fuse-bar { height: 12px; border-radius: 999px; background: var(--faw-s3); overflow: hidden; border: 1px solid var(--faw-line); }
+.bomba__fuse-bar > i { display: block; height: 100%; width: 0%; border-radius: 999px; background: var(--faw-acc); transition: width .12s linear; }
+.bomba__fuse-lab { margin: 0; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--faw-tx2); text-align: right; font-family: var(--faw-font-num); }
 .bomba__hero[data-liv="1"] .bomba__fuse-bar > i { background: #4fd1a5; }
 .bomba__hero[data-liv="2"] .bomba__fuse-bar > i { background: #cfd24a; }
 .bomba__hero[data-liv="3"] .bomba__fuse-bar > i { background: #f0a55c; }
-.bomba__hero[data-liv="4"] .bomba__fuse-bar > i { background: var(--faw-danger); }
-.bomba__hero[data-liv="5"] .bomba__fuse-bar > i { background: var(--faw-danger); animation: bomba-pulso .5s ease-in-out infinite alternate; }
+.bomba__hero[data-liv="4"] .bomba__fuse-bar > i { background: var(--faw-bad); }
+.bomba__hero[data-liv="5"] .bomba__fuse-bar > i { background: var(--faw-bad); animation: bomba-pulso .5s ease-in-out infinite alternate; }
 @keyframes bomba-pulso { from { opacity: .55; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
   .bomba__hero.trema, .bomba__hero[data-liv="5"] .bomba__fuse-bar > i { animation: none; }
@@ -46,19 +46,19 @@
 .bomba__input .faw-btn { flex: 0 0 auto; padding-inline: 18px; }
 .bomba__fb { margin: 0; min-height: 18px; }
 .bomba__fb.is-ok { color: var(--faw-ok); }
-.bomba__fb.is-no { color: var(--faw-danger); }
+.bomba__fb.is-no { color: var(--faw-bad); }
 .bomba__last { display: flex; align-items: center; gap: 8px; font-size: 13px; }
-.bomba__last strong { font-family: var(--faw-font-mono); letter-spacing: .04em; }
+.bomba__last strong { font-family: var(--faw-font-num); letter-spacing: .04em; }
 
 /* riga giocatore */
-.bomba__gioc { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--faw-line); border-radius: var(--faw-r-3); background: var(--faw-surface-2); }
-.bomba__gioc[data-who="me"] { border-color: var(--faw-game-accent); }
-.bomba__gioc[data-bomba="1"] { background: rgba(255, 106, 106, .12); border-color: var(--faw-danger); }
-.bomba__gioc__av { width: 30px; height: 30px; border-radius: 10px; display: grid; place-items: center; font-size: 13px; background: var(--faw-surface-3); flex: 0 0 auto; }
+.bomba__gioc { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--faw-line); border-radius: var(--faw-r-lg); background: var(--faw-s2); }
+.bomba__gioc[data-who="me"] { border-color: var(--faw-acc); }
+.bomba__gioc[data-bomba="1"] { background: rgba(255, 106, 106, .12); border-color: var(--faw-bad); }
+.bomba__gioc__av { width: 30px; height: 30px; border-radius: 10px; display: grid; place-items: center; font-size: 13px; background: var(--faw-s3); flex: 0 0 auto; }
 .bomba__gioc__n { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
-.bomba__gioc__s { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--faw-text-muted); font-family: var(--faw-font-mono); }
-.bomba__gioc__boom { color: var(--faw-danger); }
-.bomba__nota { font-size: 12px; color: var(--faw-text-muted); }
+.bomba__gioc__s { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--faw-tx2); font-family: var(--faw-font-num); }
+.bomba__gioc__boom { color: var(--faw-bad); }
+.bomba__nota { font-size: 12px; color: var(--faw-tx2); }
 .bomba__solo { display: flex; align-items: center; gap: 8px; margin-left: auto; }
 
 /* esito */
@@ -72,8 +72,41 @@
   .bomba__actions .faw-btn { flex: 1 1 100%; }
   .bomba__input .faw-btn { padding-inline: 14px; }
 }
-/* orizzontale: due colonne, hero compatto */
-@media (min-width: 860px) and (orientation: landscape) {
-  .bomba__wrap { max-width: 1040px; display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr); gap: 14px; align-items: start; }
-  .bomba__hero { margin: 0; }
+/* I pannelli sono figli dello schermo, non del wrapper: il layout desktop
+   precedente confinava l'intero gioco in mezza pagina. */
+@media (min-width: 860px) {
+  .bomba__wrap { max-width: 960px; }
+  #schermo-gioco { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(260px, .75fr); gap: 16px; align-items: start; }
+  #schermo-gioco > .faw-hud { grid-column: 1 / -1; }
+  .bomba__hero { grid-column: 1; grid-row: 2 / span 3; margin: 0; }
+  #schermo-gioco > .faw-card { grid-column: 2; }
 }
+body[data-game="bomba"][data-theme="light"] { --faw-acc: #a34605; --faw-acc-soft: #fff0dd; --faw-acc-ink: #fff; }
+.bomba__wrap .faw-screen > .faw-card { margin-bottom: 14px; }
+.bomba__wrap .faw-screen { min-width: 0; }
+.bomba__join .faw-field { min-width: 0; }
+.bomba__code { max-width: 100%; }
+.bomba__code strong { overflow-wrap: anywhere; font-size: clamp(15px, 4vw, 22px); }
+.bomba__last { flex-wrap: wrap; }
+.bomba__last strong { min-width: 0; overflow-wrap: anywhere; }
+body[data-game="bomba"] .faw-topbar__title { display: grid; gap: 0; }
+body[data-game="bomba"] .faw-topbar__title strong { font-size: 14px; }
+body[data-game="bomba"] .faw-topbar__title small { font-size: 11px; color: var(--faw-tx2); }
+body[data-game="bomba"] .faw-topbar__actions { display: flex; gap: 4px; }
+body[data-game="bomba"] .faw-muted, body[data-game="bomba"] .faw-hint { color: var(--faw-tx2); font-size: 12px; line-height: 1.6; }
+body[data-game="bomba"] .faw-eyebrow { color: var(--faw-tx3); font-size: 10px; text-transform: uppercase; letter-spacing: .12em; }
+body[data-game="bomba"] .faw-title { font-size: 24px; line-height: 1.15; }
+body[data-game="bomba"] .faw-title--sm { font-size: 22px; }
+body[data-game="bomba"] .faw-lead { color: var(--faw-tx2); font-size: 14px; }
+body[data-game="bomba"] .faw-display { font-size: clamp(30px, 7vw, 44px); font-weight: 800; }
+body[data-game="bomba"] .faw-seg__btn span { display: block; font-size: 11px; }
+body[data-game="bomba"] .faw-hud__item { font-size: 12px; padding: 5px 9px; border: 1px solid var(--faw-line); border-radius: 8px; }
+body[data-game="bomba"] .faw-count-box__n { font: 700 36px var(--faw-font-num); }
+body[data-game="bomba"] .faw-count-box__t { color: var(--faw-tx2); font-size: 12px; text-align: center; }
+body[data-game="bomba"] .faw-dialog__inner { display: grid; gap: 18px; padding: 22px; }
+body[data-game="bomba"] .faw-dialog__actions { display: flex; justify-content: flex-end; }
+body[data-game="bomba"] .faw-disconnected { background: var(--faw-warn-soft); color: var(--faw-warn); padding: 12px; border: 1px solid var(--faw-warn); border-radius: 10px; font-size: 12px; }
+body[data-game="bomba"] .faw-rank { grid-template-columns: 18px 30px minmax(0, 1fr) auto; padding: 12px; }
+body[data-game="bomba"] .faw-rank__meta { grid-column: 3; color: var(--faw-tx2); font-size: 11px; }
+body[data-game="bomba"] .faw-rank__v { grid-column: 4; grid-row: 1 / span 2; font: 700 22px var(--faw-font-num); }
+body[data-game="bomba"] .faw-rank__nome { overflow-wrap: anywhere; font-size: 13px; font-weight: 700; }
