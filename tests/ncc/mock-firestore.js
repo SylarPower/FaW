@@ -33,30 +33,58 @@ function createMockFirestore() {
   const m = {
     store: new Map(),
     subs: new Map(),
+    subMeta: new Map(),
     readsGet: 0,
     readsListener: 0,
-    writes: 0
+    writes: 0,
+    /* registro delle scritture: serve a contare CHI scrive cosa (es. una sola
+       scrittura dei punteggi finali di Ruzzle invece di una per client) */
+    log: []
   };
 
   function clone(d) { return d === undefined ? undefined : JSON.parse(JSON.stringify(d)); }
 
   function notifyDoc(p) {
-    const subs = m.subs.get(p);
-    if (!subs || !subs.size) return;
     const doc = m.store.get(p);
-    const snap = { exists: !!doc, data: () => clone(doc), metadata: { fromCache: false, hasPendingWrites: false } };
-    subs.forEach((cb) => queueMicrotask(() => cb(snap)));
+    const subs = m.subs.get(p);
+    if (subs && subs.size) {
+      const snap = { exists: !!doc, data: () => clone(doc), metadata: { fromCache: false, hasPendingWrites: false } };
+      subs.forEach((cb) => queueMicrotask(() => cb(snap)));
+    }
+    // listener di collezione (db.collection(x).onSnapshot) che includono il doc
+    m.subs.forEach((set, key) => {
+      const meta = m.subMeta.get(key);
+      if (!meta || meta.tipo !== 'coll') return;
+      if (p.indexOf(meta.prefix + '/') !== 0) return;
+      if (p.slice(meta.prefix.length + 1).indexOf('/') !== -1) return;
+      const snapColl = snapLista(figli(meta.prefix));
+      set.forEach((cb) => queueMicrotask(() => cb(snapColl)));
+    });
   }
   function queryKey(prefix, field, value) { return 'Q:' + prefix + ':' + field + '=' + value; }
-  function hits(prefix, field, value) {
+  function collKey(prefix) { return 'C:' + prefix; }
+  /* Figli diretti di una collezione (le sottocollezioni restano fuori). */
+  function figli(prefix) {
     const out = [];
     m.store.forEach((doc, p) => {
       if (p.indexOf(prefix + '/') !== 0) return;
-      if (p.slice(prefix.length + 1).indexOf('/') !== -1) return;   // solo figli diretti
-      if (doc[field] !== value) return;
+      if (p.slice(prefix.length + 1).indexOf('/') !== -1) return;
       out.push({ id: p.split('/').pop(), data: () => clone(doc) });
     });
     return out;
+  }
+  function hits(prefix, field, value) {
+    return figli(prefix).filter((d) => d.data()[field] === value);
+  }
+  /* Snapshot in stile Firestore: forEach/size/docs + docChanges(). */
+  function snapLista(list) {
+    return {
+      forEach: (fn) => list.forEach(fn),
+      size: list.length,
+      docs: list,
+      empty: list.length === 0,
+      docChanges: () => list.map((doc) => ({ type: 'added', doc: doc }))
+    };
   }
   function notifyQuery(prefix, field, value) {
     const subs = m.subs.get(queryKey(prefix, field, value));
@@ -109,10 +137,23 @@ function createMockFirestore() {
             }));
             return () => s.delete(cb);
           },
-          update(patch) { m.writes++; applyPatch(p, patch, true); return Promise.resolve(); },
-          set(data, opts) { m.writes++; applyPatch(p, data, !!(opts && opts.merge)); return Promise.resolve(); },
+          update(patch) { m.writes++; m.log.push({ p: p, patch: patch }); applyPatch(p, patch, true); return Promise.resolve(); },
+          set(data, opts) { m.writes++; m.log.push({ p: p, set: data }); applyPatch(p, data, !!(opts && opts.merge)); return Promise.resolve(); },
           delete() { m.writes++; m.store.delete(p); notifyDoc(p); return Promise.resolve(); }
         };
+      },
+      onSnapshot(cb) {
+        /* Listener su tutta la collezione: lo usano le sottocollezioni di
+           Ruzzle (proposte, eliminazioni). */
+        const key = collKey(prefix);
+        const s = m.subs.get(key) || new Set();
+        s.add(cb);
+        m.subs.set(key, s);
+        const list = figli(prefix);
+        m.readsListener += list.length;
+        m.subMeta.set(key, { tipo: 'coll', prefix: prefix });
+        queueMicrotask(() => cb(snapLista(list)));
+        return () => s.delete(cb);
       },
       where(field, op, value) {
         return {
@@ -123,7 +164,8 @@ function createMockFirestore() {
             m.subs.set(key, s);
             const list = hits(prefix, field, value);
             m.readsListener += list.length;
-            queueMicrotask(() => cb({ forEach: (fn) => list.forEach(fn), size: list.length, docs: list }));
+            m.subMeta.set(key, { tipo: 'query', prefix: prefix, field: field, value: value });
+            queueMicrotask(() => cb(snapLista(list)));
             return () => s.delete(cb);
           }
         };

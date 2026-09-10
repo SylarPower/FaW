@@ -499,6 +499,24 @@ button { font-family: var(--font); }
   border-color: var(--fire-0);
   box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.14);
 }
+/* Bozza: parola già scritta da chi non ha ancora il turno (preparazione) */
+#word-input.bozza {
+  border-color: var(--ok);
+  border-style: dashed;
+  background: var(--ok-soft);
+}
+.input-prep {
+  margin-top: 8px;
+  padding: 8px 11px;
+  border-radius: 10px;
+  border: 1px dashed var(--card-border);
+  background: var(--card-2);
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: var(--text-1);
+}
+.input-prep.hidden { display: none; }
+.input-prep b { color: var(--text-0); }
 #word-input::placeholder {
   font-weight: 500;
   letter-spacing: 0.02em;
@@ -869,60 +887,18 @@ button { font-family: var(--font); }
 .fine h2 { margin: 10px 0 4px; font-size: 1.5rem; font-weight: 800; letter-spacing: -0.01em; }
 #fine-sub { color: var(--text-1); font-size: 0.9rem; margin: 0 0 20px; }
 
-.podio {
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  gap: 12px;
+/* Il podio usa la struttura condivisa (../shared/podio.css): qui restano solo i
+   colori del tema di Patata Bollente. */
+#podio {
+  --podio-card: var(--card-2);
+  --podio-bar: var(--card-2);
+  --podio-border: var(--card-border);
+  --podio-text: var(--text-0);
+  --podio-sub: var(--text-2);
+  --podio-gold: var(--fire-border);
+  --podio-gold-bg: var(--fire-soft);
   margin-bottom: 22px;
 }
-.pod-col {
-  flex: 1;
-  max-width: 150px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 7px;
-}
-.pod-medal { font-size: 1.5rem; min-height: 2rem; }
-.pod-col .avatar {
-  width: 44px; height: 44px;
-  border-radius: 50%;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.95rem;
-  font-weight: 800;
-  color: #1f2937;
-}
-.pod-name {
-  font-weight: 700;
-  font-size: 0.8rem;
-  max-width: 100%;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.pod-bar {
-  width: 100%;
-  border-radius: 10px 10px 0 0;
-  background: var(--card-2);
-  border: 1px solid var(--card-border);
-  border-bottom: none;
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding-top: 8px;
-  font-size: 1.1rem;
-  font-weight: 800;
-  color: var(--text-0);
-  font-variant-numeric: tabular-nums;
-}
-.pod-col.p1 .pod-bar { min-height: 88px; background: var(--fire-soft); border-color: var(--fire-border); color: var(--fire-0); }
-.pod-col.p2 .pod-bar { min-height: 62px; }
-.pod-col.p3 .pod-bar { min-height: 46px; }
-.pod-col.p1 .avatar { box-shadow: 0 0 0 2px var(--fire-0); }
-.pod-sub { font-size: 0.68rem; color: var(--text-2); font-weight: 600; }
 
 .fine-stats {
   display: grid;

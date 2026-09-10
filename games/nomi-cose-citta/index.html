@@ -12,11 +12,15 @@
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../shared/faw-ui.css">
   <link rel="stylesheet" href="css/style.css">
+  <!-- Podio di fine partita (condiviso tra i giochi) -->
+  <link rel="stylesheet" href="../shared/podio.css">
   <!-- Firebase (compat, come negli altri giochi FaW) -->
   <script src="https://www.gstatic.com/firebasejs/9.1.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.1.1/firebase-firestore-compat.js"></script>
   <!-- Config Firebase condivisa (PRIMA dello script che inizializza Firebase) -->
   <script src="../shared/firebase-config.js"></script>
+  <!-- Podio di fine partita (condiviso tra i giochi) -->
+  <script src="../shared/podio.js"></script>
   <!-- Spazio per i banner di stato fissi in cima (evita che coprano il testo) -->
   <script src="../shared/faw-layout.js" defer></script>
 </head>
@@ -56,7 +60,9 @@
             Una <b>lettera</b> uguale per tutti e una risposta per ogni <b>categoria</b>.
             Scrivi più in fretta che puoi e premi <b class="gold">STOP</b>: la revisione si apre subito.
             Il gioco <b>non giudica il significato</b> di una parola: se la ritieni fuori posto,
-            contestala — ma serve il voto di <b class="red">tutti, autore incluso</b>.
+            contestala con <b class="red">🚫 NON VALIDA</b>. Se invece il dizionario non conosce una
+            parola che per te è giusta, difendila con <b>✅ VALIDA</b>.
+            In entrambi i casi serve il voto di <b>tutti, autore incluso</b>.
           </p>
         </div>
 
@@ -146,12 +152,16 @@
         <div>
           <h3>REVISIONE — ROUND <span id="rev-round">1</span> · LETTERA <b id="rev-lettera">—</b></h3>
           <p>
-            Una risposta è annullata <b>solo se tutti</b> i partecipanti del round votano “Non valida”,
-            <b>autore incluso</b>. Alla scadenza, una contestazione non unanime <b>lascia valida</b> la risposta.
+            Due voti, stessa regola: una risposta è annullata <b>solo se tutti</b> votano “Non valida”,
+            <b>autore incluso</b>; allo stesso modo una parola che il dizionario non conosce diventa
+            valida <b>solo se tutti</b> votano “Valida”. Alla scadenza, un voto non unanime
+            <b>lascia le cose come stanno</b>.
           </p>
         </div>
       </div>
       <div class="rev-timer"><span id="rev-timer-num">—</span> s alla chiusura <i id="rev-timer-fill"></i></div>
+      <!-- Parole in "stato di voto": chi vuole renderle valide o annullarle -->
+      <div id="rev-voti" class="rev-voti hidden"></div>
       <div id="rev-body" class="rev-body"></div>
       <div class="rev-foot">
         <div id="conf-progress" class="conf-progress"></div>
@@ -170,6 +180,8 @@
           <p>Punti definitivi, calcolati sull’esito congelato della revisione.</p>
         </div>
       </div>
+      <!-- Classifica provvisoria: mostrata a ogni fine turno -->
+      <div id="res-classifica" class="res-classifica"></div>
       <div id="res-body" class="res-body"></div>
       <div class="res-foot">
         <span id="res-countdown" class="res-countdown">Prossimo round tra …</span>
@@ -185,12 +197,15 @@
         <h2 id="fine-title">PARTITA FINITA</h2>
         <p id="fine-sub"></p>
       </div>
+      <!-- Rivincita IN ALTO: raggiungibile senza scorrere il dettaglio -->
+      <div id="fine-top-actions" class="fine-actions fine-top-actions hidden">
+        <button id="btn-rivincita" class="btn btn-fire btn-rivincita-top">🔁 RIVINCITA</button>
+      </div>
       <div id="podio" class="podio"></div>
       <div class="lobby-label">DETTAGLIO PER ROUND E CATEGORIA</div>
       <div id="fine-dettaglio" class="fine-dettaglio"></div>
       <div id="fine-stats" class="fine-stats"></div>
       <div class="fine-actions">
-        <button id="btn-rivincita" class="btn btn-fire">🔁 RIVINCITA</button>
         <a class="btn btn-ghost" href="../../index.html">🏠 HOME</a>
       </div>
     </div>

@@ -1,0 +1,98 @@
+/* ============================================================
+   PODIO CONDIVISO — fine partita multiplayer (tutti i giochi FaW)
+   Markup generato da ../shared/podio.js:
+   .podio > .pod-col.p1|.p2|.p3|.pn > .pod-medal + .pod-avatar +
+   .pod-name + .pod-bar + .pod-sub
+
+   Regola di layout: il 1° classificato sta sul gradino PIÙ ALTO e
+   l'altezza scende di posizione in posizione (--pod-h, scritta da podio.js),
+   per TUTTI i giocatori, non solo per i primi tre. I colori seguono il tema
+   del gioco: ogni pagina può sovrascrivere le variabili --podio-*.
+   ============================================================ */
+.podio {
+  --podio-card: rgba(255, 255, 255, 0.10);
+  --podio-bar: rgba(255, 255, 255, 0.18);
+  --podio-border: rgba(255, 255, 255, 0.22);
+  --podio-text: #ffffff;
+  --podio-sub: rgba(255, 255, 255, 0.72);
+  --podio-gold: #fcd34d;
+  --podio-gold-bg: #fde68a;
+  --podio-silver: #cbd5e1;
+  --podio-silver-bg: #e5e7eb;
+  --podio-bronze: #d9a066;
+  --podio-bronze-bg: #fcd9b6;
+
+  display: flex;
+  align-items: flex-end;          /* i gradini partono tutti dalla stessa base */
+  justify-content: center;
+  gap: 12px;
+  margin: 16px 0;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+.pod-col {
+  flex: 1 0 84px;
+  max-width: 150px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 12px 8px 0;
+  background: var(--podio-card);
+  border: 1px solid var(--podio-border);
+  border-radius: 14px 14px 0 0;
+}
+.pod-col.p1 { border-color: var(--podio-gold); }
+.pod-medal { font-size: 1.4rem; min-height: 1.9rem; }
+.pod-avatar {
+  width: 42px; height: 42px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: #111827;
+}
+.pod-col.p1 .pod-avatar { box-shadow: 0 0 0 2px var(--podio-gold); }
+.pod-name {
+  font-weight: 800;
+  font-size: 0.82rem;
+  color: var(--podio-text);
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pod-bar {
+  width: 100%;
+  /* Altezza = posizione (variabile scritta da podio.js, mai il contrario). */
+  height: var(--pod-h, 46px);
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px 10px 0 0;
+  background: var(--podio-bar);
+  border: 1px solid var(--podio-border);
+  border-bottom: none;
+  font-size: 1.15rem;
+  font-weight: 900;
+  color: var(--podio-text);
+  font-variant-numeric: tabular-nums;
+  transition: height 0.3s ease;
+}
+.pod-col.p1 .pod-bar { background: var(--podio-gold-bg); border-color: var(--podio-gold); color: #7c2d12; }
+.pod-col.p2 .pod-bar { background: var(--podio-silver-bg); border-color: var(--podio-silver); color: #334155; }
+.pod-col.p3 .pod-bar { background: var(--podio-bronze-bg); border-color: var(--podio-bronze); color: #5b3413; }
+.pod-sub {
+  font-size: 0.68rem;
+  color: var(--podio-sub);
+  font-weight: 600;
+  padding: 5px 0;
+  max-width: 100%;
+  white-space: nowrap;            /* una riga sola: le basi restano allineate */
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

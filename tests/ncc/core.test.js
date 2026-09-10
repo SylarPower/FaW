@@ -260,6 +260,76 @@ console.log('\n[8] Contestazioni: unanimità con autore incluso');
     'annullando una delle due "Roma" la superstite passa da 5 a 10');
 }
 
+console.log('\n[8b] Voto "Valida": stessa regola (unanimità) dell\'annullamento');
+{
+  const players = ['A', 'B', 'C'];
+  const risposte = {
+    A: { citta: { raw: 'Roma' } },
+    B: { citta: { raw: 'Ravenna' } },
+    C: { citta: { raw: 'Roccasicura' } }   // parola reale, assente dal dizionario di prova
+  };
+
+  // tutti votano "valida" → la parola è recuperata
+  const rd = mkRound('R', ['citta'], players, { votiValida: { c0_p2: ['A', 'B', 'C'] } });
+  const es = C.calcolaEsitoRound({ roundData: rd, risposte, dizionario: D });
+  eq(es.celle[2].validata, true, 'unanimità "valida" (autore incluso) → parola recuperata');
+  eq(es.celle[2].valida, true, 'la parola votata conta come valida');
+  eq(es.celle[2].motivo, null, 'nessun motivo di invalidità dopo il voto');
+  eq(es.celle[2].motivoAutomatico, 'ASSENTE', 'il responso del dizionario resta registrato a parte');
+  eq(puntiPer(es.celle), { A: 10, B: 10, C: 10 }, 'tre valide distinte → 10 ciascuna');
+
+  // la maggioranza NON basta (stessa regola dell'annullamento)
+  const rd2 = mkRound('R', ['citta'], players, { votiValida: { c0_p2: ['A', 'B'] } });
+  const es2 = C.calcolaEsitoRound({ roundData: rd2, risposte, dizionario: D });
+  eq(es2.celle[2].validata, false, 'senza il voto di tutti la parola resta non valida');
+  eq(puntiPer(es2.celle), { A: 10, B: 10, C: 0 }, 'punteggi invariati senza unanimità');
+  eq(C.rispostaValidata(['A', 'B'], players), false, 'quorum "valida" non raggiunto con 2 voti su 3');
+  eq(C.rispostaValidata(['A', 'B', 'C'], players), true, 'quorum "valida" raggiunto con tutti i voti');
+
+  // una risposta vuota non è recuperabile
+  const rd3 = mkRound('R', ['citta'], players, { votiValida: { c0_p2: ['A', 'B', 'C'] } });
+  const es3 = C.calcolaEsitoRound({
+    roundData: rd3,
+    risposte: { A: { citta: { raw: 'Roma' } }, B: { citta: { raw: 'Ravenna' } }, C: { citta: { raw: '' } } },
+    dizionario: D
+  });
+  eq(es3.celle[2].validata, false, 'il voto non può rendere valida una risposta vuota');
+
+  // l'annullamento unanime ha la precedenza
+  const rd4 = mkRound('R', ['citta'], players, {
+    voti: { c0_p0: ['A', 'B', 'C'] }, votiValida: { c0_p0: ['A', 'B', 'C'] }
+  });
+  const es4 = C.calcolaEsitoRound({ roundData: rd4, risposte, dizionario: D });
+  eq(es4.celle[0].annullata, true, 'con entrambi i voti unanimi vince l’annullamento');
+  eq(es4.celle[0].validata, false, 'nessuna doppia marca sulla stessa cella');
+
+  // mutatore: mappa separata, ritiro del voto opposto, conferma revocata
+  const st = {
+    stato: 'in_corso', round: 1, partecipanti: players.slice(),
+    opzioni: C.normOpzioni({ round: '1', categorie: 'light', seed: 'S', lettere: ['R'] }),
+    punteggi: C.mapZero(players), risultati: [],
+    roundData: mkRound('R', ['citta'], players, { votiValida: {}, conferme: ['A'] })
+  };
+  const up = C.mutVotaValida(st, { me: 'A', now: 1, key: 'c0_p2', vota: true });
+  eq(up['roundData.votiValida.c0_p2'], { __op: 'union', items: ['A'] }, 'voto "valida" nella mappa dedicata');
+  eq(up['roundData.conferme'], { __op: 'remove', items: ['A'] }, 'cambiare voto revoca la conferma');
+  C.applyPartial(st, up);
+  eq(st.roundData.votiValida.c0_p2, ['A'], 'voto registrato in votiValida');
+  eq(st.roundData.voti.c0_p2 || [], [], 'la mappa dei voti di annullamento resta vuota');
+  const up2 = C.mutVota(st, { me: 'A', now: 2, key: 'c0_p2', vota: true });
+  eq(up2['roundData.votiValida.c0_p2'], { __op: 'remove', items: ['A'] },
+    'votando "non valida" si ritira il voto "valida"');
+  C.applyPartial(st, up2);
+  eq(st.roundData.votiValida.c0_p2, [], 'un solo voto per giocatore e per cella');
+  eq(C.mutVotaValida(st, { me: 'A', now: 3, key: 'c0_p2', vota: false }), null,
+    'ritiro di un voto "valida" inesistente: nessuna scrittura');
+  const stChiuso = Object.assign({}, st, { roundData: Object.assign({}, st.roundData, { fase: 'risultati' }) });
+  eq(C.mutVotaValida(stChiuso, { me: 'A', now: 4, key: 'c0_p2', vota: true }).__error.code, 'REVISIONE_CHIUSA',
+    'voto "valida" a revisione chiusa: rifiutato');
+  eq(C.mutVotaValida(st, { me: 'Z', now: 5, key: 'c0_p2', vota: true }).__error.code, 'NON_PARTECIPANTE',
+    'chi non è nel round non può votare "valida"');
+}
+
 console.log('\n[9] Quorum fissato a inizio round');
 {
   const quorum = ['A', 'B', 'C'];
@@ -484,6 +554,29 @@ console.log('\n[13] Allenamento solo: 10 punti per risposta valida, mai 20 autom
   eq(cellaManuale.annullata, false, 'non è un annullamento per votazione');
   C.applyPartial(st3, C.mutAnnullaManualeSolo(st3, { me: 'TU', now: now + 30, key: kNomi, annulla: false, risposte: risp3, dizionario: D, dizionarioPronto: true }));
   eq(st3.punteggi.TU, 30, 'ripristino dell’annullamento manuale');
+
+  // validazione MANUALE: l'equivalente "solo" del voto "Valida"
+  const st4 = C.normState({ partecipanti: ['TU'], opzioni: { round: '1', categorie: 'light', seed: 'SOLO', lettere: ['R', 'M', 'C'] }, stato: 'attesa', pronti: ['TU'] });
+  C.applyPartial(st4, C.mutStart(st4, { me: 'TU', now, dizionarioPronto: true, dizionario: D, dictVersion: D.fingerprint }));
+  const L4 = st4.roundData.lettera;
+  const [w1, w2] = parolePer(L4, 2);
+  const risp4 = { TU: { nomi: { raw: w1 }, cose: { raw: w2 }, citta: { raw: L4 + 'zzzz' } } };
+  C.applyPartial(st4, C.mutConsegnaSolo(st4, { me: 'TU', now: now + 10, risposte: risp4, rispostePronte: true, dizionario: D, dizionarioPronto: true }));
+  eq(st4.punteggi.TU, 20, 'due valide + una assente dal dizionario → 20');
+  const kCitta = st4.risultati[0].celle.filter((c) => c.cat === 'citta')[0].k;
+  C.applyPartial(st4, C.mutValidaManualeSolo(st4, { me: 'TU', now: now + 20, key: kCitta, valida: true, risposte: risp4, dizionario: D, dizionarioPronto: true }));
+  eq(st4.punteggi.TU, 30, 'validazione manuale → la parola conta come valida');
+  const cellaValidata = st4.risultati[0].celle.filter((c) => c.k === kCitta)[0];
+  eq(cellaValidata.validataManuale, true, 'cella marcata come validata manualmente');
+  eq(cellaValidata.validata, true, 'marca di validazione collettiva/manuale');
+  eq(cellaValidata.valida, true, 'risposta valida dopo la validazione manuale');
+  eq(cellaValidata.motivoAutomatico, 'ASSENTE', 'il responso del dizionario resta registrato');
+  // le due azioni manuali si escludono
+  C.applyPartial(st4, C.mutAnnullaManualeSolo(st4, { me: 'TU', now: now + 30, key: kCitta, annulla: true, risposte: risp4, dizionario: D, dizionarioPronto: true }));
+  const cellaDopo = st4.risultati[0].celle.filter((c) => c.k === kCitta)[0];
+  eq(cellaDopo.validataManuale, false, 'annullando si toglie la validazione manuale');
+  eq(cellaDopo.annullataManuale, true, 'annullamento manuale attivo');
+  eq(st4.punteggi.TU, 20, 'punti ricalcolati dopo il cambio di scelta');
 }
 
 console.log('\n[14] Classifica con pari merito');

@@ -695,6 +695,9 @@
 				overflow-wrap: anywhere;
 			}
 			.invite-sub { font-size: 0.84rem; color: var(--faw-text-2); margin-top: 3px; overflow-wrap: anywhere; }
+			/* Coda inviti: quanti altri inviti stanno aspettando dietro a questo */
+			.invite-more { margin-top: 12px; padding: 8px 12px; border-radius: 10px; border: 1px dashed #f59e0b; background: rgba(245, 158, 11, 0.10); font-size: 0.82rem; font-weight: 700; color: #b45309; }
+			:root[data-theme='light'] .invite-more { background: rgba(245, 158, 11, 0.14); }
 			.invite-actions { display: flex; gap: 10px; margin-top: 16px; }
 			.invite-btn {
 				flex: 1;
@@ -752,7 +755,7 @@
 
 		<!-- ============ POPUP INVITO SFIDA (evidente) ============ -->
 		<div id="invite-popup" style="display:none;" role="alertdialog" aria-live="assertive" aria-label="Invito a una sfida">
-			<button id="invite-close" class="invite-close" onclick="chiudiInvito()" title="Ignora: la sfida resta nella lista Partite in Corso">✖</button>
+			<button id="invite-close" class="invite-close" onclick="chiudiInvito()" title="Ignora questo invito: la sfida resta nella lista Partite in Corso">✖</button>
 			<div class="invite-head">
 				<span class="invite-icon">⚔️</span>
 				<div style="min-width:0;">
@@ -760,6 +763,9 @@
 					<div class="invite-sub" id="invite-sub"></div>
 				</div>
 			</div>
+			<!-- Coda inviti: se ne arrivano piu' di uno il popup lo dice, e la ✖ passa
+				al successivo invece di nascondere tutto fino al refresh. -->
+			<div class="invite-more" id="invite-more" style="display:none;" role="status"></div>
 			<div class="invite-actions">
 				<button id="invite-acc" class="invite-btn invite-btn--acc">✅ ACCETTA</button>
 				<button id="invite-rif" class="invite-btn invite-btn--rif">✖ RIFIUTA</button>
@@ -1494,6 +1500,7 @@ if (mioNome && passwordHashSalvato) {
 			    const stato = p.stato;
 			    if (stato === 'conclusa' || stato === 'results') return;
 			    if ((p.rivincitaRifiutataDa || []).length > 0) return;
+			    if ((p.invitoRifiutatoDa || []).includes(mioNome)) return;
 			    const partecipanti = p.partecipanti || p.players || [];
 			    if (!partecipanti.includes(mioNome)) return;
 			    if (stato === 'in_corso' || stato === 'drawing' || stato === 'interpreting' || stato === 'voting') {
@@ -1552,10 +1559,13 @@ function listen() {
         aggiornaListaAmici(snap, presenzeData);
     });
 
-    // PARTITE: niente listener in tempo reale. La lista "Partite in Corso"
-    // si aggiorna una volta al minuto (o a mano con il pulsante ⟳), cosi'
-    // non sfarfalla di continuo e non brucia letture Firestore.
+    // LISTA "Partite in Corso": niente listener in tempo reale (sfarfallerebbe a
+    // ogni variazione). Si aggiorna una volta al minuto, o a mano con il pulsante ⟳.
     avviaRefreshPartite();
+
+    // ⚔️ INVITI: qui il tempo reale serve davvero, e c'e' un listener dedicato
+    // limitato alle partite ancora in attesa (vedi avviaListenerInviti piu' sotto).
+    avviaListenerInviti();
 }
 
 /* ========================================
@@ -1569,6 +1579,7 @@ const REFRESH_MIN_GAP_MS = 4000;    // anti-rimbalzo su focus/click ravvicinati
 let ultimoRefreshPartite = 0;
 let refreshPartiteInCorso = null;
 let refreshPartiteTimer = null;
+let refreshRinviato = null;
 let refreshMetaTimer = null;
 let ultimaFirmaPartite = '';
 
@@ -1585,7 +1596,15 @@ async function refreshPartite(manuale = false) {
     if (!db || !mioNome) return;
     if (refreshPartiteInCorso) return refreshPartiteInCorso;
     const adesso = Date.now();
-    if (!manuale && adesso - ultimoRefreshPartite < REFRESH_MIN_GAP_MS) return;
+    if (!manuale && adesso - ultimoRefreshPartite < REFRESH_MIN_GAP_MS) {
+        /* Anti-rimbalzo: la richiesta NON viene buttata via. Prima un focus, o un
+           ritorno sulla scheda, entro 4s dall'ultimo aggiornamento faceva uscire
+           subito dalla funzione: l'invito appena arrivato aspettava comunque il
+           minuto pieno. Ora il refresh parte alla fine della finestra, non va perso. */
+        rinviaRefreshPartite(REFRESH_MIN_GAP_MS - (adesso - ultimoRefreshPartite));
+        return;
+    }
+    if (refreshRinviato) { clearTimeout(refreshRinviato); refreshRinviato = null; }
 
     const btn = document.getElementById('btn-refresh-partite');
     if (btn) btn.classList.add('is-loading');
@@ -1634,6 +1653,15 @@ async function refreshPartite(manuale = false) {
     return refreshPartiteInCorso;
 }
 
+/* Accoda un unico refresh alla fine della finestra di anti-rimbalzo. */
+function rinviaRefreshPartite(ms) {
+    if (refreshRinviato) return;   // ce n'e' gia' uno in coda: ne basta uno
+    refreshRinviato = setTimeout(() => {
+        refreshRinviato = null;
+        refreshPartite(false);
+    }, Math.max(200, ms) + 50);
+}
+
 function avviaRefreshPartite() {
     refreshPartite(false);
     if (refreshPartiteTimer) clearInterval(refreshPartiteTimer);
@@ -1656,6 +1684,87 @@ function aggiornaRefreshMeta() {
     el.textContent = s < 5 ? 'aggiornato ora'
         : s < 60 ? `aggiornato ${s}s fa`
         : `aggiornato ${Math.round(s / 60)} min fa`;
+}
+
+// ========================================
+// ⚡ INVITI IN TEMPO REALE — listener dedicato
+// ========================================
+/* Prima gli inviti arrivavano solo dal refresh della lista partite (60s): chi
+   veniva sfidato aspettava fino a un minuto prima di vedere il popup. Ora c'e'
+   un listener dedicato alle partite ancora in attesa. Usa la stessa coppia di
+   filtri gia' usata dallo storico (partecipanti array-contains + stato == ...),
+   quindi lo stesso indice composito Firestore: l'invito compare in ~1s e le
+   letture sono MENO di prima, perche' il listener scarica solo le partite in
+   attesa e poi solo le variazioni, invece di tutto lo storico a ogni minuto. */
+const INVITO_RIALLINEA_MS = 1200;   // la lista segue l'invito con un piccolo debounce
+const invitiLive = { partite: [], pictionary: [] };   // ultimo snapshot inviti
+let unsubscribeInviti = [];
+let invitiListenerAttivo = false;
+let invitiRiallineaTimer = null;
+let ultimaFirmaInviti = null;
+
+function snapshotInvitiLista(snap) {
+  const out = [];
+  if (snap && typeof snap.forEach === 'function') {
+    snap.forEach(doc => out.push({ id: doc.id, ...doc.data() }));
+  }
+  return out;
+}
+
+function avviaListenerInviti() {
+  if (!db || !mioNome) return;
+  // ripartenza pulita: un secondo login non deve duplicare i listener
+  unsubscribeInviti.forEach(fn => { try { fn(); } catch (e) { /* noop */ } });
+  unsubscribeInviti = [];
+  invitiLive.partite = [];
+  invitiLive.pictionary = [];
+  invitiListenerAttivo = false;
+  ultimaFirmaInviti = null;
+  ascoltaInviti('partite', 'partecipanti', 'attesa', 'partite');
+  ascoltaInviti('pictionary_rooms', 'players', 'lobby', 'pictionary');
+}
+
+function ascoltaInviti(nomeCollezione, campoGiocatori, statoAttesa, bucket) {
+  const base = db.collection(nomeCollezione).where(campoGiocatori, 'array-contains', mioNome);
+  const ricevi = (snap) => {
+    invitiListenerAttivo = true;
+    /* Il filtro sullo stato resta anche qui: se scatta il ripiego sotto, lo
+       snapshot contiene partite in qualunque stato. */
+    invitiLive[bucket] = snapshotInvitiLista(snap).filter(d => d && d.stato === statoAttesa);
+    invitiCambiati();
+  };
+  const errore = (err) => {
+    /* Indice composito mancante o regole di sicurezza: ripieghiamo sulla query
+       senza filtro di stato (quella che il refresh usa gia' oggi) e filtriamo
+       lato client. Gli inviti restano in tempo reale, cambiano solo le letture. */
+    console.warn('[FaW] inviti ' + nomeCollezione + ': ' + (err && err.message) +
+      ' — ripiego sul listener senza filtro di stato');
+    try {
+      unsubscribeInviti.push(base.onSnapshot(ricevi, (e2) => {
+        console.warn('[FaW] inviti ' + nomeCollezione + ' non disponibili: ' + (e2 && e2.message));
+      }));
+    } catch (e) {
+      console.warn('[FaW] inviti ' + nomeCollezione + ' non avviabili: ' + (e && e.message));
+    }
+  };
+  unsubscribeInviti.push(base.where('stato', '==', statoAttesa).onSnapshot(ricevi, errore));
+}
+
+/* Un invito e' arrivato o e' cambiato: popup subito, lista un attimo dopo (una
+   raffica di scritture produce un solo refresh invece di N render). */
+function invitiCambiati() {
+  aggiornaInviti();
+  /* La lista va riallineata solo se il SET di inviti e' cambiato: gli altri
+     snapshot (un altro giocatore che si prepara, un punteggio...) non devono
+     far rileggere niente, e il primo snapshot a vuoto non scatena un refresh. */
+  const firma = invitiLive.partite.concat(invitiLive.pictionary).map(d => d.id).sort().join(",");
+  if (firma === ultimaFirmaInviti) return;
+  ultimaFirmaInviti = firma;
+  if (invitiRiallineaTimer) clearTimeout(invitiRiallineaTimer);
+  invitiRiallineaTimer = setTimeout(() => {
+    invitiRiallineaTimer = null;
+    refreshPartite(true);
+  }, INVITO_RIALLINEA_MS);
 }
 
 // ========================================
@@ -1686,24 +1795,41 @@ function fermaFlashTitolo() {
 // Tutti gli inviti a me pendenti (partite + room pictionary)
 function invitiPendenti() {
   const out = [];
-  const partite = [].concat(partiteCache.ruzzle || [], partiteCache.patata || [],
-    partiteCache.ncc || [],
-    partiteCache.neonwar || [], partiteCache.gameof15 || []);
-  partite.forEach(p => {
-    if (!p || p.stato !== 'attesa') return;
-    if (!(p.partecipanti || []).includes(mioNome)) return;
-    if (p.partecipanti[0] === mioNome) return; // sono io il creatore
+  const visti = new Set();
+  const spingiPartita = (p) => {
+    if (!p || !p.id || visti.has(p.id)) return;
+    if (p.stato !== 'attesa') return;
+    const partecipanti = p.partecipanti || [];
+    if (!partecipanti.includes(mioNome)) return;
+    if (partecipanti[0] === mioNome) return;   // sono io il creatore
+    /* Il rifiuto di un INVITO vive in invitoRifiutatoDa (ed e' per giocatore);
+       rivincitaRifiutataDa resta il rifiuto della rivincita fatto dentro la
+       partita e copre anche le partite marcate col campo sbagliato in passato. */
+    if ((p.invitoRifiutatoDa || []).includes(mioNome)) return;
     if ((p.rivincitaRifiutataDa || []).length > 0) return;
-    if ((p.rivincitaAccettataDa || []).includes(mioNome)) return; // già accettata
-    out.push({ id: p.id, gioco: p.gioco, da: p.partecipanti[0], tipo: 'partita', num: p.partecipanti.length });
-  });
-  (partiteCache.pictionary || []).forEach(p => {
-    if (!p || p.stato !== 'lobby') return;
+    if ((p.rivincitaAccettataDa || []).includes(mioNome)) return;   // gia' accettata
+    visti.add(p.id);
+    out.push({ id: p.id, gioco: p.gioco, da: partecipanti[0], tipo: 'partita',
+      num: partecipanti.length, ts: p.timestamp || 0 });
+  };
+  const spingiPic = (p) => {
+    if (!p || !p.id || visti.has(p.id)) return;
+    if (p.stato !== 'lobby') return;
     if (!(p.players || []).includes(mioNome)) return;
     if (p.host === mioNome) return;
-    out.push({ id: p.id, gioco: 'pictionary', da: p.host, tipo: 'pictionary', num: p.players.length });
-  });
-  return out;
+    visti.add(p.id);
+    out.push({ id: p.id, gioco: 'pictionary', da: p.host, tipo: 'pictionary',
+      num: p.players.length, ts: p.timestamp || 0 });
+  };
+  /* Due fonti: lo snapshot in tempo reale (elencato per primo, quindi la sua
+     copia vince quando l'id c'e' in entrambe) e la cache del refresh a 60s,
+     utile finche' non arriva il primo snapshot. */
+  [].concat(invitiLive.partite || [],
+    partiteCache.ruzzle || [], partiteCache.patata || [], partiteCache.ncc || [],
+    partiteCache.neonwar || [], partiteCache.gameof15 || []).forEach(spingiPartita);
+  [].concat(invitiLive.pictionary || [], partiteCache.pictionary || []).forEach(spingiPic);
+  // il piu' recente per primo: e' quello che il popup mostra
+  return out.sort((a, b) => b.ts - a.ts);
 }
 
 function aggiornaInviti() {
@@ -1717,7 +1843,17 @@ function aggiornaInviti() {
       nuovoArrivo = true;
     }
   });
-  const inv = pendenti.length ? pendenti[pendenti.length - 1] : null;
+  const inv = pendenti.length ? pendenti[0] : null;   // il piu' recente
+  const coda = document.getElementById('invite-more');
+  if (coda) {
+    /* Gli inviti entrano nel popup uno per volta, ma l'utente deve sapere che
+       ce ne sono altri dietro e come si scorrono (✖ passa al successivo). */
+    const altri = pendenti.length - 1;
+    coda.textContent = altri === 1
+      ? '⏳ C\u2019è ancora 1 invito in attesa · ✖ per vederlo'
+      : `⏳ Ci sono ancora ${altri} inviti in attesa · ✖ per passare al successivo`;
+    coda.style.display = altri > 0 ? 'block' : 'none';
+  }
   if (inv) {
     const cfg = GIOCHI_CONFIG[inv.gioco] || { nome: inv.gioco, icona: '🎮' };
     document.getElementById('invite-title').textContent = `⚔️ ${inv.da} ti sfida!`;
@@ -1750,22 +1886,36 @@ function accettaInvito(inv) {
 function rifiutaInvito(inv) {
   invitiNotificati.add(inv.id);
   if (inv.tipo === 'pictionary') {
-    // pictionary non ha stato "rifiutato": chiudi e resta raggiungibile dalla lista
     invitiIgnorati.add(inv.id);
     aggiornaInviti();
+    rifiutaRoomPictionary(inv.id);
     return;
   }
+  /* rifiutaSfida() scrive su Firestore e, se il rifiuto va a buon fine, toglie
+     l'invito dalla coda e aggiorna popup e lista. */
   rifiutaSfida(inv.id);
 }
+/* Le room pictionary non hanno uno stato "rifiutato": chi rifiuta esce dalla
+   room, esattamente come fa il pulsante ESCI dentro il gioco. Se restasse tra i
+   players l'host non potrebbe mai iniziare: servono tutti i giocatori pronti. */
+async function rifiutaRoomPictionary(roomId) {
+  try {
+    await db.collection('pictionary_rooms').doc(roomId).update({
+      players: firebase.firestore.FieldValue.arrayRemove(mioNome),
+      ready: firebase.firestore.FieldValue.arrayRemove(mioNome)
+    });
+    mostraToast('❌ Invito rifiutato');
+  } catch (e) {
+    console.error('Errore rifiuto room pictionary:', e);
+  }
+}
 function chiudiInvito() {
-  const popup = document.getElementById('invite-popup');
-  if (!popup) return;
-  popup.style.display = 'none';
-  popup.classList.remove('invite-live');
-  fermaFlashTitolo();
-  // segna l'invito corrente come ignorato (resta nella lista Partite in Corso)
+  /* ✖ = "ignora QUESTO invito": la sfida resta nella lista Partite in Corso e,
+     se ce n'e' un altro in coda, il popup lo mostra subito. Prima nascondeva
+     tutto fino al refresh successivo, cioe' fino a un minuto. */
   const pendenti = invitiPendenti().filter(i => !invitiIgnorati.has(i.id));
-  if (pendenti.length) invitiIgnorati.add(pendenti[pendenti.length - 1].id);
+  if (pendenti.length) invitiIgnorati.add(pendenti[0].id);
+  aggiornaInviti();
 }
 
 // ========================================
@@ -1778,7 +1928,8 @@ function firmaListaPartite() {
         return giocoSelezionato + '|' + JSON.stringify(partiteInCache().map(p => ({
             id: p.id, gioco: p.gioco, stato: p.stato,
             n: (p.partecipanti || p.players || []).length,
-            acc: p.rivincitaAccettataDa || [], rif: p.rivincitaRifiutataDa || []
+            acc: p.rivincitaAccettataDa || [], rif: p.rivincitaRifiutataDa || [],
+            inv: p.invitoRifiutatoDa || []
         })));
     } catch (e) { return ''; }
 }
@@ -1833,7 +1984,10 @@ function renderPartitaRuzzle(p, div) {
 
     if (p.stato === "conclusa") return;
 
-    const rifiutanti = p.rivincitaRifiutataDa || [];
+    /* Chi ha rifiutato l'invito (campo nuovo) e chi ha rifiutato una rivincita col
+       codice vecchio: la riga in lista e' la stessa, "sfida rifiutata". */
+    const rifiutanti = (p.invitoRifiutatoDa || []).concat(p.rivincitaRifiutataDa || [])
+        .filter((n, i, arr) => arr.indexOf(n) === i);
     const accettanti = p.rivincitaAccettataDa || [];
     const creatore = p.partecipanti[0];
     const altriGiocatori = p.partecipanti.filter(x => x !== creatore);
@@ -1842,19 +1996,27 @@ function renderPartitaRuzzle(p, div) {
     // Rifiuti / annullata
     if (rifiutanti.length > 0) {
         if (rifiutanti.includes(mioNome)) {
+            /* Partite marcate prima che il rifiuto uscisse dai partecipanti: oggi
+               chi rifiuta la partita non la vede nemmeno piu'. */
             div.innerHTML += `
                 <div class="user-item u-row--declined">
                     <span>👋 Hai rifiutato la sfida di ${creatore}</span>
                     ${delBtn}
                 </div>`;
-        } else {
+            return;
+        }
+        /* Chi rifiuta adesso esce dai partecipanti, quindi la sfida puo' proseguire
+           con chi resta: in quel caso la riga giusta e' la "in attesa" qui sotto.
+           La dichiariamo annullata solo se non ci sono piu' abbastanza giocatori. */
+        const minimo = Math.max(2, (GIOCHI_CONFIG[p.gioco] || {}).minGiocatori || 2);
+        if ((p.partecipanti || []).length < minimo) {
             div.innerHTML += `
                 <div class="user-item u-row--canceled">
                     <span>😔 Sfida annullata: ${rifiutanti.join(', ')} ha rifiutato</span>
                     ${delBtn}
                 </div>`;
+            return;
         }
-        return;
     }
 
     // Attesa
@@ -2422,10 +2584,28 @@ if (giocoSelezionato === 'pictionary') {
 			}
 			async function rifiutaSfida(partitaId) {
 			  if (!confirm('Sicuro di rifiutare la sfida?')) return;
-			  await db.collection("partite").doc(partitaId).update({
-			    rivincitaRifiutataDa: firebase.firestore.FieldValue.arrayUnion(mioNome)
-			  });
+			  try {
+			    await db.collection("partite").doc(partitaId).update({
+			      /* Rifiutare un INVITO non e' rifiutare una RIVINCITA: prima finivano
+			         entrambi in rivincitaRifiutataDa, con due effetti brutti. (1) chi
+			         rifiutava restava tra i partecipanti, quindi la lobby aspettava per
+			         sempre anche lui. (2) il pulsante RIVINCITA di quella partita restava
+			         disabilitato per tutti. Ora il rifiuto ha un campo suo e chi rifiuta
+			         esce davvero dalla partita. */
+			      invitoRifiutatoDa: firebase.firestore.FieldValue.arrayUnion(mioNome),
+			      partecipanti: firebase.firestore.FieldValue.arrayRemove(mioNome)
+			    });
+			  } catch (e) {
+			    console.error("Errore rifiuto sfida:", e);
+			    mostraToast('⚠️ Non sono riuscito a rifiutare, riprova', 'err');
+			    return;
+			  }
 			  mostraToast('❌ Sfida rifiutata');
+			  /* Il popup passa subito al successivo e la lista mostra "hai rifiutato",
+			     senza aspettare lo snapshot o il refresh. */
+			  invitiIgnorati.add(partitaId);
+			  aggiornaInviti();
+			  refreshPartite(true);
 			}
 			async function annullaSfida(partitaId) {
 			  if (!confirm('Sicuro di annullare la sfida?')) return;

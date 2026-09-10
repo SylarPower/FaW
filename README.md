@@ -15,6 +15,8 @@ FaW/
     ├── shared/firebase-config.js   # Config Firebase condivisa (unica fonte)
     ├── shared/faw-ui.css           # Design system premium condivisa (token + componenti)
     ├── shared/faw-layout.js        # Riserva lo spazio dei banner fissi in cima
+    ├── shared/podio.js             # Podio di fine partita (posizioni + gradini)
+    ├── shared/podio.css            # Stile del podio (colori via --podio-*)
     ├── ruzzle/index.html
     ├── patata/                  # Patata Bollente (index.html + css/ + js/)
     ├── nomi-cose-citta/         # Nomi, Cose, Città (index.html + css/ + js/, README dedicato)
@@ -125,11 +127,61 @@ Firestore con **429 Too Many Requests** e il gioco resta bloccato in lobby. Per 
   sui fallimenti (2s → 30s).
 - **Nessun polling a pochi secondi**: l'hub aggiorna la lista partite ogni 60 secondi
   (o a mano con il pulsante ⟳), e la presenza ogni 30 secondi.
+- **Gli inviti non usano il polling**: hanno un listener dedicato, limitato alle
+  partite in attesa (`partecipanti array-contains me` + `stato == 'attesa'`, stessa
+  coppia di filtri dello storico quindi stesso indice composito) e alle room
+  pictionary in lobby. L'invito arriva in ~1s e costa meno del vecchio refresh,
+  perché lo snapshot contiene solo le partite in attesa e poi solo le variazioni.
+  Se l'indice composito non esiste il listener ripiega sulla query senza filtro di
+  stato e filtra lato client: gli inviti restano in tempo reale, cambiano solo le
+  letture.
+- **Rifiutare un invito non rompe la partita**: il rifiuto va in `invitoRifiutatoDa`
+  (non in `rivincitaRifiutataDa`, che resta il rifiuto della rivincita fatto dentro
+  la partita) e chi rifiuta viene tolto da `partecipanti`, così la lobby parte con
+  chi resta e il pulsante RIVINCITA non resta bloccato.
 
 `tests/patata/quota.test.js` misura letture e scritture reali di una lobby a 3 client e
 blocca le regressioni. `tests/ncc/quota.test.js` fa lo stesso per Nomi, Cose, Città:
 una partita completa a 3 giocatori e 2 round costa 0 letture `get`/transazioni, 21
 letture da listener e 22 scritture; l'allenamento solo scrive zero.
+
+## Ruzzle: punteggi finali
+
+Il risultato di una partita multiplayer si calcola **una volta sola** e con una
+regola unica (`calcolaPunteggiFinali` in `games/ruzzle/index.html`): parola
+trovata anche da un altro giocatore = 0 punti, parola eliminata per votazione o
+esclusa dal dizionario = 0 punti, ogni partecipante ha sempre una voce.
+
+- Chiude la partita **un solo client** (l'arbitro = primo partecipante in ordine
+  alfabetico), che rilegge il documento prima di scrivere; se l'arbitro ha la
+  scheda chiusa, dopo 6 secondi subentra il primo client vivo.
+- La UI legge sempre `punteggiAllineati`: punteggio, classifica, banner e live
+  score mostrano gli stessi numeri su ogni client, anche se il documento non è
+  ancora aggiornato (chi manca vale 0).
+- A ogni snapshot di una partita conclusa l'arbitro confronta il documento con il
+  calcolo atteso e, se non tornano, lo riscrive: i punteggi restano allineati
+  anche dopo un'eliminazione tardiva o una scrittura concorrente.
+- Il live score (`punteggi.<nome>`) viene scritto solo durante la partita: a fine
+  partita non sovrascrive più il risultato calcolato con la regola condivisa.
+
+`tests/ruzzle/punteggi-finali.test.js` apre tre client reali sullo stesso
+`matchId` (mock Firestore) e verifica: una sola scrittura di chiusura, risultato
+corretto, stessi numeri sui tre schermi, ricalcolo dopo un'eliminazione e
+riconciliazione di un punteggio sbagliato senza loop di scritture.
+
+## Leggibilità nel tema chiaro
+
+Il tema bianco di Ruzzle usa superfici chiare (`--item-bg`): tutto il testo che ci
+sta sopra deve seguire il tema, altrimenti resta chiaro su chiaro e sparisce.
+
+- `--item-text`, `--accent-strong` e `--primary-strong` sono definiti sia in
+  `:root` (tema chiaro) sia in `body.dark-mode`, e hanno un contrasto ≥ 4.5:1 sul
+  rispettivo sfondo (verificato da `tests/ruzzle/punteggi-finali.test.js`).
+- Le schede dentro i modali ("Cosa mi sono perso", statistiche) usano
+  `--item-text`: il modale resta scuro in entrambi i temi, ma le sue schede no.
+- La barra "MOSTRA PAROLE DI:" dell'analisi ha sfondo sempre scuro, quindi il
+  testo è chiaro in modo esplicito.
+- Il podio usa `--item-text`/`--item-bg`, così resta leggibile in entrambi i temi.
 
 ## Nomi, Cose, Città
 
@@ -141,6 +193,27 @@ compromesso privacy/letture, limiti noti e verifiche:
 
 Senza `matchId` nella URL si apre l'**allenamento solo**: stessa UI e stessa logica,
 zero scritture Firestore.
+
+## Podio di fine partita
+
+Ogni gioco multiplayer (Ruzzle, Patata Bollente, Nomi Cose Città, Gioco del 15,
+Pictionary) mostra a fine partita un podio con **tutte le posizioni e i punteggi
+corretti**, generato da un unico modulo condiviso:
+
+- `games/shared/podio.js` — `FAWPodio.render(oggetto, righe, { io })`: ordina per
+  punteggio decrescente (parità: nome in ordine alfabetico), assegna il gradino
+  più alto al 1° e scende di 16 px a ogni posizione (minimo 32 px), marca il
+  giocatore corrente con `(TU)` ed escaping dei nomi.
+- `games/shared/podio.css` — struttura e colori di base; ogni gioco sovrascrive
+  le variabili `--podio-*` con il proprio tema.
+
+Regole valide per tutti i giochi: entrano nel podio **tutti** i giocatori (non
+solo i primi tre) e l'altezza dei gradini segue la classifica, mai il contrario.
+Ruzzle riempie il podio con `punteggiAllineati`, quindi mostra gli stessi numeri
+del documento; Pictionary e Gioco del 15 usano i punteggi della partita.
+
+`tests/shared/podio.test.js` copre ordine, gradini, medaglie, `(TU)`, escaping e
+CSS; ogni gioco è verificato anche dal test statico `[9]`.
 
 ## Palestra mobile
 
