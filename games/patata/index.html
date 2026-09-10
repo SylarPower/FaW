@@ -12,11 +12,15 @@
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../shared/faw-ui.css">
   <link rel="stylesheet" href="css/style.css">
+  <!-- Podio di fine partita (condiviso tra i giochi) -->
+  <link rel="stylesheet" href="../shared/podio.css">
   <!-- Firebase (compat, come negli altri giochi FaW) -->
   <script src="https://www.gstatic.com/firebasejs/9.1.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.1.1/firebase-firestore-compat.js"></script>
   <!-- Config Firebase condivisa (PRIMA dello script che inizializza Firebase) -->
   <script src="../shared/firebase-config.js"></script>
+  <!-- Podio di fine partita (condiviso tra i giochi) -->
+  <script src="../shared/podio.js"></script>
   <!-- Spazio per i banner di stato fissi in cima (evita che coprano il testo) -->
   <script src="../shared/faw-layout.js" defer></script>
 </head>
@@ -61,7 +65,9 @@
           <p class="lobby-sub">
             A turno, scrivi una parola che <b>contenga tutte le lettere richieste</b> prima che scada
             il tempo. Ogni parola valida: <b class="gold">+5 secondi</b> e la patata passa al prossimo.
-            Chi tiene la patata quando arriva a zero… <b class="red">si scotta (−10 pt)</b>. 🫠
+            Chi tiene la patata quando arriva a zero… <b class="red">si scotta (−10 pt)</b>. 🫠<br>
+            La casella è <b>sempre scrivibile</b>: prepara la tua parola anche quando tocca agli altri
+            e inviala appena arriva il tuo turno. ⚡
           </p>
         </div>
 
@@ -129,6 +135,8 @@
                      autocapitalize="characters" spellcheck="false" aria-label="Parola">
               <button id="btn-invia" class="btn btn-fire">INVIA</button>
             </div>
+            <!-- La casella è SEMPRE scrivibile: chi non ha il turno prepara la parola -->
+            <div class="input-prep" id="input-prep"></div>
             <div class="input-hint" id="input-hint"></div>
             <div class="feedback" id="feedback" aria-live="polite"></div>
           </div>

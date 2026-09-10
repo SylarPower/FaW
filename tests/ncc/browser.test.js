@@ -14,6 +14,7 @@ const html = fs.readFileSync(path.join(ROOT, 'games/nomi-cose-citta/index.html')
 const coreJs = fs.readFileSync(path.join(ROOT, 'games/nomi-cose-citta/js/core.js'), 'utf8');
 const backendJs = fs.readFileSync(path.join(ROOT, 'games/nomi-cose-citta/js/backend.js'), 'utf8');
 const uiJs = fs.readFileSync(path.join(ROOT, 'games/nomi-cose-citta/js/ui.js'), 'utf8');
+const podioJs = fs.readFileSync(path.join(ROOT, 'games/shared/podio.js'), 'utf8');
 
 /* Campione del dizionario reale: una riga ogni dieci, cosi' il campione copre
    tutto l'alfabeto (il file e' ordinato: le prime righe sono solo parole con "a"). */
@@ -69,6 +70,7 @@ dictSample.split('\n').forEach((w) => {
 
   window.eval(coreJs);
   window.eval(backendJs);
+  window.eval(podioJs);   // podio condiviso di fine partita
   window.eval(uiJs);
 
   console.log('\n[1] Boot: dizionario → lobby di allenamento');
@@ -128,6 +130,11 @@ dictSample.split('\n').forEach((w) => {
   ok(!document.getElementById('btn-stop').disabled, 'STOP resta disponibile: parole sbagliate incluse');
   inputs[0].value = parole[0];
   inputs[0].dispatchEvent(new window.Event('input', { bubbles: true }));
+  // Una risposta resta volutamente fuori dizionario: serve a provare la
+  // validazione manuale del riepilogo (equivalente del voto "Valida").
+  const parolaFuoriDizionario = lettera + 'ZZZQX';
+  inputs[2].value = parolaFuoriDizionario;
+  inputs[2].dispatchEvent(new window.Event('input', { bubbles: true }));
   await sleep(1400);   // oltre il debounce di salvataggio
   ok(/salvato/i.test(document.getElementById('save-state').textContent),
     'indicatore di salvataggio: ' + document.getElementById('save-state').textContent);
@@ -138,24 +145,50 @@ dictSample.split('\n').forEach((w) => {
     'overlay risultati'), 'overlay dei risultati del round');
   const st = window.__NCC.state;
   eq(st.roundData.fase, 'risultati', 'fase risultati');
-  eq(st.punteggi.GIOCATORE, 30, '3 risposte valide × 10 punti (allenamento)');
+  eq(st.punteggi.GIOCATORE, 20, '2 risposte valide × 10 punti (la terza è fuori dizionario)');
   const celle = st.risultati[0].celle;
-  ok(celle.every((c) => c.punti === 10), 'nessuna risposta da 20 in allenamento');
+  ok(celle.every((c) => c.punti === 10 || c.punti === 0), 'nessuna risposta da 20 in allenamento');
   eq(st.risultati[0].allenamento, true, 'risultato marcato come allenamento');
   ok(/Allenamento: 10 punti/.test(document.getElementById('res-body').textContent),
     'punteggio di allenamento spiegato in UI');
+  ok(/CLASSIFICA PROVVISORIA/i.test(document.getElementById('res-classifica').textContent),
+    'classifica provvisoria mostrata a fine turno');
+  ok(document.getElementById('res-classifica').textContent.indexOf('GIOCATORE') !== -1,
+    'classifica provvisoria con il giocatore e il totale');
 
   console.log('\n[6] Annullamento MANUALE distinto dalla validazione automatica');
-  const btnManuale = document.querySelector('#res-body .btn-manuale');
+  const btnManuale = document.querySelector('#res-body .btn-manuale[data-azione="annulla"]');
   ok(!!btnManuale, 'pulsante di annullamento manuale presente in allenamento');
   btnManuale.dispatchEvent(new window.Event('click'));
   await sleep(80);
-  eq(window.__NCC.state.punteggi.GIOCATORE, 20, 'annullamento manuale → 20 punti');
+  eq(window.__NCC.state.punteggi.GIOCATORE, 10, 'annullamento manuale → 10 punti');
   const annullata = window.__NCC.state.risultati[0].celle.filter((c) => c.annullataManuale)[0];
   ok(!!annullata, 'cella marcata come annullata manualmente');
   eq(annullata.motivoAutomatico, null, 'la validità automatica resta registrata a parte');
   ok(/annullata manualmente/i.test(document.getElementById('res-body').textContent),
     'distinzione visibile in UI');
+
+  console.log('\n[6b] Validazione MANUALE: dichiarare corretta una parola fuori dizionario');
+  const cellaAssente = window.__NCC.state.risultati[0].celle
+    .filter((c) => c.motivoAutomatico === 'ASSENTE')[0];
+  ok(!!cellaAssente, 'cella con parola assente dal dizionario: ' + (cellaAssente || {}).raw);
+  const btnValida = document.querySelector(
+    '#res-body .btn-manuale[data-azione="valida"][data-key="' + cellaAssente.k + '"]');
+  ok(!!btnValida && !btnValida.disabled, 'pulsante VALIDA attivo sulla parola non riconosciuta');
+  const btnValidaSuValida = document.querySelector(
+    '#res-body .btn-manuale[data-azione="valida"][data-key="' +
+    window.__NCC.state.risultati[0].celle.filter((c) => !c.motivoAutomatico)[0].k + '"]');
+  ok(!!btnValidaSuValida && btnValidaSuValida.disabled,
+    'pulsante VALIDA disattivato su una parola già valida');
+  btnValida.dispatchEvent(new window.Event('click'));
+  await sleep(80);
+  eq(window.__NCC.state.punteggi.GIOCATORE, 20, 'validazione manuale → la parola vale 10 punti');
+  const validata = window.__NCC.state.risultati[0].celle.filter((c) => c.k === cellaAssente.k)[0];
+  eq(validata.validataManuale, true, 'cella marcata come validata manualmente');
+  eq(validata.valida, true, 'risposta valida dopo la scelta manuale');
+  eq(validata.motivoAutomatico, 'ASSENTE', 'il responso del dizionario resta registrato');
+  ok(/validata manualmente/i.test(document.getElementById('res-body').textContent),
+    'stato di validazione manuale visibile in UI');
 
   console.log('\n[7] Nessun dato multiplayer scritto');
   eq(window.__NCC.backend.scrittureFirestore, 0, 'zero scritture Firestore in allenamento');

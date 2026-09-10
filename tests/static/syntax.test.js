@@ -160,6 +160,29 @@ console.log('\n[5] Hub: lista partite con refresh manuale e cadenza 1 minuto');
   ok(/firmaListaPartite/.test(hub), 'render saltato quando i dati non cambiano');
 }
 
+console.log('\n[5b] Hub: inviti in tempo reale, rifiuto non distruttivo');
+{
+  const hub = leggi('index.html');
+  ok(/avviaListenerInviti\(\);/.test(hub), 'listener dedicato agli inviti avviato al login');
+  ok(/ascoltaInviti\('partite', 'partecipanti', 'attesa', 'partite'\)/.test(hub),
+    'listener partite limitato a chi partecipa e a stato attesa');
+  ok(/ascoltaInviti\('pictionary_rooms', 'players', 'lobby', 'pictionary'\)/.test(hub),
+    'listener pictionary limitato alle room in lobby');
+  ok(/ripiego sul listener senza filtro di stato/.test(hub),
+    'ripiego se manca l\'indice composito');
+  ok(/invitoRifiutatoDa: firebase\.firestore\.FieldValue\.arrayUnion/.test(hub),
+    'il rifiuto di un invito ha un campo suo');
+  ok(/partecipanti: firebase\.firestore\.FieldValue\.arrayRemove/.test(hub),
+    'chi rifiuta esce dai partecipanti (la lobby non lo aspetta)');
+  ok(!/rivincitaRifiutataDa: firebase\.firestore\.FieldValue\.arrayUnion/.test(hub),
+    'l\'hub non scrive piu\' nel campo della rivincita');
+  ok(/function chiudiInvito\(\)[\s\S]{0,400}aggiornaInviti\(\);/.test(hub),
+    'la ✖ passa all\'invito successivo invece di nascondere tutto');
+  ok(/id="invite-more"/.test(hub), 'riga "altri inviti in attesa" nel popup');
+  ok(/function rinviaRefreshPartite/.test(hub),
+    'anti-rimbalzo: il refresh viene rimandato, non scartato');
+}
+
 console.log('\n[6] Ruzzle: verifica parole automatica');
 {
   const rz = leggi('games/ruzzle/index.html');
@@ -167,6 +190,28 @@ console.log('\n[6] Ruzzle: verifica parole automatica');
   ok(/verificaAutoInviata/.test(rz), 'verifica avviata automaticamente (con guardia anti-loop)');
   ok((rz.match(/avviaVerificaUnificata\(\)\.catch/g) || []).length >= 2,
     'auto-verifica sia a fine tempo sia nello stato verifica');
+}
+
+console.log('\n[6b] Ruzzle: punteggi finali condivisi e allineati');
+{
+  const rz = leggi('games/ruzzle/index.html');
+  ok(/function calcolaPunteggiFinali/.test(rz), 'una sola funzione di calcolo dei punteggi finali');
+  ok(/function punteggiAllineati/.test(rz), 'mappa punteggi completa per la UI (nessun undefined)');
+  ok(/function arbitroPunteggi/.test(rz), 'un solo client scrive la chiusura (arbitro designato)');
+  ok(/function allineaPunteggiFinali/.test(rz), 'riconciliazione del documento a partita conclusa');
+  ok((rz.match(/calcolaPunteggiFinali\(/g) || []).length >= 5,
+    'calcolo condiviso usato in chiusura, eliminazione, dizionario, toggle e riconciliazione');
+  ok(!/let nuoviPunteggi = \{\};[\s\S]{0,500}pFinal/.test(rz),
+    'nessun calcolo in linea dei punteggi finali dentro il listener');
+  ok(!/const totalScore = data\.punteggi\[player\]/.test(rz),
+    'la classifica non legge punteggi parziali dal documento');
+  ok(/partitaFinita/.test(rz), 'il live score non sovrascrive il risultato finale');
+  ok((rz.match(/headerDiv\.style = "background:#2c3e50; color:#eef1fa/g) || []).length === 2,
+    'testo chiaro sulla barra di analisi (lo sfondo è sempre scuro)');
+  ok(/\.words-list li \.pts \{[\s\S]{0,220}color: var\(--primary-strong\)/.test(rz),
+    'punti dell\'elenco parole leggibili anche nel tema chiaro');
+  ok(/#podio \{[\s\S]{0,300}--podio-text: var\(--item-text\)/.test(rz),
+    'il podio di Ruzzle usa i colori del tema');
 }
 
 console.log('\n[7] Patata Bollente: zero runTransaction (modello Ruzzle)');
@@ -224,6 +269,30 @@ console.log('\n[8] Nomi, Cose, Città: regole strutturali');
   ok(/9\.1\.1\/firebase-firestore-compat/.test(pagina), 'SDK compat 9.1.1');
   ok(!AUDIO_RE.test(codice), 'nessun costrutto audio');
   ok(!/navigator\.vibrate/.test(codice), 'nessuna vibrazione');
+}
+
+console.log('\n[9] Podio di fine partita in tutti i giochi multiplayer');
+{
+  const giochiMultiplayer = [
+    'games/ruzzle/index.html',
+    'games/patata/index.html',
+    'games/nomi-cose-citta/index.html',
+    'games/gameof15/index.html',
+    'games/pictionary/index.html'
+  ];
+  giochiMultiplayer.forEach((g) => {
+    const src = leggi(g);
+    ok(src.indexOf('../shared/podio.css') !== -1, g + ': collega il CSS del podio');
+    ok(src.indexOf('../shared/podio.js') !== -1, g + ': carica il modulo del podio');
+    ok(/id="podio"/.test(src), g + ': ha il contenitore #podio');
+    ok(!/gradinoPodio|podiumOrder/.test(src), g + ': nessun calcolo locale di gradini o posizioni');
+  });
+  const podio = leggi('games/shared/podio.js');
+  ok(/punti\(b\) - punti\(a\)/.test(podio), 'podio.js: ordine per punteggio decrescente');
+  ok(/Math\.max\(PODIO_MIN, PODIO_MAX - i \* PODIO_STEP\)/.test(podio),
+    'podio.js: gradino più alto al 1°, poi via via più basso');
+  ok(!/slice\(0,\s*3\)/.test(podio), 'podio.js: nessun limite ai primi tre classificati');
+  ok(/esc\(/.test(podio), 'podio.js: i nomi vengono escapati');
 }
 
 console.log('\n=================');

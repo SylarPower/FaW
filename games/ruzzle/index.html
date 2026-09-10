@@ -10,10 +10,14 @@
 		<script src="../shared/firebase-config.js"></script>
 		<!-- Spazio per i banner di stato fissi in cima (evita che coprano il testo) -->
 		<script src="../shared/faw-layout.js" defer></script>
+		<!-- Podio di fine partita (condiviso tra i giochi) -->
+		<script src="../shared/podio.js"></script>
 		<link rel="preconnect" href="https://fonts.googleapis.com">
 		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 		<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
 		<link rel="stylesheet" href="../shared/faw-ui.css">
+		<!-- Podio di fine partita (condiviso tra i giochi) -->
+		<link rel="stylesheet" href="../shared/podio.css">
 		<style>
 			/* Font piattaforma caricati via <link> nel <head> */
 			:root {
@@ -28,6 +32,10 @@
 			--tile-valid: #2fd67b;
 			--panel-bg: rgba(255, 255, 255, 0.85);
 			--item-bg: #f4f7fc;
+			/* testo sopra --item-bg e varianti scure per il tema chiaro (contrasto) */
+			--item-text: #1c2438;
+			--accent-strong: #b91c3c;
+			--primary-strong: #0e7490;
 			--line-soft: rgba(28, 36, 56, 0.12);
 			--line-color: rgba(28, 36, 56, 0.75);
 			--overlay-bg: rgba(16, 22, 42, 0.92);
@@ -47,6 +55,9 @@
 			--tile-valid: #2fd67b;
 			--panel-bg: rgba(255, 255, 255, 0.045);
 			--item-bg: rgba(255, 255, 255, 0.075);
+			--item-text: #eef1fa;
+			--accent-strong: #ff5a6e;
+			--primary-strong: #22d3ee;
 			--line-soft: rgba(255, 255, 255, 0.09);
 			--line-color: rgba(34, 211, 238, 0.85);
 			--overlay-bg: rgba(5, 8, 16, 0.94);
@@ -681,7 +692,8 @@
 			.words-list li .pts {
 			font-family: var(--font-display);
 			font-weight: 700;
-			color: var(--primary);
+			/* --primary-strong: leggibile anche sul fondo chiaro del tema bianco */
+			color: var(--primary-strong);
 			}
 			.words-list li.deleted {
 			text-decoration: line-through;
@@ -975,6 +987,27 @@
 			.stat-label {
 			font-size: 0.75rem;
 			opacity: 0.8;
+			}
+			/* Le schede dentro i modali hanno sfondo --item-bg, che nel tema chiaro è
+			chiaro: il testo deve seguire il tema, altrimenti resta chiaro su chiaro
+			(.modal-content impone un colore chiaro perché il modale è sempre scuro).
+			Riguarda "Cosa mi sono perso" e le statistiche. */
+			.modal-content .missed-words-list li,
+			.modal-content .stat-card {
+			color: var(--item-text);
+			opacity: 1;
+			}
+			.modal-content .missed-words-list .mw-p { color: var(--accent-strong); }
+			.modal-content .stat-val { color: var(--primary-strong); }
+			/* Podio nella sidebar: la sidebar segue --bg (chiaro nel tema chiaro),
+			quindi le variabili del podio condiviso usano i colori del tema. */
+			#podio {
+			--podio-card: var(--item-bg);
+			--podio-bar: var(--item-bg);
+			--podio-border: var(--line-soft);
+			--podio-text: var(--item-text);
+			--podio-sub: var(--item-text);
+			margin: 10px 0 14px;
 			}
 			.legend-table {
 			width: 100%;
@@ -1395,6 +1428,8 @@
 						</div>
 						<button class="info-btn" onclick="openLegend()" title="Legenda">i</button>
 					</div>
+					<!-- Podio di fine partita: posizioni e punteggi finali (stessi per tutti) -->
+					<div id="podio" class="podio" style="display:none;"></div>
 					<div id="proposta-manuale-container" style="display:none; background:rgba(3,218,198,0.1); padding:10px; border-radius:8px; margin-bottom:10px; border:1px dashed #03dac6;">
 						<input type="text" id="input-nuova-parola" placeholder="Parola non letta? Scrivila..." autocomplete="off" autocorrect="off" spellcheck="false" style="width:100%; margin:0; font-size:0.8rem; text-transform:uppercase;">
 						<button onclick="proponiParolaManuale()" class="btn-action" style="margin-top:5px; padding:8px; font-size:0.75rem;">PROPONI AGGIUNTA 📢</button>
@@ -2984,6 +3019,129 @@
 			  return pts * wordMult;
 			}
 			
+			/* ========================================
+			🏁 PUNTEGGI FINALI — una regola sola, un solo scrittore
+			======================================== */
+			/* Prima i punteggi finali venivano calcolati in tre punti diversi con regole
+			diverse: la chiusura della verifica ignorava le parole eliminate per votazione
+			e ogni client scriveva il risultato per conto suo. Risultato: punteggi che
+			tornavano indietro o diversi da giocatore a giocatore. Ora c'e' una sola
+			funzione di calcolo, una sola mappa per la UI e un solo client che scrive. */
+			function paroleEsclusePartita(data) {
+			  const custom = (data && data.dizionarioCustom) || {};
+			  const out = [];
+			  ((data && data.paroleEscluse) || []).forEach(w => { if (out.indexOf(w) === -1) out.push(w); });
+			  (custom.excluded || []).forEach(w => { if (out.indexOf(w) === -1) out.push(w); });
+			  return out;
+			}
+
+			/* Regole, identiche in ogni punto che le applica: parola in comune con un altro
+			giocatore = 0 punti, parola eliminata o esclusa dal dizionario = 0 punti, ogni
+			partecipante ha sempre una voce (anche a 0). */
+			function calcolaPunteggiFinali(data) {
+			  const out = {};
+			  if (!data || !Array.isArray(data.partecipanti)) return out;
+			  const parole = data.parole || {};
+			  const escluse = paroleEsclusePartita(data);
+			  data.partecipanti.forEach(player => {
+			    let tot = 0;
+			    (parole[player] || []).forEach(par => {
+			      if (!par || !par.w) return;
+			      if (escluse.indexOf(par.w) !== -1) return;
+			      const inComune = data.partecipanti.some(altro => altro !== player &&
+			        (parole[altro] || []).some(x => x && x.w === par.w));
+			      if (inComune) return;
+			      tot += Number(par.p) || 0;
+			    });
+			    out[player] = tot;
+			  });
+			  return out;
+			}
+
+			/* Mappa completa per la UI: tutti i partecipanti, mai undefined. Punteggio,
+			classifica, banner e live score mostrano cosi' gli stessi numeri su ogni
+			client, anche se il documento non e' ancora allineato. */
+			function punteggiAllineati(data) {
+			  const src = (data && data.punteggi) || {};
+			  const out = {};
+			  ((data && data.partecipanti) || []).forEach(p => { out[p] = Number(src[p]) || 0; });
+			  return out;
+			}
+
+			function stessiPunteggi(a, b) {
+			  const ka = Object.keys(a || {});
+			  const kb = Object.keys(b || {});
+			  if (ka.length !== kb.length) return false;
+			  return ka.every(k => Number(a[k]) === Number(b[k]));
+			}
+
+			/* Chi scrive la chiusura: il primo partecipante in ordine alfabetico. Tutti i
+			client fanno la stessa scelta, quindi la scrittura avviene una volta sola. */
+			function arbitroPunteggi(data) {
+			  const lista = ((data && data.partecipanti) || []).slice().sort();
+			  return lista.length ? lista[0] : null;
+			}
+
+			const SUBENTRO_FINALE_MS = 6000;
+			let chiusuraFinaleInCorso = false;
+			let timerSubentroFinale = null;
+
+			/* Chiusura della verifica: rilegge il documento (una lettura sola) e scrive
+			solo se lo stato e' ancora "verifica", cosi' due client non si sovrappongono. */
+			async function chiusuraVerifica() {
+			  if (chiusuraFinaleInCorso) return;
+			  chiusuraFinaleInCorso = true;
+			  try {
+			    const docRef = db.collection("partite").doc(matchId);
+			    const snap = await docRef.get();
+			    const fresco = snap.data();
+			    if (!fresco || fresco.stato !== "verifica") return;
+			    if ((fresco.confermaVerifica || []).length < (fresco.partecipanti || []).length) return;
+			    await docRef.update({
+			      punteggi: calcolaPunteggiFinali(fresco),
+			      stato: "conclusa"
+			    });
+			  } catch (e) {
+			    console.error("Errore calcolo punteggi finali:", e);
+			  } finally {
+			    chiusuraFinaleInCorso = false;
+			  }
+			}
+
+			function pianificaChiusuraVerifica(data) {
+			  if (arbitroPunteggi(data) === mioNome) { chiusuraVerifica(); return; }
+			  /* L'arbitro potrebbe avere la scheda chiusa: dopo l'attesa subentra il primo
+			  client vivo. La chiusura rilegge lo stato, quindi il subentro resta sicuro. */
+			  if (timerSubentroFinale) return;
+			  timerSubentroFinale = setTimeout(() => {
+			    timerSubentroFinale = null;
+			    chiusuraVerifica();
+			  }, SUBENTRO_FINALE_MS);
+			}
+
+			let allineamentoInCorso = false;
+			/* Riconciliazione: se il documento ha punteggi incompleti o calcolati con
+			regole vecchie (partita chiusa da un client non aggiornato, scrittura
+			concorrente, parola eliminata dopo la chiusura), l'arbitro li riscrive. Dopo
+			la scrittura i conti tornano e la funzione non scrive piu': niente loop. */
+			async function allineaPunteggiFinali(data) {
+			  if (!data || data.stato !== "conclusa") return;
+			  if (allineamentoInCorso) return;
+			  if (arbitroPunteggi(data) !== mioNome) return;
+			  const attuali = data.punteggi || {};
+			  const attesi = calcolaPunteggiFinali(data);
+			  const completo = (data.partecipanti || []).every(p => attuali[p] !== undefined);
+			  if (completo && stessiPunteggi(attuali, attesi)) return;
+			  allineamentoInCorso = true;
+			  try {
+			    await db.collection("partite").doc(matchId).update({ punteggi: attesi });
+			  } catch (e) {
+			    console.error("Errore allineamento punteggi:", e);
+			  } finally {
+			    allineamentoInCorso = false;
+			  }
+			}
+
 			function updateTotalScore() {
 			  score = 0;
 			  foundWords.forEach(v => {
@@ -2992,9 +3150,17 @@
 			  scoreDisplay.textContent = score;
 			  if (isAnalysisPhase) updateHistoryScore();
 			  if (typeof matchId !== 'undefined' && matchId && db) {
-			    db.collection("partite").doc(matchId).update({
-			      [`punteggi.${mioNome}`]: score
-			    }).catch(e => {});
+			      /* A fine partita il punteggio condiviso non e' la somma locale: duplicati e
+			         parole eliminate valgono 0. Quel valore lo scrive chi ricalcola con la
+			         regola condivisa, non il live score, che altrimenti disallineerebbe gli
+			         altri giocatori. */
+			      const partitaFinita = isAnalysisPhase ||
+			        (currentGameData && currentGameData.stato === 'conclusa');
+			      if (!partitaFinita) {
+			        db.collection("partite").doc(matchId).update({
+			          [`punteggi.${mioNome}`]: score
+			        }).catch(e => {});
+			      }
 			  }
 			}
 			
@@ -3017,10 +3183,19 @@
 			                }
 			            });
 			            
-			            await db.collection("partite").doc(matchId).update({
-			                [`parole.${mioNome}`]: mieParole,
-			                [`punteggi.${mioNome}`]: score
-			            });
+            const patch = {};
+                        patch[`parole.${mioNome}`] = mieParole;
+                        if (currentGameData.stato === 'conclusa' || isAnalysisPhase) {
+                            /* A fine partita vale la regola condivisa (duplicati e parole
+                               eliminate = 0), non la somma locale: ricalcolo per tutti. */
+                            const ipotetico = Object.assign({}, currentGameData, {
+                                parole: Object.assign({}, currentGameData.parole, { [mioNome]: mieParole })
+                            });
+                            patch.punteggi = calcolaPunteggiFinali(ipotetico);
+                        } else {
+                            patch[`punteggi.${mioNome}`] = score;
+                        }
+                        await db.collection("partite").doc(matchId).update(patch);
 			        } catch(e) {
 			            console.error("Errore sync eliminazione:", e);
 			        }
@@ -3530,7 +3705,26 @@ function fermaFesteggiamenti() {
     if (banner) banner.classList.remove('banner-victory');
 }
 
-function aggiornaFesteggiamentoVincitore(data) {
+/* Podio di fine partita (modulo condiviso ../shared/podio.js): una posizione per
+			ogni giocatore, in ordine di punteggio decrescente, con i punteggi finali
+			allineati. Fuori dallo stato "conclusa" resta nascosto. */
+			function renderizzaPodioFinale(data) {
+			  const box = document.getElementById('podio');
+			  if (!box) return;
+			  const partecipanti = (data && data.partecipanti) || [];
+			  if (!data || data.stato !== 'conclusa' || partecipanti.length < 2 || !window.FAWPodio) {
+			    box.style.display = 'none';
+			    return;
+			  }
+			  const finali = punteggiAllineati(data);
+			  window.FAWPodio.render(box, partecipanti.map(p => ({
+			    nome: p,
+			    punti: finali[p] || 0,
+			    sottotitolo: (((data.parole || {})[p]) || []).length + ' parole'
+			  })), { io: mioNome });
+			  box.style.display = 'flex';
+			}
+			function aggiornaFesteggiamentoVincitore(data) {
     if (!data || !data.punteggi) return;
 
     const partecipanti = data.partecipanti || [];
@@ -3539,8 +3733,9 @@ function aggiornaFesteggiamentoVincitore(data) {
     let playerStats = [];
 
     // Calcolo statistiche per ogni giocatore
-    partecipanti.forEach(player => {
-        const totalScore = data.punteggi[player] || 0;
+        const finali = punteggiAllineati(data);   // tutti i giocatori, mai undefined
+        partecipanti.forEach(player => {
+            const totalScore = finali[player];
         
         const parolePlayer = data.parole?.[player] || [];
         
@@ -3604,9 +3799,9 @@ function aggiornaFesteggiamentoVincitore(data) {
             const statsVincitore = playerStats.find(p => p.name === vincitoreSingolo);
             
             titolo = haVinto ? 'VITTORIA!' : 'SCONFITTA!';
-            sottotitolo = Object.entries(data.punteggi)
-                .map(([p, s]) => `${p}: ${s} pt`)
-                .join(' | ');
+            sottotitolo = Object.entries(finali)
+                            .map(([p, s]) => `${p}: ${s} pt`)
+                            .join(' | ');
             
             if (statsVincitore && statsVincitore.maxWordScore > 0) {
                 sottotitolo += ` • Max parola valida: ${statsVincitore.maxWord} (${statsVincitore.maxWordScore} pt)`;
@@ -3626,10 +3821,10 @@ function aggiornaFesteggiamentoVincitore(data) {
         });
     }
 
-    if (data.punteggi[mioNome] !== undefined) {
-        score = data.punteggi[mioNome];
+    /* Il punteggio mostrato e' sempre quello condiviso: se il documento non ha
+        ancora la mia voce vale 0, esattamente come lo vedono gli altri. */
+        score = finali[mioNome] !== undefined ? finali[mioNome] : 0;
         scoreDisplay.textContent = score;
-    }
 
     currentWinner = vincitori[0];
 }
@@ -3640,7 +3835,7 @@ function aggiornaLiveScorePostGame(data) {
     const altri = data.partecipanti.filter(n => n !== mioNome);
     let scoresHtml = "";
     altri.forEach(a => {
-        const punteggio = data.punteggi && data.punteggi[a] ? data.punteggi[a] : 0;
+        const punteggio = punteggiAllineati(data)[a] || 0;
         scoresHtml += `<span style="margin:0 5px;">🆚 ${a}: <strong>${punteggio}</strong></span>`;
     });
 
@@ -3764,7 +3959,7 @@ function aggiornaLiveScorePostGame(data) {
 			  const altri = data.partecipanti.filter(n => n !== mioNome);
 			  let scoresHtml = "";
 			  altri.forEach(a => {
-			    const punteggio = data.punteggi && data.punteggi[a] ? data.punteggi[a] : 0;
+			    const punteggio = punteggiAllineati(data)[a] || 0;
 			    scoresHtml += `
 																<span style="margin:0 5px;">🆚 ${a}: 
 																	<strong>${punteggio}</strong>
@@ -3794,6 +3989,9 @@ function aggiornaLiveScorePostGame(data) {
 			      return;
 			    }
 			    currentGameData = data;
+			    /* Podio: si aggiorna a ogni snapshot, così resta allineato anche se i
+			       punteggi cambiano dopo la chiusura (parola eliminata, riconciliazione). */
+			    renderizzaPodioFinale(data);
 				  // Nascondi SEMPRE la lobby (usiamo solo banner)
 			    document.getElementById('multiplayer-lobby').style.display = 'none';
 			    const btnNewEl = document.querySelector('.btn-new');
@@ -4019,26 +4217,11 @@ if (data.stato === "in_corso") {
 			          spinner: true
 			        });
 			      }
-			      // Tutti hanno confermato? Calcola e chiudi
+			      // Tutti hanno confermato? Chiude UN solo client (l'arbitro), che rilegge il
+			      // documento prima di scrivere: niente scritture concorrenti che possono
+			      // lasciare punteggi finali diversi da giocatore a giocatore.
 			      if (conferma.length >= data.partecipanti.length) {
-			        // Calcola punteggi finali
-			        let nuoviPunteggi = {};
-			        data.partecipanti.forEach(player => {
-			          let pFinal = 0;
-			          const mieParole = data.parole[player] || [];
-			          mieParole.forEach(par => {
-			            let comune = false;
-			            data.partecipanti.forEach(altro => {
-			              if (player !== altro && (data.parole[altro] || []).some(x => x.w === par.w)) comune = true;
-			            });
-			            if (!comune) pFinal += par.p;
-			          });
-			          nuoviPunteggi[player] = pFinal;
-			        });
-			        db.collection("partite").doc(matchId).update({
-			          punteggi: nuoviPunteggi,
-			          stato: "conclusa"
-			        });
+			      pianificaChiusuraVerifica(data);
 			      }
 			    }
 			    // ========================================
@@ -4046,10 +4229,12 @@ if (data.stato === "in_corso") {
 			    // ========================================
 			    if (data.stato === "conclusa") {
 					 
-					 if (data.punteggi && data.punteggi[mioNome] !== undefined) {
-						  score = data.punteggi[mioNome];
-						  scoreDisplay.textContent = score;
-					 }
+					 /* Punteggio condiviso, mai quello locale, e riconciliazione del documento:
+					    se i conti non tornano l'arbitro li riscrive e tutti vedono gli stessi. */
+					 const finaliConclusa = punteggiAllineati(data);
+					 score = finaliConclusa[mioNome] !== undefined ? finaliConclusa[mioNome] : 0;
+					 scoreDisplay.textContent = score;
+					 allineaPunteggiFinali(data);
 
 					 const btnNewEl = document.querySelector('.btn-new');
 					 if (btnNewEl) btnNewEl.style.display = 'block';
@@ -4256,7 +4441,7 @@ if (data.stato === "in_corso") {
 			  wordsListEl.innerHTML = "";
 			  if (!document.getElementById('sel-analisi')) {
 			    const headerDiv = document.createElement('div');
-			    headerDiv.style = "background:#2c3e50; padding:10px; border-radius:5px; margin-bottom:10px;";
+			    headerDiv.style = "background:#2c3e50; color:#eef1fa; padding:10px; border-radius:5px; margin-bottom:10px;";
 			    headerDiv.innerHTML = `
 																<label style="font-size:0.7rem; font-weight:bold; display:block; margin-bottom:5px;">MOSTRA PAROLE DI:</label>
 																<select id="sel-analisi" style="width:100%; background:#1e1e1e; color:white; border:1px solid #444; padding:5px;"></select>`;
@@ -4358,41 +4543,28 @@ async function applicaModificaDizionario(parola, tipo) {
         
         // ✅ RICALCOLA PUNTEGGI PER TUTTI I GIOCATORI
         if (tipo === 'exclude' && currentGameData) {
-            const nuoviPunteggi = {};
             const nuoveParole = {};
-            
-            currentGameData.partecipanti.forEach(player => {
-                let parolePlayer = currentGameData.parole[player] || [];
-                
-                // Rimuovi la parola esclusa
-                parolePlayer = parolePlayer.filter(p => p.w !== parola);
-                nuoveParole[player] = parolePlayer;
-                
-                // Ricalcola punteggio (considerando duplicati)
-                let punteggio = 0;
-                parolePlayer.forEach(p => {
-                    // Conta quanti giocatori hanno questa parola
-                    let count = 0;
-                    currentGameData.partecipanti.forEach(altro => {
-                        const paroleAltro = altro === player ? parolePlayer : (nuoveParole[altro] || currentGameData.parole[altro] || []);
-                        if (paroleAltro.some(x => x.w === p.w)) count++;
-                    });
-                    // Se solo uno ha la parola, conta
-                    if (count <= 1) punteggio += p.p;
-                });
-                
-                nuoviPunteggi[player] = punteggio;
-            });
-            
-            // Aggiorna Firebase con nuovi punteggi
-            await db.collection("partite").doc(matchId).update({
-                parole: nuoveParole,
-                punteggi: nuoviPunteggi
-            });
-            
-            // Aggiorna locale
-            score = nuoviPunteggi[mioNome] || 0;
-            scoreDisplay.textContent = score;
+                        currentGameData.partecipanti.forEach(player => {
+                            nuoveParole[player] = (currentGameData.parole[player] || []).filter(p => p.w !== parola);
+                        });
+
+                        /* Stessa regola degli altri ricalcoli: parola esclusa e duplicati
+                           valgono 0, e ogni partecipante ha la sua voce. */
+                        const aggiornati = Object.assign({}, currentGameData, {
+                            parole: nuoveParole,
+                            paroleEscluse: (currentGameData.paroleEscluse || []).concat([parola])
+                        });
+                        const nuoviPunteggi = calcolaPunteggiFinali(aggiornati);
+
+                        // Aggiorna Firebase con nuovi punteggi
+                        await db.collection("partite").doc(matchId).update({
+                            parole: nuoveParole,
+                            punteggi: nuoviPunteggi
+                        });
+
+                        // Aggiorna locale
+                        score = nuoviPunteggi[mioNome] !== undefined ? nuoviPunteggi[mioNome] : 0;
+                        scoreDisplay.textContent = score;
         }
     }
     
@@ -4647,13 +4819,15 @@ async function attivaAnalisiMultiplayerSilent() {
     wordsListEl.innerHTML = "";
 
     // ✅ Determina il vincitore (punteggio più alto)
-    const classifica = Object.entries(data.punteggi || {}).sort((a, b) => b[1] - a[1]);
-    const vincitore = classifica.length > 0 ? classifica[0][0] : mioNome;
+    // ✅ Determina il vincitore (punteggio più alto) — mappa completa, così la
+        // classifica non perde chi nel documento non ha ancora un punteggio
+        const classifica = Object.entries(punteggiAllineati(data)).sort((a, b) => b[1] - a[1]);
+        const vincitore = classifica.length > 0 ? classifica[0][0] : mioNome;
 
     // Header "MOSTRA PAROLE DI" - vincitore per primo
     if (!document.getElementById('sel-analisi')) {
         const headerDiv = document.createElement('div');
-        headerDiv.style = "background:#2c3e50; padding:10px; border-radius:5px; margin-bottom:10px;";
+        headerDiv.style = "background:#2c3e50; color:#eef1fa; padding:10px; border-radius:5px; margin-bottom:10px;";
         headerDiv.innerHTML = `
             <label style="font-size:0.7rem; font-weight:bold; display:block; margin-bottom:5px;">MOSTRA PAROLE DI:</label>
             <select id="sel-analisi" style="width:100%; background:#1e1e1e; color:white; border:1px solid #444; padding:5px;"></select>`;
@@ -4954,42 +5128,22 @@ async function applicaEliminazioneParola(parola) {
         dictionary.delete(parola);
         buildTrie();
 
-        // 5. Ricalcola punteggi per tutti i giocatori
-        const snap = await db.collection("partite").doc(matchId).get();
-        const data = snap.data();
-        const paroleEscluse = data.paroleEscluse || [];
+        // 5. Ricalcola i punteggi per tutti con la regola condivisa
+                const snap = await db.collection("partite").doc(matchId).get();
+                const data = snap.data();
+                const nuoviPunteggi = calcolaPunteggiFinali(data);
 
-        let nuoviPunteggi = {};
-        data.partecipanti.forEach(player => {
-            let punteggio = 0;
-            const parolePlayer = data.parole[player] || [];
+                /* Scrittura solo se i conti sono davvero cambiati: questa funzione
+                   parte su ogni client che vede il voto, ma il valore e' lo stesso. */
+                if (!stessiPunteggi(data.punteggi || {}, nuoviPunteggi)) {
+                    await db.collection("partite").doc(matchId).update({
+                        punteggi: nuoviPunteggi
+                    });
+                }
 
-            parolePlayer.forEach(p => {
-                // Se la parola è esclusa → 0 punti
-                if (paroleEscluse.includes(p.w)) return;
-
-                // Se la parola è duplicata → 0 punti
-                let count = 0;
-                data.partecipanti.forEach(altro => {
-                    if ((data.parole[altro] || []).some(x => x.w === p.w)) count++;
-                });
-                if (count > 1) return;
-
-                punteggio += p.p;
-            });
-
-            nuoviPunteggi[player] = punteggio;
-        });
-
-        await db.collection("partite").doc(matchId).update({
-            punteggi: nuoviPunteggi
-        });
-
-        // Aggiorna locale
-        if (nuoviPunteggi[mioNome] !== undefined) {
-            score = nuoviPunteggi[mioNome];
-            scoreDisplay.textContent = score;
-        }
+                // Aggiorna locale
+                score = nuoviPunteggi[mioNome] !== undefined ? nuoviPunteggi[mioNome] : 0;
+                scoreDisplay.textContent = score;
 
     } catch (e) {
         console.error("Errore applicazione eliminazione:", e);

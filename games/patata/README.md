@@ -10,9 +10,14 @@ mentre il timer corre. Chi la tiene quando arriva a zero… si scotta.
 2. A turno, ogni giocatore deve scrivere una parola (minimo 4 lettere,
    presente nel dizionario Ruzzle) che **contenga tutte le lettere
    richieste** — in qualsiasi posizione: inizio, mezzo o fine.
+   **La casella è sempre scrivibile**: anche chi non ha la patata prepara la
+   sua parola (bozza evidenziata, pulsante `PREPARA` → `✔ PRONTA`, controllo
+   immediato della validità) e la invia appena arriva il proprio turno. La
+   preparazione è solo locale: **non scrive nulla** e non passa la patata.
 3. **Parola corretta** → `+5 secondi` al timer e la patata passa al
-   giocatore successivo.
-4. **Parola sbagliata** → `−5 secondi` e tocca ancora a te.
+   giocatore successivo (la bozza degli altri **non** viene cancellata).
+4. **Parola sbagliata** → feedback di errore, **tempo invariato** e tocca
+   ancora a te.
 5. **Tempo a zero** → chi tiene la patata subisce la scottatura
    (`−10 punti`) e si apre il **recap del turno**: tutte le parole scritte,
    i punti e lo scottato. Ogni parola può essere **contestata** con il 🚩
@@ -20,8 +25,11 @@ mentre il timer corre. Chi la tiene quando arriva a zero… si scotta.
    i relativi punti).
 6. **Tutti confermano** il recap → si passa al turno successivo con nuove
    lettere (il giocatore iniziale ruota a ogni turno).
-7. A fine partita (tutti i turni giocati) → **classifica finale**: vince chi
-   ha più punti. Disponibile la **rivincita** a tutti i giocatori.
+7. A fine partita (tutti i turni giocati) → **classifica finale su podio**:
+   il vincitore sta sul gradino **più alto**, il secondo su quello
+   intermedio, il terzo più in basso, e così via per tutti gli altri
+   giocatori (altezza `104 − 16 × posizione`, minimo `32 px`). Vince chi ha
+   più punti. Disponibile la **rivincita** a tutti i giocatori.
 
 ### Lettere "ovviamente non impossibili"
 
@@ -104,8 +112,14 @@ Tre suite in [`tests/patata/`](../../tests/patata/):
   serializzate, `arrayUnion`/`delete`, gare su timeout/next-round → esatta una
   transazione vince, contestazioni, rotazione turni, fine partita).
 - `browser.test.js` — E2E 38 test in jsdom sulla pagina reale: boot → lobby →
-  partita → parola corretta (+5 s, punti, feed) → parola sbagliata (−5 s) →
-  timeout (scottatura) → recap → conferma → fine (podio + statistiche hub).
+  partita → parola corretta (+5 s, punti, feed) → parola sbagliata (tempo
+  invariato) → timeout (scottatura) → recap → conferma → fine (podio +
+  statistiche hub).
+- `browser-multiplayer.test.js` — E2E con **due pagine reali** su mock
+  Firestore: la casella di chi non ha la patata resta scrivibile, la bozza
+  preparata **non scrive nulla** e sopravvive al passaggio della patata, la
+  parola preparata si invia al proprio turno, e a fine partita il gradino del
+  vincitore è il più alto.
 
 ## Note / limiti
 

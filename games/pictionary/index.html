@@ -14,6 +14,9 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="../shared/faw-ui.css">
+    <!-- Podio di fine partita (condiviso tra i giochi) -->
+    <link rel="stylesheet" href="../shared/podio.css">
+    <script src="../shared/podio.js"></script>
     <style>
         /* Font piattaforma caricati via <link> nel <head> */
 
@@ -433,39 +436,19 @@
             width: 100%; max-width: 600px;
         }
 
-        .podium {
-            display: flex; justify-content: center; align-items: flex-end;
-            gap: 20px; margin: 30px 0; height: 200px;
+        /* Il podio usa la struttura condivisa (../shared/podio.css): qui i colori
+           del tema di Pictionary. */
+        #podio {
+            --podio-card: var(--panel);
+            --podio-bar: var(--panel);
+            --podio-border: rgba(255, 255, 255, 0.18);
+            --podio-text: #ffffff;
+            --podio-sub: rgba(255, 255, 255, 0.7);
+            --podio-gold: var(--gold);
+            --podio-silver: var(--silver);
+            --podio-bronze: var(--bronze);
+            margin: 26px 0;
         }
-
-        .podium-place {
-            display: flex; flex-direction: column; align-items: center;
-            animation: bounce 0.5s ease;
-        }
-
-        .podium-avatar {
-            width: 60px; height: 60px; border-radius: 50%;
-            background: var(--panel); display: flex; align-items: center;
-            justify-content: center; font-size: 1.5rem; font-weight: 900;
-            border: 3px solid;
-        }
-
-        .podium-bar {
-            width: 80px; display: flex; flex-direction: column;
-            align-items: center; justify-content: flex-end;
-            padding: 10px; border-radius: 10px 10px 0 0;
-            margin-top: 10px;
-        }
-
-        .place-1 .podium-bar { height: 120px; background: linear-gradient(180deg, var(--gold) 0%, #cc9900 100%); }
-        .place-1 .podium-avatar { border-color: var(--gold); }
-        .place-2 .podium-bar { height: 90px; background: linear-gradient(180deg, var(--silver) 0%, #999 100%); }
-        .place-2 .podium-avatar { border-color: var(--silver); }
-        .place-3 .podium-bar { height: 60px; background: linear-gradient(180deg, var(--bronze) 0%, #8b5a2b 100%); }
-        .place-3 .podium-avatar { border-color: var(--bronze); }
-
-        .podium-name { font-weight: 700; font-size: 0.8rem; margin-top: 5px; }
-        .podium-score { font-family: var(--font-display); font-size: 1.25rem; font-weight: 800; color: #10131f; }
 
         .full-ranking {
             background: var(--panel); border-radius: 15px; padding: 20px;
@@ -1218,7 +1201,7 @@
             <h1 style="margin: 10px 0;">RISULTATI</h1>
         </div>
         
-        <div class="podium" id="podium"></div>
+        <div id="podio" class="podio"></div>
         
         <div class="full-ranking" id="full-ranking"></div>
         
@@ -2883,29 +2866,15 @@ function handleResultsPhase(data) {
     
     const sorted = Object.entries(data.scores).sort((a, b) => b[1] - a[1]);
     
-    const podium = document.getElementById('podium');
-    podium.innerHTML = '';
-    
-const podiumOrder = [1, 0, 2];
-podiumOrder.forEach((idx) => {
-    if (sorted[idx]) {
-        const [player, score] = sorted[idx];
-        const place = idx + 1;
-        
-        const div = document.createElement('div');
-        div.className = `podium-place place-${place}`;
-        div.style.animationDelay = `${idx * 0.2}s`;
-        div.innerHTML = `
-            <div class="podium-avatar">${place}°</div>
-            <div class="podium-bar">
-                <div class="podium-score">${score}</div>
-            </div>
-            <div class="podium-name">${player}</div>
-        `;
-        podium.appendChild(div);
-    }
-});
-    
+    /* Podio condiviso (../shared/podio.js): TUTTI i giocatori in ordine di
+       punteggio decrescente, con il 1° sul gradino più alto (prima il podio era
+       centrale-prima e mostrava solo i primi tre). */
+    FAWPodio.render(document.getElementById('podio'), sorted.map(([player, score]) => ({
+        nome: player,
+        punti: score,
+        sottotitolo: 'voti'
+    })), { io: state.playerName });
+
     const ranking = document.getElementById('full-ranking');
     ranking.innerHTML = '<h3 style="margin-top: 0;">Classifica Completa</h3>';
     

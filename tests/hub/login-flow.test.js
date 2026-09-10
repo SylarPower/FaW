@@ -7,6 +7,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { JSDOM, VirtualConsole } = require('jsdom');
+const { creaMockFirestore } = require('./mock-firestore.js');
 
 const ROOT = path.join(__dirname, '..', '..');
 const HTML = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
@@ -19,46 +20,19 @@ function ok(cond, msg) {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const sha256 = (s) => crypto.createHash('sha256').update(s).digest('hex');
 
-// hash passato come parametro: la funzione viene serializzata nella pagina
-function mockDb(hash) {
-  const docs = { partite: [], pictionary_rooms: [], presenze: [], amicizie: [] };
-  const scritture = [];
-  const coll = (name) => ({
-    where() { return this; },
-    doc(id) {
-      return {
-        id,
-        get: async () => ({
-          exists: id === 'TEST',
-          data: () => ({ passwordHash: hash })
-        }),
-        set: async (d) => { scritture.push({ coll: name, id, data: d }); },
-        update: async (d) => { scritture.push({ coll: name, id, update: d }); },
-        delete: async () => { scritture.push({ coll: name, id, delete: true }); }
-      };
-    },
-    add: async (d) => { scritture.push({ coll: name, add: d }); return { id: 'NUOVA-1' }; },
-    get: async () => ({ forEach: (fn) => (docs[name] || []).forEach(fn) }),
-    onSnapshot(cb) {
-      queueMicrotask(() => cb({ forEach: (fn) => (docs[name] || []).forEach(fn) }));
-      return () => {};
-    }
-  });
-  const db = { collection: coll };
-  db.__docs = docs;
-  db.__scritture = scritture;
-  return db;
-}
-
 (async () => {
   let html = HTML;
   html = html.replace(/\t*<script src="https:\/\/www\.gstatic\.com[^"]*"><\/script>\n?/g, '');
   html = html.replace(/\t*<script src="games\/shared\/firebase-config\.js"><\/script>\n?/g, '');
   const mock = `
-window.__makeDb__ = ${mockDb.toString()};
+window.__makeDb__ = ${creaMockFirestore.toString()};
 window.__MOCK_DB__ = window.__makeDb__('${sha256('test123')}');
 window.firebase = { initializeApp: function(){ return {}; }, firestore: function(){ return window.__MOCK_DB__; } };
-window.firebase.firestore.FieldValue = { arrayUnion: function(){ return {}; } };
+window.firebase.firestore.FieldValue = {
+  arrayUnion: function(){ return { __op: 'array-union', args: [].slice.call(arguments) }; },
+  arrayRemove: function(){ return { __op: 'array-remove', args: [].slice.call(arguments) }; },
+  delete: function(){ return { __op: 'delete' }; }
+};
 window.FAW_FIREBASE_CONFIG = { apiKey: 'test-key-123', projectId: 'test' };
 window.FAW_REQUIRE_FIREBASE_CONFIG = function(){ return window.FAW_FIREBASE_CONFIG; };
 `;

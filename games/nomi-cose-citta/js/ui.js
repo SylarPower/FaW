@@ -73,10 +73,10 @@
     'risposte-card', 'risposte-progress', 'campi', 'save-state', 'btn-stop', 'risposte-hint',
     'giocatori', 'punteggi', 'storico',
     'overlay-revisione', 'rev-round', 'rev-lettera', 'rev-timer-num', 'rev-timer-fill',
-    'rev-body', 'conf-progress', 'btn-conferma',
-    'overlay-risultati', 'res-round', 'res-body', 'res-countdown',
+    'rev-voti', 'rev-body', 'conf-progress', 'btn-conferma',
+    'overlay-risultati', 'res-round', 'res-classifica', 'res-body', 'res-countdown',
     'overlay-fine', 'fine-emoji', 'fine-title', 'fine-sub', 'podio', 'fine-dettaglio',
-    'fine-stats', 'btn-rivincita', 'banner', 'toast'
+    'fine-top-actions', 'fine-stats', 'btn-rivincita', 'banner', 'toast'
   ].forEach(function (id) { el[id] = $(id); });
 
   /* ---------------- UTILITY UI ---------------- */
@@ -593,12 +593,18 @@
         var r = (risposte[nome] && risposte[nome][catId]) || null;
         var v = C.validaRisposta(r ? r.raw : '', rd.lettera, dizionario);
         var voti = (rd.voti && rd.voti[k]) ? rd.voti[k] : [];
+        var votiValida = (rd.votiValida && rd.votiValida[k]) ? rd.votiValida[k] : [];
+        var annullata = v.ok && C.rispostaAnnullata(voti, quorum);
         celle.push({
           k: k, ci: ci, pi: pi, cat: catId, nome: nome,
           raw: r ? r.raw : '', norm: v.norm,
-          valida: v.ok, motivo: v.motivo,
+          validaAutomatica: v.ok,
+          valida: v.ok || (!annullata && !!v.norm && C.rispostaValidata(votiValida, quorum)),
+          validata: !v.ok && !annullata && !!v.norm && C.rispostaValidata(votiValida, quorum),
+          motivo: v.motivo,
           voti: voti.slice(),
-          annullata: v.ok && C.rispostaAnnullata(voti, quorum)
+          votiValida: votiValida.slice(),
+          annullata: annullata
         });
       });
     });
@@ -625,18 +631,24 @@
       var label = C.etichettaCategoria(s.opzioni.categorie, catId);
       var tds = rd.partecipanti.map(function (nome, pi) {
         var c = celle.filter(function (x) { return x.ci === ci && x.pi === pi; })[0];
-        return '<td class="rev-cell' + (nome === G.me ? ' mine' : '') + '">' + cellaHtml(c, rd, s) + '</td>';
+        var inVoto = (c.voti.length + c.votiValida.length) > 0;
+        return '<td class="rev-cell' + (nome === G.me ? ' mine' : '') + (inVoto ? ' in-voto' : '') + '">' +
+          cellaHtml(c, rd, s) + '</td>';
       }).join('');
       return '<tr><th>' + esc(label) + '</th>' + tds + '</tr>';
     }).join('');
 
     el['rev-body'].innerHTML = '<table class="rev-table"><thead>' + head + '</thead><tbody>' + body + '</tbody></table>';
 
+    renderVotiAperti(s, celle);
+
     Array.prototype.forEach.call(el['rev-body'].querySelectorAll('.vote-btn'), function (btn) {
       btn.addEventListener('click', function () {
         var key = btn.getAttribute('data-key');
         var vota = btn.getAttribute('data-vota') === '1';
-        G.backend.applyAtomic(C.mutVota, { key: key, vota: vota }).then(function (r) {
+        var perValida = btn.getAttribute('data-tipo') === 'valida';
+        var mut = perValida ? C.mutVotaValida : C.mutVota;
+        G.backend.applyAtomic(mut, { key: key, vota: vota }).then(function (r) {
           if (r && r.error && r.error.code === 'REVISIONE_CHIUSA') toast('La revisione è già chiusa');
           else if (r && r.error && r.error.code === 'NON_PARTECIPANTE') toast('Non partecipi a questo round');
         });
@@ -657,33 +669,99 @@
       : (iDone ? '⏳ IN ATTESA DEGLI ALTRI…' : '✔ REVISIONE CONCLUSA');
   }
 
+  /**
+   * Striscia "IN VOTAZIONE": elenca in modo evidente le risposte su cui
+   * qualcuno ha già votato — per renderle VALIDE o per ANNULLARLE — con
+   * autore, categoria, voti raccolti e chi manca all'unanimità.
+   */
+  function renderVotiAperti(s, celle) {
+    if (!el['rev-voti']) return;
+    var rd = s.roundData;
+    var quorum = rd.partecipanti;
+    var aperte = (celle || []).filter(function (c) {
+      return (c.voti.length + c.votiValida.length) > 0;
+    });
+    if (!aperte.length) {
+      el['rev-voti'].className = 'rev-voti hidden';
+      el['rev-voti'].innerHTML = '<span class="rv-empty">Nessuna parola in votazione.</span>';
+      return;
+    }
+    el['rev-voti'].className = 'rev-voti';
+    el['rev-voti'].innerHTML =
+      '<div class="rv-title">🗳️ IN VOTAZIONE — ' + aperte.length +
+      ' parol' + (aperte.length === 1 ? 'a' : 'e') +
+      ' <span class="rv-sub">serve il voto di tutti, autore incluso</span></div>' +
+      '<div class="rv-list">' + aperte.map(function (c) {
+        var perValida = c.votiValida.length > 0;
+        var voti = perValida ? c.votiValida : c.voti;
+        var mancano = quorum.filter(function (p) { return voti.indexOf(p) === -1; });
+        var risolto = c.annullata || c.validata;
+        return '<span class="rv-item ' + (perValida ? 'valida' : 'invalida') + (risolto ? ' risolto' : '') + '">' +
+          '<b>' + esc(c.raw) + '</b>' +
+          '<span class="rv-who">' + esc(c.nome) + ' · ' + esc(C.etichettaCategoria(s.opzioni.categorie, c.cat)) + '</span>' +
+          '<span class="rv-voti">' + (perValida ? '✅ valida' : '🚫 non valida') + ' ' +
+            voti.length + '/' + quorum.length + '</span>' +
+          (risolto
+            ? '<span class="rv-esito">' + (c.annullata ? 'ANNULLATA' : 'VALIDATA') + '</span>'
+            : '<span class="rv-mancano">mancano ' + esc(mancano.join(', ')) + '</span>') +
+          '</span>';
+      }).join('') + '</div>';
+  }
+
   function cellaHtml(c, rd, s) {
     if (!String(c.raw || '').trim()) {
       return '<span class="cell-empty">nessuna risposta</span>' +
         '<div class="cell-meta"><span class="tag mute">VUOTA</span><span class="tag pts zero">0</span></div>';
     }
     var diz = dizionarioPerUI();
+    var quorum = rd.partecipanti;
+    var posso = quorum.indexOf(G.me) !== -1 && rd.fase === 'revisione';
     var tagValidita;
     if (!diz) {
       tagValidita = '<span class="tag mute">NON VERIFICATA</span>';
+    } else if (c.validata) {
+      tagValidita = '<span class="tag ok">VALIDA · VOTATA DA TUTTI</span>';
     } else if (c.valida) {
       tagValidita = '<span class="tag ok">VALIDA</span>';
     } else {
       tagValidita = '<span class="tag ko">' + esc(C.motivoTesto(c.motivo, rd.lettera).toUpperCase()) + '</span>';
     }
-    var quorum = rd.partecipanti;
-    var hoVotato = c.voti.indexOf(G.me) !== -1;
-    var possoVotare = diz && c.valida && !c.annullata && quorum.indexOf(G.me) !== -1 && rd.fase === 'revisione';
-    var voto = '<button class="vote-btn' + (hoVotato ? ' votato' : '') + '" data-key="' + esc(c.k) +
-      '" data-vota="' + (hoVotato ? '0' : '1') + '"' + (possoVotare ? '' : ' disabled') + '>' +
-      (hoVotato ? '↩ RITIRA' : '🚫 NON VALIDA') + '</button>';
-    var conteggio = c.voti.length
+
+    /* Voto "NON VALIDA": solo su una risposta automaticamente valida e non
+       ancora annullata. Voto "VALIDA": solo su una risposta scritta che il
+       dizionario non riconosce. Stessa regola per entrambi: unanimità. */
+    var hoInvalida = c.voti.indexOf(G.me) !== -1;
+    var votoInvalida = '<button class="vote-btn' + (hoInvalida ? ' votato' : '') +
+      '" data-key="' + esc(c.k) + '" data-tipo="invalida" data-vota="' + (hoInvalida ? '0' : '1') + '"' +
+      ((diz && c.validaAutomatica && !c.annullata && posso) ? '' : ' disabled') +
+      ' title="Vota per annullare questa risposta">' +
+      (hoInvalida ? '↩ RITIRA' : '🚫 NON VALIDA') + '</button>';
+    var hoValida = c.votiValida.indexOf(G.me) !== -1;
+    var votoValida = '<button class="vote-btn valida' + (hoValida ? ' votato' : '') +
+      '" data-key="' + esc(c.k) + '" data-tipo="valida" data-vota="' + (hoValida ? '0' : '1') + '"' +
+      ((diz && !c.validaAutomatica && !!c.norm && posso) ? '' : ' disabled') +
+      ' title="Vota per rendere valida questa parola">' +
+      (hoValida ? '↩ RITIRA' : '✅ VALIDA') + '</button>';
+
+    var conteggioInvalida = c.voti.length
       ? '<span class="tag ' + (c.annullata ? 'ko' : 'info') + '">🚫 ' + c.voti.length + '/' + quorum.length +
         (c.annullata ? ' · ANNULLATA' : '') + '</span>'
       : '';
-    return '<div class="cell-word' + (c.annullata ? ' annullata' : '') + '">' + esc(c.raw) + '</div>' +
-      '<div class="cell-meta">' + tagValidita + conteggio +
-      '<span class="tag pts' + (c.punti ? '' : ' zero') + '">' + (c.punti || 0) + ' pt</span>' + voto + '</div>';
+    var conteggioValida = c.votiValida.length
+      ? '<span class="tag ' + (c.validata ? 'ok' : 'info') + '">✅ ' + c.votiValida.length + '/' + quorum.length +
+        (c.validata ? ' · VALIDATA' : '') + '</span>'
+      : '';
+    /* "Stato di voto": appena esiste almeno un voto (in un senso o
+       nell'altro) la cella lo dichiara in modo evidente. */
+    var inVoto = (c.voti.length + c.votiValida.length) > 0;
+    var nastro = inVoto
+      ? '<span class="tag voto">🗳️ IN VOTO ' + (c.votiValida.length ? 'per VALIDARE' : 'per ANNULLARE') + '</span>'
+      : '';
+    return '<div class="cell-word' + (c.annullata ? ' annullata' : '') + (c.validata ? ' validata' : '') + '">' +
+      esc(c.raw) + '</div>' +
+      '<div class="cell-meta">' + tagValidita + nastro + conteggioInvalida + conteggioValida +
+      '<span class="tag pts' + (c.punti ? '' : ' zero') + '">' + (c.punti || 0) + ' pt</span>' +
+      votoInvalida + votoValida + '</div>';
   }
 
   /* ---------------- RENDER: RISULTATI ROUND ---------------- */
@@ -691,6 +769,9 @@
     var rd = s.roundData;
     var r = (s.risultati || []).filter(function (x) { return x.id === rd.esitoId || x.round === rd.round; })[0];
     el['res-round'].textContent = rd.round;
+    // La classifica provvisoria si mostra a OGNI fine turno, anche se l'esito
+    // del round non è ancora disponibile sul client.
+    renderClassificaProvvisoria(s, r);
     if (!r) {
       el['res-body'].innerHTML = '<div class="storico-empty">Esito non ancora disponibile.</div>';
       return;
@@ -702,14 +783,23 @@
       var righe = perCat[catId].map(function (c) {
         var stato = !String(c.raw || '').trim() ? 'vuota'
           : c.annullataManuale ? 'annullata manualmente'
-            : c.annullata ? 'annullata all’unanimità'
-              : c.valida ? 'valida' : C.motivoTesto(c.motivoAutomatico || c.motivo, r.lettera).toLowerCase();
-        // In allenamento l'annullamento è MANUALE e dichiarato come tale:
-        // non esiste votazione né quorum con un solo giocatore.
-        var azione = G.solo ? '<button class="vote-btn btn-manuale" data-key="' + esc(c.k) +
-          '" data-annulla="' + (c.annullataManuale ? '0' : '1') + '"' +
-          (String(c.raw || '').trim() ? '' : ' disabled') + '>' +
-          (c.annullataManuale ? '↩ RIPRISTINA' : '✖ ANNULLA') + '</button>' : '';
+            : c.validataManuale ? 'validata manualmente'
+              : c.validata ? 'validata all’unanimità'
+                : c.annullata ? 'annullata all’unanimità'
+                  : c.valida ? 'valida' : C.motivoTesto(c.motivoAutomatico || c.motivo, r.lettera).toLowerCase();
+        /* In allenamento le due scelte sono MANUALI e dichiarate come tali:
+           non esiste votazione né quorum con un solo giocatore. */
+        var azione = '';
+        if (G.solo && String(c.raw || '').trim()) {
+          azione = '<button class="vote-btn btn-manuale" data-key="' + esc(c.k) +
+            '" data-azione="annulla" data-valore="' + (c.annullataManuale ? '0' : '1') + '">' +
+            (c.annullataManuale ? '↩ RIPRISTINA' : '✖ ANNULLA') + '</button>' +
+            '<button class="vote-btn valida btn-manuale" data-key="' + esc(c.k) +
+            '" data-azione="valida" data-valore="' + (c.validataManuale ? '0' : '1') + '"' +
+            (c.motivoAutomatico ? '' : ' disabled') +
+            ' title="Il dizionario non la conosce: dichiarala corretta">' +
+            (c.validataManuale ? '↩ RIPRISTINA' : '✅ VALIDA') + '</button>';
+        }
         return '<div class="st-row"><span>' + esc(c.nome) + '</span>' +
           '<span class="st-lettera' + (c.annullataManuale ? ' annullata' : '') + '">' + esc(c.raw || '—') + '</span>' +
           '<span class="mini">' + esc(stato) + '</span>' + azione +
@@ -724,20 +814,53 @@
       }).join('') + '</div>' +
       (G.solo
         ? '<p class="hint">Allenamento: 10 punti per risposta automaticamente valida. ' +
-          'L’annullamento manuale è una tua scelta locale, distinta dalla validazione del dizionario.</p>'
+          'Annullamento e validazione manuali sono scelte tue, distinte dal dizionario.</p>'
         : '');
 
     Array.prototype.forEach.call(el['res-body'].querySelectorAll('.btn-manuale'), function (btn) {
       btn.addEventListener('click', function () {
         var ctx = ctxAvanzamento(G.state);
         ctx.key = btn.getAttribute('data-key');
-        ctx.annulla = btn.getAttribute('data-annulla') === '1';
-        G.backend.applyAtomic(C.mutAnnullaManualeSolo, ctx);
+        var valore = btn.getAttribute('data-valore') === '1';
+        if (btn.getAttribute('data-azione') === 'valida') {
+          ctx.valida = valore;
+          G.backend.applyAtomic(C.mutValidaManualeSolo, ctx);
+        } else {
+          ctx.annulla = valore;
+          G.backend.applyAtomic(C.mutAnnullaManualeSolo, ctx);
+        }
       });
     });
   }
 
+  /**
+   * Classifica provvisoria di fine turno: totali aggiornati, punti del round
+   * appena chiuso e una barra proporzionale al vantaggio.
+   */
+  function renderClassificaProvvisoria(s, esito) {
+    if (!el['res-classifica']) return;
+    var righe = C.classifica(s.punteggi, s.partecipanti);
+    var delta = (esito && esito.punti) || {};
+    var max = righe.reduce(function (m, r) { return Math.max(m, r.punti); }, 0) || 1;
+    var ultimo = s.opzioni.round === s.round;
+    el['res-classifica'].innerHTML =
+      '<div class="rc-head">🏁 CLASSIFICA PROVVISORIA' +
+      '<span class="rc-sub">dopo il round ' + esc(s.round) + ' di ' + esc(s.opzioni.round) +
+      (ultimo ? ' · ultimo round' : '') + '</span></div>' +
+      righe.map(function (r, i) {
+        var medaglie = ['🥇', '🥈', '🥉'];
+        return '<div class="rc-row' + (r.nome === G.me ? ' mine' : '') + '">' +
+          '<span class="rc-pos">' + (medaglie[i] || r.posizione) + '</span>' +
+          avatar(r.nome) +
+          '<span class="rc-name">' + esc(r.nome) + (r.nome === G.me ? ' (TU)' : '') + '</span>' +
+          (delta[r.nome] ? '<span class="rc-delta">+' + delta[r.nome] + '</span>' : '') +
+          '<span class="rc-bar"><i style="width:' + Math.round((r.punti / max) * 100) + '%"></i></span>' +
+          '<span class="rc-pts">' + r.punti + '</span></div>';
+      }).join('');
+  }
+
   /* ---------------- RENDER: FINE PARTITA ---------------- */
+
   function renderFine(s) {
     var righe = C.classifica(s.punteggi, s.partecipanti);
     var top = C.vincitore(s.punteggi, s.partecipanti) || [];
@@ -759,16 +882,11 @@
       el['fine-sub'].textContent = 'Con ' + top[0].punti + ' punti';
     }
 
-    var cls = { 0: 'p1' };
-    el.podio.innerHTML = righe.slice(0, 6).map(function (r, i) {
-      var medals = ['🥇', '🥈', '🥉'];
-      return '<div class="pod-col' + (cls[i] ? ' ' + cls[i] : '') + '">' +
-        '<span class="pod-medal">' + (medals[i] || '#' + r.posizione) + '</span>' +
-        avatar(r.nome) +
-        '<span class="pod-name">' + esc(r.nome) + (r.nome === G.me ? ' (TU)' : '') + '</span>' +
-        '<div class="pod-bar">' + r.punti + '</div>' +
-        '<span class="pod-sub">posizione ' + r.posizione + '</span></div>';
-    }).join('');
+    /* Podio condiviso (../shared/podio.js): ordine per punteggio decrescente,
+       gradino del 1° più alto e via via più basso, tutti i giocatori visibili. */
+    window.FAWPodio.render(el.podio, righe.map(function (r) {
+      return { nome: r.nome, punti: r.punti, sottotitolo: 'posizione ' + r.posizione };
+    }), { io: G.me });
 
     el['fine-dettaglio'].innerHTML = (s.risultati || []).map(function (r) {
       var tot = r.punti || {};
@@ -813,6 +931,9 @@
     }
 
     el['btn-rivincita'].classList.toggle('hidden', G.solo);
+    // La rivincita sta IN ALTO nella schermata finale: si vede e si preme
+    // senza scorrere tutto il dettaglio dei round.
+    if (el['fine-top-actions']) el['fine-top-actions'].classList.toggle('hidden', G.solo);
     renderRematch(s);
   }
 

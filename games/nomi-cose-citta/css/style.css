@@ -28,6 +28,8 @@
   --ok-soft: #f0fdf4;
   --info: #0369a1;
   --info-soft: #f0f9ff;
+  --warn: #b45309;
+  --warn-soft: #fffbeb;
   --radius: 16px;
   --radius-sm: 10px;
   --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.05);
@@ -350,7 +352,61 @@ button { font-family: var(--font); }
 .vote-btn:hover { border-color: var(--danger); color: var(--danger); }
 .vote-btn.votato { background: var(--danger-soft); border-color: #fecaca; color: var(--danger); }
 .vote-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+/* Voto "Valida": stessa forma del voto di annullamento, colore opposto */
+.vote-btn.valida:hover:not(:disabled) { border-color: var(--ok); color: var(--ok); }
+.vote-btn.valida.votato { background: var(--ok-soft); border-color: #bbf7d0; color: var(--ok); }
 .cell-empty { color: var(--text-2); font-style: italic; font-size: 0.85rem; }
+.cell-word.validata { color: var(--ok); }
+
+/* ---------- "Stato di voto": cella e striscia dedicate ---------- */
+.rev-cell.in-voto {
+  background: var(--warn-soft);
+  box-shadow: inset 0 0 0 2px #fbbf24;
+  border-radius: var(--radius-sm);
+  animation: ncc-voto 1.6s ease-in-out infinite;
+}
+@keyframes ncc-voto {
+  0%, 100% { box-shadow: inset 0 0 0 2px #fbbf24; }
+  50% { box-shadow: inset 0 0 0 2px #f59e0b, 0 0 0 4px rgba(245, 158, 11, 0.18); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rev-cell.in-voto { animation: none; }
+}
+.tag.voto {
+  background: #fef3c7; color: #92400e; border-color: #fcd34d;
+  text-transform: uppercase; letter-spacing: 0.05em;
+}
+.rev-voti {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border: 1px solid #fcd34d;
+  border-left: 5px solid #f59e0b;
+  border-radius: var(--radius-sm);
+  background: var(--warn-soft);
+}
+.rev-voti.hidden { display: none; }
+.rv-title { font-weight: 900; font-size: 0.86rem; color: #92400e; }
+.rv-sub { font-weight: 600; font-size: 0.74rem; color: var(--text-1); }
+.rv-empty { font-size: 0.82rem; color: var(--text-2); }
+.rv-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.rv-item {
+  display: inline-flex; align-items: center; gap: 7px; flex-wrap: wrap;
+  padding: 6px 10px; border-radius: 999px;
+  border: 1px solid var(--card-border); background: var(--card);
+  font-size: 0.78rem;
+}
+.rv-item.invalida { border-color: #fecaca; }
+.rv-item.valida { border-color: #bbf7d0; }
+.rv-item.risolto { background: var(--card-2); }
+.rv-item b { font-size: 0.86rem; letter-spacing: 0.03em; }
+.rv-who { color: var(--text-2); font-size: 0.72rem; font-weight: 700; }
+.rv-voti { font-weight: 900; }
+.rv-mancano { color: var(--text-1); font-size: 0.72rem; font-weight: 700; }
+.rv-esito {
+  font-weight: 900; font-size: 0.7rem; letter-spacing: 0.06em;
+  padding: 1px 7px; border-radius: 999px;
+  background: var(--card-2); border: 1px solid var(--card-border);
+}
 
 .rev-foot {
   display: flex; align-items: center; justify-content: space-between;
@@ -362,6 +418,27 @@ button { font-family: var(--font); }
 
 /* Risultati del round */
 .res-head { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 14px; }
+/* Classifica provvisoria di fine turno */
+.res-classifica {
+  margin-bottom: 16px; padding: 12px 14px;
+  border: 1px solid var(--acc-border); border-radius: var(--radius-sm);
+  background: var(--acc-soft);
+}
+.rc-head { font-weight: 900; font-size: 0.9rem; color: var(--acc-1); margin-bottom: 8px; }
+.rc-sub { font-weight: 600; font-size: 0.74rem; color: var(--text-1); margin-left: 8px; }
+.rc-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 8px; border-radius: var(--radius-sm);
+  background: var(--card); border: 1px solid var(--card-border); margin-bottom: 5px;
+}
+.rc-row:last-child { margin-bottom: 0; }
+.rc-row.mine { border-color: var(--acc-border); background: #fff; box-shadow: inset 3px 0 0 var(--acc-0); }
+.rc-pos { width: 24px; text-align: center; font-weight: 900; font-size: 0.9rem; }
+.rc-name { font-weight: 800; font-size: 0.86rem; }
+.rc-delta { font-size: 0.72rem; font-weight: 800; color: var(--ok); }
+.rc-bar { flex: 1; height: 8px; border-radius: 99px; background: var(--card-2); overflow: hidden; min-width: 40px; }
+.rc-bar > i { display: block; height: 100%; background: linear-gradient(90deg, var(--acc-0), #7c3aed); }
+.rc-pts { font-weight: 900; font-size: 0.95rem; min-width: 34px; text-align: right; }
 .res-emoji { font-size: 1.8rem; }
 .res-head h3 { font-size: 1.1rem; }
 .res-head p { margin: 0; color: var(--text-1); font-size: 0.88rem; }
@@ -374,17 +451,18 @@ button { font-family: var(--font); }
 .fine-emoji { font-size: 3rem; }
 .fine-top h2 { font-size: 1.6rem; margin: 6px 0; }
 .fine-top p { color: var(--text-1); margin: 0; }
-.podio { display: flex; align-items: flex-end; justify-content: center; gap: 14px; margin: 18px 0; flex-wrap: wrap; }
-.pod-col {
-  display: flex; flex-direction: column; align-items: center; gap: 6px;
-  background: var(--row-bg); border: 1px solid var(--card-border);
-  border-radius: var(--radius); padding: 14px 18px; min-width: 130px;
+/* Il podio usa la struttura condivisa (../shared/podio.css): qui restano solo i
+   colori del tema di Nomi, Cose, Città. */
+#podio {
+  --podio-card: var(--row-bg);
+  --podio-bar: var(--card-2);
+  --podio-border: var(--card-border);
+  --podio-text: var(--text-0);
+  --podio-sub: var(--text-2);
+  --podio-gold: #fcd34d;
+  --podio-gold-bg: #fde68a;
+  margin: 18px 0;
 }
-.pod-col.p1 { border-color: #fcd34d; background: #fffbeb; }
-.pod-medal { font-size: 1.4rem; }
-.pod-name { font-weight: 800; font-size: 0.9rem; }
-.pod-bar { font-size: 1.4rem; font-weight: 900; color: var(--acc-1); }
-.pod-sub { font-size: 0.74rem; color: var(--text-2); }
 .fine-dettaglio { text-align: left; }
 .fine-stats {
   display: flex; justify-content: center; gap: 26px; flex-wrap: wrap;
@@ -393,6 +471,10 @@ button { font-family: var(--font); }
 .fs-val { font-size: 1.2rem; font-weight: 900; }
 .fs-lab { font-size: 0.66rem; letter-spacing: 0.08em; color: var(--text-2); font-weight: 800; }
 .fine-actions { display: flex; gap: 10px; justify-content: center; margin-top: 10px; }
+.fine-actions.hidden { display: none; }
+/* Rivincita in alto nella schermata finale: visibile senza scorrere */
+.fine-top-actions { margin: 4px 0 6px; }
+.btn-rivincita-top { padding: 13px 28px; font-size: 1rem; }
 .det-round { margin-bottom: 12px; }
 .det-round h4 { font-size: 0.86rem; margin: 0 0 6px; }
 

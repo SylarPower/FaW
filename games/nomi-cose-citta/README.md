@@ -19,35 +19,54 @@ collettiva** in cui una risposta si annulla solo **all'unanimità**.
    I motivi di invalidità sono mostrati esplicitamente: *vuota*, *non inizia
    per X*, *assente dal dizionario*.
 4. **Revisione**: la tabella mostra tutte le risposte (righe = categorie,
-   colonne = giocatori) con testo, validità automatica + motivo, voti di
-   annullamento, stato e punteggio provvisorio.
-5. **Regola dell'unanimità** (obbligatoria): una risposta è annullata **solo
-   se tutti i partecipanti del round votano "Non valida", autore incluso**.
+   colonne = giocatori) con testo, validità automatica + motivo, voti,
+   stato e punteggio provvisorio.
+5. **Due voti, stessa regola dell'unanimità** (obbligatoria):
+   - **🚫 NON VALIDA** (annullamento): una risposta automaticamente valida è
+     annullata **solo se tutti i partecipanti del round votano "Non valida",
+     autore incluso**;
+   - **✅ VALIDA** (validazione): una risposta scritta che il dizionario non
+     riconosce (*assente dal dizionario*, *non inizia per X*) diventa valida
+     **solo se tutti votano "Valida", autore incluso**. Il responso del
+     dizionario resta registrato (`motivoAutomatico`): la parola è *validata
+     dai giocatori*, non "presente nel dizionario".
    Nessuna maggioranza, nessun voto dei soli avversari, nessun silenzio-assenso.
-   Alla scadenza della revisione una contestazione **non unanime lascia valida**
-   la risposta; le risposte automaticamente non valide restano a 0.
-6. Il **quorum è congelato a inizio round** (`roundData.partecipanti`): un
+   Alla scadenza della revisione un voto **non unanime lascia le cose come
+   stanno** (la valida resta valida, la non riconosciuta resta a 0).
+   I due voti si escludono: un giocatore ha **un solo voto per cella** e una
+   risposta vuota non è recuperabile. A parità di unanimità vince
+   l'annullamento.
+6. **Stato di voto evidente**: appena esiste almeno un voto, la cella si
+   evidenzia (bordo animato + nastro "🗳️ IN VOTO") e sopra la tabella compare
+   la striscia **"IN VOTAZIONE"** con parola, autore, categoria, direzione del
+   voto, voti raccolti e **chi manca** all'unanimità.
+7. Il **quorum è congelato a inizio round** (`roundData.partecipanti`): un
    giocatore che si disconnette non lo riduce, chi entra dopo non lo aumenta,
    chi torna rientra con il proprio voto.
-7. Ogni giocatore conferma **"Revisione conclusa"**; cambiare voto **revoca**
+8. Ogni giocatore conferma **"Revisione conclusa"**; cambiare voto **revoca**
    la propria conferma. La revisione si chiude quando tutti hanno confermato
    o alla scadenza.
-8. **Punteggio (variante classica, dichiarata in UI)**:
+9. **Punteggio (variante classica, dichiarata in UI)**:
 
    | caso | punti |
    |------|-------|
    | vuota / infine non valida | 0 |
-   | valida, duplicata da almeno un'altra valida nella stessa categoria | 5 |
+   | valida (anche **validata dal voto**), duplicata da almeno un'altra valida | 5 |
    | valida e distinta, con altre valide nella categoria | 10 |
    | **unica** risposta valida della categoria | **20** |
 
    Il 20 **sostituisce** il 10 (non si sommano). I duplicati si confrontano
    sulla forma **normalizzata**, stessa categoria e stesso round; la stessa
-   parola in categorie diverse è ammessa. Dopo un annullamento **l'intera
-   categoria viene ricalcolata**.
-9. Fine partita: dettaglio per round e per categoria, totali per round,
-   classifica con pareggi, rivincita (stesse opzioni, nuova sessione logica,
-   nessun residuo di risposte/voti/esiti).
+   parola in categorie diverse è ammessa. Dopo un annullamento o una
+   validazione **l'intera categoria viene ricalcolata**.
+10. **Fine turno**: il riepilogo del round mostra subito la **classifica
+    provvisoria** (posizione, totale aggiornato, punti del round e barra
+    proporzionale) prima del dettaglio per categoria.
+11. **Fine partita**: **podio con gradini decrescenti** (il vincitore è il più
+    alto, poi il secondo, il terzo e così via per tutti), **pulsante RIVINCITA
+    in alto** (visibile senza scorrere), dettaglio per round e per categoria,
+    totali per round, classifica con pareggi. La rivincita riusa le stesse
+    opzioni in una nuova sessione logica, senza residui di risposte/voti/esiti.
 
 ### Categorie
 
@@ -141,18 +160,25 @@ roundData {
   inizio         ms
   deadline       ms                         ← scadenza assoluta condivisa
   stop           null | { da, ts }          ← 'TEMPO' se chiusura a tempo
-  voti           { 'c0_p1': ['ALFA'] }      ← chiavi c<cat>_p<giocatore>
+  voti           { 'c0_p1': ['ALFA'] }      ← voti "NON VALIDA", chiavi c<cat>_p<giocatore>
+  votiValida     { 'c0_p1': ['ALFA'] }      ← voti "VALIDA" (stessa forma, mappa separata)
   conferme       ['ALFA']                   ← revisione conclusa
   esitoId        null | 'r3'                ← esito congelato (idempotenza)
   dictVersion    'v1:ceeacbd1'
   annullateManuali []                       ← solo allenamento (mai condivisa)
+  validateManuali  []                       ← solo allenamento (mai condivisa)
 }
 esito (elemento di risultati[]) {
   id 'r3', round 3, lettera 'M',
-  celle [ { k, c, p, cat, nome, raw, norm, valida, motivo, voti, annullata, punti } ],
-  punti { ALFA: 40, BETA: 0 }
+  celle [ { k, c, p, cat, nome, raw, norm, valida, motivo, motivoAutomatico,
+            voti, votiValida, annullata, validata, punti } ],
+  punti { ALFA: 40, BETA: 20 }
 }
 ```
+
+`valida` è `true` per validazione automatica **oppure** per voto unanime
+"Valida"; in quest'ultimo caso `validata` è `true` e `motivoAutomatico`
+conserva il responso del dizionario (`ASSENTE`, `INIZIALE`, …).
 
 **Nessun dato dei giocatori in chiaro nel documento partita durante la
 compilazione**: il documento contiene solo voti, conferme ed esiti congelati.
@@ -298,8 +324,10 @@ Stesso `core.js`, stessa UI, stessa macchina a stati, ma `SoloBackend`
 - punteggio di **allenamento dichiarato**: 10 punti per risposta
   automaticamente valida, 0 altrimenti; **mai 20 automatici** (con un solo
   giocatore ogni risposta sarebbe "unica");
-- l'annullamento è **manuale** (`annullataManuale`) e distinto dalla validità
-  automatica (`motivoAutomatico` conservato);
+- annullamento e validazione sono **manuali** (`annullataManuale` /
+  `validataManuale`, mutuamente esclusivi) e distinti dalla validità
+  automatica (`motivoAutomatico` conservato): in allenamento non esiste un
+  quorum, quindi i due voti della revisione diventano due scelte dichiarate;
 - nessun mescolamento con i record multiplayer: la rivincita multiplayer non
   è disponibile e le statistiche sono le stesse (`funatwork_daily_stats`,
   chiave `ncc`) come per gli altri giochi.
@@ -316,11 +344,11 @@ npm test              # tutto
 
 | file | cosa copre | tipo |
 |---|---|---|
-| `tests/ncc/core.test.js` | normalizzazione, iniziale, override, dizionario mancante/disallineato, punteggi 0/5/10/20, duplicati dopo annullamento, voto dell'autore e unanimità, quorum stabile, timeout, rivincita senza residui, allenamento | unitario (logica pura) |
+| `tests/ncc/core.test.js` | normalizzazione, iniziale, override, dizionario mancante/disallineato, punteggi 0/5/10/20, duplicati dopo annullamento, voto dell'autore e unanimità, **voto "Valida" (unanimità, precedenza dell'annullamento, ritiro del voto opposto)**, quorum stabile, timeout, rivincita senza residui, allenamento con annullamento/validazione manuali | unitario (logica pura) |
 | `tests/ncc/multiplayer.test.js` | 3 client su Firestore simulato: STOP simultanei, subentro al referente, scritture in ritardo, riconnessione, doppia finalizzazione, refresh | integrazione (backend) |
 | `tests/ncc/quota.test.js` | zero get/transazioni, scritture per azione, nessun timer scritto, listener minimi + cleanup, budget totale | quota |
-| `tests/ncc/browser.test.js` | pagina reale in allenamento: boot, lobby, campi, STOP, punti, statistiche | E2E (jsdom) |
-| `tests/ncc/browser-multiplayer.test.js` | due pagine reali + Firestore simulato: privacy in compilazione, tabella di revisione, voti, conferme, esito, classifica, budget | E2E (jsdom) |
+| `tests/ncc/browser.test.js` | pagina reale in allenamento: boot, lobby, campi, STOP, punti, annullamento/validazione manuali, classifica provvisoria, statistiche | E2E (jsdom) |
+| `tests/ncc/browser-multiplayer.test.js` | due pagine reali + Firestore simulato: privacy in compilazione, tabella di revisione, voti "non valida" e "valida", striscia "in votazione", conferme, esito, classifica provvisoria, podio, budget | E2E (jsdom) |
 
 Le **Security Rules non sono testate automaticamente**: in questo ambiente
 non è disponibile l'Emulator Suite (`firebase-tools` non installato, nessuna

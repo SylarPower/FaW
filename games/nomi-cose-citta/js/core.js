@@ -352,6 +352,11 @@
     const voti = {};
     const src = (rd && rd.voti) || {};
     Object.keys(src).forEach((k) => { voti[k] = Array.isArray(src[k]) ? src[k].slice() : []; });
+    // Voti "Valida" (recupero di una parola che il dizionario non conosce):
+    // stessa forma dei voti di annullamento, mappa separata.
+    const votiValida = {};
+    const srcV = (rd && rd.votiValida) || {};
+    Object.keys(srcV).forEach((k) => { votiValida[k] = Array.isArray(srcV[k]) ? srcV[k].slice() : []; });
     return {
       id: rd.id || roundId(rd.round || 1),
       round: parseInt(rd.round, 10) || 1,
@@ -364,10 +369,12 @@
       deadline: parseInt(rd.deadline, 10) || 0,
       stop: rd.stop || null,
       voti,
+      votiValida,
       conferme: Array.isArray(rd.conferme) ? rd.conferme.slice() : [],
       esitoId: rd.esitoId || null,
       dictVersion: rd.dictVersion || null,
-      annullateManuali: Array.isArray(rd.annullateManuali) ? rd.annullateManuali.slice() : []
+      annullateManuali: Array.isArray(rd.annullateManuali) ? rd.annullateManuali.slice() : [],
+      validateManuali: Array.isArray(rd.validateManuali) ? rd.validateManuali.slice() : []
     };
   }
 
@@ -387,10 +394,12 @@
       deadline: now + op.tempo * 1000,
       stop: null,
       voti: {},
+      votiValida: {},
       conferme: [],
       esitoId: null,
       dictVersion: dictVersion || null,
-      annullateManuali: []
+      annullateManuali: [],
+      validateManuali: []
     };
   }
 
@@ -481,21 +490,31 @@
     return '';
   }
 
-  /* ---------------- CONTESTAZIONI: UNANIMITÀ ----------------
+  /* ---------------- CONTESTAZIONI E VALIDAZIONI: UNANIMITÀ ----------------
      Una risposta è annullata SOLO se TUTTI i partecipanti al round votano
-     "Non valida", autore INCLUSO. Non valgono maggioranza, unanimità dei
-     soli avversari, né l'assenza di voto come consenso.
+     "Non valida", autore INCLUSO. Con la stessa identica regola (stesso
+     quorum, stessa unanimità, autore incluso) tutti i partecipanti possono
+     votare "Valida" una risposta che il dizionario non riconosce: il voto
+     collettivo la recupera. Non valgono maggioranze, unanimità dei soli
+     avversari, né l'assenza di voto come consenso.
      Il quorum è `roundData.partecipanti`, fissato all'inizio del round. */
-  function rispostaAnnullata(voti, quorum) {
+  function unanime(voti, quorum) {
     if (!Array.isArray(quorum) || !quorum.length) return false;
     const lista = Array.isArray(voti) ? voti : [];
     return quorum.every((p) => lista.indexOf(p) !== -1);
+  }
+  function rispostaAnnullata(voti, quorum) {
+    return unanime(voti, quorum);
+  }
+  /** Voti "Valida" all'unanimità: stessa regola dell'annullamento. */
+  function rispostaValidata(voti, quorum) {
+    return unanime(voti, quorum);
   }
 
   function statoVotazione(voti, quorum) {
     const lista = Array.isArray(voti) ? voti : [];
     const tot = (quorum || []).length;
-    return { voti: lista.length, quorum: tot, unanime: rispostaAnnullata(voti, quorum) };
+    return { voti: lista.length, quorum: tot, unanime: unanime(voti, quorum) };
   }
 
   /* ---------------- PUNTEGGI (puri) ---------------- */
@@ -544,13 +563,21 @@
         const r = (risposte[nome] && risposte[nome][catId]) || null;
         const v = validaRisposta(r ? r.raw : '', rd.lettera, dizionario);
         const voti = (rd.voti && rd.voti[k]) ? rd.voti[k].slice() : [];
+        const votiValida = (rd.votiValida && rd.votiValida[k]) ? rd.votiValida[k].slice() : [];
         const annullata = v.ok && rispostaAnnullata(voti, quorum);
+        /* Voto "Valida" all'unanimità: recupera una risposta che il
+           dizionario non riconosce (una risposta vuota non è recuperabile).
+           L'annullamento unanime ha comunque la precedenza. */
+        const validata = !v.ok && !!v.norm && !annullata && rispostaValidata(votiValida, quorum);
         celle.push({
           k: k, c: catKey(ci), p: playerKey(pi),
           cat: catId, nome: nome,
           raw: v.raw, norm: v.norm,
-          valida: v.ok, motivo: v.motivo,
-          voti: voti, annullata: annullata, punti: 0
+          valida: v.ok || validata,
+          motivo: v.ok || validata ? null : v.motivo,
+          motivoAutomatico: v.motivo,
+          voti: voti, votiValida: votiValida,
+          annullata: annullata, validata: validata, punti: 0
         });
       });
     });
@@ -590,6 +617,7 @@
     const risposte = opts.risposte || {};
     const dizionario = opts.dizionario;
     const manuali = opts.annullateManuali || [];
+    const validate = opts.validateManuali || [];
     const celle = [];
     (rd.categorie || []).forEach((catId, ci) => {
       (rd.partecipanti || []).forEach((nome, pi) => {
@@ -600,18 +628,28 @@
           k: k, c: catKey(ci), p: playerKey(pi), cat: catId, nome: nome,
           raw: v.raw, norm: v.norm, valida: v.ok, motivo: v.motivo,
           motivoAutomatico: v.motivo,
-          voti: [], annullata: false,
-          annullataManuale: manuali.indexOf(k) !== -1, punti: 0
+          voti: [], votiValida: [], annullata: false, validata: false,
+          annullataManuale: manuali.indexOf(k) !== -1,
+          validataManuale: validate.indexOf(k) !== -1, punti: 0
         });
       });
     });
     celle.forEach((c) => {
-      if (!c.annullataManuale) return;
-      // Annullamento MANUALE dell'allenamento: distinto dalla validazione
-      // automatica (che resta nel campo `motivoAutomatico`) e mai condiviso.
+      if (c.annullataManuale) {
+        // Annullamento MANUALE dell'allenamento: distinto dalla validazione
+        // automatica (che resta nel campo `motivoAutomatico`) e mai condiviso.
+        c.motivoAutomatico = c.motivo;
+        c.valida = false;
+        c.motivo = 'ANNULLATA_MANUALE';
+        return;
+      }
+      if (!c.validataManuale || !c.norm) return;
+      // Validazione MANUALE dell'allenamento: recupera una parola che il
+      // dizionario non conosce (una risposta vuota non è recuperabile).
       c.motivoAutomatico = c.motivo;
-      c.valida = false;
-      c.motivo = 'ANNULLATA_MANUALE';
+      c.valida = true;
+      c.validata = true;
+      c.motivo = null;
     });
     assegnaPuntiAllenamento(celle);
     const punti = mapZero(rd.partecipanti);
@@ -722,28 +760,52 @@
   }
 
   /**
-   * Voto "Non valida" / ritiro del voto.
-   * Cambiare un voto revoca la propria conferma di revisione.
+   * Voto su una cella della revisione, nelle due direzioni:
+   *  - 'invalida' → "Non valida" (annullamento all'unanimità);
+   *  - 'valida'   → "Valida" (recupero all'unanimità di una parola che il
+   *                 dizionario non riconosce).
+   * `ctx.vota: false` ritira il proprio voto. Le due direzioni si escludono
+   * (un solo voto per giocatore e per cella) e cambiare voto revoca la
+   * propria conferma di revisione.
    */
-  function mutVota(state, ctx) {
+  function mutVotaDirezione(state, ctx, direzione) {
     if (state.stato !== 'in_corso' || !state.roundData) return null;
     const rd = state.roundData;
     if (rd.fase !== 'revisione') return { __error: { code: 'REVISIONE_CHIUSA' } };
     if (rd.partecipanti.indexOf(ctx.me) === -1) return { __error: { code: 'NON_PARTECIPANTE' } };
     const key = ctx.key;
     if (!key) return null;
-    const voti = rd.voti[key] || [];
+    const perValida = direzione === 'valida';
+    const mappa = perValida ? (rd.votiValida || {}) : (rd.voti || {});
+    const mappaAltra = perValida ? (rd.voti || {}) : (rd.votiValida || {});
+    const prefisso = perValida ? 'roundData.votiValida.' : 'roundData.voti.';
+    const prefissoAltro = perValida ? 'roundData.voti.' : 'roundData.votiValida.';
+    const voti = mappa[key] || [];
     const hoVotato = voti.indexOf(ctx.me) !== -1;
     if (ctx.vota && hoVotato) return null;
     if (!ctx.vota && !hoVotato) return null;
     const up = {};
-    up['roundData.voti.' + key] = ctx.vota
+    up[prefisso + key] = ctx.vota
       ? { __op: 'union', items: [ctx.me] }
       : { __op: 'remove', items: [ctx.me] };
+    /* Le due direzioni si escludono: un giocatore ha UN voto per cella,
+       quindi votare in un senso ritira l'eventuale voto opposto. */
+    if (ctx.vota && (mappaAltra[key] || []).indexOf(ctx.me) !== -1) {
+      up[prefissoAltro + key] = { __op: 'remove', items: [ctx.me] };
+    }
     if (rd.conferme.indexOf(ctx.me) !== -1) {
       up['roundData.conferme'] = { __op: 'remove', items: [ctx.me] };
     }
     return up;
+  }
+
+  function mutVota(state, ctx) {
+    return mutVotaDirezione(state, ctx, 'invalida');
+  }
+
+  /** Voto "Valida": recupera all'unanimità una parola non riconosciuta. */
+  function mutVotaValida(state, ctx) {
+    return mutVotaDirezione(state, ctx, 'valida');
   }
 
   function mutConfermaRevisione(state, ctx) {
@@ -823,7 +885,8 @@
       roundData: rd,
       risposte: ctx.risposte || {},
       dizionario: ctx.dizionario,
-      annullateManuali: rd.annullateManuali || []
+      annullateManuali: rd.annullateManuali || [],
+      validateManuali: rd.validateManuali || []
     });
     const risultati = (state.risultati || []).concat([esito.risultato]);
     return {
@@ -840,29 +903,57 @@
 
   /** Annullamento MANUALE in allenamento: distinto dalla validazione automatica. */
   function mutAnnullaManualeSolo(state, ctx) {
+    return azioneManualeSolo(state, ctx, 'annulla');
+  }
+
+  /**
+   * Validazione MANUALE in allenamento: l'equivalente "solo" del voto
+   * "Valida" della revisione (in allenamento non esiste un quorum).
+   */
+  function mutValidaManualeSolo(state, ctx) {
+    return azioneManualeSolo(state, ctx, 'valida');
+  }
+
+  /* Le due azioni manuali si escludono a vicenda e ricalcolano l'esito. */
+  function azioneManualeSolo(state, ctx, tipo) {
     if (state.stato !== 'in_corso' || !state.roundData) return null;
     const rd = state.roundData;
     if (rd.fase !== 'risultati' || !rd.esitoId) return null;
     if (!ctx.dizionarioPronto) return { __error: { code: 'DIZIONARIO_NON_PRONTO' } };
-    const lista = (rd.annullateManuali || []).slice();
+    const annulla = tipo === 'annulla';
+    const campo = annulla ? 'annullateManuali' : 'validateManuali';
+    const campoAltro = annulla ? 'validateManuali' : 'annullateManuali';
+    const lista = (rd[campo] || []).slice();
+    const altra = (rd[campoAltro] || []).slice();
     const i = lista.indexOf(ctx.key);
-    if (ctx.annulla) { if (i !== -1) return null; lista.push(ctx.key); }
-    else { if (i === -1) return null; lista.splice(i, 1); }
+    const attiva = annulla ? ctx.annulla : ctx.valida;
+    if (attiva) {
+      if (i !== -1) return null;
+      lista.push(ctx.key);
+      const j = altra.indexOf(ctx.key);
+      if (j !== -1) altra.splice(j, 1);
+    } else {
+      if (i === -1) return null;
+      lista.splice(i, 1);
+    }
     const idx = (state.risultati || []).findIndex((r) => r && r.id === rd.id);
     if (idx === -1) return null;
     const esito = calcolaEsitoAllenamento({
       roundData: rd,
       risposte: ctx.risposte || {},
       dizionario: ctx.dizionario,
-      annullateManuali: lista
+      annullateManuali: annulla ? lista : altra,
+      validateManuali: annulla ? altra : lista
     });
     const risultati = (state.risultati || []).slice();
     risultati[idx] = esito.risultato;
-    return {
-      'roundData.annullateManuali': lista,
+    const up = {
       risultati: risultati,
       punteggi: punteggiDaRisultati(risultati, state.partecipanti)
     };
+    up['roundData.' + campo] = lista;
+    if (attiva) up['roundData.' + campoAltro] = altra;
+    return up;
   }
 
   /* ---------------- HELPERS DI FASE ---------------- */
@@ -903,13 +994,14 @@
     normOpzioni, normState, normRoundData, nuovoRoundData, mapZero,
     setPath, applyPartial, toFirestoreUpdate, docExists, isRateLimitError,
     // regole
-    validaRisposta, motivoTesto, rispostaAnnullata, statoVotazione,
+    validaRisposta, motivoTesto, unanime, rispostaAnnullata, rispostaValidata,
+    statoVotazione,
     assegnaPuntiCategoria, calcolaEsitoRound, assegnaPuntiAllenamento,
     calcolaEsitoAllenamento, punteggiDaRisultati, classifica, vincitore,
     // mutatori
-    mutReady, mutStart, mutStop, mutTimeoutCompilazione, mutVota,
+    mutReady, mutStart, mutStop, mutTimeoutCompilazione, mutVota, mutVotaValida,
     mutConfermaRevisione, mutChiudiRevisione, mutProssimoRound,
-    mutConsegnaSolo, mutAnnullaManualeSolo,
+    mutConsegnaSolo, mutAnnullaManualeSolo, mutValidaManualeSolo,
     // helper
     quorumRound, referenteAzione, risposteComplete
   };

@@ -8,6 +8,7 @@ const { JSDOM } = require('jsdom');
 const ROOT = path.join(__dirname, '..','..');
 const html = fs.readFileSync(path.join(ROOT, 'games/patata/index.html'), 'utf8');
 const gameJs = fs.readFileSync(path.join(ROOT, 'games/patata/js/game.js'), 'utf8');
+const podioJs = fs.readFileSync(path.join(ROOT, 'games/shared/podio.js'), 'utf8');
 
 // campione del dizionario Ruzzle reale (prime 20000 righe)
 const dictSample = fs.readFileSync(path.join(ROOT, 'dizionario.txt'), 'utf8').split('\n').slice(0, 20000).join('\n');
@@ -48,6 +49,7 @@ async function until(fn, what, timeout = 20000) {
   };
 
   // Esegui game.js nella pagina (gli script esterni firebase non vengono caricati → solo)
+  window.eval(podioJs);   // podio condiviso di fine partita
   window.eval(gameJs);
 
   console.log('\n[1] Boot: caricamento dizionario → lobby');

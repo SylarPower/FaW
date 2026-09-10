@@ -849,7 +849,7 @@
    'lobby-status', 'lobby-status-text', 'btn-start-solo', 'lobby-hint',
    'screen-game', 'letter-tiles', 'letters-rule-badge', 'letters-avail', 'ring-fill', 'timer-sec',
    'turn-banner', 'game-players', 'input-card', 'word-input', 'btn-invia',
-   'input-hint', 'feedback', 'scoreboard', 'feed', 'feed-count',
+   'input-prep', 'input-hint', 'feedback', 'scoreboard', 'feed', 'feed-count',
    'overlay-recap', 'recap-round', 'recap-patata', 'recap-body',
    'conf-progress', 'btn-conferma',
    'overlay-fine', 'fine-emoji', 'fine-title', 'fine-sub', 'podio', 'fine-stats',
@@ -1226,18 +1226,52 @@
       el['turn-banner'].classList.add('hidden');
     }
 
-    // Input abilitato solo al mio turno
-    const myTurn = s.roundData && s.roundData.fase === 'giochi' && s.turno && s.turno.giocatore === G.me;
-    el['word-input'].disabled = !myTurn;
-    el['btn-invia'].disabled = !myTurn;
+    aggiornaInput(s);
+  }
+
+  /**
+   * Stato della casella di scrittura.
+   * La casella resta SEMPRE scrivibile durante il turno di gioco: anche chi
+   * non ha la patata prepara la sua parola, così al proprio turno deve solo
+   * premere INVIO. L'invio effettivo resta possibile solo al proprio turno
+   * (il mutatore rifiuta comunque qualsiasi scrittura fuori turno).
+   * Chiamata a ogni snapshot E a ogni battuta (per aggiornare l'etichetta).
+   */
+  function aggiornaInput(s) {
+    if (!s) return;
+    const inGioco = !!(s.roundData && s.roundData.fase === 'giochi' && s.turno);
+    const myTurn = inGioco && s.turno.giocatore === G.me;
+    const bozza = normalizeWord(el['word-input'].value);
+    el['word-input'].disabled = !inGioco;
+    el['btn-invia'].disabled = !inGioco;
+    el['word-input'].classList.toggle('ready', myTurn);
+    el['word-input'].classList.toggle('bozza', !myTurn && !!bozza);
+    el['btn-invia'].classList.toggle('btn-fire', myTurn);
+    el['btn-invia'].classList.toggle('btn-ghost', !myTurn);
     if (myTurn) {
-      el['word-input'].classList.add('ready');
-      el['word-input'].placeholder = 'Scrivi la parola… (INVIO)';
-      if (document.hasFocus()) el['word-input'].focus({ preventScroll: true });
+      el['word-input'].placeholder = bozza
+        ? 'Parola pronta: premi INVIO per inviarla'
+        : 'Scrivi la parola… (INVIO)';
+      el['btn-invia'].textContent = 'INVIA';
+      if (document.hasFocus() && document.activeElement !== el['word-input']) {
+        el['word-input'].focus({ preventScroll: true });
+      }
     } else {
-      el['word-input'].classList.remove('ready');
       const next = s.turno ? s.turno.giocatore : (s.partecipanti[0] || '');
-      el['word-input'].placeholder = next === G.me ? 'Preparati…' : 'In attesa di ' + next + '…';
+      el['word-input'].placeholder = bozza
+        ? 'Parola pronta: inviala quando tocca a te'
+        : 'Prepara la tua parola (ora tocca a ' + next + ')…';
+      el['btn-invia'].textContent = bozza ? '✔ PRONTA' : 'PREPARA';
+    }
+
+    // Striscia "preparazione": dice a tutti che si può già scrivere
+    if (el['input-prep']) {
+      el['input-prep'].classList.toggle('hidden', !inGioco);
+      el['input-prep'].innerHTML = myTurn
+        ? '<b>🔥 Tocca a te:</b> invia la parola per passare la patata.'
+        : '<b>✍️ Puoi già scrivere:</b> la parola resta pronta nella casella ' +
+          'e la invii quando tocca a te (ora gioca <b>' +
+          esc(s.turno ? s.turno.giocatore : '') + '</b>).';
     }
   }
 
@@ -1402,20 +1436,13 @@
       el['fine-sub'].textContent = 'Con ' + best.pts + ' punti. Rivedi la patata e riprova!';
     }
 
-    const top = ranking.slice(0, 3);
-    const cls = { 1: 'p1', 0: 'p2', 2: 'p3' }; // layout: 2°, 1°, 3°
-    const order = [top[1], top[0], top[2]].filter(Boolean);
-    el.podio.innerHTML = order.map((r) => {
-      const idx = top.indexOf(r);
-      const medals = ['🥇', '', '🥉'];
-      return '<div class="pod-col ' + cls[idx] + '">' +
-        '<span class="pod-medal">' + medals[idx] + '</span>' +
-        '<span class="avatar" style="background:' + avatarColor(r.p) + '">' + esc(r.p.slice(0, 2).toUpperCase()) + '</span>' +
-        '<span class="pod-name">' + esc(r.p) + (r.p === G.me ? ' (TU)' : '') + '</span>' +
-        '<div class="pod-bar">' + r.pts + '</div>' +
-        '<span class="pod-sub">' + r.parole + ' parole' + (r.patate ? ' · 🥔×' + r.patate : '') + '</span>' +
-        '</div>';
-    }).join('');
+    /* Podio condiviso (../shared/podio.js): ordine per punteggio decrescente,
+       gradino del 1° più alto e via via più basso, tutti i giocatori visibili. */
+    window.FAWPodio.render(el.podio, ranking.map((r) => ({
+      nome: r.p,
+      punti: r.pts,
+      sottotitolo: r.parole + ' parole' + (r.patate ? ' · 🥔×' + r.patate : '')
+    })), { io: G.me });
 
     const storia = s.storia || [];
     let longest = null;
@@ -1648,7 +1675,10 @@
   function onUltimo(ultimo, s) {
     if (ultimo.ok) {
       showFeedback('ok', '✅ ' + ultimo.w + '  +' + ultimo.p + ' pt — passa a ' + nextPlayer(s, ultimo.nome).toUpperCase());
-      el['word-input'].value = '';
+      // Svuota la casella solo a chi ha appena giocato: la bozza preparata
+      // dagli altri deve sopravvivere al passaggio della patata.
+      if (ultimo.nome === G.me) el['word-input'].value = '';
+      updateInputHint();
     } else if (ultimo.patata) {
       showFeedback('err', '💥 SCOTTATURA: ' + ultimo.nome.toUpperCase() + ' −' + PATATA_PENALTY + ' pt');
     } else if (ultimo.nome === G.me) {
@@ -1705,13 +1735,30 @@
     const s = G.state;
     if (!s) return;
     if (s.stato !== 'in_corso' || !s.roundData || s.roundData.fase !== 'giochi') return;
+    const rule0 = ruleFor(s);
+    const ctx0 = ctxFor({ word: el['word-input'].value, rule: rule0 });
+
+    // Non è il mio turno: la parola resta nella casella come BOZZA e viene
+    // controllata subito, così chi aspetta sa già se è buona (nessuna
+    // scrittura su Firestore: la patata non passa).
     if (!s.turno || s.turno.giocatore !== G.me) {
-      toast('Non è il tuo turno ⏳');
+      const prep = validateWord(ctx0.word, ctx0.letters, ctx0.used, ctx0.dict, rule0);
+      if (prep.err === 'EMPTY') { toast('Scrivi una parola per prepararti…'); return; }
+      if (!prep.ok) {
+        if (prep.err === 'USED') showFeedback('err', '❌ Parola già usata in questa partita');
+        else showFeedback('err', msgForErr(prep));
+        toast('Correggi la parola: al tuo turno dovrai inviarla subito');
+        return;
+      }
+      showFeedback('ok', '💾 ' + prep.w + ' è pronta (+' + prep.p + ' pt) — inviala quando tocca a te');
+      toast('Parola pronta: attendi il tuo turno ⏳');
+      aggiornaInput(s);
       return;
     }
+
     const raw = el['word-input'].value;
-    const rule = ruleFor(s);
-    const ctx = ctxFor({ word: raw, rule });
+    const rule = rule0;
+    const ctx = ctx0;
     const v = validateWord(raw, ctx.letters, ctx.used, ctx.dict, rule);
     if (!v.ok) {
       if (v.err === 'EMPTY') { toast('Scrivi una parola…'); return; }
@@ -1771,7 +1818,10 @@
     el['word-input'].addEventListener('keydown', (e) => {
       if (e.key === 'Enter') { e.preventDefault(); inviaParola(); }
     });
-    el['word-input'].addEventListener('input', updateInputHint);
+    el['word-input'].addEventListener('input', () => {
+      updateInputHint();
+      aggiornaInput(G.state);   // l'etichetta del pulsante segue la bozza
+    });
     el['btn-invia'].addEventListener('click', inviaParola);
     el['btn-conferma'].addEventListener('click', confermaTurno);
     el['btn-start-solo'].addEventListener('click', startSolo);

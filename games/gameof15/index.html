@@ -12,6 +12,9 @@
     <!-- Config Firebase condivisa (prima dello script che inizializza Firebase) -->
     <script src="../shared/firebase-config.js"></script>
     <link rel="stylesheet" href="../shared/faw-ui.css">
+    <!-- Podio di fine partita (condiviso tra i giochi) -->
+    <link rel="stylesheet" href="../shared/podio.css">
+    <script src="../shared/podio.js"></script>
     <style>
         /* Font piattaforma caricati via <link> nel <head> */
 
@@ -567,8 +570,8 @@
             <div class="streak-badge">🏆 NUOVO RECORD!</div>
         </div>
         <div id="multiplayer-results" style="display:none; margin:15px 0;">
-            <h3 style="color:#00ccff;">CLASSIFICA</h3>
-            <div id="results-list" style="font-size:0.7rem; color:#fff;"></div>
+            <h3 style="color:#00ccff;">PODIO FINALE</h3>
+            <div id="podio" class="podio"></div>
         </div>
         <div>
             <button class="btn btn-play" onclick="startGame()">🔄 RIGIOCA</button>
@@ -1528,28 +1531,14 @@ async function winGame() {
         const snap = await db.collection("partite").doc(matchId).get();
         const data = snap.data();
         if (data && data.punteggi) {
-            const classifica = Object.entries(data.punteggi).sort((a,b) => b[1]-a[1]);
-            let html = '';
-            classifica.forEach(([nome, punti], idx) => {
-                const medal = idx===0?'🥇':idx===1?'🥈':idx===2?'🥉':`${idx+1}.`;
-                html += `<div style="margin:5px 0;">${medal} ${nome}: ${punti} pt</div>`;
-            });
-            document.getElementById('results-list').innerHTML = html;
-            document.getElementById('multiplayer-results').style.display = 'block';
+            renderPodioFinale(data);
             const finiti = data.finito || [];
             if ((data.partecipanti || []).every(n => finiti.includes(n))) {
                 await db.collection("partite").doc(matchId).update({ stato: 'conclusa' });
             }
         }
     } else if (isMultiplayer && matchData && matchData.punteggi) {
-        const classifica = Object.entries(matchData.punteggi).sort((a,b) => b[1]-a[1]);
-        let html = '';
-        classifica.forEach(([nome, punti], idx) => {
-            const medal = idx===0?'🥇':idx===1?'🥈':idx===2?'🥉':`${idx+1}.`;
-            html += `<div style="margin:5px 0;">${medal} ${nome}: ${punti} pt</div>`;
-        });
-        document.getElementById('results-list').innerHTML = html;
-        document.getElementById('multiplayer-results').style.display = 'block';
+        renderPodioFinale(matchData);
     }
 
     if (solved) spawnConfetti(100);
@@ -1565,6 +1554,23 @@ async function winGame() {
         document.getElementById('puzzle-board').classList.remove('glow-win');
         document.getElementById('win-screen').style.display = 'flex';
     }, solved ? 1500 : 500);
+}
+
+/* Podio di fine partita (modulo condiviso ../shared/podio.js): una posizione per
+   ogni giocatore, in ordine di punteggio decrescente, con il 1° più in alto. */
+function renderPodioFinale(data) {
+    const box = document.getElementById('podio');
+    const wrap = document.getElementById('multiplayer-results');
+    if (!box || !wrap) return;
+    const punteggi = (data && data.punteggi) || {};
+    const partecipanti = (data && data.partecipanti && data.partecipanti.length)
+        ? data.partecipanti
+        : Object.keys(punteggi);
+    window.FAWPodio.render(box, partecipanti.map((nome) => ({
+        nome: nome,
+        punti: punteggi[nome] || 0
+    })), { io: mioNome });
+    wrap.style.display = 'block';
 }
 
 function backToMenu() {
