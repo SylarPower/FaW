@@ -59,6 +59,10 @@
     prevFase: null,
     statsSaved: false,
     completatoSegnalato: false,   // ho già segnalato "consegna completa" a questo round
+    viaRound: null,               // round per cui ho già mostrato il 3·2·1
+    viaAttivo: false,             // countdown in corso (lettera e campi nascosti)
+    viaTimer: null,
+    focusRound: null,             // round in cui ho già messo il focus nel primo campo
     redirected: false,
     rateLimited: false,
     ultimoStatoSalvataggio: 'idle'
@@ -72,7 +76,7 @@
     'lobby-players', 'lobby-status', 'lobby-status-text', 'btn-start-solo', 'lobby-hint',
     'screen-gioco', 'lettera-tile', 'timer-num', 'timer-label', 'timer-fill', 'fase-chip',
     'risposte-card', 'risposte-progress', 'campi', 'save-state', 'btn-stop', 'risposte-hint',
-    'stop-avviso', 'stop-testo', 'stop-crono',
+    'stop-avviso', 'stop-testo', 'stop-crono', 'via-overlay', 'via-num', 'via-text',
     'giocatori', 'punteggi', 'storico',
     'overlay-revisione', 'rev-round', 'rev-lettera', 'rev-timer-num', 'rev-timer-fill',
     'rev-voti', 'rev-body', 'conf-progress', 'btn-conferma',
@@ -507,6 +511,90 @@
     });
   }
 
+  /* ---------------- 3·2·1 DI APERTURA ROUND ----------------
+     Quando il round parte (tutti pronti in sfida, "INIZIA ALLENAMENTO" in
+     solo) si mostra un conto alla rovescia molto visibile: lettera e campi
+     restano nascosti finché non compare VIA!, poi si entra nel primo campo.
+     La finestra di scrittura parte al VIA (`core.VIA_COUNTDOWN_MS`): chi
+     riceve lo stato in ritardo va dritto ai campi, senza perdere tempo. */
+  var VIA_PASSI = ['3', '2', '1', 'VIA!'];
+  var VIA_STEP_MS = 900;
+  var VIA_FINE_MS = 700;
+
+  function viaInArrivo(rd) {
+    if (!rd || rd.fase !== 'compilazione' || rd.stop) return false;   // mai durante la grazia
+    var inizio = Number(rd.inizio) || 0;
+    if (!inizio) return false;
+    return Date.now() < inizio + VIA_STEP_MS;   // solo chi c'è dall'inizio
+  }
+
+  function avviaCountdownVia(s, rd) {
+    if (G.viaRound === rd.id || G.viaAttivo) return;
+    G.viaRound = rd.id;
+    G.viaAttivo = true;
+    clearTimeout(G.viaTimer);
+    el['via-overlay'].classList.remove('hidden');
+    el['screen-gioco'].classList.add('via');
+    var i = 0;
+    var mostra = function () {
+      var passo = VIA_PASSI[i];
+      var ultimo = i === VIA_PASSI.length - 1;
+      el['via-num'].textContent = passo;
+      el['via-num'].classList.toggle('via-via', ultimo);
+      el['via-num'].classList.remove('pop');
+      void el['via-num'].offsetWidth;          // riavvia l'animazione CSS
+      el['via-num'].classList.add('pop');
+      el['via-text'].textContent = ultimo
+        ? 'Via! Scrivi le tue risposte'
+        : 'Round ' + rd.round + ' · lettera ' + rd.lettera + ' in arrivo…';
+      i++;
+      if (i < VIA_PASSI.length) G.viaTimer = setTimeout(mostra, VIA_STEP_MS);
+      else G.viaTimer = setTimeout(fineCountdownVia, VIA_FINE_MS);
+    };
+    mostra();
+  }
+
+  function fineCountdownVia() {
+    clearTimeout(G.viaTimer);
+    G.viaTimer = null;
+    G.viaAttivo = false;
+    el['via-overlay'].classList.add('hidden');
+    el['screen-gioco'].classList.remove('via');
+    if (G.state && G.state.roundData) {
+      G.focusRound = G.state.roundData.id;
+      renderGioco(G.state);                     // svela lettera e campi
+    }
+    aggiornaStop();
+    focusPrimoCampo(true);
+  }
+
+  /** Countdown interrotto (fase cambiata, partita finita, round nuovo). */
+  function chiudiCountdownVia() {
+    clearTimeout(G.viaTimer);
+    G.viaTimer = null;
+    G.viaAttivo = false;
+    el['via-overlay'].classList.add('hidden');
+    el['screen-gioco'].classList.remove('via');
+  }
+
+  /**
+   * Focus nel primo campo (in ordine di categoria), una volta per round:
+   * il primo campo vuoto se c'è, altrimenti il primo. Non ruba mai il focus
+   * se il giocatore sta già scrivendo in un campo.
+   */
+  function focusPrimoCampo(forza) {
+    var inputs = Array.prototype.slice.call(el.campi.querySelectorAll('input'));
+    if (!inputs.length) return;
+    var attivo = document.activeElement;
+    if (!forza && attivo && inputs.indexOf(attivo) !== -1) return;
+    var rd = G.state && G.state.roundData;
+    if (rd && rd.fase === 'compilazione' && hoFermato(rd)) return;   // round fermato da me
+    var vuoto = inputs.filter(function (i) { return !String(i.value || '').trim(); })[0];
+    var target = vuoto || inputs[0];
+    if (target.disabled) return;
+    try { target.focus(); } catch (e) { /* noop */ }
+  }
+
   /* ---------------- RENDER: GIOCO ---------------- */
   function renderGioco(s) {
     var rd = s.roundData;
@@ -517,6 +605,7 @@
       G.campi = {};
       G.touched = {};
       G.completatoSegnalato = false;   // nuovo round: nuova coda per il bonus
+      G.focusRound = null;             // e nuovo focus nel primo campo
       el.campi.dataset.round = rd.id;
       buildCampi(s);
       var mie = (G.backend && G.backend.getMieRisposte) ? G.backend.getMieRisposte() : {};
@@ -526,6 +615,9 @@
       applicaCampi();
       if (!G.solo) toast('✏️ Round ' + rd.round + ' — lettera ' + rd.lettera);
     }
+
+    var via = G.viaAttivo && rd.id === G.viaRound;
+    el['screen-gioco'].classList.toggle('via', via);
 
     el['lettera-tile'].textContent = rd.lettera;
     el['round-badge'].classList.remove('hidden');
@@ -539,7 +631,7 @@
 
     /* Dopo lo STOP la fase resta 'compilazione' (grazia): chi ha fermato non
        scrive più, gli altri hanno ancora qualche secondo per finire. */
-    var attivo = rd.fase === 'compilazione' && !hoFermato(rd);
+    var attivo = rd.fase === 'compilazione' && !hoFermato(rd) && !via;
     Array.prototype.forEach.call(el.campi.querySelectorAll('input'), function (i) { i.disabled = !attivo; });
     el['risposte-card'].classList.toggle('hidden', rd.fase !== 'compilazione');
     aggiornaStop();
@@ -1169,7 +1261,19 @@
     var rd = s.roundData;
     G.prevFase = rd ? rd.fase : s.stato;
 
+    // Il 3·2·1 precede il primo render utile del round: la maschera parte
+    // subito, così lettera e campi non compaiono prima del VIA.
+    if (s.stato === 'in_corso' && viaInArrivo(rd)) avviaCountdownVia(s, rd);
+    else if (G.viaAttivo && (!rd || rd.fase !== 'compilazione' || rd.id !== G.viaRound)) chiudiCountdownVia();
+
     if (rd) renderGioco(s);
+
+    // Focus nel primo campo: dopo il VIA, o al rientro in una partita già
+    // avviata (refresh), una volta per round.
+    if (s.stato === 'in_corso' && rd && rd.fase === 'compilazione' && !G.viaAttivo && G.focusRound !== rd.id) {
+      G.focusRound = rd.id;
+      setTimeout(function () { focusPrimoCampo(false); }, 0);
+    }
 
     var mostraRevisione = s.stato === 'in_corso' && rd && rd.fase === 'revisione';
     var mostraRisultati = s.stato === 'in_corso' && rd && rd.fase === 'risultati';
@@ -1297,6 +1401,9 @@
       var rest = Math.max(0, rd.deadline - now);
       var frac = Math.min(1, rest / span);
       var sec = secondiTra(rd.deadline, now);
+      // Prima del VIA il round non è ancora iniziato: il timer non mostra più
+      // del tempo configurato (la finestra di scrittura dura esattamente quello).
+      if (rd.fase === 'compilazione' && sec > s.opzioni.tempo) sec = s.opzioni.tempo;
       var danger = sec <= 10;
       el['timer-num'].textContent = String(sec);
       el['timer-num'].classList.toggle('danger', danger);
@@ -1461,6 +1568,8 @@
     get dizionario() { return G.dizionario; },
     get campi() { return G.campi; },
     get backend() { return G.backend; },
+    get viaAttivo() { return G.viaAttivo; },
+    get viaRound() { return G.viaRound; },
     salva: salva,
     stop: premiStop
   };

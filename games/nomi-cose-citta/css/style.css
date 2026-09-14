@@ -310,6 +310,40 @@ button { font-family: var(--font); }
 .st-row .st-pts { margin-left: auto; font-weight: 800; }
 .storico-empty { color: var(--text-2); font-size: 0.82rem; }
 
+/* ---------- 3·2·1 di apertura round ---------- */
+/* Finché il countdown è attivo la lettera e i campi restano NASCOSTI:
+   compaiono al VIA (visibility, non display: il testo resta nel DOM). */
+#screen-gioco.via .lettera-tile,
+#screen-gioco.via .risposte-card { visibility: hidden; }
+
+.via-overlay {
+  position: fixed; inset: 0; z-index: 950;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 8px; text-align: center; color: #fff;
+  background: radial-gradient(circle at 50% 42%, rgba(79, 70, 229, 0.97), rgba(17, 24, 39, 0.98));
+}
+.via-overlay.hidden { display: none; }
+.via-num {
+  font-size: clamp(6rem, 24vw, 16rem); font-weight: 900; line-height: 1;
+  letter-spacing: -0.05em; text-shadow: 0 14px 44px rgba(0, 0, 0, 0.45);
+}
+.via-num.pop { animation: via-pop 0.9s cubic-bezier(0.2, 0.9, 0.25, 1) both; }
+.via-num.via-via {
+  font-size: clamp(4.5rem, 17vw, 12rem); color: #fde68a; letter-spacing: 0.02em;
+}
+.via-text {
+  font-size: clamp(0.85rem, 2.4vw, 1.15rem); font-weight: 800;
+  letter-spacing: 0.16em; text-transform: uppercase; opacity: 0.92; padding: 0 16px;
+}
+@keyframes via-pop {
+  0% { transform: scale(0.35); opacity: 0; }
+  35% { transform: scale(1.14); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .via-num.pop { animation-duration: 0.01s; }
+}
+
 /* ---------- Overlay ---------- */
 .overlay {
   position: fixed; inset: 0; z-index: 900;

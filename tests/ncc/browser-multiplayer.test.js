@@ -105,14 +105,32 @@ const visibile = (w, id) => !w.document.getElementById(id).classList.contains('h
   ok(/^DIZ v1:[0-9a-f]+$/.test(a.document.getElementById('dict-badge').textContent),
     'fingerprint del dizionario nel topbar: ' + a.document.getElementById('dict-badge').textContent);
 
-  console.log('\n[2] Ready automatico e start: una sola transizione vince');
+  console.log('\n[2] Ready automatico, start e 3·2·1 condiviso: una sola transizione vince');
   ok(await until(() => visibile(a, 'screen-gioco') && visibile(b, 'screen-gioco'), 'schermata di gioco'),
     'entrambi i giocatori passano in compilazione');
+  ok(await until(() => !!mock.store.get('partite/M1').roundData, 'round avviato'), 'round avviato');
+  // Il countdown parte su entrambe le pagine, con lettera e campi nascosti
+  ok(await until(() => !a.document.getElementById('via-overlay').classList.contains('hidden')
+    && !b.document.getElementById('via-overlay').classList.contains('hidden'), 'countdown su entrambi'),
+  'countdown 3·2·1 visibile su entrambe le pagine');
+  eq(a.document.getElementById('screen-gioco').classList.contains('via'), true,
+    'lettera e campi nascosti durante il countdown');
+  ok(Array.prototype.every.call(a.document.querySelectorAll('#campi input'), (i) => i.disabled),
+    'nessuno può scrivere prima del VIA');
+  ok(await until(() => !a.document.defaultView.__NCC.viaAttivo && !b.document.defaultView.__NCC.viaAttivo,
+    'fine del countdown'), 'alla fine del countdown si entra in compilazione');
+  eq(a.document.getElementById('via-num').textContent, 'VIA!', 'il countdown si chiude con VIA!');
+  eq(a.document.activeElement.getAttribute('data-input'),
+    mock.store.get('partite/M1').roundData.categorie[0], 'ALFA ha il focus nel primo campo');
+  eq(b.document.activeElement.getAttribute('data-input'),
+    mock.store.get('partite/M1').roundData.categorie[0], 'BETA ha il focus nel primo campo');
   eq(a.document.getElementById('fase-chip').textContent, 'COMPILAZIONE', 'fase compilazione su ALFA');
   eq(mock.store.get('partite/M1').roundData.fase, 'compilazione', 'fase condivisa');
   eq(mock.store.get('partite/M1').roundData.partecipanti, ['ALFA', 'BETA'], 'quorum congelato a inizio round');
   eq(mock.store.get('partite/M1').roundData.lettera, a.document.getElementById('lettera-tile').textContent,
     'lettera condivisa');
+  eq(mock.store.get('partite/M1').roundData.deadline - mock.store.get('partite/M1').roundData.inizio, 120000,
+    'la finestra di scrittura è esattamente il tempo configurato, a partire dal VIA');
 
   console.log('\n[3] Compilazione isolata: ogni giocatore scrive solo le proprie risposte');
   const lettera = a.document.getElementById('lettera-tile').textContent;

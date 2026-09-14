@@ -377,7 +377,10 @@ console.log('\n[10] Macchina a stati: fasi, STOP, timeout, avanzamento');
   eq(st.roundData.lettera, C.letteraPerRound('TEST', st.opzioni.lettere, 1), 'lettera derivata dal seed');
   eq(st.roundData.partecipanti, ['A', 'B'], 'partecipanti fissati a inizio round');
   eq(st.roundData.categorie, st.opzioni.categorie.map((c) => c.id), 'categorie fissate a inizio round');
-  eq(st.roundData.deadline, now + 120000, 'deadline condivisa della compilazione');
+  eq(st.roundData.inizio, now + C.VIA_COUNTDOWN_MS, 'la finestra di scrittura parte al VIA (dopo il 3·2·1)');
+  eq(st.roundData.deadline, now + C.VIA_COUNTDOWN_MS + 120000,
+    'deadline condivisa: 120s di scrittura pieni dopo il countdown (più i ' +
+    (C.VIA_COUNTDOWN_MS / 1000) + 's del 3·2·1)');
   eq(st.roundData.dictVersion, D.fingerprint, 'fingerprint del dizionario scritto nel round');
   eq(C.mutStart(st, ctx('A')), null, 'start non ripetibile');
   eq(C.mutStart(st, ctx('A', { dizionarioPronto: false })), null, 'nessun secondo start');

@@ -12,6 +12,14 @@ collettiva** in cui una risposta si annulla solo **all'unanimità**.
 ## 1. Regole implementate
 
 1. Ogni round ha **una lettera** e **un insieme di categorie** comuni a tutti.
+   Il round **si apre con un conto alla rovescia 3·2·1** molto visibile
+   (`VIA_COUNTDOWN_MS`, overlay a tutto schermo con i passi `3 → 2 → 1 → VIA!`):
+   fino al VIA **lettera e campi restano nascosti** e i campi sono disabilitati.
+   Al VIA compaiono lettera e campi, il **focus è già nel primo campo** e ci si
+   sposta con **TAB** (ordine delle categorie) o con **Enter**. La finestra di
+   scrittura dura **esattamente** `opzioni.tempo` e parte dal VIA: `roundData.inizio`
+   è l'istante del VIA, `deadline = inizio + tempo`. Chi riceve lo stato in
+   ritardo (refresh, rete lenta) va dritto ai campi, senza perdere tempo.
 2. Ogni giocatore scrive **una risposta per categoria**.
 3. Una risposta è **automaticamente valida** se: non è vuota, la sua forma
    normalizzata **inizia con la lettera** del round e la forma normalizzata
@@ -212,6 +220,10 @@ esito (elemento di risultati[]) {
 }
 ```
 
+`roundData.inizio` è l'istante del **VIA** (apertura della finestra di
+scrittura, `now + VIA_COUNTDOWN_MS` alla creazione del round) e `deadline`
+lo segue di esattamente `opzioni.tempo`.
+
 Durante la **grazia post-STOP** la fase resta `compilazione` e `deadline`
 diventa `stop.ts + opzioni.graziaStop`; `inizio` viene riscritto sull'istante
 dello STOP (il countdown mostra solo la grazia). `stop.ts` non cambia quando
@@ -392,11 +404,11 @@ npm test              # tutto
 
 | file | cosa copre | tipo |
 |---|---|---|
-| `tests/ncc/core.test.js` | normalizzazione, iniziale, override, dizionario mancante/disallineato, **categorie multi (7, etichette esatte)**, punteggi 0/5/10/20, duplicati dopo annullamento, voto dell'autore e unanimità, **voto "Valida" (unanimità, precedenza dell'annullamento, ritiro del voto opposto)**, **STOP con grazia e bonus +10 (assegnato, annullato, passaggio al primo che aveva finito, timeout, doppio bonus)**, quorum stabile, timeout, rivincita senza residui, allenamento con annullamento/validazione manuali | unitario (logica pura) |
+| `tests/ncc/core.test.js` | normalizzazione, iniziale, override, dizionario mancante/disallineato, **apertura round con 3·2·1 (finestra di scrittura = tempo configurato dal VIA)**, **categorie multi (7, etichette esatte)**, punteggi 0/5/10/20, duplicati dopo annullamento, voto dell'autore e unanimità, **voto "Valida" (unanimità, precedenza dell'annullamento, ritiro del voto opposto)**, **STOP con grazia e bonus +10 (assegnato, annullato, passaggio al primo che aveva finito, timeout, doppio bonus)**, quorum stabile, timeout, rivincita senza residui, allenamento con annullamento/validazione manuali | unitario (logica pura) |
 | `tests/ncc/multiplayer.test.js` | 3 client su Firestore simulato: STOP simultanei, **grazia di 10 s con salvataggi tardivi accettati**, subentro al referente, scritture in ritardo, riconnessione, doppia finalizzazione, refresh | integrazione (backend) |
 | `tests/ncc/quota.test.js` | zero get/transazioni, scritture per azione, nessun timer scritto, listener minimi + cleanup, budget totale | quota |
-| `tests/ncc/browser.test.js` | pagina reale in allenamento: boot, lobby, campi, STOP, punti, annullamento/validazione manuali, classifica provvisoria, statistiche | E2E (jsdom) |
-| `tests/ncc/browser-multiplayer.test.js` | due pagine reali + Firestore simulato: privacy in compilazione, **avviso di STOP con conto alla rovescia e risposte scritte in grazia**, tabella di revisione, voti "non valida" e "valida", striscia "in votazione", conferme, esito con bonus STOP annullato, classifica provvisoria, podio, budget | E2E (jsdom) |
+| `tests/ncc/browser.test.js` | pagina reale in allenamento: boot, lobby, **countdown 3·2·1 con lettera/campi nascosti, focus nel primo campo e navigazione da tastiera**, campi, STOP, punti, annullamento/validazione manuali, classifica provvisoria, statistiche | E2E (jsdom) |
+| `tests/ncc/browser-multiplayer.test.js` | due pagine reali + Firestore simulato: **countdown 3·2·1 condiviso con focus nel primo campo su entrambe**, privacy in compilazione, **avviso di STOP con conto alla rovescia e risposte scritte in grazia**, tabella di revisione, voti "non valida" e "valida", striscia "in votazione", conferme, esito con bonus STOP annullato, classifica provvisoria, podio, budget | E2E (jsdom) |
 
 Le **Security Rules non sono testate automaticamente**: in questo ambiente
 non è disponibile l'Emulator Suite (`firebase-tools` non installato, nessuna

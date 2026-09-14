@@ -31,6 +31,7 @@
   const PUNTI_SOLO_VALIDA = 20;      // unica risposta valida della categoria (precede il 10)
   const PUNTI_ALLENAMENTO = 10;      // allenamento solo: 10 per risposta automaticamente valida
   const TIMEOUT_GRACE = 2500;        // tolleranza sulle scadenze condivise (convenzione Patata)
+  const VIA_COUNTDOWN_MS = 3400;     // 3·2·1 di apertura round (lettera e campi appaiono al VIA)
   const STOP_GRAZIA_MS = 10000;      // dopo lo STOP gli altri hanno 10s per finire di scrivere
   const BONUS_STOP = 10;             // punti a chi chiude il round con TUTTE le risposte valide
   const RISULTATI_HOLD_MS = 9000;    // quanto resta visibile il recap del round prima di avanzare
@@ -389,7 +390,12 @@
     };
   }
 
-  /** Dati del round nuovo: categorie, partecipanti e lettera fissati PRIMA della compilazione. */
+  /**
+   * Dati del round nuovo: categorie, partecipanti e lettera fissati PRIMA della
+   * compilazione. Il round si APRE con il 3·2·1 (`VIA_COUNTDOWN_MS`): la
+   * finestra di scrittura dura esattamente `opzioni.tempo` e parte al VIA,
+   * quindi `inizio` è l'istante del VIA e `deadline` lo segue di `tempo`.
+   */
   function nuovoRoundData(round, state, now, dictVersion) {
     const op = state.opzioni;
     const lettera = letteraPerRound(op.seed, op.lettere, round);
@@ -401,8 +407,8 @@
       partecipanti: state.partecipanti.slice(),
       fase: 'compilazione',
       faseVersion: 1,
-      inizio: now,
-      deadline: now + op.tempo * 1000,
+      inizio: now + VIA_COUNTDOWN_MS,
+      deadline: now + VIA_COUNTDOWN_MS + op.tempo * 1000,
       stop: null,
       voti: {},
       votiValida: {},
@@ -1105,7 +1111,7 @@
   const core = {
     // costanti
     MIN_WORD_LENGTH, PUNTI_DUPLICATO, PUNTI_DISTINTA, PUNTI_SOLO_VALIDA,
-    PUNTI_ALLENAMENTO, TIMEOUT_GRACE, STOP_GRAZIA_MS, BONUS_STOP,
+    PUNTI_ALLENAMENTO, TIMEOUT_GRACE, VIA_COUNTDOWN_MS, STOP_GRAZIA_MS, BONUS_STOP,
     RISULTATI_HOLD_MS, STUCK_FALLBACK_MS,
     ACTION_RETRY_MIN, ACTION_RETRY_MAX, RATE_LIMIT_BACKOFF_MIN,
     RATE_LIMIT_BACKOFF_MAX, TICK_MS, DICT_CACHE_TTL, DICT_CACHE_KEY,
