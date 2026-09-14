@@ -130,15 +130,21 @@ console.log('\n[4] Lettere: seed condiviso, niente ripetizioni, nessun sorteggio
 
 console.log('\n[5] Categorie: id stabili separati dalle etichette');
 {
-  const preset = C.categoriePerPartita('classic');
-  eq(preset.map((c) => c.id), ['nomi', 'cose', 'citta', 'animali', 'mestieri', 'piante'], 'preset classic');
+  const multi = ['nomi', 'cose', 'citta', 'animali', 'frutta', 'mestieri', 'colori'];
+  eq(C.categoriePerPartita('multi').map((c) => c.id), multi, 'preset multi (7 categorie)');
+  eq(C.categoriePerPartita('classic').map((c) => c.id), multi, 'preset classic = alias storico di multi');
+  eq(C.categoriePerPartita('multi').map((c) => c.label),
+    ['Nomi di persona', 'Cose', 'Città', 'Animali', 'Frutta o Verdura', 'Mestieri', 'Colori'],
+    'etichette esatte della modalità multi-categoria');
   eq(C.categoriePerPartita('light').map((c) => c.id), ['nomi', 'cose', 'citta'], 'preset light');
   const custom = C.categoriePerPartita([{ id: 'Marchi Auto!', label: 'Marchi auto' }, { id: 'nomi', label: 'Nomi' }]);
   eq(custom.map((c) => c.id), ['MARCHIAUTO', 'nomi'], 'id personalizzati sanificati');
   eq(custom[0].label, 'Marchi auto', 'etichetta originale conservata');
   ok(!/[.\s]/.test(custom[0].id), 'nessun punto/spazio nell’id (sicuro nei dot-path)');
   eq(C.etichettaCategoria(custom, 'MARCHIAUTO'), 'Marchi auto', 'etichetta risolta dall’id');
-  ok(C.categoriePerPartita(null).length === 6, 'default: 6 categorie classiche');
+  ok(C.categoriePerPartita(null).length === 7, 'default: 7 categorie multi');
+  eq(C.categorieBase().map((c) => c.id), multi, 'nessuna categoria fuori elenco (niente piante)');
+  eq(C.PRESET_CATEGORIE.multi, multi, 'preset esposto dal core');
   eq(C.categoriePerPartita(['nomi', 'nomi']).length, 1, 'categorie duplicate eliminate');
 }
 
@@ -357,7 +363,8 @@ console.log('\n[10] Macchina a stati: fasi, STOP, timeout, avanzamento');
   eq(st.opzioni.round, 2, 'opzioni normalizzate (round)');
   eq(st.opzioni.tempo, 120, 'opzioni normalizzate (tempo)');
   eq(st.opzioni.revisione, 90, 'opzioni normalizzate (revisione)');
-  eq(st.opzioni.categorie.length, 6, 'categorie del preset');
+  eq(st.opzioni.categorie.length, 7, 'categorie del preset multi');
+  eq(st.opzioni.graziaStop, 10, 'grazia post-STOP: 10 secondi di default');
 
   let now = 1_000_000;
   const ctx = (me, extra) => Object.assign({ me, now, dizionarioPronto: true, dizionario: D, dictVersion: D.fingerprint }, extra || {});
@@ -375,15 +382,24 @@ console.log('\n[10] Macchina a stati: fasi, STOP, timeout, avanzamento');
   eq(C.mutStart(st, ctx('A')), null, 'start non ripetibile');
   eq(C.mutStart(st, ctx('A', { dizionarioPronto: false })), null, 'nessun secondo start');
 
-  // STOP del primo arrivato vince, gli altri abortiscono
+  // STOP del primo arrivato vince: il round resta in compilazione per la
+  // grazia di 10s concessa agli altri, poi si apre la revisione.
   now += 5000;
   const stop1 = C.mutStop(st, ctx('A'));
   C.applyPartial(st, stop1);
-  eq(st.roundData.fase, 'revisione', 'STOP → revisione');
+  eq(st.roundData.fase, 'compilazione', 'STOP → ancora compilazione (grazia)');
   eq(st.roundData.stop, { da: 'A', ts: now }, 'STOP attribuito');
-  eq(st.roundData.deadline, now + 90000, 'deadline condivisa della revisione');
+  eq(st.roundData.deadline, now + 10000, 'la scadenza diventa la fine della grazia (10s)');
   eq(C.mutStop(st, ctx('B')), null, 'secondo STOP abortito (transizione idempotente)');
-  eq(C.mutTimeoutCompilazione(st, ctx('B', { now: now + 200000 })), null, 'timeout dopo lo STOP: niente doppia transizione');
+  eq(C.mutTimeoutCompilazione(st, ctx('B', { now: now + 5000 })), null,
+    'grazia non ancora scaduta: la revisione non si apre');
+  const fineGrazia = st.roundData.deadline + C.TIMEOUT_GRACE + 1;
+  C.applyPartial(st, C.mutTimeoutCompilazione(st, ctx('B', { now: fineGrazia })));
+  eq(st.roundData.fase, 'revisione', 'fine della grazia → revisione');
+  eq(st.roundData.stop.da, 'A', 'lo STOP resta attribuito a chi l\'ha premuto');
+  eq(st.roundData.deadline, fineGrazia + 90000, 'deadline condivisa della revisione');
+  eq(C.mutTimeoutCompilazione(st, ctx('B', { now: now + 200000 })), null, 'timeout dopo la revisione: niente doppia transizione');
+  now = fineGrazia;
 
   // voti e conferma
   const key = C.cellKey(0, 0);
@@ -448,6 +464,8 @@ console.log('\n[10] Macchina a stati: fasi, STOP, timeout, avanzamento');
   const [w2a, w2b] = parolePer(L2, 2);
   const risposte2 = { A: { nomi: { raw: w2a } }, B: { nomi: { raw: w2b } } };
   C.applyPartial(st, C.mutStop(st, ctx('B', { now: dopo + 1000 })));
+  C.applyPartial(st, C.mutTimeoutCompilazione(st, ctx('A', { now: dopo + 1000 + 10000 + C.TIMEOUT_GRACE + 1 })));
+  eq(st.roundData.fase, 'revisione', 'round 2: grazia scaduta → revisione');
   C.applyPartial(st, C.mutConfermaRevisione(st, ctx('A', { now: dopo + 2000 })));
   C.applyPartial(st, C.mutConfermaRevisione(st, ctx('B', { now: dopo + 2000 })));
   const ch2 = C.mutChiudiRevisione(st, ctx('A', { now: dopo + 3000, risposte: risposte2, rispostePronte: true }));
@@ -462,6 +480,129 @@ console.log('\n[10] Macchina a stati: fasi, STOP, timeout, avanzamento');
   eq(st.punteggi, C.punteggiDaRisultati(st.risultati, st.partecipanti), 'totali = somma dei round');
 }
 
+console.log('\n[10b] Bonus STOP: +10 a chi chiude il round con tutte le risposte valide');
+{
+  const cats = ['nomi', 'cose', 'citta'];
+  const L = 'R';
+  const parole = parolePer(L, 7);
+  const [a1, a2, a3, b1, b2, b3, c1] = parole;
+  const [a4, a5] = parole.slice(4, 6);
+  const risposte = (pA, pB, pC) => ({
+    A: { nomi: { raw: pA[0] }, cose: { raw: pA[1] }, citta: { raw: pA[2] } },
+    B: { nomi: { raw: pB[0] }, cose: { raw: pB[1] }, citta: { raw: pB[2] } },
+    C: { nomi: { raw: pC[0] }, cose: { raw: pC[1] }, citta: { raw: pC[2] } }
+  });
+  const esito = (rd, risp) => C.calcolaEsitoRound({ roundData: rd, risposte: risp, dizionario: D });
+
+  // 1) chi ferma il gioco ha tutte le risposte valide → +10 a lui
+  const rd1 = mkRound(L, cats, ['A', 'B', 'C'], { stop: { da: 'A', ts: 1000 } });
+  const e1 = esito(rd1, risposte([a1, a2, a3], [b1, b2, b3], [c1, a1 + 'X']));
+  eq(e1.bonus.nome, 'A', 'STOP con tutte le risposte valide → bonus a chi ha fermato');
+  eq(e1.bonus.punti, C.BONUS_STOP, 'il bonus vale ' + C.BONUS_STOP + ' punti');
+  eq(e1.bonus.punti, 10, 'bonus richiesto: 10 punti');
+  eq(e1.punti.A, 30 + 10, 'i 10 punti entrano nel totale del round');
+  eq(e1.risultato.bonus.nome, 'A', 'il bonus fa parte dell\'esito congelato');
+  eq(e1.punti.B, 30, 'gli altri non prendono il bonus');
+  eq(C.punteggiDaRisultati([e1.risultato], ['A', 'B', 'C']).A, 40, 'il bonus finisce nei totali di partita');
+
+  // 2) chi ferma il gioco ha un errore → bonus annullato e passato al primo
+  //    che aveva finito (ordine di completamento, non ordine di lista)
+  const rd2 = mkRound(L, cats, ['C', 'B', 'A'], {
+    stop: { da: 'A', ts: 9000 },
+    completati: [{ nome: 'C', ts: 20 }, { nome: 'B', ts: 5 }]
+  });
+  const e2 = esito(rd2, risposte([a1 + 'QQQQ', a2, a3], [b1, b2, b3], [c1, a4, a5]));
+  eq(e2.bonus.nome, 'B', 'STOP con errore → bonus al primo che aveva finito (B, ts 5)');
+  eq(e2.punti.B, e2.punti.C + 10, 'B ha esattamente 10 punti in più di C (stesse risposte)');
+  eq(e2.bonus.dettagli[0].esito, 'NON_VALIDA', 'il candidato che ha fermato è segnato non valido');
+  eq(e2.bonus.ordine, ['A', 'B', 'C'], 'ordine di valutazione: STOP, poi completamento');
+
+  // 3) tipo di errore: chi non ha finito di scrivere non è candidato
+  const rd3 = mkRound(L, cats, ['A', 'B'], {
+    stop: { da: 'A', ts: 100 }, completati: [{ nome: 'B', ts: 50 }]
+  });
+  const e3 = esito(rd3, { A: { nomi: { raw: a1 + 'Q' }, cose: { raw: a2 }, citta: { raw: a3 } }, B: { nomi: { raw: b1 }, cose: { raw: '' }, citta: { raw: b3 } } });
+  eq(e3.bonus.nome, null, 'nessuno ha chiuso con tutte le risposte valide → nessun bonus');
+  eq(e3.bonus.motivo, 'NESSUNO_VALIDO', 'motivo registrato');
+  eq(e3.bonus.dettagli.filter((d) => d.esito === 'INCOMPLETA').map((d) => d.nome), ['B'],
+    'B risulta incompleto (una categoria vuota)');
+
+  // 4) timeout senza STOP → il bonus non esiste (nessuno ha fermato il gioco)
+  const rd4 = mkRound(L, cats, ['A', 'B'], { stop: { da: 'TEMPO', ts: 999 } });
+  const e4 = esito(rd4, risposte([a1, a2, a3], [b1, b2, b3], []));
+  eq(e4.bonus.nome, null, 'timeout: nessun bonus');
+  eq(e4.bonus.motivo, 'TEMPO_SCADUTO', 'motivo: tempo scaduto');
+  eq(e4.punti.A, 30, 'punteggio normale di A (3×10), senza bonus');
+  eq(e4.punti.B, 30, 'B ha gli stessi punti: nessuno ha preso il bonus');
+
+  // 5) una parola annullata in revisione annulla il bonus (esito effettivo)
+  const rd5 = mkRound(L, cats, ['A', 'B'], {
+    stop: { da: 'A', ts: 1 }, completati: [{ nome: 'A', ts: 1 }, { nome: 'B', ts: 2 }],
+    voti: { c0_p0: ['A', 'B'] }
+  });
+  const e5 = esito(rd5, risposte([a1, a2, a3], [b1, b2, b3], []));
+  eq(e5.celle.filter((c) => c.k === 'c0_p0')[0].annullata, true, 'parola di A annullata all\'unanimità');
+  eq(e5.bonus.nome, 'B', 'bonus passato a B dopo l\'annullamento');
+  eq(e5.bonus.dettagli[0].categorie, ['nomi'], 'il dettaglio dice quale categoria ha fatto cadere il bonus');
+
+  // 6) nessun marcatore di completamento (partite già in corso) → ripiego
+  //    sull'ordine dei partecipanti, sempre dopo chi ha premuto STOP
+  const rd6 = mkRound(L, cats, ['A', 'B', 'C'], { stop: { da: 'B', ts: 7 } });
+  const e6 = esito(rd6, risposte([], [b1 + 'Q', b2, b3], []));
+  eq(e6.bonus.nome, null, 'senza marcatori si valuta comunque chi ha le categorie piene');
+  eq(e6.bonus.ordine, ['B'], 'A e C non hanno consegnato: A non è candidato');
+
+  // 7) segnaCompletato: una sola volta, solo in compilazione
+  const stc = C.normState({
+    partecipanti: ['A', 'B'], opzioni: { round: '1', tempo: '60', revisione: '30', seed: 'S', categorie: 'light' },
+    stato: 'attesa', pronti: ['A', 'B']
+  });
+  C.applyPartial(stc, C.mutStart(stc, { me: 'A', now: 100, dizionarioPronto: true, dizionario: D, dictVersion: D.fingerprint }));
+  const segna = C.segnaCompletato(stc, { me: 'A', now: 500 });
+  ok(!!segna && !!segna['roundData.completati'], 'completamento segnalato in compilazione');
+  C.applyPartial(stc, segna);
+  eq(stc.roundData.completati, [{ nome: 'A', ts: 500 }], 'marcatore con nome e istante');
+  eq(C.segnaCompletato(stc, { me: 'A', now: 900 }), null, 'secondo marcatore dello stesso giocatore: abortito');
+  eq(C.segnaCompletato(stc, { me: 'Z', now: 900 }), null, 'chi non è nel round non può marcare');
+  C.applyPartial(stc, C.mutStop(stc, { me: 'B', now: 1000 }));
+  eq(C.segnaCompletato(stc, { me: 'B', now: 1100 }) && true, true, 'si può completare anche durante la grazia');
+  C.applyPartial(stc, C.mutTimeoutCompilazione(stc, { me: 'A', now: 1000 + 10000 + C.TIMEOUT_GRACE + 1 }));
+  eq(C.segnaCompletato(stc, { me: 'A', now: 99999 }), null, 'a revisione aperta il marcatore non si scrive più');
+
+  // 8) integrazione completa: STOP → grazia → revisione → esito con bonus
+  const stb = C.normState({
+    partecipanti: ['A', 'B'],
+    opzioni: { round: '1', tempo: '60', revisione: '30', seed: 'BONUS', categorie: 'light' },
+    stato: 'attesa', pronti: ['A', 'B']
+  });
+  C.applyPartial(stb, C.mutStart(stb, { me: 'A', now: 100, dizionarioPronto: true, dizionario: D, dictVersion: D.fingerprint }));
+  // Lettera con abbastanza parole nel dizionario di prova (la lettera è
+  // comunque un dato del round: qui la fissiamo per avere risposte valide).
+  stb.roundData.lettera = 'M';
+  const [x1, x2, x3, y1, y2, y3] = parolePer('M', 6);
+  ok([x1, x2, x3, y1, y2, y3].every((w) => D.parole.has(C.normalizeWord(w))),
+    'risposte di prova tutte nel dizionario: ' + [x1, x2, x3].join(', '));
+  C.applyPartial(stb, C.mutStop(stb, { me: 'A', now: 200 }));
+  eq(stb.roundData.fase, 'compilazione', 'STOP: si apre la grazia');
+  C.applyPartial(stb, C.mutTimeoutCompilazione(stb, { me: 'A', now: 200 + C.STOP_GRAZIA_MS + C.TIMEOUT_GRACE + 1 }));
+  eq(stb.roundData.fase, 'revisione', 'grazia scaduta → revisione');
+  C.applyPartial(stb, C.mutConfermaRevisione(stb, { me: 'A' }));
+  C.applyPartial(stb, C.mutConfermaRevisione(stb, { me: 'B' }));
+  const rispB = {
+    A: { nomi: { raw: x1 }, cose: { raw: x2 }, citta: { raw: x3 } },
+    B: { nomi: { raw: y1 }, cose: { raw: y2 }, citta: { raw: y3 } }
+  };
+  const chiusura = C.mutChiudiRevisione(stb, { me: 'A', now: 300, risposte: rispB, rispostePronte: true, dizionario: D, dizionarioPronto: true });
+  ok(!!chiusura && !chiusura.__error, 'revisione chiusa');
+  C.applyPartial(stb, chiusura);
+  eq(stb.risultati[0].bonus.nome, 'A', 'bonus a chi ha fermato il round con tutte le risposte valide');
+  eq(stb.punteggi.A, stb.punteggi.B + 10, 'i 10 punti del bonus sono nei punteggi di partita');
+  const punteggiDopo = JSON.parse(JSON.stringify(stb.punteggi));
+  eq(C.mutChiudiRevisione(stb, { me: 'B', now: 9999, risposte: rispB, rispostePronte: true, dizionario: D, dizionarioPronto: true }), null,
+    'chiusura ripetuta: abortita');
+  eq(stb.punteggi, punteggiDopo, 'nessun doppio bonus');
+}
+
 console.log('\n[11] Timeout della revisione: contestazione non unanime lascia valida');
 {
   const now = 1_000_000;
@@ -472,6 +613,8 @@ console.log('\n[11] Timeout della revisione: contestazione non unanime lascia va
   });
   C.applyPartial(st, C.mutStart(st, { me: 'A', now, dizionarioPronto: true, dizionario: D, dictVersion: D.fingerprint }));
   C.applyPartial(st, C.mutStop(st, { me: 'B', now: now + 1000 }));
+  // La grazia post-STOP è scaduta da un pezzo: si apre la revisione.
+  C.applyPartial(st, C.mutTimeoutCompilazione(st, { me: 'A', now: now + 1000 + C.STOP_GRAZIA_MS + C.TIMEOUT_GRACE + 1 }));
   const key = C.cellKey(0, 0);
   C.applyPartial(st, C.mutVota(st, { me: 'B', now: now + 2000, key, vota: true }));
   C.applyPartial(st, C.mutVota(st, { me: 'C', now: now + 2000, key, vota: true }));
@@ -511,18 +654,19 @@ console.log('\n[13] Allenamento solo: 10 punti per risposta valida, mai 20 autom
   });
   C.applyPartial(st, C.mutStart(st, { me: 'TU', now, dizionarioPronto: true, dizionario: D, dictVersion: D.fingerprint }));
   const LS = st.roundData.lettera;
-  const [s1, s2, s3, s4, s5, s6] = parolePer(LS, 6);
+  eq(st.roundData.categorie.length, 7, 'multi-categoria: 7 categorie in allenamento');
+  const [s1, s2, s3, s4, s5, s6, s7] = parolePer(LS, 7);
   const risposte = {
     TU: {
-      nomi: { raw: s1 }, cose: { raw: s2 }, citta: { raw: s3 },
-      animali: { raw: s4 }, mestieri: { raw: s5 }, piante: { raw: s6 }
+      nomi: { raw: s1 }, cose: { raw: s2 }, citta: { raw: s3 }, animali: { raw: s4 },
+      frutta: { raw: s5 }, mestieri: { raw: s6 }, colori: { raw: s7 }
     }
   };
   const ctx = { me: 'TU', now: now + 1000, risposte, rispostePronte: true, dizionario: D, dizionarioPronto: true };
   const up = C.mutConsegnaSolo(st, ctx);
   C.applyPartial(st, up);
   eq(st.roundData.fase, 'risultati', 'consegna → risultati (nessuna revisione in solo)');
-  eq(st.punteggi.TU, 60, '6 risposte valide × 10 punti');
+  eq(st.punteggi.TU, 70, '7 risposte valide × 10 punti');
   ok(st.risultati[0].celle.every((c) => c.punti === 10), 'nessuna risposta da 20 in allenamento');
   eq(st.risultati[0].allenamento, true, 'risultato marcato come allenamento');
 

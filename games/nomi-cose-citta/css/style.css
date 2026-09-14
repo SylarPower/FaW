@@ -239,6 +239,26 @@ button { font-family: var(--font); }
 .campo input:focus { outline: 2px solid var(--acc-0); outline-offset: 1px; border-color: var(--acc-0); }
 .campo input:disabled { background: var(--card-2); color: var(--text-2); }
 
+/* ---------- STOP: grazia di 10s agli altri giocatori ---------- */
+.stop-avviso {
+  display: flex; align-items: center; gap: 10px; margin-top: 10px;
+  padding: 9px 12px; border-radius: var(--radius-sm);
+  background: var(--gold-soft, #fef3c7); border: 1px solid #fcd34d;
+  color: #92400e; font-size: 0.82rem; font-weight: 700;
+}
+.stop-avviso.hidden { display: none; }
+.stop-avviso .stop-crono {
+  margin-left: auto; font-weight: 900; font-variant-numeric: tabular-nums;
+  background: #fff; border: 1px solid #fcd34d; border-radius: 999px;
+  padding: 2px 10px; color: #92400e;
+}
+.stop-avviso .stop-crono.danger { background: var(--danger); border-color: var(--danger); color: #fff; }
+
+/* Righe del bonus STOP nel recap del round */
+.st-row.bonus-stop.ok { border-color: #fcd34d; background: #fffbeb; }
+.st-row.bonus-stop.no { border-style: dashed; }
+.st-row.bonus-stop .st-lettera { color: var(--text-1); }
+
 .azioni-risposte {
   display: flex; align-items: center; justify-content: space-between;
   gap: 12px; margin-top: 14px;

@@ -43,10 +43,29 @@ collettiva** in cui una risposta si annulla solo **all'unanimità**.
 7. Il **quorum è congelato a inizio round** (`roundData.partecipanti`): un
    giocatore che si disconnette non lo riduce, chi entra dopo non lo aumenta,
    chi torna rientra con il proprio voto.
-8. Ogni giocatore conferma **"Revisione conclusa"**; cambiare voto **revoca**
-   la propria conferma. La revisione si chiude quando tutti hanno confermato
+8. **STOP**: quando un giocatore ferma il gioco (pulsante STOP, disponibile
+   solo con tutte le proprie categorie piene) il round **non si chiude
+   subito**: gli altri hanno **10 secondi** (`opzioni.graziaStop`, 2–30 s) per
+   finire di scrivere, con il conto alla rovescia visibile (striscia gialla
+   "X ha fermato il round!" + etichetta `SECONDI PER FINIRE`). In quella
+   finestra la fase resta `compilazione`, quindi i salvataggi tardivi **sono
+   accettati**; chi ha premuto STOP non scrive più e non può ripetere lo STOP.
+   Alla fine della grazia si apre la revisione come sempre. Se nessuno preme
+   STOP, il round si chiude alla scadenza normale.
+9. **Bonus STOP**: chi ferma il gioco guadagna **+10 punti** *solo se tutte le
+   sue risposte sono valide* (dizionario + voti della revisione, quindi una
+   parola annullata all'unanimità fa cadere il bonus). Se chi ha fermato il
+   round ha un errore, il bonus passa **al primo giocatore che aveva finito di
+   scrivere** (tutte le categorie piene), in ordine di completamento
+   (`roundData.completati`, un marcatore per giocatore e per round); senza
+   marcatori si ripiega sull'ordine dei partecipanti. Se nessun candidato ha
+   tutte le risposte valide, il bonus è **annullato**. Un timeout senza STOP
+   non assegna nessun bonus. Il recap del round mostra a chi è andato o perché
+   è caduto.
+10. Ogni giocatore conferma **"Revisione conclusa"**; cambiare voto **revoca**
+    la propria conferma. La revisione si chiude quando tutti hanno confermato
    o alla scadenza.
-9. **Punteggio (variante classica, dichiarata in UI)**:
+11. **Punteggio (variante classica, dichiarata in UI)**:
 
    | caso | punti |
    |------|-------|
@@ -59,10 +78,10 @@ collettiva** in cui una risposta si annulla solo **all'unanimità**.
    sulla forma **normalizzata**, stessa categoria e stesso round; la stessa
    parola in categorie diverse è ammessa. Dopo un annullamento o una
    validazione **l'intera categoria viene ricalcolata**.
-10. **Fine turno**: il riepilogo del round mostra subito la **classifica
+12. **Fine turno**: il riepilogo del round mostra subito la **classifica
     provvisoria** (posizione, totale aggiornato, punti del round e barra
     proporzionale) prima del dettaglio per categoria.
-11. **Fine partita**: **podio con gradini decrescenti** (il vincitore è il più
+13. **Fine partita**: **podio con gradini decrescenti** (il vincitore è il più
     alto, poi il secondo, il terzo e così via per tutti), **pulsante RIVINCITA
     in alto** (visibile senza scorrere), dettaglio per round e per categoria,
     totali per round, classifica con pareggi. La rivincita riusa le stesse
@@ -70,10 +89,22 @@ collettiva** in cui una risposta si annulla solo **all'unanimità**.
 
 ### Categorie
 
-Id stabili separati dalle etichette: `nomi, cose, citta, animali, mestieri,
-piante` (preset `classic`, 6) e `nomi, cose, citta` (preset `light`, 3).
-Categorie personalizzate: id sanificato in `[A-Z0-9]`, etichetta conservata a
-parte; massimo 10.
+Id stabili separati dalle etichette. **Multi-categoria** (preset `multi`,
+alias storico `classic`, ed è il default) sono esattamente:
+
+| id | etichetta |
+|----|-----------|
+| `nomi` | Nomi di persona |
+| `cose` | Cose |
+| `citta` | Città |
+| `animali` | Animali |
+| `frutta` | Frutta o Verdura |
+| `mestieri` | Mestieri |
+| `colori` | Colori |
+
+Preset `light`: `nomi, cose, citta` (3). Categorie personalizzate: id
+sanificato in `[A-Z0-9]`, etichetta conservata a parte; massimo 10.
+Nell'hub la partita nasce con `categorie: 'multi'` (7).
 
 ### Lettere
 
@@ -160,6 +191,7 @@ roundData {
   inizio         ms
   deadline       ms                         ← scadenza assoluta condivisa
   stop           null | { da, ts }          ← 'TEMPO' se chiusura a tempo
+  completati     [ { nome, ts } ]           ← ordine di completamento (bonus STOP)
   voti           { 'c0_p1': ['ALFA'] }      ← voti "NON VALIDA", chiavi c<cat>_p<giocatore>
   votiValida     { 'c0_p1': ['ALFA'] }      ← voti "VALIDA" (stessa forma, mappa separata)
   conferme       ['ALFA']                   ← revisione conclusa
@@ -172,9 +204,22 @@ esito (elemento di risultati[]) {
   id 'r3', round 3, lettera 'M',
   celle [ { k, c, p, cat, nome, raw, norm, valida, motivo, motivoAutomatico,
             voti, votiValida, annullata, validata, punti } ],
-  punti { ALFA: 40, BETA: 20 }
+  punti { ALFA: 40, BETA: 20 }             ← include il bonus STOP, se assegnato
+  bonus { nome, punti, motivo, fermatoDa, ordine, dettagli }
 }
 ```
+
+Durante la **grazia post-STOP** la fase resta `compilazione` e `deadline`
+diventa `stop.ts + opzioni.graziaStop`; `inizio` viene riscritto sull'istante
+dello STOP (il countdown mostra solo la grazia). `stop.ts` non cambia quando
+la grazia scade e si apre la revisione, quindi resta leggibile chi ha fermato
+il round e quando.
+
+`bonus.motivo` è `ASSEGNATO` (bonus a `bonus.nome`), `NESSUNO_VALIDO`
+(candidati valutati nessuno con tutte le risposte valide), `TEMPO_SCADUTO`
+(chiusura a tempo, nessuno STOP) oppure `SENZA_STOP` (esito senza STOP, es.
+allenamento). `bonus.dettagli` elenca i candidati valutati con `esito`
+`OK` / `NON_VALIDA` / `INCOMPLETA` e le categorie che l'hanno fatto cadere.
 
 `valida` è `true` per validazione automatica **oppure** per voto unanime
 "Valida"; in quest'ultimo caso `validata` è `true` e `motivoAutomatico`
@@ -251,7 +296,7 @@ Il progetto ha il vincolo **zero `runTransaction` e zero `BatchGetDocuments`**
 | scenario | get/transazioni | letture listener | scritture |
 |---|---|---|---|
 | partita completa, 3 giocatori × 2 round (`tests/ncc/quota.test.js`) | **0** | 21 | 22 |
-| partita completa reale via UI, 2 giocatori × 1 round (`tests/ncc/browser-multiplayer.test.js`) | 2 (`config/dizionario`) | 4 | 13 |
+| partita completa reale via UI, 2 giocatori × 1 round (`tests/ncc/browser-multiplayer.test.js`) | 2 (`config/dizionario`) | 6 | 19 |
 | allenamento solo (`tests/ncc/browser.test.js`) | 0 | 0 | **0** |
 
 In compilazione i listener attivi sono **due**: il documento partita e il
@@ -344,11 +389,11 @@ npm test              # tutto
 
 | file | cosa copre | tipo |
 |---|---|---|
-| `tests/ncc/core.test.js` | normalizzazione, iniziale, override, dizionario mancante/disallineato, punteggi 0/5/10/20, duplicati dopo annullamento, voto dell'autore e unanimità, **voto "Valida" (unanimità, precedenza dell'annullamento, ritiro del voto opposto)**, quorum stabile, timeout, rivincita senza residui, allenamento con annullamento/validazione manuali | unitario (logica pura) |
-| `tests/ncc/multiplayer.test.js` | 3 client su Firestore simulato: STOP simultanei, subentro al referente, scritture in ritardo, riconnessione, doppia finalizzazione, refresh | integrazione (backend) |
+| `tests/ncc/core.test.js` | normalizzazione, iniziale, override, dizionario mancante/disallineato, **categorie multi (7, etichette esatte)**, punteggi 0/5/10/20, duplicati dopo annullamento, voto dell'autore e unanimità, **voto "Valida" (unanimità, precedenza dell'annullamento, ritiro del voto opposto)**, **STOP con grazia e bonus +10 (assegnato, annullato, passaggio al primo che aveva finito, timeout, doppio bonus)**, quorum stabile, timeout, rivincita senza residui, allenamento con annullamento/validazione manuali | unitario (logica pura) |
+| `tests/ncc/multiplayer.test.js` | 3 client su Firestore simulato: STOP simultanei, **grazia di 10 s con salvataggi tardivi accettati**, subentro al referente, scritture in ritardo, riconnessione, doppia finalizzazione, refresh | integrazione (backend) |
 | `tests/ncc/quota.test.js` | zero get/transazioni, scritture per azione, nessun timer scritto, listener minimi + cleanup, budget totale | quota |
 | `tests/ncc/browser.test.js` | pagina reale in allenamento: boot, lobby, campi, STOP, punti, annullamento/validazione manuali, classifica provvisoria, statistiche | E2E (jsdom) |
-| `tests/ncc/browser-multiplayer.test.js` | due pagine reali + Firestore simulato: privacy in compilazione, tabella di revisione, voti "non valida" e "valida", striscia "in votazione", conferme, esito, classifica provvisoria, podio, budget | E2E (jsdom) |
+| `tests/ncc/browser-multiplayer.test.js` | due pagine reali + Firestore simulato: privacy in compilazione, **avviso di STOP con conto alla rovescia e risposte scritte in grazia**, tabella di revisione, voti "non valida" e "valida", striscia "in votazione", conferme, esito con bonus STOP annullato, classifica provvisoria, podio, budget | E2E (jsdom) |
 
 Le **Security Rules non sono testate automaticamente**: in questo ambiente
 non è disponibile l'Emulator Suite (`firebase-tools` non installato, nessuna

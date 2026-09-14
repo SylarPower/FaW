@@ -58,6 +58,7 @@
     prevRound: 0,
     prevFase: null,
     statsSaved: false,
+    completatoSegnalato: false,   // ho già segnalato "consegna completa" a questo round
     redirected: false,
     rateLimited: false,
     ultimoStatoSalvataggio: 'idle'
@@ -71,6 +72,7 @@
     'lobby-players', 'lobby-status', 'lobby-status-text', 'btn-start-solo', 'lobby-hint',
     'screen-gioco', 'lettera-tile', 'timer-num', 'timer-label', 'timer-fill', 'fase-chip',
     'risposte-card', 'risposte-progress', 'campi', 'save-state', 'btn-stop', 'risposte-hint',
+    'stop-avviso', 'stop-testo', 'stop-crono',
     'giocatori', 'punteggi', 'storico',
     'overlay-revisione', 'rev-round', 'rev-lettera', 'rev-timer-num', 'rev-timer-fill',
     'rev-voti', 'rev-body', 'conf-progress', 'btn-conferma',
@@ -376,6 +378,14 @@
     if (i >= 0 && i < inputs.length - 1) inputs[i + 1].focus();
   }
 
+  /** La grazia post-STOP: fase ancora di compilazione, ma il round è fermato. */
+  function inGraziaStop(rd) {
+    return !!(rd && rd.fase === 'compilazione' && rd.stop && rd.stop.da !== 'TEMPO');
+  }
+  function hoFermato(rd) {
+    return !!(rd && rd.stop && rd.stop.da === G.me);
+  }
+
   function tuttiCampiPieni() {
     var rd = G.state && G.state.roundData;
     if (!rd) return false;
@@ -412,7 +422,9 @@
   function aggiornaStop() {
     var s = G.state;
     var rd = s && s.roundData;
-    var mioTurno = rd && rd.fase === 'compilazione' && s.stato === 'in_corso';
+    // STOP disponibile solo in compilazione, una volta sola: dopo lo STOP il
+    // round è fermato e si aspetta solo la fine della grazia degli altri.
+    var mioTurno = rd && rd.fase === 'compilazione' && s.stato === 'in_corso' && !rd.stop;
     el['btn-stop'].disabled = !mioTurno || !tuttiCampiPieni();
     var n = rd ? rd.categorie.filter(function (id) { return String(G.campi[id] || '').trim(); }).length : 0;
     el['risposte-progress'].textContent = rd ? '(' + n + '/' + rd.categorie.length + ')' : '';
@@ -445,7 +457,15 @@
     }
     setSaveState('salvo');
     return G.backend.salvaRisposte(rispostePayload()).then(function (r) {
-      if (r && r.ok) setSaveState('salvato');
+      if (r && r.ok) {
+        setSaveState('salvato');
+        // Consegna completa: si entra in coda per il bonus STOP. Una sola
+        // scrittura per round (e solo con le proprie categorie tutte piene).
+        if (!G.solo && !G.completatoSegnalato && tuttiCampiPieni()) {
+          G.completatoSegnalato = true;
+          G.backend.applyAtomic(C.segnaCompletato, { now: Date.now() });
+        }
+      }
       else if (r && r.failed) {
         setSaveState('errore');
         // L'errore di salvataggio deve restare visibile, non nascosto.
@@ -495,6 +515,7 @@
       G.roundAperto = rd.round;
       G.campi = {};
       G.touched = {};
+      G.completatoSegnalato = false;   // nuovo round: nuova coda per il bonus
       el.campi.dataset.round = rd.id;
       buildCampi(s);
       var mie = (G.backend && G.backend.getMieRisposte) ? G.backend.getMieRisposte() : {};
@@ -512,14 +533,19 @@
     el['fase-chip'].textContent = fasi[rd.fase] || String(rd.fase).toUpperCase();
     el['fase-chip'].className = 'fase-chip ' + (rd.fase === 'compilazione' ? '' : rd.fase);
 
-    var attivo = rd.fase === 'compilazione';
+    /* Dopo lo STOP la fase resta 'compilazione' (grazia): chi ha fermato non
+       scrive più, gli altri hanno ancora qualche secondo per finire. */
+    var attivo = rd.fase === 'compilazione' && !hoFermato(rd);
     Array.prototype.forEach.call(el.campi.querySelectorAll('input'), function (i) { i.disabled = !attivo; });
-    el['risposte-card'].classList.toggle('hidden', !attivo);
+    el['risposte-card'].classList.toggle('hidden', rd.fase !== 'compilazione');
     aggiornaStop();
-    el['risposte-hint'].textContent = attivo
-      ? 'Una parola è valida se esiste nel dizionario e inizia per ' + rd.lettera +
-        '. STOP non controlla il significato: puoi fermarti anche con parole sbagliate.'
-      : '';
+    aggiornaAvvisoStop(s, rd);
+    el['risposte-hint'].textContent = rd.fase !== 'compilazione' ? ''
+      : hoFermato(rd)
+        ? 'Hai fermato il round: le tue risposte sono chiuse, gli altri hanno ' +
+          (C.graziaStopMs({ opzioni: s.opzioni }) / 1000) + 's per finire.'
+        : 'Una parola è valida se esiste nel dizionario e inizia per ' + rd.lettera +
+          '. STOP non controlla il significato: puoi fermarti anche con parole sbagliate.';
 
     renderGiocatori(s);
     renderPunteggi(s);
@@ -543,13 +569,38 @@
     el.giocatori.innerHTML = s.partecipanti.map(function (p) {
       var nelRound = rd && rd.partecipanti.indexOf(p) !== -1;
       var stop = rd && rd.stop && rd.stop.da === p;
+      var grazia = nelRound && rd && inGraziaStop(rd);
       var nota = !nelRound ? 'non partecipa al round'
         : (rd.fase === 'revisione' ? (rd.conferme.indexOf(p) !== -1 ? 'ha confermato' : 'in revisione')
-          : (stop ? 'ha premuto STOP' : 'sta scrivendo'));
+          : (rd.fase === 'risultati' ? 'esito chiuso'
+            : (stop ? 'ha fermato il round' : (grazia ? 'sta finendo di scrivere' : 'sta scrivendo'))));
       return '<span class="pchip' + (p === G.me ? ' mine' : '') + (stop ? ' active' : '') + '">' +
         avatar(p) + esc(p) + (p === G.me ? ' (TU)' : '') +
         '<span class="mini">' + esc(nota) + '</span></span>';
     }).join('');
+  }
+
+  /**
+   * Striscia di avviso dello STOP: chi ha fermato il round e quanti secondi
+   * restano agli altri per consegnare. Visibile a tutti (anche a chi ha
+   * premuto STOP, che però non scrive più).
+   */
+  function aggiornaAvvisoStop(s, rd) {
+    var box = el['stop-avviso'];
+    if (!box) return;
+    if (!inGraziaStop(rd)) { box.classList.add('hidden'); return; }
+    box.classList.remove('hidden');
+    var sec = secondiTra(rd.deadline, Date.now());
+    var crono = el['stop-crono'];
+    if (crono) {
+      crono.textContent = sec + 's';
+      crono.classList.toggle('danger', sec <= 3);
+    }
+    var testo = hoFermato(rd)
+      ? '🚩 <b>Hai fermato il round.</b> Gli altri hanno ancora <b>' + sec + 's</b> per finire di scrivere.'
+      : '🚩 <b>' + esc(rd.stop.da) + ' ha fermato il round!</b> Hai <b>' + sec + 's</b> per finire di scrivere.';
+    var t = el['stop-testo'];
+    if (t) t.innerHTML = testo;
   }
 
   function renderPunteggi(s) {
@@ -811,7 +862,7 @@
     el['res-body'].innerHTML += '<div class="det-round"><h4>TOTALE ROUND</h4>' +
       s.partecipanti.map(function (p) {
         return '<div class="st-row"><span>' + esc(p) + '</span><span class="st-pts">+' + (tot[p] || 0) + '</span></div>';
-      }).join('') + '</div>' +
+      }).join('') + '</div>' + bonusHtml(r.bonus) +
       (G.solo
         ? '<p class="hint">Allenamento: 10 punti per risposta automaticamente valida. ' +
           'Annullamento e validazione manuali sono scelte tue, distinte dal dizionario.</p>'
@@ -831,6 +882,36 @@
         }
       });
     });
+  }
+
+  /**
+   * Spiega il bonus STOP nel recap: a chi è andato, oppure perché è stato
+   * annullato (chi ha fermato il round aveva una parola non valida) e a chi
+   * è passato. Senza STOP (timeout) il bonus non esiste e non si mostra nulla.
+   */
+  function bonusHtml(bonus) {
+    if (!bonus || !bonus.motivo || bonus.motivo === 'SENZA_STOP' || bonus.motivo === 'TEMPO_SCADUTO') return '';
+    var righe = '';
+    if (bonus.nome) {
+      righe += '<div class="st-row bonus-stop ok"><span>🎯 BONUS STOP</span>' +
+        '<span class="st-lettera">' + esc(bonus.nome) + (bonus.nome === G.me ? ' (TU)' : '') + '</span>' +
+        '<span class="st-pts">+' + bonus.punti + '</span></div>';
+    }
+    (bonus.dettagli || []).forEach(function (d) {
+      if (d.esito === 'OK') return;
+      var incompleta = d.esito === 'INCOMPLETA';
+      var perche = incompleta
+        ? 'non aveva finito di scrivere (' + (d.categorie || []).length + ' categorie vuote)'
+        : 'aveva ' + (d.categorie || []).length + ' risposta/e non valida/e';
+      righe += '<div class="st-row bonus-stop no"><span>✋ ' + esc(d.nome) + '</span>' +
+        '<span class="st-lettera">' + (incompleta ? 'non in coda' : 'bonus annullato') + '</span>' +
+        '<span class="mini">' + esc(perche) + '</span></div>';
+    });
+    var titolo = bonus.nome
+      ? '🎯 BONUS STOP — chi ferma il gioco con tutte le risposte valide guadagna ' +
+        C.BONUS_STOP + ' punti.'
+      : '🎯 BONUS STOP ANNULLATO — nessuno ha chiuso il round con tutte le risposte valide.';
+    return '<div class="det-round"><h4>' + titolo + '</h4>' + righe + '</div>';
   }
 
   /**
@@ -1218,7 +1299,9 @@
       el['timer-fill'].style.width = Math.round(frac * 100) + '%';
       el['timer-fill'].classList.toggle('danger', danger);
       el['timer-label'].textContent = rd.fase === 'revisione' ? 'SECONDI ALLA CHIUSURA'
-        : rd.fase === 'risultati' ? 'SECONDI AL PROSSIMO ROUND' : 'SECONDI ALLA CONSEGNA';
+        : rd.fase === 'risultati' ? 'SECONDI AL PROSSIMO ROUND'
+          : inGraziaStop(rd) ? 'SECONDI PER FINIRE' : 'SECONDI ALLA CONSEGNA';
+      aggiornaAvvisoStop(s, rd);
       if (rd.fase === 'revisione') {
         el['rev-timer-num'].textContent = String(sec);
         el['rev-timer-fill'].style.width = Math.round(frac * 100) + '%';
@@ -1239,7 +1322,7 @@
    *  ?categorie=nomi,cose,MARCHI       → lista di id (anche personalizzati).
    */
   function categorieDaParam(val) {
-    if (!val) return 'classic';
+    if (!val) return 'multi';
     var v = String(val).trim();
     if (C.PRESET_CATEGORIE[v]) return v;
     var lista = v.split(',').map(function (x) { return x.trim(); }).filter(Boolean);

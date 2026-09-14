@@ -277,7 +277,7 @@ const ctx = (extra) => Object.assign({ dizionario: D, dizionarioPronto: true, di
     m.store.set('partite/q5', {
       gioco: 'nomi-cose-citta', partecipanti: ['ALFA', 'BETA', 'GAMMA'], punteggi: {},
       pronti: [], round: 0, roundData: null, risultati: [], stato: 'attesa',
-      opzioni: { round: '2', tempo: '60', revisione: '30', categorie: 'classic', seed: 'BUD', lettere: ['R', 'C'] }
+      opzioni: { round: '2', tempo: '60', revisione: '30', categorie: 'classic', seed: 'BUD', lettere: ['R', 'C'], graziaStop: '2' }
     });
     const bes = {};
     ['ALFA', 'BETA', 'GAMMA'].forEach((n) => {
@@ -302,6 +302,11 @@ const ctx = (extra) => Object.assign({ dizionario: D, dizionarioPronto: true, di
         bes[n].salvaRisposte({ nomi: { raw: parola(lettera, i), norm: parola(lettera, i) } })));
       await sleep(20);
       await bes.ALFA.applyAtomic(C.mutStop);
+      await sleep(20);
+      // Dopo lo STOP il round resta aperto per la grazia (2s qui): si aspetta
+      // la fine della grazia, poi si entra in revisione.
+      const fineGrazia = bes.ALFA.state.roundData.deadline + C.TIMEOUT_GRACE + 1;
+      await bes.ALFA.applyAtomic(C.mutTimeoutCompilazione, ctx({ now: fineGrazia }));
       await sleep(20);
       for (const n of Object.keys(bes)) bes[n].apriRisposte(round);
       await sleep(30);

@@ -270,27 +270,47 @@ const ctxBase = () => ({ dizionario: D, dizionarioPronto: true, dictVersion: D.f
     const queryAperte = Array.from(fs.subs.keys()).filter((k) => k.indexOf('Q:') === 0);
     eq(queryAperte, [], 'in compilazione NESSUNA query sulle risposte altrui è aperta');
 
-    console.log('\n[3] STOP simultanei: una sola transizione');
+    console.log('\n[3] STOP simultanei: una sola fermata e 10 secondi agli altri');
     const stops = await Promise.all([
       clients.ALFA.applyAtomic(C.mutStop),
       clients.BETA.applyAtomic(C.mutStop),
       clients.GAMMA.applyAtomic(C.mutStop)
     ]);
     const accettati = stops.filter((r) => r && r.ok).length;
-    await wait(clients.GAMMA, (s) => s.roundData.fase === 'revisione', 'fase revisione');
+    await wait(clients.GAMMA, (s) => !!s.roundData.stop, 'STOP condiviso');
     const doc = fs.store.get('partite/' + MATCH);
     ok(!!doc.roundData.stop && !!doc.roundData.stop.da, 'STOP registrato: ' + doc.roundData.stop.da);
-    eq(doc.roundData.faseVersion, 2, 'una sola transizione di fase (faseVersion 2)');
+    eq(doc.roundData.fase, 'compilazione', 'dopo lo STOP il round resta in compilazione (grazia)');
+    eq(doc.roundData.deadline - doc.roundData.stop.ts, 10000,
+      'la scadenza diventa la fine della grazia: 10 secondi agli altri');
+    eq(doc.roundData.faseVersion, 2, 'una sola transizione di stato (faseVersion 2)');
     ok(accettati <= 3, 'nessun errore fra gli STOP concorrenti (' + accettati + ' ok)');
+    // durante la grazia le scritture tardive degli altri sono ACCETTATE
+    const idxGamma = doc.roundData.partecipanti.indexOf('GAMMA');
+    const grazia = await clients.GAMMA.salvaRisposte({ nomi: { raw: 'Roma', norm: 'ROMA' } });
+    ok(!!grazia && grazia.ok, 'scrittura durante la grazia accettata');
+    ok(!!fs.store.get('partite/' + MATCH + '/risposte/r1__p' + idxGamma), 'risposta tardiva scritta nel proprio documento');
     const rTimeout = await clients.GAMMA.applyAtomic(C.mutTimeoutCompilazione, ctxBase());
-    ok(rTimeout.aborted, 'timeout dopo lo STOP: abortito');
+    ok(rTimeout.aborted, 'grazia ancora in corso: la revisione non si apre');
+    const fineGrazia = doc.roundData.deadline + C.TIMEOUT_GRACE + 1;
+    const rGrazia = await clients.GAMMA.applyAtomic(C.mutTimeoutCompilazione,
+      Object.assign(ctxBase(), { now: fineGrazia }));
+    ok(!!rGrazia && rGrazia.ok, 'grazia scaduta: si apre la revisione');
+    await wait(clients.ALFA, (s) => s.roundData.fase === 'revisione', 'fase revisione');
+    const docG = fs.store.get('partite/' + MATCH);
+    eq(docG.roundData.stop.da, doc.roundData.stop.da, 'lo STOP resta attribuito a chi l\'ha premuto');
+    eq(docG.roundData.deadline - docG.roundData.inizio, 30000, 'deadline condivisa della revisione (30s)');
+    const tardi = await clients.ALFA.salvaRisposte({ nomi: { raw: 'Roma', norm: 'ROMA' } });
+    ok(tardi.aborted && tardi.error.code === 'ROUND_CHIUSO', 'a revisione aperta la scrittura è rifiutata');
 
     console.log('\n[4] Revisione: query del round, unanimità, conferma, chiusura');
     ['ALFA', 'BETA', 'GAMMA'].forEach((n) => clients[n].apriRisposte(1));
     await wait(clients.ALFA, () => clients.ALFA.rispostePronte(), 'risposte del round caricate');
     const risposte = clients.ALFA.getRisposte();
-    eq(Object.keys(risposte).sort(), ['ALFA', 'BETA'], 'solo chi ha scritto ha un documento');
+    eq(Object.keys(risposte).sort(), ['ALFA', 'BETA', 'GAMMA'],
+      'hanno un documento solo ALFA, BETA e GAMMA (che ha scritto durante la grazia)');
     eq(risposte.ALFA.nomi.raw, wa, 'risposta di ALFA letta in revisione');
+    eq(risposte.GAMMA.nomi.raw, 'Roma', 'la risposta scritta durante la grazia entra nella revisione');
 
     const key = C.cellKey(0, 0);   // categoria 'nomi', giocatore ALFA
     // maggioranza (2 su 3, autore escluso) NON annulla
@@ -367,6 +387,9 @@ const ctxBase = () => ({ dizionario: D, dizionarioPronto: true, dictVersion: D.f
     const [w2] = parolePer(lettera2, 1);
     await clients.ALFA.salvaRisposte({ nomi: { raw: w2, norm: C.normalizeWord(w2) } });
     await clients.ALFA.applyAtomic(C.mutStop);
+    await wait(clients.ALFA, (s) => !!s.roundData.stop, 'STOP round 2');
+    await clients.ALFA.applyAtomic(C.mutTimeoutCompilazione,
+      Object.assign(ctxBase(), { now: fs.store.get('partite/' + MATCH).roundData.deadline + C.TIMEOUT_GRACE + 1 }));
     await wait(clients.ALFA, (s) => s.roundData.fase === 'revisione', 'revisione round 2');
     clients.ALFA.apriRisposte(2);
     await wait(clients.ALFA, () => clients.ALFA.rispostePronte(), 'risposte round 2');
