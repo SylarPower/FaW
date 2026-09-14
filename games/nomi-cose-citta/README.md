@@ -138,6 +138,9 @@ Lo stesso `core.js` è usato dall'allenamento e dalla sfida.
 
 `stato`: `attesa` → `in_corso` → `conclusa`; dentro `in_corso`,
 `roundData.fase`: `compilazione` → `revisione` → `risultati`.
+Lo **STOP non è una fase a sé**: resta in `compilazione` con la scadenza
+spostata a `stop.ts + graziaStop` (grazia agli altri giocatori), e la
+transizione a `revisione` avviene alla scadenza (`mutTimeoutCompilazione`).
 In allenamento la `revisione` è saltata (un solo giocatore, nessun quorum):
 `compilazione` → `risultati` con punteggio di allenamento.
 
