@@ -2873,7 +2873,7 @@ function handleResultsPhase(data) {
         nome: player,
         punti: score,
         sottotitolo: 'voti'
-    })), { io: state.playerName });
+    })), { io: state.playerName, unita: 'voti' });
 
     const ranking = document.getElementById('full-ranking');
     ranking.innerHTML = '<h3 style="margin-top: 0;">Classifica Completa</h3>';

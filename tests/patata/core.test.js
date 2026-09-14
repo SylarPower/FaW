@@ -171,7 +171,10 @@ now += 1000;
 const sub1 = run('ALFA', C.mutSubmitWord, { word: w1 });
 ok(sub1 && !sub1.__error, 'submit ALFA ok');
 eq(s.turno.giocatore, 'BETA', 'patata passa a BETA');
-eq(s.turno.deadline, dBefore + C.TIME_BONUS, 'deadline +5s (max(deadline,now)+5000)');
+ok(s.turno.deadline <= now + 60000,
+  'tetto: il cronometro non supera il tempo configurato (' +
+  ((s.turno.deadline - now) / 1000) + 's su 60s)');
+ok(s.turno.deadline >= dBefore, 'il bonus non toglie tempo (deadline mai indietro)');
 eq(s.punteggi.ALFA, C.pointsFor(w1.length), 'punti ad ALFA');
 eq(s.storia.length, 1, 'storia: 1 parola');
 eq(s.roundData.parlate.ALFA, [{ w: w1, p: C.pointsFor(w1.length) }], 'parlate ALFA');
@@ -247,6 +250,91 @@ const ranking = s.partecipanti
   .map(p => ({ p, pts: s.punteggi[p] || 0 }))
   .sort((a, b) => b.pts - a.pts);
 console.log('   classifica:', ranking.map(r => r.p + '=' + r.pts).join(', '));
+
+/* ---------- bonus a scalare e tetto del cronometro ---------- */
+console.log('\n[6b] Bonus a scalare (5→4→3→2→1) e tetto del cronometro');
+{
+  const TEMPO = 60;
+  const t0 = 3_000_000_000_000;
+  const mk = () => {
+    const st = C.normState({
+      partecipanti: ['ALFA', 'BETA'],
+      opzioni: { tempo: String(TEMPO), turni: '2', lettere: '3', seed: 'BONUS' },
+      punteggi: {}, pronti: ['ALFA', 'BETA'], stato: 'attesa'
+    });
+    C.applyPartial(st, C.mutStart(st, { me: 'ALFA', now: t0, dictVersion: 'v' }));
+    return st;
+  };
+  const lettere = (st) => C.pickLetters('BONUS', st.round || 1, 3, FAKE_IDX, C.ruleFor(st));
+  const usate = new Set();
+  /* gioca una parola valida al tempo `now`, diversa dalle precedenti.
+     `usate` viene aggiornato DOPO l'invio: prima di allora la parola non è
+     ancora stata giocata (altrimenti il mutatore la rifiuterebbe come USED). */
+  const gioca = (st, now, chi) => {
+    const let_ = lettere(st);
+    const w = FAKE_WORDS.find(x => let_.every(l => x.includes(l)) && !usate.has(x));
+    const up = C.mutSubmitWord(st, { me: chi, now: now, letters: let_, used: usate, dict: FAKE_SET, word: w, rule: 'classic' });
+    if (up && !up.__error) C.applyPartial(st, up);
+    else ok(false, 'la parola di prova non è stata accettata: ' + JSON.stringify(up && (up.__error || up)));
+    usate.add(w);
+    return w;
+  };
+
+  eq(C.bonusPerParola({ turno: { inizio: t0 } }, t0), 5, 'bonus pieno nel primo minuto: +5');
+  ok(C.bonusPerParola({ turno: { inizio: t0 } }, t0 + 61000) === 4, 'dopo 1 minuto di turno: +4');
+  ok(C.bonusPerParola({ turno: { inizio: t0 } }, t0 + 121000) === 3, 'dopo 2 minuti: +3');
+  ok(C.bonusPerParola({ turno: { inizio: t0 } }, t0 + 181000) === 2, 'dopo 3 minuti: +2');
+  ok(C.bonusPerParola({ turno: { inizio: t0 } }, t0 + 241000) === 1, 'dopo 4 minuti: +1');
+  ok(C.bonusPerParola({ turno: { inizio: t0 } }, t0 + 600000) === 1, 'mai sotto +1, per quanto duri il turno');
+
+  const st = mk();
+  eq(C.bonusPerParola(st, t0 + 500), 5, 'il turno nuovo riparte dal bonus pieno');
+
+  /* tetto: partendo dal pieno, una parola non porta oltre il tempo configurato */
+  const primaDellaPrima = st.turno.deadline;
+  gioca(st, t0 + 1000, 'ALFA');
+  ok(st.turno.deadline <= t0 + 1000 + TEMPO * 1000,
+    'prima parola: il cronometro non supera i ' + TEMPO + 's (' +
+    ((st.turno.deadline - (t0 + 1000)) / 1000) + 's)');
+  ok(st.turno.deadline >= primaDellaPrima, 'prima parola: tetto, non taglio del tempo già restante');
+
+  /* tetto con tante parole di fila: la deadline non sfonda mai il massimo */
+  let now = t0 + 2000;
+  for (let i = 0; i < 6; i++) {
+    const chi = st.turno.giocatore;
+    now += 500;
+    gioca(st, now, chi);
+    ok(st.turno.deadline <= now + TEMPO * 1000,
+      'parola ' + (i + 2) + ': massimo ' + TEMPO + 's di cronometro');
+  }
+
+  /* bonus visibile quando il tempo è sceso sotto il tetto */
+  st.turno.deadline = now + 20000;          // restano 20s
+  st.turno.inizio = now - 5000;             // il turno dura da 5s → bonus +5
+  const chi1 = st.turno.giocatore;
+  gioca(st, now, chi1);
+  eq(st.turno.deadline, now + 25000, 'tempo basso: il bonus aggiunge davvero i secondi (+5)');
+
+  /* lo stesso turno, dopo i minuti: il bonus è più piccolo */
+  st.turno.deadline = now + 20000;
+  st.turno.inizio = now - 130000;           // 2 minuti e 10s → bonus +3
+  const chi2 = st.turno.giocatore;
+  gioca(st, now, chi2);
+  eq(st.turno.deadline, now + 23000, 'dopo 2 minuti di turno il bonus vale +3');
+
+  st.turno.deadline = now + 20000;
+  st.turno.inizio = now - 1000000;          // turno lunghissimo → bonus +1
+  const chi3 = st.turno.giocatore;
+  gioca(st, now, chi3);
+  eq(st.turno.deadline, now + 21000, 'a turno lunghissimo il bonus vale +1');
+
+  /* il turno successivo riparte dal bonus pieno */
+  st.roundData.fase = 'recap';
+  st.confermaTurno = ['ALFA', 'BETA'];
+  C.applyPartial(st, C.mutNextRound(st, { now: now + 1000 }));
+  eq(st.round, 2, 'round 2 avviato');
+  eq(C.bonusPerParola(st, now + 1000 + 3000), 5, 'nuovo turno: bonus di nuovo +5');
+}
 
 /* ---------- SoloBackend con clock controllato ---------- */
 console.log('\n[7] SoloBackend (allenamento)');

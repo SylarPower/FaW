@@ -169,6 +169,25 @@ esclusa dal dizionario = 0 punti, ogni partecipante ha sempre una voce.
 corretto, stessi numeri sui tre schermi, ricalcolo dopo un'eliminazione e
 riconciliazione di un punteggio sbagliato senza loop di scritture.
 
+## Ruzzle: durata della partita
+
+Il conto alla rovescia è **ancorato all'orologio**: a ogni tick il tempo residuo
+si ricalcola dalla scadenza (`timerDeadline`), non sottraendo un secondo al
+contatore. La durata scelta nel menu è quindi quella giocata davvero, anche se la
+scheda rallenta (telefono in background, tabella dei round), e un secondo
+mostrato dura sempre un secondo reale.
+
+- Un solo punto di avvio (`avviaContoAllaRovescia`) con un solo `setInterval`:
+  premere due volte VIA (o pausa + riprendi) non raddoppia il ritmo del tempo.
+- La **pausa** congela il residuo (`secondiResidui()`) e alla ripresa il conto
+  riparte da lì: il tempo in pausa non viene consumato.
+- Il display non scende mai sotto `00:00` (`formatTime` limita a zero) e
+  `endGame()` viene chiamato una volta sola, quando il tempo è davvero finito.
+
+`tests/ruzzle/timer.test.js` gioca round reali da pochi secondi sulla pagina
+vera: durata misurata con `Date.now()`, doppio VIA, pausa/ripresa, blocco di 3
+secondi che simula la scheda rallentata e scadenza a zero.
+
 ## Leggibilità nel tema chiaro
 
 Il tema bianco di Ruzzle usa superfici chiare (`--item-bg`): tutto il testo che ci
@@ -200,10 +219,12 @@ Ogni gioco multiplayer (Ruzzle, Patata Bollente, Nomi Cose Città, Gioco del 15,
 Pictionary) mostra a fine partita un podio con **tutte le posizioni e i punteggi
 corretti**, generato da un unico modulo condiviso:
 
-- `games/shared/podio.js` — `FAWPodio.render(oggetto, righe, { io })`: ordina per
-  punteggio decrescente (parità: nome in ordine alfabetico), assegna il gradino
-  più alto al 1° e scende di 16 px a ogni posizione (minimo 32 px), marca il
-  giocatore corrente con `(TU)` ed escaping dei nomi.
+- `games/shared/podio.js` — `FAWPodio.render(oggetto, righe, { io, unita })`:
+  ordina per punteggio decrescente (parità: nome in ordine alfabetico), assegna
+  il gradino più alto al 1° e scende di 16 px a ogni posizione (minimo 32 px),
+  marca il giocatore corrente con `(TU)` ed escaping dei nomi. Il disegno è
+  **idempotente**: se i dati non cambiano il podio non viene ridisegnato (nessuno
+  sfarfallio quando il documento della partita si aggiorna).
 - `games/shared/podio.css` — struttura e colori di base; ogni gioco sovrascrive
   le variabili `--podio-*` con il proprio tema.
 
@@ -212,8 +233,24 @@ solo i primi tre) e l'altezza dei gradini segue la classifica, mai il contrario.
 Ruzzle riempie il podio con `punteggiAllineati`, quindi mostra gli stessi numeri
 del documento; Pictionary e Gioco del 15 usano i punteggi della partita.
 
-`tests/shared/podio.test.js` copre ordine, gradini, medaglie, `(TU)`, escaping e
-CSS; ogni gioco è verificato anche dal test statico `[9]`.
+Grafica (uguale in tutti i giochi):
+
+- Le colonne sono **griglie con righe di altezza fissa** (medaglia, avatar, nome,
+  gradino, sottotitolo): le basi dei gradini restano incolonnate anche quando un
+  giocatore ha il sottotitolo e un altro no.
+- **Medaglie** 🥇🥈🥉 per i primi tre e numero (`#4`, `#5`…) per gli altri, su una
+  pastiglia colorata con il metallo; `(TU)` è una pastiglia neutra, leggibile su
+  tema chiaro e scuro.
+- I nomi possono andare a capo su due righe e solo dopo vengono accorciati: la
+  pastiglia `(TU)` non taglia più il nome nelle colonne strette.
+- Con 5-6 giocatori le colonne si stringono e, se non entrano, il podio scorre in
+  orizzontale con una sfumatura sul bordo destro che indica che c'è dell'altro.
+- Su schermi stretti (telefono) misure più compatte; i lettori di schermo
+  leggono `1° posto: ALFA, 120 punti, 3 parole`.
+
+`tests/shared/podio.test.js` copre ordine, gradini, medaglie, `(TU)`, escaping,
+le regole grafiche (righe allineate e nomi mai tagliati) e il CSS; ogni gioco è
+verificato anche dal test statico `[9]`.
 
 ## Palestra mobile
 

@@ -84,6 +84,43 @@ ok(/\.podio\s*\{/.test(podioCss) && /\.pod-bar\s*\{/.test(podioCss), 'regole di 
 ok(/height:\s*var\(--pod-h/.test(podioCss), 'l\'altezza del gradino viene da --pod-h');
 ok(/--podio-card/.test(podioCss) && /--podio-text/.test(podioCss), 'variabili di tema sovrascrivibili dai giochi');
 
+console.log('\n[6] Grafica: colonne allineate e nomi mai tagliati');
+const cssRegola = (sel) => {
+  const m = podioCss.match(new RegExp(sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*\\{([^}]*)\\}'));
+  return m ? m[1] : '';
+};
+const griglia = cssRegola('.pod-col');
+ok(/display:\s*grid/.test(griglia), 'ogni colonna è una griglia (righe allineate tra i giocatori)');
+ok(/grid-template-rows:[\s\S]*--podio-medal-h[\s\S]*--podio-name-h[\s\S]*--podio-h-max[\s\S]*--podio-sub-h/.test(griglia),
+  'le righe sono nell\'ordine medaglia → nome → gradino → sottotitolo');
+ok(/align-items:\s*flex-end/.test(cssRegola('.podio')), 'le colonne poggiano sulla stessa base');
+ok(/align-self:\s*end/.test(cssRegola('.pod-bar')), 'il gradino si allinea in fondo (stessa base per tutti)');
+ok(/-webkit-line-clamp:\s*2/.test(cssRegola('.pod-name')), 'i nomi vanno su due righe, mai tagliati a una');
+ok(/width:\s*var\(--podio-avatar\)/.test(cssRegola('.pod-avatar')), 'avatar a misura fissa (nessuna riga fuori asse)');
+ok(/min-width:/.test(cssRegola('.pod-medal')) && /border-radius:\s*999px/.test(cssRegola('.pod-medal')),
+  'medaglie su pastiglia colorata per posizione');
+ok(/\.podio\[data-scroll="1"\][\s\S]{0,200}mask-image/.test(podioCss),
+  'quando il podio scorre una sfumatura indica che c\'è dell\'altro');
+ok(/@media \(max-width:\s*520px\)/.test(podioCss), 'misure compatte su schermi stretti');
+ok(/@media \(prefers-reduced-motion: reduce\)/.test(podioCss), 'rispetta prefers-reduced-motion');
+
+console.log('\n[7] Accessibilità e ridisegno');
+const markup = P.html([{ nome: 'ALFA', punti: 10 }, { nome: 'BETA', punti: 6, sottotitolo: '2 parole' }], { io: 'BETA' });
+ok((markup.match(/role="listitem"/g) || []).length === 2, 'ogni colonna è un elemento di lista');
+ok(/aria-label="1° posto: ALFA, 10 punti"/.test(markup), 'etichetta per i lettori di schermo con posizione e punti');
+ok(/aria-label="2° posto: BETA, 6 punti, 2 parole \(tu\)"/.test(markup), 'l\'etichetta include sottotitolo e (TU)');
+ok(/class="pod-tu"/.test(markup), 'la pastiglia (TU) è nel nome, non fuori');
+const datiStabili = [{ nome: 'ALFA', punti: 10, sottotitolo: '2 parole' }, { nome: 'BETA', punti: 6 }];
+P.render(box, datiStabili, { io: 'ALFA' });
+const colPo1 = box.querySelector('.pod-col');
+P.render(box, datiStabili.map((r) => Object.assign({}, r)), { io: 'ALFA' });
+ok(box.querySelector('.pod-col') === colPo1,
+  'stessi dati e DOM intatto: il podio non viene ridisegnato (niente sfarfallio)');
+P.render(box, [{ nome: 'ALFA', punti: 12 }, { nome: 'BETA', punti: 6 }], { io: 'ALFA' });
+ok(box.querySelector('.pod-col') !== colPo1, 'punteggio cambiato: il podio viene ridisegnato');
+ok(box.querySelectorAll('.pod-col').length === 2, 'nessun doppione dopo i ridisegni');
+ok(box.getAttribute('data-firma') !== null, 'la firma dei dati resta sul contenitore');
+
 console.log('\n=================');
 console.log('PASSATI: ' + passed + '  FALLITI: ' + failed);
 process.exit(failed ? 1 : 0);

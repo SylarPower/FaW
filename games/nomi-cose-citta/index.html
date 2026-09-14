@@ -58,7 +58,9 @@
           <h2>NOMI, COSE, CITTÀ</h2>
           <p class="lobby-sub">
             Una <b>lettera</b> uguale per tutti e una risposta per ogni <b>categoria</b>.
-            Scrivi più in fretta che puoi e premi <b class="gold">STOP</b>: la revisione si apre subito.
+            Scrivi più in fretta che puoi e premi <b class="gold">STOP</b>: chi ferma il gioco con
+            <b>tutte le risposte valide</b> guadagna <b>+10 punti</b>, e gli altri hanno
+            <b>10 secondi</b> per finire di scrivere prima della revisione.
             Il gioco <b>non giudica il significato</b> di una parola: se la ritieni fuori posto,
             contestala con <b class="red">🚫 NON VALIDA</b>. Se invece il dizionario non conosce una
             parola che per te è giusta, difendila con <b>✅ VALIDA</b>.
@@ -117,6 +119,10 @@
 
           <div class="card risposte-card" id="risposte-card">
             <div class="card-label">LE TUE RISPOSTE <span id="risposte-progress" class="feed-count"></span></div>
+            <div id="stop-avviso" class="stop-avviso hidden" role="status" aria-live="polite">
+              <span id="stop-testo"></span>
+              <span id="stop-crono" class="stop-crono">10s</span>
+            </div>
             <div id="campi" class="campi"></div>
             <div class="azioni-risposte">
               <span class="save-state" id="save-state" aria-live="polite">—</span>
@@ -209,6 +215,12 @@
         <a class="btn btn-ghost" href="../../index.html">🏠 HOME</a>
       </div>
     </div>
+  </div>
+
+  <!-- Conto alla rovescia di apertura round: lettera e campi appaiono al VIA -->
+  <div id="via-overlay" class="via-overlay hidden" role="status" aria-live="assertive" aria-label="Inizio del round">
+    <div class="via-num" id="via-num">3</div>
+    <div class="via-text" id="via-text">Tutti pronti…</div>
   </div>
 
   <div id="banner" class="banner hidden"></div>

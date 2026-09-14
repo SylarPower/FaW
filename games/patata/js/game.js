@@ -11,7 +11,10 @@
      * MIX       → alternanza deterministica round per round
    - Chi sta giocando deve scrivere una parola (min 4 lettere, presente
      nel dizionario Ruzzle) che rispetti la regola del turno.
-   - Parola corretta  → +5 secondi al timer e la patata passa al prossimo.
+   - Parola corretta  → +secondi al timer (bonus a scalare: +5 nel primo minuto
+     di turno, poi +4, +3, +2 e infine +1) e la patata passa al prossimo.
+     Il timer ha un tetto: non supera mai il tempo configurato (es. 60s).
+   - Si scrive SOLO al proprio turno: fuori turno la casella è disabilitata.
    - Parola sbagliata → feedback di errore, tempo invariato (nessuna penalità).
    - Tempo a zero     → chi tiene la patata "si scotta" (−10 pt) e si
      apre il recap: tutte le parole del turno, tutti confermano e si
@@ -32,7 +35,12 @@
 
   /* ---------------- COSTANTI ---------------- */
   const MIN_WORD_LENGTH = 4;
-  const TIME_BONUS = 5000;        // +5 s per parola corretta
+  const TIME_BONUS = 5000;        // +5 s per parola corretta (bonus pieno, primo minuto di turno)
+  /* Il bonus cala di un secondo ogni minuto di TURNO: 0-60s → +5, 60-120s → +4,
+     120-180s → +3, 180-240s → +2, oltre → +1. Si azzera a ogni nuovo turno
+     (ogni turno riparte dal bonus pieno). */
+  const TIME_BONUS_STEPS = [5, 4, 3, 2, 1];
+  const TIME_BONUS_STEP_MS = 60000;
   const WRONG_PENALTY = 0;        // La parola sbagliata non toglie tempo
   const PATATA_PENALTY = 10;      // −10 pt per la scottatura
   const TIMEOUT_GRACE = 2500;     // tolleranza prima di dichiarare la scottatura
@@ -51,6 +59,20 @@
     A: 8, E: 12, I: 9, O: 10, U: 3, L: 7, R: 6, N: 5, T: 5, S: 4, C: 4,
     M: 4, D: 3, P: 3, B: 2, G: 2, F: 1, V: 1, Z: 1, H: 1
   };
+
+  /**
+   * Secondi di bonus per una parola corretta, in base a quanto è durato il
+   * turno: 5 nel primo minuto, poi 4, 3, 2 e infine 1 (mai sotto 1).
+   * Deterministico: stesso `now` → stesso bonus su ogni client.
+   */
+  function bonusPerParola(state, now) {
+    /* `inizio` può valere 0 (clock di test che parte da zero): il controllo
+       esplicito evita di scambiarlo per "nessun inizio". */
+    const t = state && state.turno ? Number(state.turno.inizio) : NaN;
+    const inizio = isFinite(t) ? t : now;
+    const minuti = Math.floor(Math.max(0, now - inizio) / TIME_BONUS_STEP_MS);
+    return TIME_BONUS_STEPS[Math.min(TIME_BONUS_STEPS.length - 1, minuti)];
+  }
 
   function pointsFor(len) {
     if (len <= 4) return 1;
@@ -471,8 +493,14 @@
     const v = validateWord(ctx.word, ctx.letters, ctx.used, ctx.dict, rule);
     if (!v.ok) return { __error: { code: 'INVALID', detail: v.err } };
     const next = nextPlayer(state, ctx.me);
+    /* Bonus del turno (cala col passare dei minuti) e TETTO al tempo
+       configurato: il conto alla rovescia non può mai superare, per esempio,
+       i 60 secondi. */
+    const bonusMs = bonusPerParola(state, ctx.now) * 1000;
+    const tetto = ctx.now + state.opzioni.tempo * 1000;
+    const deadline = Math.min(Math.max(state.turno.deadline, ctx.now) + bonusMs, tetto);
     return {
-      'turno.deadline': Math.max(state.turno.deadline, ctx.now) + TIME_BONUS,
+      'turno.deadline': deadline,
       'turno.riferimento': ctx.now,
       'turno.giocatore': next,
       'turno.ultimo': { nome: ctx.me, w: v.w, p: v.p, ok: true, ts: ctx.now },
@@ -792,7 +820,8 @@
   /* ---------------- ESPOSIZIONE PER TEST ---------------- */
   const core = {
     MIN_WORD_LENGTH, TIME_BONUS, WRONG_PENALTY, PATATA_PENALTY, TIMEOUT_GRACE,
-    LETTER_THRESHOLD, LETTER_WEIGHTS,
+    LETTER_THRESHOLD, LETTER_WEIGHTS, TIME_BONUS_STEPS, TIME_BONUS_STEP_MS,
+    bonusPerParola,
     cyrb128, sfc32, normalizeWord, LetterIndex, pickLetters, weightedLetter,
     pointsFor, applyPartial, setPath, roundOrderFor, nextPlayer, usedWords,
     findWordAuthor, flagThreshold, flagsByOthers, flagResolved, validateWord,
@@ -836,6 +865,7 @@
     prevUltimoTs: 0,
     prevRound: 0,
     lastWholeSec: -1,
+    lastBonus: -1,
     statsSaved: false,
     redirected: false,
     lastFeedbackTimer: null,
@@ -1215,11 +1245,12 @@
     // Turn banner
     if (s.roundData && s.roundData.fase === 'giochi' && s.turno) {
       el['turn-banner'].classList.remove('hidden');
+      const bonusCorrente = bonusPerParola(s, Date.now());
       if (s.turno.giocatore === G.me) {
-        el['turn-banner'].textContent = '🔥 TOCCA A TE — SCRIVI UNA PAROLA!';
+        el['turn-banner'].textContent = '🔥 TOCCA A TE — SCRIVI UNA PAROLA! (+' + bonusCorrente + 's)';
         el['turn-banner'].classList.add('mine');
       } else {
-        el['turn-banner'].textContent = 'TOCCA A ' + s.turno.giocatore.toUpperCase();
+        el['turn-banner'].textContent = 'TOCCA A ' + s.turno.giocatore.toUpperCase() + ' · +' + bonusCorrente + 's';
         el['turn-banner'].classList.remove('mine');
       }
     } else {
@@ -1231,47 +1262,44 @@
 
   /**
    * Stato della casella di scrittura.
-   * La casella resta SEMPRE scrivibile durante il turno di gioco: anche chi
-   * non ha la patata prepara la sua parola, così al proprio turno deve solo
-   * premere INVIO. L'invio effettivo resta possibile solo al proprio turno
-   * (il mutatore rifiuta comunque qualsiasi scrittura fuori turno).
+   * Si scrive SOLO quando la patata è nostra: fuori turno la casella è
+   * disabilitata e vuota (nessuna parola preparata in anticipo). L'invio
+   * resta possibile solo al proprio turno: il mutatore rifiuta comunque
+   * qualsiasi scrittura fuori turno, questa è la parte visibile della regola.
    * Chiamata a ogni snapshot E a ogni battuta (per aggiornare l'etichetta).
    */
   function aggiornaInput(s) {
     if (!s) return;
     const inGioco = !!(s.roundData && s.roundData.fase === 'giochi' && s.turno);
     const myTurn = inGioco && s.turno.giocatore === G.me;
-    const bozza = normalizeWord(el['word-input'].value);
-    el['word-input'].disabled = !inGioco;
-    el['btn-invia'].disabled = !inGioco;
+    if (!myTurn && el['word-input'].value) el['word-input'].value = '';
+    el['word-input'].disabled = !myTurn;
+    el['btn-invia'].disabled = !myTurn;
     el['word-input'].classList.toggle('ready', myTurn);
-    el['word-input'].classList.toggle('bozza', !myTurn && !!bozza);
     el['btn-invia'].classList.toggle('btn-fire', myTurn);
     el['btn-invia'].classList.toggle('btn-ghost', !myTurn);
+    const bonus = inGioco ? bonusPerParola(s, Date.now()) : 0;
     if (myTurn) {
-      el['word-input'].placeholder = bozza
-        ? 'Parola pronta: premi INVIO per inviarla'
-        : 'Scrivi la parola… (INVIO)';
+      el['word-input'].placeholder = 'Scrivi la parola… (INVIO)';
       el['btn-invia'].textContent = 'INVIA';
       if (document.hasFocus() && document.activeElement !== el['word-input']) {
         el['word-input'].focus({ preventScroll: true });
       }
     } else {
-      const next = s.turno ? s.turno.giocatore : (s.partecipanti[0] || '');
-      el['word-input'].placeholder = bozza
-        ? 'Parola pronta: inviala quando tocca a te'
-        : 'Prepara la tua parola (ora tocca a ' + next + ')…';
-      el['btn-invia'].textContent = bozza ? '✔ PRONTA' : 'PREPARA';
+      el['word-input'].placeholder = inGioco ? '⏳ Aspetta il tuo turno…' : '—';
+      el['btn-invia'].textContent = '⏳';
     }
 
-    // Striscia "preparazione": dice a tutti che si può già scrivere
+    // Striscia informativa: dice quando si può scrivere e quanto vale il bonus
     if (el['input-prep']) {
       el['input-prep'].classList.toggle('hidden', !inGioco);
       el['input-prep'].innerHTML = myTurn
-        ? '<b>🔥 Tocca a te:</b> invia la parola per passare la patata.'
-        : '<b>✍️ Puoi già scrivere:</b> la parola resta pronta nella casella ' +
-          'e la invii quando tocca a te (ora gioca <b>' +
-          esc(s.turno ? s.turno.giocatore : '') + '</b>).';
+        ? '<b>🔥 Tocca a te:</b> invia una parola per passare la patata — ' +
+          '<b>+' + bonus + 's</b> sul cronometro.'
+        : '<b>⏳ Tocca a ' + esc(s.turno ? s.turno.giocatore : '') + ':</b> ' +
+          'potrai scrivere solo al tuo turno. ' +
+          'Ogni parola vale <b>+' + bonus + 's</b>' +
+          (bonus < TIME_BONUS_STEPS[0] ? ' (il bonus cala di 1s ogni minuto di turno)' : '') + '.';
     }
   }
 
@@ -1675,8 +1703,8 @@
   function onUltimo(ultimo, s) {
     if (ultimo.ok) {
       showFeedback('ok', '✅ ' + ultimo.w + '  +' + ultimo.p + ' pt — passa a ' + nextPlayer(s, ultimo.nome).toUpperCase());
-      // Svuota la casella solo a chi ha appena giocato: la bozza preparata
-      // dagli altri deve sopravvivere al passaggio della patata.
+      // Svuota la casella di chi ha appena giocato (nessuna parola
+      // preparata in anticipo: ogni turno riparte dalla casella vuota).
       if (ultimo.nome === G.me) el['word-input'].value = '';
       updateInputHint();
     } else if (ultimo.patata) {
@@ -1700,6 +1728,12 @@
   const RING_C = 2 * Math.PI * 88;
   function ringFrame() {
     const s = G.state;
+    // Il bonus cala nel tempo: la striscia va rinfrescata "a ogni secondo
+    // intero" anche senza snapshot (altrimenti mostrerebbe il valore vecchio).
+    if (s && s.stato === 'in_corso' && s.roundData && s.roundData.fase === 'giochi' && s.turno) {
+      const b = bonusPerParola(s, Date.now());
+      if (b !== G.lastBonus) { G.lastBonus = b; aggiornaInput(s); }
+    }
     const attivo = s && s.stato === 'in_corso' && s.roundData && s.roundData.fase === 'giochi' && s.turno;
     if (attivo) {
       const now = Date.now();
@@ -1738,20 +1772,11 @@
     const rule0 = ruleFor(s);
     const ctx0 = ctxFor({ word: el['word-input'].value, rule: rule0 });
 
-    // Non è il mio turno: la parola resta nella casella come BOZZA e viene
-    // controllata subito, così chi aspetta sa già se è buona (nessuna
-    // scrittura su Firestore: la patata non passa).
+    // Fuori turno non si scrive: la casella è disabilitata e il pulsante anche.
+    // Il controllo resta come rete di sicurezza (es. click da tastiera o
+    // snapshot in ritardo): nessuna scrittura, nessuna parola preparata prima.
     if (!s.turno || s.turno.giocatore !== G.me) {
-      const prep = validateWord(ctx0.word, ctx0.letters, ctx0.used, ctx0.dict, rule0);
-      if (prep.err === 'EMPTY') { toast('Scrivi una parola per prepararti…'); return; }
-      if (!prep.ok) {
-        if (prep.err === 'USED') showFeedback('err', '❌ Parola già usata in questa partita');
-        else showFeedback('err', msgForErr(prep));
-        toast('Correggi la parola: al tuo turno dovrai inviarla subito');
-        return;
-      }
-      showFeedback('ok', '💾 ' + prep.w + ' è pronta (+' + prep.p + ' pt) — inviala quando tocca a te');
-      toast('Parola pronta: attendi il tuo turno ⏳');
+      toast('⏳ Aspetta il tuo turno per scrivere');
       aggiornaInput(s);
       return;
     }
@@ -1820,7 +1845,7 @@
     });
     el['word-input'].addEventListener('input', () => {
       updateInputHint();
-      aggiornaInput(G.state);   // l'etichetta del pulsante segue la bozza
+      aggiornaInput(G.state);   // l'etichetta del pulsante segue il turno
     });
     el['btn-invia'].addEventListener('click', inviaParola);
     el['btn-conferma'].addEventListener('click', confermaTurno);

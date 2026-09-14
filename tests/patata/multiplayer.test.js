@@ -156,7 +156,11 @@ const waitSnap = async (name, pred, what, timeout = 5000) => {
       me: 'ALFA', now: Date.now(), letters: lA, used: C.usedWords(st), dict: FAKE_SET, word: w1, rule: 'classic'
     }));
     await waitSnap('BETA', (s) => s.turno.giocatore === 'BETA', 'patata a BETA');
-    ok(clients['BETA'].state.turno.deadline >= d0 + 5000, 'deadline +5s sincronizzata');
+    ok(clients['BETA'].state.turno.deadline >= d0, 'la parola non toglie tempo (sincronizzato)');
+    ok(clients['BETA'].state.turno.deadline - Date.now() <= 5 * 1000 + 250,
+      'tetto rispettato anche fra client: al massimo ' +
+      Math.round((clients['BETA'].state.turno.deadline - Date.now()) / 1000) +
+      's di cronometro (tempo configurato 5s)');
     eq(clients['GAMMA'].state.punteggi.ALFA, C.pointsFor(w1.length), 'punti ALFA visibili a GAMMA');
 
     // BETA prova a sottomettere per conto di ALFA: rifiutato

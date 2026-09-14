@@ -31,6 +31,9 @@
   const PUNTI_SOLO_VALIDA = 20;      // unica risposta valida della categoria (precede il 10)
   const PUNTI_ALLENAMENTO = 10;      // allenamento solo: 10 per risposta automaticamente valida
   const TIMEOUT_GRACE = 2500;        // tolleranza sulle scadenze condivise (convenzione Patata)
+  const VIA_COUNTDOWN_MS = 3400;     // 3·2·1 di apertura round (lettera e campi appaiono al VIA)
+  const STOP_GRAZIA_MS = 10000;      // dopo lo STOP gli altri hanno 10s per finire di scrivere
+  const BONUS_STOP = 10;             // punti a chi chiude il round con TUTTE le risposte valide
   const RISULTATI_HOLD_MS = 9000;    // quanto resta visibile il recap del round prima di avanzare
   const STUCK_FALLBACK_MS = 12000;   // subentro se il referente non agisce (convenzione Patata)
   const ACTION_RETRY_MIN = 2000;
@@ -48,16 +51,21 @@
      Gli identificativi (`id`) sono stabili e usati come chiavi nei dati;
      le etichette (`label`) sono solo visualizzate e possono cambiare. */
   const CATEGORIE_BASE = [
-    { id: 'nomi', label: 'Nomi', icona: '👤' },
+    { id: 'nomi', label: 'Nomi di persona', icona: '👤' },
     { id: 'cose', label: 'Cose', icona: '📦' },
     { id: 'citta', label: 'Città', icona: '🏙️' },
     { id: 'animali', label: 'Animali', icona: '🐾' },
+    { id: 'frutta', label: 'Frutta o Verdura', icona: '🍎' },
     { id: 'mestieri', label: 'Mestieri', icona: '🛠️' },
-    { id: 'piante', label: 'Piante', icona: '🌿' }
+    { id: 'colori', label: 'Colori', icona: '🎨' }
   ];
+  /* `multi` è l'insieme multi-categoria ufficiale (7 categorie, in questo
+     ordine); `classic` ne è l'alias storico usato dalle partite già create. */
+  const MULTI_CATEGORIE = ['nomi', 'cose', 'citta', 'animali', 'frutta', 'mestieri', 'colori'];
   const PRESET_CATEGORIE = {
     light: ['nomi', 'cose', 'citta'],
-    classic: ['nomi', 'cose', 'citta', 'animali', 'mestieri', 'piante']
+    multi: MULTI_CATEGORIE.slice(),
+    classic: MULTI_CATEGORIE.slice()
   };
   const MAX_CATEGORIE = 10;
   const MIN_CATEGORIE = 1;
@@ -292,7 +300,7 @@
       const base2 = CATEGORIE_BASE.filter((c) => c.id === id)[0];
       out.push({ id, label: label || id, icona: (item && item.icona) || (base2 ? base2.icona : '📝') });
     });
-    if (!out.length) out.push({ id: 'nomi', label: 'Nomi', icona: '👤' });
+    if (!out.length) out.push({ id: 'nomi', label: 'Nomi di persona', icona: '👤' });
     return out.slice(0, MAX_CATEGORIE);
   }
 
@@ -322,6 +330,9 @@
       round: num(o.round != null ? o.round : o.turni, 3, 1, 10),
       tempo: num(o.tempo, 120, 30, 600),
       revisione: num(o.revisione, 90, 20, 600),
+      // Secondi di grazia dopo lo STOP (richiesta di gioco: 10s agli altri
+      // per finire di scrivere). Configurabile solo per i test.
+      graziaStop: num(o.graziaStop, 10, 2, 30),
       seed: typeof o.seed === 'string' && o.seed ? o.seed : 'SEED',
       mode: o.mode || 'classica',
       categorie: categoriePerPartita(o.categorie),
@@ -374,11 +385,17 @@
       esitoId: rd.esitoId || null,
       dictVersion: rd.dictVersion || null,
       annullateManuali: Array.isArray(rd.annullateManuali) ? rd.annullateManuali.slice() : [],
-      validateManuali: Array.isArray(rd.validateManuali) ? rd.validateManuali.slice() : []
+      validateManuali: Array.isArray(rd.validateManuali) ? rd.validateManuali.slice() : [],
+      completati: Array.isArray(rd.completati) ? rd.completati.slice() : []
     };
   }
 
-  /** Dati del round nuovo: categorie, partecipanti e lettera fissati PRIMA della compilazione. */
+  /**
+   * Dati del round nuovo: categorie, partecipanti e lettera fissati PRIMA della
+   * compilazione. Il round si APRE con il 3·2·1 (`VIA_COUNTDOWN_MS`): la
+   * finestra di scrittura dura esattamente `opzioni.tempo` e parte al VIA,
+   * quindi `inizio` è l'istante del VIA e `deadline` lo segue di `tempo`.
+   */
   function nuovoRoundData(round, state, now, dictVersion) {
     const op = state.opzioni;
     const lettera = letteraPerRound(op.seed, op.lettere, round);
@@ -390,8 +407,8 @@
       partecipanti: state.partecipanti.slice(),
       fase: 'compilazione',
       faseVersion: 1,
-      inizio: now,
-      deadline: now + op.tempo * 1000,
+      inizio: now + VIA_COUNTDOWN_MS,
+      deadline: now + VIA_COUNTDOWN_MS + op.tempo * 1000,
       stop: null,
       voti: {},
       votiValida: {},
@@ -399,7 +416,11 @@
       esitoId: null,
       dictVersion: dictVersion || null,
       annullateManuali: [],
-      validateManuali: []
+      validateManuali: [],
+      // Chi ha completato tutte le categorie, in ordine di arrivo: serve al
+      // bonus STOP (se chi ferma il gioco ha un errore, il bonus passa al
+      // primo che aveva finito).
+      completati: []
     };
   }
 
@@ -545,6 +566,81 @@
     return celle;
   }
 
+  /* ---------------- BONUS STOP ----------------
+     Chi ferma il gioco guadagna BONUS_STOP punti SOLO se tutte le sue
+     risposte sono valide; altrimenti il bonus passa al primo giocatore che
+     aveva finito di scrivere (tutte le categorie piene), nell'ordine in cui
+     ha completato. Un timeout senza STOP non assegna il bonus. La
+     valutazione avviene sull'esito effettivo (dizionario + voti), quindi una
+     parola annullata in revisione fa scattare il passaggio. */
+  function celleDi(celle, nome) {
+    return (celle || []).filter((c) => c.nome === nome);
+  }
+  function rispostaCompleta(c) {
+    return !!String(c.raw == null ? '' : c.raw).trim();
+  }
+  /** tutte le risposte valide e presenti (celle vuote = incomplete). */
+  function esitoCandidato(celle, nome) {
+    const mie = celleDi(celle, nome);
+    if (!mie.length || !mie.every(rispostaCompleta)) {
+      return { nome: nome, esito: 'INCOMPLETA', categorie: mie.filter((c) => !rispostaCompleta(c)).map((c) => c.cat) };
+    }
+    const cattive = mie.filter((c) => !c.valida || c.annullata);
+    if (cattive.length) {
+      return { nome: nome, esito: 'NON_VALIDA', categorie: cattive.map((c) => c.cat) };
+    }
+    return { nome: nome, esito: 'OK', categorie: [] };
+  }
+  /**
+   * Ordine di valutazione del bonus: chi ha premuto STOP, poi gli altri in
+   * ordine di completamento (`roundData.completati`), infine — per i round
+   * senza marcatori (partite vecchie o scrittura persa) — chi ha tutte le
+   * categorie piene, nell'ordine dei partecipanti.
+   */
+  function ordineBonus(rd, celle) {
+    const ordine = [];
+    const push = (nome) => {
+      if (nome && ordine.indexOf(nome) === -1) ordine.push(nome);
+    };
+    if (rd.stop && rd.stop.da && rd.stop.da !== 'TEMPO') push(rd.stop.da);
+    (rd.completati || [])
+      .slice()
+      .sort((a, b) => ((a && a.ts) || 0) - ((b && b.ts) || 0))
+      .forEach((e) => push(e && e.nome));
+    (rd.partecipanti || []).forEach((nome) => {
+      if (ordine.indexOf(nome) !== -1) return;
+      const mie = celleDi(celle, nome);
+      if (mie.length && mie.every(rispostaCompleta)) push(nome);
+    });
+    return ordine;
+  }
+  /**
+   * Bonus STOP del round. Ritorna anche il dettaglio dei candidati, così la
+   * UI può spiegare perché il bonus è stato assegnato o annullato.
+   */
+  function bonusStop(opts) {
+    const rd = (opts && opts.roundData) || {};
+    const celle = (opts && opts.celle) || [];
+    const stop = rd.stop;
+    if (!stop || !stop.da) {
+      return { nome: null, punti: 0, motivo: 'SENZA_STOP', ordine: [], dettagli: [] };
+    }
+    if (stop.da === 'TEMPO') {
+      return { nome: null, punti: 0, motivo: 'TEMPO_SCADUTO', ordine: [], dettagli: [] };
+    }
+    const ordine = ordineBonus(rd, celle);
+    const dettagli = ordine.map((nome) => esitoCandidato(celle, nome));
+    const vincitore = dettagli.filter((d) => d.esito === 'OK')[0] || null;
+    return {
+      nome: vincitore ? vincitore.nome : null,
+      punti: vincitore ? BONUS_STOP : 0,
+      motivo: vincitore ? 'ASSEGNATO' : 'NESSUNO_VALIDO',
+      fermatoDa: stop.da,
+      ordine: ordine,
+      dettagli: dettagli
+    };
+  }
+
   /**
    * Esito congelato di un round: validazione + contestazioni + punti.
    * Deterministico: stessi input (risposte accettate, voti, quorum,
@@ -589,14 +685,19 @@
     const punti = mapZero(quorum);
     celle.forEach((c) => { punti[c.nome] = (punti[c.nome] || 0) + c.punti; });
 
+    // Bonus STOP: entra nel totale del round, quindi in `punteggiDaRisultati`.
+    const bonus = bonusStop({ roundData: rd, celle: celle });
+    if (bonus.nome) punti[bonus.nome] = (punti[bonus.nome] || 0) + bonus.punti;
+
     const risultato = {
       id: rd.id,
       round: rd.round,
       lettera: rd.lettera,
       celle: celle,
-      punti: punti
+      punti: punti,
+      bonus: bonus
     };
-    return { celle: celle, punti: punti, risultato: risultato };
+    return { celle: celle, punti: punti, risultato: risultato, bonus: bonus };
   }
 
   /** Punteggio di allenamento: 10 per risposta automaticamente valida, 0 altrimenti. */
@@ -725,7 +826,21 @@
     };
   }
 
-  /** STOP: chiude la compilazione e apre la revisione. Il primo accettato vince. */
+  /** Secondi di grazia dopo lo STOP (10s di default, vedi `opzioni.graziaStop`). */
+  function graziaStopMs(state) {
+    const op = (state && state.opzioni) || {};
+    const sec = parseInt(op.graziaStop, 10);
+    if (!isFinite(sec) || sec <= 0) return STOP_GRAZIA_MS;
+    return Math.min(30, Math.max(2, sec)) * 1000;
+  }
+
+  /**
+   * STOP: il round è fermato, ma non chiuso. Gli ALTRI giocatori hanno
+   * `graziaStop` secondi (10 di default) per finire di scrivere: la fase resta
+   * 'compilazione' e le scritture tardive sono accettate fino alla nuova
+   * scadenza. Allo scadere della grazia si apre la revisione come sempre.
+   * Il primo STOP accettato vince; chi l'ha premuto non può ripeterlo.
+   */
   function mutStop(state, ctx) {
     if (state.stato !== 'in_corso' || !state.roundData) return null;
     const rd = state.roundData;
@@ -734,28 +849,48 @@
     if (rd.partecipanti.indexOf(ctx.me) === -1) return { __error: { code: 'NON_PARTECIPANTE' } };
     return {
       'roundData.stop': { da: ctx.me, ts: ctx.now },
+      'roundData.faseVersion': rd.faseVersion + 1,
+      'roundData.inizio': ctx.now,                             // il countdown riparte da qui…
+      'roundData.deadline': ctx.now + graziaStopMs(state)      // …e copre solo la grazia
+    };
+  }
+
+  /** Transizione a revisione (fine compilazione o fine della grazia di STOP). */
+  function apriRevisione(state, rd, now, stopDa, stopTs) {
+    return {
+      'roundData.stop': { da: stopDa, ts: stopTs },
       'roundData.fase': 'revisione',
       'roundData.faseVersion': rd.faseVersion + 1,
-      'roundData.inizio': ctx.now,
-      'roundData.deadline': ctx.now + state.opzioni.revisione * 1000,
+      'roundData.inizio': now,
+      'roundData.deadline': now + state.opzioni.revisione * 1000,
       'roundData.conferme': []
     };
   }
 
-  /** Scadenza della compilazione: stessa transizione dello STOP. */
+  /**
+   * Scadenza della compilazione. Due casi:
+   *  - nessuno ha premuto STOP → la compilazione è finita, si apre la revisione;
+   *  - qualcuno ha premuto STOP → scade la grazia concessa agli altri.
+   */
   function mutTimeoutCompilazione(state, ctx) {
     if (state.stato !== 'in_corso' || !state.roundData) return null;
     const rd = state.roundData;
     if (rd.fase !== 'compilazione') return null;
-    if (rd.stop) return null;
     if (ctx.now <= rd.deadline + TIMEOUT_GRACE) return null;
+    if (rd.stop) return apriRevisione(state, rd, ctx.now, rd.stop.da, rd.stop.ts);
+    return apriRevisione(state, rd, ctx.now, 'TEMPO', ctx.now);
+  }
+
+  /** Un giocatore ha completato tutte le categorie: entra in coda per il bonus STOP. */
+  function segnaCompletato(state, ctx) {
+    if (state.stato !== 'in_corso' || !state.roundData) return null;
+    const rd = state.roundData;
+    if (rd.fase !== 'compilazione') return null;
+    if (rd.esitoId) return null;
+    if (rd.partecipanti.indexOf(ctx.me) === -1) return null;
+    if ((rd.completati || []).some((e) => e && e.nome === ctx.me)) return null;
     return {
-      'roundData.stop': { da: 'TEMPO', ts: ctx.now },
-      'roundData.fase': 'revisione',
-      'roundData.faseVersion': rd.faseVersion + 1,
-      'roundData.inizio': ctx.now,
-      'roundData.deadline': ctx.now + state.opzioni.revisione * 1000,
-      'roundData.conferme': []
+      'roundData.completati': { __op: 'union', items: [{ nome: ctx.me, ts: ctx.now }] }
     };
   }
 
@@ -976,11 +1111,12 @@
   const core = {
     // costanti
     MIN_WORD_LENGTH, PUNTI_DUPLICATO, PUNTI_DISTINTA, PUNTI_SOLO_VALIDA,
-    PUNTI_ALLENAMENTO, TIMEOUT_GRACE, RISULTATI_HOLD_MS, STUCK_FALLBACK_MS,
+    PUNTI_ALLENAMENTO, TIMEOUT_GRACE, VIA_COUNTDOWN_MS, STOP_GRAZIA_MS, BONUS_STOP,
+    RISULTATI_HOLD_MS, STUCK_FALLBACK_MS,
     ACTION_RETRY_MIN, ACTION_RETRY_MAX, RATE_LIMIT_BACKOFF_MIN,
     RATE_LIMIT_BACKOFF_MAX, TICK_MS, DICT_CACHE_TTL, DICT_CACHE_KEY,
-    DICT_CACHE_KEY_ALT, CATEGORIE_BASE, PRESET_CATEGORIE, LETTERE_BASE,
-    MAX_CATEGORIE, MIN_CATEGORIE,
+    DICT_CACHE_KEY_ALT, CATEGORIE_BASE, PRESET_CATEGORIE, MULTI_CATEGORIE,
+    LETTERE_BASE, MAX_CATEGORIE, MIN_CATEGORIE,
     // rng / lettere
     cyrb128, sfc32, generaSequenzaLettere, letteraPerRound, lettereSupportate,
     conteggioPerIniziale,
@@ -996,12 +1132,14 @@
     // regole
     validaRisposta, motivoTesto, unanime, rispostaAnnullata, rispostaValidata,
     statoVotazione,
-    assegnaPuntiCategoria, calcolaEsitoRound, assegnaPuntiAllenamento,
+    assegnaPuntiCategoria, calcolaEsitoRound, bonusStop, graziaStopMs,
+    assegnaPuntiAllenamento,
     calcolaEsitoAllenamento, punteggiDaRisultati, classifica, vincitore,
     // mutatori
     mutReady, mutStart, mutStop, mutTimeoutCompilazione, mutVota, mutVotaValida,
     mutConfermaRevisione, mutChiudiRevisione, mutProssimoRound,
     mutConsegnaSolo, mutAnnullaManualeSolo, mutValidaManualeSolo,
+    segnaCompletato,
     // helper
     quorumRound, referenteAzione, risposteComplete
   };

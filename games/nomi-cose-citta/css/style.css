@@ -213,6 +213,7 @@ button { font-family: var(--font); }
   padding: 6px 12px; border-radius: 999px;
   background: var(--acc-soft); color: var(--acc-1); border: 1px solid var(--acc-border);
 }
+.fase-chip.stop-grazia { background: #fef3c7; color: #92400e; border-color: #fcd34d; }
 .fase-chip.revisione { background: var(--info-soft); color: var(--info); border-color: #bae6fd; }
 .fase-chip.risultati { background: var(--ok-soft); color: var(--ok); border-color: #bbf7d0; }
 
@@ -238,6 +239,26 @@ button { font-family: var(--font); }
 }
 .campo input:focus { outline: 2px solid var(--acc-0); outline-offset: 1px; border-color: var(--acc-0); }
 .campo input:disabled { background: var(--card-2); color: var(--text-2); }
+
+/* ---------- STOP: grazia di 10s agli altri giocatori ---------- */
+.stop-avviso {
+  display: flex; align-items: center; gap: 10px; margin-top: 10px;
+  padding: 9px 12px; border-radius: var(--radius-sm);
+  background: var(--gold-soft, #fef3c7); border: 1px solid #fcd34d;
+  color: #92400e; font-size: 0.82rem; font-weight: 700;
+}
+.stop-avviso.hidden { display: none; }
+.stop-avviso .stop-crono {
+  margin-left: auto; font-weight: 900; font-variant-numeric: tabular-nums;
+  background: #fff; border: 1px solid #fcd34d; border-radius: 999px;
+  padding: 2px 10px; color: #92400e;
+}
+.stop-avviso .stop-crono.danger { background: var(--danger); border-color: var(--danger); color: #fff; }
+
+/* Righe del bonus STOP nel recap del round */
+.st-row.bonus-stop.ok { border-color: #fcd34d; background: #fffbeb; }
+.st-row.bonus-stop.no { border-style: dashed; }
+.st-row.bonus-stop .st-lettera { color: var(--text-1); }
 
 .azioni-risposte {
   display: flex; align-items: center; justify-content: space-between;
@@ -288,6 +309,40 @@ button { font-family: var(--font); }
 .st-row .st-lettera { font-weight: 900; color: var(--acc-1); }
 .st-row .st-pts { margin-left: auto; font-weight: 800; }
 .storico-empty { color: var(--text-2); font-size: 0.82rem; }
+
+/* ---------- 3·2·1 di apertura round ---------- */
+/* Finché il countdown è attivo la lettera e i campi restano NASCOSTI:
+   compaiono al VIA (visibility, non display: il testo resta nel DOM). */
+#screen-gioco.via .lettera-tile,
+#screen-gioco.via .risposte-card { visibility: hidden; }
+
+.via-overlay {
+  position: fixed; inset: 0; z-index: 950;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 8px; text-align: center; color: #fff;
+  background: radial-gradient(circle at 50% 42%, rgba(79, 70, 229, 0.97), rgba(17, 24, 39, 0.98));
+}
+.via-overlay.hidden { display: none; }
+.via-num {
+  font-size: clamp(6rem, 24vw, 16rem); font-weight: 900; line-height: 1;
+  letter-spacing: -0.05em; text-shadow: 0 14px 44px rgba(0, 0, 0, 0.45);
+}
+.via-num.pop { animation: via-pop 0.9s cubic-bezier(0.2, 0.9, 0.25, 1) both; }
+.via-num.via-via {
+  font-size: clamp(4.5rem, 17vw, 12rem); color: #fde68a; letter-spacing: 0.02em;
+}
+.via-text {
+  font-size: clamp(0.85rem, 2.4vw, 1.15rem); font-weight: 800;
+  letter-spacing: 0.16em; text-transform: uppercase; opacity: 0.92; padding: 0 16px;
+}
+@keyframes via-pop {
+  0% { transform: scale(0.35); opacity: 0; }
+  35% { transform: scale(1.14); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .via-num.pop { animation-duration: 0.01s; }
+}
 
 /* ---------- Overlay ---------- */
 .overlay {

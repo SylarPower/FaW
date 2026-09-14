@@ -96,7 +96,10 @@ async function until(fn, what, timeout = 20000) {
   document.getElementById('btn-invia').click();
   ok(await until(() => window.__PATATA.state.storia.length === 1, 'storia 1 parola'), 'parola accettata in storia');
   const s1 = window.__PATATA.state;
-  ok(s1.turno.deadline >= dBefore + 5000, 'deadline +5s (da ' + (dBefore - s0.turno.inizio) + 's a ' + (s1.turno.deadline - s0.turno.inizio) + 's dal via)');
+  ok(s1.turno.deadline >= dBefore, 'la parola non toglie tempo al cronometro');
+  ok(s1.turno.deadline - s1.turno.inizio <= 60 * 1000,
+    'tetto: il cronometro non supera il tempo configurato (60s) — ' +
+    Math.round((s1.turno.deadline - s1.turno.inizio) / 1000) + 's dal via del turno');
   ok(s1.punteggi.GIOCATORE > 0, 'punti assegnati: ' + s1.punteggi.GIOCATORE);
   ok(document.getElementById('feed').textContent.includes(validWord), 'parola nel feed');
   ok(document.getElementById('scoreboard').textContent.includes(s1.punteggi.GIOCATORE), 'punteggio nello scoreboard');

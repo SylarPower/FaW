@@ -64,10 +64,13 @@
           <h2>PATATA BOLLENTE</h2>
           <p class="lobby-sub">
             A turno, scrivi una parola che <b>contenga tutte le lettere richieste</b> prima che scada
-            il tempo. Ogni parola valida: <b class="gold">+5 secondi</b> e la patata passa al prossimo.
+            il tempo. Ogni parola valida aggiunge secondi e passa la patata al prossimo:
+            si parte da <b class="gold">+5s</b>, poi <b class="gold">+4s</b>, <b class="gold">+3s</b>,
+            <b class="gold">+2s</b> e infine <b class="gold">+1s</b> (un secondo in meno ogni minuto
+            di turno). Il cronometro non supera mai il tempo configurato.
             Chi tiene la patata quando arriva a zero… <b class="red">si scotta (−10 pt)</b>. 🫠<br>
-            La casella è <b>sempre scrivibile</b>: prepara la tua parola anche quando tocca agli altri
-            e inviala appena arriva il tuo turno. ⚡
+            Si scrive <b>solo al proprio turno</b>: la casella si attiva con la patata e la invii
+            prima che scada il tempo. ⚡
           </p>
         </div>
 
@@ -135,7 +138,7 @@
                      autocapitalize="characters" spellcheck="false" aria-label="Parola">
               <button id="btn-invia" class="btn btn-fire">INVIA</button>
             </div>
-            <!-- La casella è SEMPRE scrivibile: chi non ha il turno prepara la parola -->
+            <!-- La casella si attiva solo al proprio turno: fuori turno è disabilitata -->
             <div class="input-prep" id="input-prep"></div>
             <div class="input-hint" id="input-hint"></div>
             <div class="feedback" id="feedback" aria-live="polite"></div>

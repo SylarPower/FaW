@@ -96,20 +96,70 @@ dictSample.split('\n').forEach((w) => {
   ok(/Città/.test(chips[2].textContent), 'categoria Città');
   ok(document.querySelector('.punti-regola').textContent.indexOf('20') !== -1, 'regola dei punti dichiarata in UI');
 
-  console.log('\n[3] Avvio: compilazione con campi e timer');
+  console.log('\n[3] Avvio: 3·2·1, poi lettera e campi');
   document.getElementById('btn-start-solo').dispatchEvent(new window.Event('click'));
   ok(await until(() => !document.getElementById('screen-gioco').classList.contains('hidden'), 'schermata di gioco'),
     'schermata di gioco visibile');
+  ok(await until(() => !document.getElementById('via-overlay').classList.contains('hidden'), 'overlay del countdown'),
+    'countdown di apertura visibile');
+  eq(document.getElementById('via-num').textContent, '3', 'parte da 3');
+  eq(document.getElementById('screen-gioco').classList.contains('via'), true,
+    'lettera e campi ancora nascosti durante il countdown');
+  const inputs = document.querySelectorAll('#campi input');
+  ok(Array.prototype.every.call(inputs, (i) => i.disabled), 'campi disabilitati finché non è VIA');
+  ok(await until(() => isFinite(parseInt(document.getElementById('timer-num').textContent, 10)),
+    'timer disegnato durante il countdown', 4000), 'timer disegnato anche durante il countdown');
+  ok(parseInt(document.getElementById('timer-num').textContent, 10) <= 120,
+    'il timer non supera il tempo configurato durante il countdown (' +
+    document.getElementById('timer-num').textContent + 's)');
+  // i passi 2 e 1 non si perdono: il testo del numero cambia in ordine
+  const passi = [document.getElementById('via-num').textContent];
+  const t0via = Date.now();
+  while (Date.now() - t0via < 4000 && window.__NCC.viaAttivo) {
+    const n = document.getElementById('via-num').textContent;
+    if (passi[passi.length - 1] !== n) passi.push(n);
+    await sleep(60);
+  }
+  eq(passi, ['3', '2', '1', 'VIA!'], 'conto alla rovescia 3 → 2 → 1 → VIA!');
+  ok(await until(() => !window.__NCC.viaAttivo && document.getElementById('via-overlay').classList.contains('hidden'),
+    'fine del countdown'), 'il countdown si chiude');
   const lettera = document.getElementById('lettera-tile').textContent;
   ok(/^[A-Z]$/.test(lettera), 'lettera del round mostrata: ' + lettera);
-  const inputs = document.querySelectorAll('#campi input');
-  eq(inputs.length, 3, 'un campo per categoria');
+  eq(document.querySelectorAll('#campi input').length, 3, 'un campo per categoria');
+  ok(!document.getElementById('screen-gioco').classList.contains('via'),
+    'lettera e campi (ri)visibili dopo il VIA');
+  ok(Array.prototype.every.call(document.querySelectorAll('#campi input'), (i) => !i.disabled),
+    'campi attivi dopo il VIA');
+  eq(document.getElementById('via-text').textContent.indexOf('Via') !== -1, true,
+    'annuncio del VIA: ' + document.getElementById('via-text').textContent);
+  await until(() => document.activeElement && document.activeElement.getAttribute
+    && document.activeElement.getAttribute('data-input') === 'nomi', 'focus nel primo campo');
+  eq(document.activeElement.getAttribute('data-input'), window.__NCC.state.roundData.categorie[0],
+    'focus già nel PRIMO campo: ' + document.activeElement.getAttribute('data-input'));
   ok(document.getElementById('btn-stop').disabled, 'STOP disabilitato con campi vuoti');
   await sleep(300);
   ok(parseInt(document.getElementById('timer-num').textContent, 10) > 0,
     'timer locale attivo: ' + document.getElementById('timer-num').textContent + 's');
   eq(document.getElementById('fase-chip').textContent, 'COMPILAZIONE', 'fase compilazione');
   eq(window.__NCC.state.roundData.partecipanti, ['GIOCATORE'], 'allenamento: un solo partecipante, nessun quorum');
+
+  console.log('\n[3b] Navigazione da tastiera: TAB fra i campi in ordine di categoria');
+  {
+    const ordine = window.__NCC.state.roundData.categorie;
+    const visita = [document.activeElement.getAttribute('data-input')];
+    for (let i = 0; i < ordine.length - 1; i++) {
+      document.activeElement.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
+      // jsdom non sposta il focus col TAB: si verifica l'ordine dei campi
+      // tabbabili (nessun tabindex negativo, tutti abilitati) e il passaggio
+      // con Enter, che in pagina sposta il focus al campo successivo.
+      document.activeElement.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+      visita.push(document.activeElement.getAttribute('data-input'));
+    }
+    eq(visita, ordine, 'Enter/TAB portano al campo successivo, nell\'ordine delle categorie');
+    eq(Array.prototype.map.call(document.querySelectorAll('#campi input'), (i) => i.getAttribute('tabindex')),
+      ordine.map(() => null), 'nessun campo fuori dall\'ordine di tabulazione (tabindex assente)');
+    document.querySelector('#campi input').focus();
+  }
 
   console.log('\n[4] Digitazione: validità in tempo reale e STOP abilitato');
   const parole = (PAROLE[lettera] || ['zzzz']).slice(0, 3);

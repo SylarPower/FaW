@@ -82,7 +82,8 @@ const visibile = (w, id) => !w.document.getElementById(id).classList.contains('h
     stato: 'attesa', rivincitaAccettataDa: [], rivincitaRifiutataDa: [],
     opzioni: {
       round: '1', tempo: '120', revisione: '180', categorie: 'light',
-      seed: '20260909', modality: 'classica'
+      // Grazia post-STOP accorciata per il test (in gioco il default è 10s).
+      graziaStop: '5', seed: '20260909', modality: 'classica'
     },
     dataOra: '2026-09-09 09:00:00',
     timestamp: new Date('2026-09-09T09:00:00Z').getTime()
@@ -104,14 +105,32 @@ const visibile = (w, id) => !w.document.getElementById(id).classList.contains('h
   ok(/^DIZ v1:[0-9a-f]+$/.test(a.document.getElementById('dict-badge').textContent),
     'fingerprint del dizionario nel topbar: ' + a.document.getElementById('dict-badge').textContent);
 
-  console.log('\n[2] Ready automatico e start: una sola transizione vince');
+  console.log('\n[2] Ready automatico, start e 3·2·1 condiviso: una sola transizione vince');
   ok(await until(() => visibile(a, 'screen-gioco') && visibile(b, 'screen-gioco'), 'schermata di gioco'),
     'entrambi i giocatori passano in compilazione');
+  ok(await until(() => !!mock.store.get('partite/M1').roundData, 'round avviato'), 'round avviato');
+  // Il countdown parte su entrambe le pagine, con lettera e campi nascosti
+  ok(await until(() => !a.document.getElementById('via-overlay').classList.contains('hidden')
+    && !b.document.getElementById('via-overlay').classList.contains('hidden'), 'countdown su entrambi'),
+  'countdown 3·2·1 visibile su entrambe le pagine');
+  eq(a.document.getElementById('screen-gioco').classList.contains('via'), true,
+    'lettera e campi nascosti durante il countdown');
+  ok(Array.prototype.every.call(a.document.querySelectorAll('#campi input'), (i) => i.disabled),
+    'nessuno può scrivere prima del VIA');
+  ok(await until(() => !a.document.defaultView.__NCC.viaAttivo && !b.document.defaultView.__NCC.viaAttivo,
+    'fine del countdown'), 'alla fine del countdown si entra in compilazione');
+  eq(a.document.getElementById('via-num').textContent, 'VIA!', 'il countdown si chiude con VIA!');
+  eq(a.document.activeElement.getAttribute('data-input'),
+    mock.store.get('partite/M1').roundData.categorie[0], 'ALFA ha il focus nel primo campo');
+  eq(b.document.activeElement.getAttribute('data-input'),
+    mock.store.get('partite/M1').roundData.categorie[0], 'BETA ha il focus nel primo campo');
   eq(a.document.getElementById('fase-chip').textContent, 'COMPILAZIONE', 'fase compilazione su ALFA');
   eq(mock.store.get('partite/M1').roundData.fase, 'compilazione', 'fase condivisa');
   eq(mock.store.get('partite/M1').roundData.partecipanti, ['ALFA', 'BETA'], 'quorum congelato a inizio round');
   eq(mock.store.get('partite/M1').roundData.lettera, a.document.getElementById('lettera-tile').textContent,
     'lettera condivisa');
+  eq(mock.store.get('partite/M1').roundData.deadline - mock.store.get('partite/M1').roundData.inizio, 120000,
+    'la finestra di scrittura è esattamente il tempo configurato, a partire dal VIA');
 
   console.log('\n[3] Compilazione isolata: ogni giocatore scrive solo le proprie risposte');
   const lettera = a.document.getElementById('lettera-tile').textContent;
@@ -145,21 +164,60 @@ const visibile = (w, id) => !w.document.getElementById(id).classList.contains('h
   eq(a.document.getElementById('save-state').textContent.indexOf('salvato') !== -1, true,
     'indicatore di salvataggio su ALFA');
 
-  console.log('\n[4] STOP di ALFA: revisione condivisa, tabella con tutti');
+  console.log('\n[4] STOP di ALFA: 5 secondi agli altri per finire di scrivere');
   a.document.getElementById('btn-stop').dispatchEvent(new a.Event('click', { bubbles: true }));
-  ok(await until(() => visibile(a, 'overlay-revisione') && visibile(b, 'overlay-revisione'), 'overlay revisione'),
-    'entrambi passano in revisione');
+  ok(await until(() => !!mock.store.get('partite/M1').roundData.stop, 'STOP condiviso'), 'STOP registrato');
+  {
+    const rd = mock.store.get('partite/M1').roundData;
+    eq(rd.fase, 'compilazione', 'il round NON passa subito in revisione');
+    eq(rd.stop.da, 'ALFA', 'chi ha premuto STOP');
+    eq(rd.deadline - rd.stop.ts, 5000, 'la scadenza diventa la fine della grazia');
+  }
+  ok(visibile(a, 'stop-avviso') && visibile(b, 'stop-avviso'), 'avviso di STOP visibile a entrambi');
+  ok(/ALFA ha fermato il round/i.test(b.document.getElementById('stop-testo').textContent),
+    'BETA legge chi ha fermato il round: ' + b.document.getElementById('stop-testo').textContent.trim());
+  ok(/\d+s/.test(b.document.getElementById('stop-crono').textContent),
+    'conto alla rovescia visibile per chi deve finire: ' + b.document.getElementById('stop-crono').textContent);
+  eq(a.document.getElementById('timer-label').textContent, 'SECONDI PER FINIRE', 'etichetta del timer dedicata');
+  eq(a.document.querySelectorAll('#campi input')[0].disabled, true, 'chi ha fermato il round non scrive più');
+  eq(b.document.querySelectorAll('#campi input')[1].disabled, false, 'gli altri possono ancora scrivere');
+
+  // BETA approfitta della grazia per scrivere un'ultima risposta (fuori
+  // dizionario: resterà a 0 punti e farà cadere il bonus STOP anche a lui),
+  // lasciando però una categoria vuota.
+  const inputsB2 = b.document.querySelectorAll('#campi input');
+  inputsB2[2].value = lettera + 'QQQZZ';
+  inputsB2[2].dispatchEvent(new b.Event('input', { bubbles: true }));
+  ok(await until(() => {
+    const doc = mock.store.get('partite/M1/risposte/r1__p1');
+    return !!(doc && doc.risposte.c2 && doc.risposte.c2.raw === lettera + 'QQQZZ');
+  }, 'risposta scritta durante la grazia'),
+  'la risposta scritta durante la grazia viene salvata');
+  {
+    const completati = mock.store.get('partite/M1').roundData.completati || [];
+    eq(completati.map((e) => e.nome), ['ALFA'],
+      'ALFA è in coda per il bonus (aveva consegnato tutte le categorie)');
+    eq(completati.filter((e) => e.nome === 'BETA').length, 0,
+      'BETA non entra in coda: con una categoria vuota la consegna non è completa');
+  }
+
+  ok(await until(() => visibile(a, 'overlay-revisione') && visibile(b, 'overlay-revisione'), 'overlay revisione', 15000),
+    'alla fine della grazia entrambi passano in revisione');
   eq(mock.store.get('partite/M1').roundData.fase, 'revisione', 'fase revisione condivisa');
   eq(mock.store.get('partite/M1').roundData.stop.da, 'ALFA', 'chi ha premuto STOP');
+  ok(!visibile(a, 'stop-avviso'), 'avviso di grazia sparito a revisione aperta');
   const righe = a.document.querySelectorAll('#rev-body .rev-table tbody tr');
   eq(righe.length, 3, 'una riga per categoria');
   eq(righe[0].querySelectorAll('td').length, 2, 'una colonna per giocatore');
   eq(a.document.querySelectorAll('#rev-body thead th').length, 3, 'intestazione: categoria + 2 giocatori');
   ok(a.document.querySelector('#rev-body .cell-word').textContent === parole[0],
     'la tabella mostra le risposte di ALFA');
-  eq(a.document.querySelectorAll('#rev-body .cell-empty').length, 2, 'le celle vuote di BETA sono evidenziate');
-  eq(a.document.querySelectorAll('#rev-body .vote-btn:not([disabled])').length, 4,
-    '3 risposte valide contestabili + 1 parola da validare (4 pulsanti attivi)');
+  eq(a.document.querySelectorAll('#rev-body .cell-empty').length, 1,
+    'resta una cella vuota (BETA non ha completato le categorie)');
+  ok(a.document.getElementById('rev-body').textContent.indexOf(lettera + 'QQQZZ') !== -1,
+    'la tabella di revisione contiene anche la risposta scritta in grazia');
+  eq(a.document.querySelectorAll('#rev-body .vote-btn:not([disabled])').length, 5,
+    '3 risposte valide contestabili + 2 parole da validare (5 pulsanti attivi)');
   ok(a.document.querySelector('#rev-body .cell-word.validata') === null,
     'nessuna parola validata prima del voto');
   ok(/solo se tutti/i.test(a.document.getElementById('overlay-revisione').textContent),
@@ -263,6 +321,15 @@ const visibile = (w, id) => !w.document.getElementById(id).classList.contains('h
     'il responso del dizionario resta registrato nell\'esito');
   eq(st.punteggi.ALFA, 40, 'punteggio partita di ALFA');
   eq(st.punteggi.BETA, 20, 'punteggio partita di BETA');
+  // Bonus STOP: chi ha fermato il round ha una parola annullata all'unanimità
+  // e l'altro ha una parola fuori dizionario → bonus annullato per tutti.
+  eq(esito.bonus.nome, null, 'nessuno prende il bonus STOP');
+  eq(esito.bonus.motivo, 'NESSUNO_VALIDO', 'motivo: nessun candidato con tutte le risposte valide');
+  eq(esito.bonus.ordine, ['ALFA'], 'candidato al bonus: solo chi aveva consegnato tutte le categorie');
+  eq(esito.bonus.dettagli[0].esito, 'NON_VALIDA', 'ad ALFA il bonus cade per la parola annullata');
+  const testoRes = a.document.getElementById('res-body').textContent;
+  ok(/BONUS STOP ANNULLATO/i.test(testoRes), 'il recap dichiara il bonus annullato');
+  ok(/ALFA/.test(testoRes) && /bonus annullato/i.test(testoRes), 'il recap dice chi l\'ha perso');
   ok(a.document.getElementById('res-body').textContent.indexOf('40') !== -1, 'punti visibili nel riepilogo');
   ok(/validata all.unanimità/i.test(a.document.getElementById('res-body').textContent),
     'il riepilogo dichiara la parola validata dal voto');
@@ -319,8 +386,9 @@ const visibile = (w, id) => !w.document.getElementById(id).classList.contains('h
   console.log('\n[10] Budget Firestore');
   eq(mock.readsGet, 2, 'due letture get in tutta la partita (le override del dizionario)');
   console.log('   scritture totali:', mock.writes, '| letture da listener:', mock.readsListener);
-  /* 13 del flusso base + 1 salvataggio risposte di BETA + 2 voti "valida". */
-  ok(mock.writes <= 17, 'scritture contenute (<=17): ' + mock.writes);
+  /* Flusso base + salvataggi risposte + 2 voti "valida" + 1 marcatore di
+     consegna completa + le scritture durante la grazia. */
+  ok(mock.writes <= 20, 'scritture contenute (<=20): ' + mock.writes);
   ok(mock.readsListener <= 20, 'letture contenute (<=20): ' + mock.readsListener);
   eq(a.document.defaultView.__NCC.backend._unsubRisposte, null,
     'listener delle risposte chiuso dopo la chiusura della partita');
