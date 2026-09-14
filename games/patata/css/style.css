@@ -499,12 +499,6 @@ button { font-family: var(--font); }
   border-color: var(--fire-0);
   box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.14);
 }
-/* Bozza: parola già scritta da chi non ha ancora il turno (preparazione) */
-#word-input.bozza {
-  border-color: var(--ok);
-  border-style: dashed;
-  background: var(--ok-soft);
-}
 .input-prep {
   margin-top: 8px;
   padding: 8px 11px;

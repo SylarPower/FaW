@@ -10,12 +10,13 @@ mentre il timer corre. Chi la tiene quando arriva a zero… si scotta.
 2. A turno, ogni giocatore deve scrivere una parola (minimo 4 lettere,
    presente nel dizionario Ruzzle) che **contenga tutte le lettere
    richieste** — in qualsiasi posizione: inizio, mezzo o fine.
-   **La casella è sempre scrivibile**: anche chi non ha la patata prepara la
-   sua parola (bozza evidenziata, pulsante `PREPARA` → `✔ PRONTA`, controllo
-   immediato della validità) e la invia appena arriva il proprio turno. La
-   preparazione è solo locale: **non scrive nulla** e non passa la patata.
-3. **Parola corretta** → `+5 secondi` al timer e la patata passa al
-   giocatore successivo (la bozza degli altri **non** viene cancellata).
+   **La casella si attiva solo al proprio turno**: chi non ha la patata la
+   vede disabilitata e vuota (placeholder `⏳ Aspetta il tuo turno…`), quindi
+   **non si può preparare la parola in anticipo**. Il mutatore rifiuta
+   comunque ogni scrittura fuori turno: la regola è applicata due volte,
+   nell'interfaccia e nel core.
+3. **Parola corretta** → `+5 secondi` al timer (vedi *Bonus a scalare*) e la
+   patata passa al giocatore successivo.
 4. **Parola sbagliata** → feedback di errore, **tempo invariato** e tocca
    ancora a te.
 5. **Tempo a zero** → chi tiene la patata subisce la scottatura
@@ -69,6 +70,14 @@ Stesse convenzioni degli altri giochi FaW:
   client concorrenti non si calpestano.
 - Il timer è un `deadline` assoluto condiviso: ogni client lo mostra in
   locale (tolleranza di 2,5 s prima di dichiarare la scottatura).
+- **Bonus a scalare**: la parola corretta aggiunge secondi sempre più piccoli
+  man mano che il turno si allunga — `+5s` nel primo minuto, poi `+4s`,
+  `+3s`, `+2s` e infine `+1s` da 4 minuti in poi. Il bonus riparte da `+5s` a
+  ogni nuovo turno.
+- **Tetto del cronometro**: il tempo mostrato non supera mai quello
+  configurato (30/60/120 s). Se il cronometro è a 58 s e la parola vale `+5s`,
+  si va a 60 s — mai 63. La partita può comunque durare di più, perché il
+  tetto vale sull'istante del turno, non sulla partita.
 - La rivincita riusa i campi `prossimaPartita` / `rivincitaAccettataDa` /
   `rivincitaRifiutataDa` già usati da Ruzzle e dall'hub.
 
@@ -112,14 +121,14 @@ Tre suite in [`tests/patata/`](../../tests/patata/):
   serializzate, `arrayUnion`/`delete`, gare su timeout/next-round → esatta una
   transazione vince, contestazioni, rotazione turni, fine partita).
 - `browser.test.js` — E2E 38 test in jsdom sulla pagina reale: boot → lobby →
-  partita → parola corretta (+5 s, punti, feed) → parola sbagliata (tempo
+  partita → parola corretta (bonus, punti, feed) → parola sbagliata (tempo
   invariato) → timeout (scottatura) → recap → conferma → fine (podio +
   statistiche hub).
 - `browser-multiplayer.test.js` — E2E con **due pagine reali** su mock
-  Firestore: la casella di chi non ha la patata resta scrivibile, la bozza
-  preparata **non scrive nulla** e sopravvive al passaggio della patata, la
-  parola preparata si invia al proprio turno, e a fine partita il gradino del
-  vincitore è il più alto.
+  Firestore: la casella di chi non ha la patata è **disabilitata e vuota**
+  (nessuna parola preparata, nessuna scrittura), si attiva al passaggio della
+  patata, il cronometro resta entro il tetto configurato, e a fine partita il
+  gradino del vincitore è il più alto.
 
 ## Note / limiti
 

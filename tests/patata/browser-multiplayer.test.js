@@ -2,10 +2,13 @@
    Due pagine reali condividono un Firestore simulato (tests/ncc/mock-firestore.js,
    riusato perché è un mock "compat" generico): vengono esercitati UI + backend
    reali, non una reimplementazione.
-   Verifica in particolare la richiesta "si può scrivere SEMPRE per prepararsi":
-   - la casella di chi NON ha la patata non è disabilitata;
-   - la parola preparata resta nella casella (bozza) e non scrive nulla;
-   - la bozza sopravvive al passaggio della patata e si invia al proprio turno;
+   Verifica in particolare la regola "si scrive SOLO al proprio turno":
+   - la casella di chi NON ha la patata è disabilitata e non accetta testo;
+   - nessuna parola preparata in anticipo: la casella resta vuota e nessuna
+     scrittura arriva su Firestore;
+   - al passaggio della patata la casella si attiva per il nuovo giocatore;
+   - il cronometro non supera mai il tempo configurato e il bonus cala con il
+     passare dei minuti di turno;
    - a fine partita il podio ha il vincitore sul gradino più alto. */
 'use strict';
 const fs = require('fs');
@@ -104,41 +107,52 @@ function invia(w) {
   const parolaAlfa = valide[0];
   const parolaBeta = valide.find((w) => w !== parolaAlfa);
 
-  console.log('\n[2] Chi NON ha la patata può scrivere per prepararsi');
-  ok(!input(b).disabled, 'casella di BETA NON disabilitata mentre gioca ALFA');
-  ok(!btnInvia(b).disabled, 'pulsante di BETA NON disabilitato');
-  eq(btnInvia(b).textContent, 'PREPARA', 'etichetta del pulsante fuori turno: ' + btnInvia(b).textContent);
+  console.log('\n[2] Chi NON ha la patata non può scrivere');
+  ok(input(b).disabled, 'casella di BETA DISABILITATA mentre gioca ALFA');
+  ok(btnInvia(b).disabled, 'pulsante di BETA DISABILITATO');
+  eq(input(b).placeholder, '⏳ Aspetta il tuo turno…', 'la casella dice di aspettare: ' + input(b).placeholder);
   ok(/tocca a te/i.test(a.document.getElementById('input-prep').textContent),
     'chi ha il turno vede l\'invito a inviare: ' +
     a.document.getElementById('input-prep').textContent.trim());
-  ok(/puoi già scrivere/i.test(b.document.getElementById('input-prep').textContent),
-    'chi aspetta vede l\'invito a prepararsi');
+  ok(/solo al tuo turno/i.test(b.document.getElementById('input-prep').textContent),
+    'chi aspetta legge che si scrive solo al proprio turno');
+  ok(/\+\d+s/.test(a.document.getElementById('input-prep').textContent),
+    'il bonus per parola è visibile: ' + a.document.getElementById('input-prep').textContent.trim());
 
-  console.log('\n[3] La bozza non scrive nulla e non passa la patata');
-  scrivi(b, parolaBeta);
-  eq(btnInvia(b).textContent, '✔ PRONTA', 'etichetta aggiornata mentre si prepara: ' + btnInvia(b).textContent);
-  ok(input(b).classList.contains('bozza'), 'classe .bozza sulla casella');
+  console.log('\n[3] Nessuna parola preparata in anticipo (nessuna scrittura)');
   const scritturePrima = mock.writes;
+  scrivi(b, parolaBeta);
+  eq(input(b).value, '', 'il testo digitato fuori turno non resta nella casella');
   invia(b);
   await sleep(300);
-  ok(/pronta/i.test(b.document.getElementById('feedback').textContent),
-    'feedback di preparazione: ' + b.document.getElementById('feedback').textContent.trim());
-  eq(mock.writes, scritturePrima, 'nessuna scrittura su Firestore per la preparazione');
+  eq(mock.writes, scritturePrima, 'nessuna scrittura su Firestore fuori turno');
   eq(mock.store.get('partite/P1').turno.giocatore, 'ALFA', 'la patata è ancora di ALFA');
   eq(mock.store.get('partite/P1').storia || [], [], 'nessuna parola registrata fuori turno');
-  eq(input(b).value, parolaBeta, 'la parola preparata resta nella casella');
+  {
+    // il cronometro del turno non supera il tempo configurato (60s dal suo inizio)
+    const doc0 = mock.store.get('partite/P1');
+    const tetto = Number(doc0.opzioni.tempo) * 1000;
+    ok(doc0.turno.deadline - doc0.turno.inizio <= tetto,
+      'cronometro entro il tetto configurato (' + doc0.opzioni.tempo + 's): ' +
+      Math.round((doc0.turno.deadline - doc0.turno.inizio) / 1000) +
+      's dal via del turno');
+  }
 
-  console.log('\n[4] ALFA gioca: la bozza di BETA sopravvive al passaggio');
+  console.log('\n[4] ALFA gioca: la casella si attiva per il nuovo giocatore');
+  ok(!input(a).disabled && !btnInvia(a).disabled,
+    'ALFA (che ha la patata) scrive: casella e pulsante attivi');
   scrivi(a, parolaAlfa);
   invia(a);
   ok(await until(() => (mock.store.get('partite/P1').storia || []).length === 1, 'prima parola registrata'),
     'parola di ALFA accettata');
   eq(mock.store.get('partite/P1').turno.giocatore, 'BETA', 'la patata passa a BETA');
-  eq(input(b).value, parolaBeta, 'la preparazione di BETA non è stata cancellata');
-  eq(btnInvia(b).textContent, 'INVIA', 'al proprio turno il pulsante torna INVIA');
-  ok(!input(a).disabled, 'anche ALFA può subito preparare la parola successiva');
+  ok(await until(() => !input(b).disabled, 'casella di BETA attiva'),
+    'al passaggio della patata la casella di BETA si attiva');
+  ok(input(a).disabled, 'ALFA torna a non poter scrivere');
+  eq(input(b).value, '', 'BETA parte da una casella vuota (niente parole preparate)');
 
-  console.log('\n[5] BETA invia la parola che aveva preparato');
+  console.log('\n[5] BETA invia la parola al proprio turno');
+  scrivi(b, parolaBeta);
   invia(b);
   ok(await until(() => (mock.store.get('partite/P1').storia || []).length === 2, 'seconda parola registrata'),
     'parola di BETA accettata');
