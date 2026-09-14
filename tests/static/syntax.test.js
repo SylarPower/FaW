@@ -192,6 +192,17 @@ console.log('\n[6] Ruzzle: verifica parole automatica');
     'auto-verifica sia a fine tempo sia nello stato verifica');
 }
 
+console.log('\n[6a] Ruzzle: timer ancorato all\u2019orologio');
+{
+  const rz = leggi('games/ruzzle/index.html');
+  ok(/function avviaContoAllaRovescia/.test(rz), 'un solo punto di avvio del conto alla rovescia');
+  ok(/timerDeadline\s*=\s*Date\.now\(\)\s*\+\s*timeRemaining\s*\*\s*1000/.test(rz),
+    'la scadenza e\u2019 calcolata dall\u2019orologio, non dal numero di tick');
+  ok(!/timeRemaining--/.test(rz), 'nessuna sottrazione a ogni tick (il tempo non si perde)');
+  ok((rz.match(/timerInterval\s*=\s*setInterval/g) || []).length === 1,
+    'un solo setInterval per il timer: premere VIA due volte non raddoppia il ritmo');
+}
+
 console.log('\n[6b] Ruzzle: punteggi finali condivisi e allineati');
 {
   const rz = leggi('games/ruzzle/index.html');

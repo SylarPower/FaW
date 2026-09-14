@@ -348,7 +348,7 @@
 			flex-direction: column;
 			gap: 20px;
 			align-items: center;
-			max-width: 950px;
+			max-width: 1080px;
 			width: 100%;
 			height: auto;
 			}
@@ -357,13 +357,15 @@
 			flex-direction: row;
 			align-items: stretch;
 			justify-content: center;
-			gap: 40px;
+			gap: 32px;
 			}
 			.board-wrapper {
 			flex: 0 0 450px;
 			}
 			.sidebar {
-			flex: 1;
+			/* Un po' più larga della colonna della griglia: il podio di fine
+			   partita (fino a 6 giocatori) ci sta senza scorrere. */
+			flex: 1 1 470px;
 			}
 			}
 			.config-bar {
@@ -609,7 +611,7 @@
 			}
 			.sidebar {
 			width: 100%;
-			max-width: 400px;
+			max-width: 540px;
 			background: var(--panel-bg);
 			border: 1px solid var(--line-soft);
 			padding: 18px;
@@ -1774,9 +1776,19 @@
 			let rotationCount = 0;
 			let errorCount = 0;
 			let fireworksInterval = null;
+			/* Conto alla rovescia ancorato all'orologio: timeRemaining e' sempre
+			   "quanti secondi mancano ADESSO", quindi la durata scelta dall'utente e'
+			   quella giocata davvero. Le sottrazioni a ogni tick dell'intervallo
+			   sbagliavano di tutti i ritardi accumulati (scheda in background,
+			   tabella dei round) e la partita finiva prima del tempo. */
 			let timerInterval;
 			let timeRemaining = 180;
 			let initialTime = 180;
+			let timerDeadline = 0;
+			let timerPausa = 0;
+			/* Tick piu' fitto del secondo: il valore mostrato viene comunque sempre
+			   ricalcolato dall'orologio, quindi l'intervallo non introduce errore. */
+			const TIMER_TICK_MS = 250;
 			let isGameActive = false;
 			let isPaused = false;
 			let isSandboxMode = false;
@@ -2499,12 +2511,7 @@
 			  if (rotateBtn) {
 			    rotateBtn.style.display = 'block';
 			  }
-			  updateTimerDisplay();
-			  timerInterval = setInterval(() => {
-			    timeRemaining--;
-			    updateTimerDisplay();
-			    if (timeRemaining <= 0) endGame();
-			  }, 1000);
+			  avviaContoAllaRovescia();
 			}
 			
 			function togglePause() {
@@ -2515,6 +2522,11 @@
 			    isPaused = true;
 			    isGameActive = false;
 			    clearInterval(timerInterval);
+			    /* Il tempo in pausa non consuma secondi: al ritorno il conto riparte
+			       dal valore congelato, non dall'orologio di quando e' iniziato. */
+			    timeRemaining = secondiResidui();
+			    timerPausa = timeRemaining;
+			    updateTimerDisplay();
 			    runAchievementCheck();
 			    pauseOverlay.style.display = 'flex';
 			    listEl.classList.add('blurred-list');
@@ -2530,11 +2542,8 @@
 			    btnPause.textContent = "PAUSA";
 			    btnPause.classList.remove('paused');
 			    if (rotateBtn) rotateBtn.style.display = 'block';
-			    timerInterval = setInterval(() => {
-			      timeRemaining--;
-			      updateTimerDisplay();
-			      if (timeRemaining <= 0) endGame();
-			    }, 1000);
+			    timeRemaining = timerPausa > 0 ? timerPausa : secondiResidui();
+			    avviaContoAllaRovescia();
 			  }
 			}
 			
@@ -3478,7 +3487,32 @@
 		}
 			
 			function formatTime(s) {
-			  return `${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`;
+			  const sec = Math.max(0, Math.ceil(Number(s) || 0));
+			  return `${Math.floor(sec/60).toString().padStart(2,'0')}:${(sec%60).toString().padStart(2,'0')}`;
+			}
+			
+			/* Secondi che mancano secondo l'orologio, mai negativi. */
+			function secondiResidui() {
+			  return Math.max(0, Math.ceil((timerDeadline - Date.now()) / 1000));
+			}
+			
+			/* Unico punto che fa scendere il tempo: ricalcola il residuo
+			   dall'orologio, lo mostra e chiude la partita solo quando e' davvero
+			   finito (un eventuale doppio ingresso non fa danni: endGame() esce
+			   subito se la partita non e' piu' attiva). */
+			function tickTimer() {
+			  timeRemaining = secondiResidui();
+			  updateTimerDisplay();
+			  if (timeRemaining <= 0) endGame();
+			}
+			
+			/* Fa partire (o riprendere) il conto alla rovescia da timeRemaining,
+			   mostrando subito il valore di partenza. */
+			function avviaContoAllaRovescia() {
+			  clearInterval(timerInterval);
+			  updateTimerDisplay();
+			  timerDeadline = Date.now() + timeRemaining * 1000;
+			  timerInterval = setInterval(tickTimer, TIMER_TICK_MS);
 			}
 			
 			function updateTimerDisplay() {

@@ -203,6 +203,21 @@ const scrittureChiusura = () => mock.log.filter((w) => w.p === 'partite/P1' && (
   eq(marcato(c), ['GAMMA'], 'GAMMA marcato (TU) solo sul proprio client');
   eq(podio(a).map(nomePodio), podio(b).map(nomePodio),
     'stesso ordine del podio su client diversi');
+  /* Grafica: stesse righe per tutti (colonne incolonnate) e sfarfallio zero */
+  ok(podio(a).every((col) => !!col.querySelector('.pod-medal') && !!col.querySelector('.pod-avatar') &&
+    !!col.querySelector('.pod-name') && !!col.querySelector('.pod-bar') && !!col.querySelector('.pod-sub')),
+  'ogni colonna completa: medaglia, avatar, nome, gradino e sottotitolo');
+  const medaglie = podio(a).map((col) => col.querySelector('.pod-medal').textContent);
+  ok(medaglie[0] === '\ud83e\udd47' && medaglie[1] === '\ud83e\udd48' && medaglie[2] === '\ud83e\udd49',
+    'prime tre posizioni con oro, argento e bronzo');
+  const primoGradino = podio(a)[0].querySelector('.pod-bar');
+  a.eval('renderizzaPodioFinale(currentGameData)');
+  ok(podio(a)[0].querySelector('.pod-bar') === primoGradino,
+    'lo stesso podio non viene ridisegnato a ogni snapshot (niente sfarfallio)');
+  ok(podio(a)[0].getAttribute('data-pos') === '1' && podio(a)[2].getAttribute('data-pos') === '3',
+    'posizioni nel DOM coerenti con la classifica');
+  ok(podio(a)[0].getAttribute('aria-label').indexOf('1\u00b0 posto') === 0,
+    'il podio è leggibile dai lettori di schermo');
 
   console.log('\n[8] Tema chiaro: testo leggibile nei modali');
   const paginaCss = fs.readFileSync(path.join(ROOT, 'games/ruzzle/index.html'), 'utf8');

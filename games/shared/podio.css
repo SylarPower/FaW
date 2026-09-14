@@ -2,14 +2,23 @@
    PODIO CONDIVISO — fine partita multiplayer (tutti i giochi FaW)
    Markup generato da ../shared/podio.js:
    .podio > .pod-col.p1|.p2|.p3|.pn > .pod-medal + .pod-avatar +
-   .pod-name + .pod-bar + .pod-sub
+   .pod-name (+ .pod-tu) + .pod-bar + .pod-sub
 
    Regola di layout: il 1° classificato sta sul gradino PIÙ ALTO e
    l'altezza scende di posizione in posizione (--pod-h, scritta da podio.js),
-   per TUTTI i giocatori, non solo per i primi tre. I colori seguono il tema
-   del gioco: ogni pagina può sovrascrivere le variabili --podio-*.
+   per TUTTI i giocatori, non solo per i primi tre.
+
+   Perché le colonne sono delle griglie con righe di altezza fissa:
+   ogni gradino parte dalla STESSA base (la riga del gradino ha un minimo
+   pari al gradino più alto e la barra si allinea in fondo), mentre medaglia,
+   avatar, nome e sottotitolo occupano righe identiche in tutte le colonne.
+   Così il podio resta incolonnato anche quando un giocatore ha il
+   sottotitolo e un altro no, quando un nome è lungo o quando i giocatori
+   sono cinque o sei. I colori seguono il tema del gioco: ogni pagina può
+   sovrascrivere le variabili --podio-*.
    ============================================================ */
 .podio {
+  /* Colori (sovrascrivibili dai giochi) */
   --podio-card: rgba(255, 255, 255, 0.10);
   --podio-bar: rgba(255, 255, 255, 0.18);
   --podio-border: rgba(255, 255, 255, 0.22);
@@ -21,32 +30,82 @@
   --podio-silver-bg: #e5e7eb;
   --podio-bronze: #d9a066;
   --podio-bronze-bg: #fcd9b6;
+  --podio-medal-bg: rgba(148, 163, 184, 0.22);
+  --podio-tu-bg: rgba(148, 163, 184, 0.28);
+
+  /* Misure: tutte qui, così il podio si adatta con una sola modifica */
+  --podio-col-w: 92px;
+  --podio-gap: 12px;
+  --podio-pad: 14px;
+  --podio-medal-h: 26px;
+  --podio-avatar: 42px;
+  --podio-name-h: 34px;   /* due righe: i nomi lunghi non vengono tagliati */
+  --podio-sub-h: 18px;
+  --podio-h-max: 104px;   /* = FAWPodio.MAX: altezza del gradino del 1° */
+  --podio-radius: 16px;
 
   display: flex;
-  align-items: flex-end;          /* i gradini partono tutti dalla stessa base */
+  align-items: flex-end;              /* i gradini partono tutti dalla stessa base */
   justify-content: center;
-  gap: 12px;
+  justify-content: safe center;       /* con tante colonne si scorre dal bordo, non dal centro */
+  gap: var(--podio-gap);
+  box-sizing: border-box;
   margin: 16px 0;
+  padding: 4px 2px;
   overflow-x: auto;
-  padding-bottom: 4px;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
 }
 .pod-col {
-  flex: 1 0 84px;
-  max-width: 150px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-end;
+  flex: 1 0 var(--podio-col-w);
+  max-width: 160px;
+  box-sizing: border-box;
+  display: grid;
+  /* Righe identiche in ogni colonna: la classifica resta incolonnata */
+  grid-template-rows: var(--podio-medal-h) auto var(--podio-name-h) minmax(var(--podio-h-max), auto) var(--podio-sub-h);
   gap: 6px;
-  padding: 12px 8px 0;
+  padding: var(--podio-pad) var(--podio-pad) 0;
   background: var(--podio-card);
   border: 1px solid var(--podio-border);
-  border-radius: 14px 14px 0 0;
+  border-radius: var(--podio-radius) var(--podio-radius) 0 0;
 }
-.pod-col.p1 { border-color: var(--podio-gold); }
-.pod-medal { font-size: 1.4rem; min-height: 1.9rem; }
+.pod-col.p1 {
+  border-color: var(--podio-gold);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.14);
+}
+.pod-col.p2,
+.pod-col.p3 { border-color: var(--podio-border); }
+
+/* Medaglia: pastiglia colorata (oro/argento/bronzo), numero per gli altri */
+.pod-medal {
+  align-self: center;
+  justify-self: center;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: calc(var(--podio-medal-h) * 1.5);
+  height: var(--podio-medal-h);
+  padding: 0 9px;
+  border-radius: 999px;
+  background: var(--podio-medal-bg);
+  color: var(--podio-text);
+  font-size: 0.92rem;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.pod-col.p1 .pod-medal { background: rgba(252, 211, 77, 0.30); }
+.pod-col.p2 .pod-medal { background: rgba(203, 213, 225, 0.34); }
+.pod-col.p3 .pod-medal { background: rgba(217, 160, 102, 0.30); }
+
 .pod-avatar {
-  width: 42px; height: 42px;
+  align-self: center;
+  justify-self: center;
+  box-sizing: border-box;
+  width: var(--podio-avatar);
+  height: var(--podio-avatar);
   border-radius: 50%;
   display: inline-flex;
   align-items: center;
@@ -54,45 +113,118 @@
   font-size: 0.9rem;
   font-weight: 800;
   color: #111827;
+  border: 2px solid rgba(255, 255, 255, 0.35);
 }
-.pod-col.p1 .pod-avatar { box-shadow: 0 0 0 2px var(--podio-gold); }
+.pod-col.p1 .pod-avatar { box-shadow: 0 0 0 2px var(--podio-gold); border-color: transparent; }
+
 .pod-name {
+  align-self: center;
+  justify-self: center;
+  max-width: 100%;
   font-weight: 800;
   font-size: 0.82rem;
+  line-height: 1.15;
   color: var(--podio-text);
-  max-width: 100%;
-  white-space: nowrap;
+  text-align: center;
+  /* Il nome può andare a capo (due righe) e solo dopo viene accorciato: così
+     la pastiglia (TU) non taglia il nome nelle colonne strette. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow: hidden;
+  overflow-wrap: anywhere;
   text-overflow: ellipsis;
 }
+/* Il giocatore che sta guardando lo schermo: pastiglia neutra, leggibile su
+   tema chiaro e scuro senza cambiare colore al testo. */
+.pod-tu {
+  box-sizing: border-box;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: var(--podio-tu-bg);
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  vertical-align: 1px;
+}
+
 .pod-bar {
-  width: 100%;
+  align-self: end;                    /* il fondo del gradino è la base del podio */
+  justify-self: stretch;
+  box-sizing: border-box;
   /* Altezza = posizione (variabile scritta da podio.js, mai il contrario). */
   height: var(--pod-h, 46px);
   min-height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 10px 10px 0 0;
-  background: var(--podio-bar);
+  border-radius: 12px 12px 3px 3px;
+  background-color: var(--podio-bar);
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0) 65%);
   border: 1px solid var(--podio-border);
   border-bottom: none;
-  font-size: 1.15rem;
+  font-size: 1.25rem;
   font-weight: 900;
+  line-height: 1;
   color: var(--podio-text);
   font-variant-numeric: tabular-nums;
   transition: height 0.3s ease;
 }
-.pod-col.p1 .pod-bar { background: var(--podio-gold-bg); border-color: var(--podio-gold); color: #7c2d12; }
-.pod-col.p2 .pod-bar { background: var(--podio-silver-bg); border-color: var(--podio-silver); color: #334155; }
-.pod-col.p3 .pod-bar { background: var(--podio-bronze-bg); border-color: var(--podio-bronze); color: #5b3413; }
+.pod-col.p1 .pod-bar { background-color: var(--podio-gold-bg); border-color: var(--podio-gold); color: #7c2d12; }
+.pod-col.p2 .pod-bar { background-color: var(--podio-silver-bg); border-color: var(--podio-silver); color: #334155; }
+.pod-col.p3 .pod-bar { background-color: var(--podio-bronze-bg); border-color: var(--podio-bronze); color: #5b3413; }
+
 .pod-sub {
+  align-self: start;
+  justify-self: center;
+  max-width: 100%;
   font-size: 0.68rem;
+  line-height: 1.2;
   color: var(--podio-sub);
   font-weight: 600;
-  padding: 5px 0;
-  max-width: 100%;
-  white-space: nowrap;            /* una riga sola: le basi restano allineate */
+  white-space: nowrap;                /* una riga sola: le basi restano allineate */
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* Schermi stretti (telefono): podio più compatto, stesso disegno */
+@media (max-width: 520px) {
+  .podio {
+    --podio-col-w: 80px;
+    --podio-gap: 8px;
+    --podio-pad: 10px;
+    --podio-medal-h: 22px;
+    --podio-avatar: 34px;
+    --podio-name-h: 30px;
+    --podio-sub-h: 16px;
+    --podio-radius: 12px;
+  }
+  .pod-name { font-size: 0.76rem; }
+  .pod-tu { font-size: 0.6rem; }
+  .pod-bar { font-size: 1.05rem; }
+  .pod-sub { font-size: 0.62rem; }
+  .pod-medal { font-size: 0.82rem; padding: 0 7px; }
+}
+
+/* Con tanti giocatori (5-6) il podio scorre: colonne un po' più strette, ma
+   con meno margine interno, così i nomi restano su una riga sola. */
+@media (min-width: 521px) {
+  .podio[data-molti="1"] {
+    --podio-col-w: 76px;
+    --podio-gap: 8px;
+    --podio-pad: 9px;
+    --podio-avatar: 38px;
+  }
+  .podio[data-molti="1"] .pod-name { font-size: 0.78rem; }
+}
+
+/* Podio che scorre: sfumatura sul bordo destro come invito allo scorrimento */
+.podio[data-scroll="1"] {
+  -webkit-mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 26px), transparent 100%);
+  mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 26px), transparent 100%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pod-bar { transition: none; }
 }
