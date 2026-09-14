@@ -213,6 +213,7 @@ button { font-family: var(--font); }
   padding: 6px 12px; border-radius: 999px;
   background: var(--acc-soft); color: var(--acc-1); border: 1px solid var(--acc-border);
 }
+.fase-chip.stop-grazia { background: #fef3c7; color: #92400e; border-color: #fcd34d; }
 .fase-chip.revisione { background: var(--info-soft); color: var(--info); border-color: #bae6fd; }
 .fase-chip.risultati { background: var(--ok-soft); color: var(--ok); border-color: #bbf7d0; }
 

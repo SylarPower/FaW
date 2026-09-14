@@ -501,7 +501,8 @@
       } else if (res && res.aborted) {
         toast('Il round è già stato fermato');
       } else if (res && res.ok) {
-        toast(G.solo ? '⏹ Consegna registrata' : '⏹ STOP! Si apre la revisione', 'ok');
+        toast(G.solo ? '⏹ Consegna registrata'
+          : '⏹ STOP! Gli altri hanno ' + (C.graziaStopMs({ opzioni: G.state.opzioni }) / 1000) + 's per finire', 'ok');
       }
     });
   }
@@ -530,8 +531,11 @@
     el['round-badge'].classList.remove('hidden');
     el['round-badge'].textContent = 'ROUND ' + rd.round + '/' + s.opzioni.round + ' · LETTERA ' + rd.lettera;
     var fasi = { compilazione: 'COMPILAZIONE', revisione: 'REVISIONE', risultati: 'RISULTATI' };
-    el['fase-chip'].textContent = fasi[rd.fase] || String(rd.fase).toUpperCase();
-    el['fase-chip'].className = 'fase-chip ' + (rd.fase === 'compilazione' ? '' : rd.fase);
+    var grazia = inGraziaStop(rd);
+    el['fase-chip'].textContent = grazia ? 'ULTIMI SECONDI'
+      : (fasi[rd.fase] || String(rd.fase).toUpperCase());
+    el['fase-chip'].className = ('fase-chip ' +
+      (grazia ? 'stop-grazia' : (rd.fase === 'compilazione' ? '' : rd.fase))).replace(/\s+/g, ' ').trim();
 
     /* Dopo lo STOP la fase resta 'compilazione' (grazia): chi ha fermato non
        scrive più, gli altri hanno ancora qualche secondo per finire. */
