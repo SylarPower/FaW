@@ -155,7 +155,8 @@ test("chiusura parziale: riepilogo e cronologia solo serie realmente fatte", asy
   await start(page);
   await page.locator("#sesTimerToggle").click();
   await page.locator("#sesCheckBtn").click();
-  await page.locator(".ses-nav-end").click();
+  await page.locator(".ses-exit").click();
+  await page.locator("#sesExitFinishBtn").click();
   await expect(page.locator("#sesSummary")).toBeVisible();
   expect(
     await page.evaluate(() => ({
@@ -444,10 +445,11 @@ test("tastiera ridotta e orientamento orizzontale mantengono navigazione e confe
   ]) {
     await page.setViewportSize(viewport);
     await noOverflow(page);
-    await page.locator("#sesCheckBtn").scrollIntoViewIfNeeded();
+    // Conferma serie sempre visibile senza scroll, dentro la barra fissa.
     const c = await page.locator("#sesCheckBtn").boundingBox(),
       n = await page.locator(".ses-nav").boundingBox();
-    expect(c.y + c.height).toBeLessThanOrEqual(n.y + 1);
+    expect(c.y).toBeGreaterThanOrEqual(n.y - 1);
+    expect(c.y + c.height).toBeLessThanOrEqual(viewport.height + 1);
   }
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({ path: "test-results/focus-dark.png" });
@@ -703,7 +705,8 @@ test("percentuale sulle serie, non sugli esercizi, visibile anche a 320px", asyn
   await expect(page.locator("#sesExCount")).toHaveText("33%");
   await page.locator("#sesBtnPrev").click();
   await expect(page.locator("#sesExCount")).toHaveText("33%");
-  await page.locator(".ses-nav-end").click();
+  await page.locator(".ses-exit").click();
+  await page.locator("#sesExitFinishBtn").click();
   await expect(page.locator("#sesExCount")).toHaveText("33%");
   expect(await page.evaluate(() => getSetProgress(199, 200))).toBe(99);
   expect(await page.evaluate(() => getSetProgress(200, 200))).toBe(100);
@@ -750,7 +753,8 @@ test("report parziale non include serie ancora da fare o valori negativi", async
   await start(page);
   await page.locator("#sesTimerToggle").click();
   await page.locator("#sesCheckBtn").click();
-  await page.locator(".ses-nav-end").click();
+  await page.locator(".ses-exit").click();
+  await page.locator("#sesExitFinishBtn").click();
   await expect(page.locator("#sesVolumeValue")).toHaveText("270");
   await expect(page.locator(".cargo-stamp")).toHaveText("SESSIONE PARZIALE");
   await expect(page.locator("#sesSumGrid")).toContainText("25%");
@@ -861,10 +865,11 @@ test("allineamenti geometrici: intestazione, etichette, input e controlli su qua
   for (const width of [320, 360, 390, 430]) {
     await page.setViewportSize({ width, height: 844 });
     await assertAlignedSession(page);
-    await page.locator("#sesCheckBtn").scrollIntoViewIfNeeded();
+    // Conferma serie sempre visibile senza scroll, dentro la barra fissa.
     const c = await page.locator("#sesCheckBtn").boundingBox(),
       n = await page.locator(".ses-nav").boundingBox();
-    expect(c.y + c.height).toBeLessThanOrEqual(n.y + 1);
+    expect(c.y).toBeGreaterThanOrEqual(n.y - 1);
+    expect(c.y + c.height).toBeLessThanOrEqual(844 + 1);
   }
   await page.setViewportSize({ width: 390, height: 844 });
   await page.locator("#sesExName").scrollIntoViewIfNeeded();
@@ -960,10 +965,11 @@ test("testo al 200% e nomi lunghi non fanno sovrapporre campi e pulsanti", async
   await start(page);
   await page.evaluate(() => (document.documentElement.style.fontSize = "32px"));
   await assertAlignedSession(page);
-  await page.locator("#sesCheckBtn").scrollIntoViewIfNeeded();
+  // Conferma serie sempre visibile senza scroll, dentro la barra fissa.
   const button = await page.locator("#sesCheckBtn").boundingBox(),
     nav = await page.locator(".ses-nav").boundingBox();
-  expect(button.y + button.height).toBeLessThanOrEqual(nav.y + 1);
+  expect(button.y).toBeGreaterThanOrEqual(nav.y - 1);
+  expect(button.y + button.height).toBeLessThanOrEqual(740 + 1);
   await page.evaluate(() => {
     gD().exs.forEach((e) => e.sd.forEach((s) => (s.done = true)));
     sesShowSummary();
@@ -1037,7 +1043,8 @@ test("RPE rimosso da sessione, editor, guida, stato e nuovi salvataggi", async (
   );
   await page.locator("#sesTimerToggle").click();
   await page.locator("#sesCheckBtn").click();
-  await page.locator(".ses-nav-end").click();
+  await page.locator(".ses-exit").click();
+  await page.locator("#sesExitFinishBtn").click();
   expect(
     await page.evaluate(() => JSON.stringify(D.hist).includes('"rpe"')),
   ).toBe(false);

@@ -423,10 +423,6 @@
                 ↺
               </button>
             </div>
-            <button class="ses-check-btn" id="sesCheckBtn" onclick="sesCheck()">
-              <span class="ses-check-icon">✓</span>
-              <span>Conferma serie</span>
-            </button>
           </div>
         </div>
 
@@ -438,13 +434,26 @@
         >
           Progressi salvati sul dispositivo
         </div>
-        <!-- Navigazione esercizi -->
+        <!-- Navigazione esercizi + conferma serie sempre visibile -->
         <div class="ses-nav">
-          <button class="ses-nav-btn" id="sesBtnPrev" onclick="sesPrevEx()">
+          <button
+            class="ses-nav-btn"
+            id="sesBtnPrev"
+            onclick="sesPrevEx()"
+            aria-label="Esercizio precedente"
+          >
             <span>◀</span><small>Precedente</small>
           </button>
-          <button class="ses-nav-end" onclick="sesFinish()">Termina</button>
-          <button class="ses-nav-btn" id="sesBtnNext" onclick="sesNextEx()">
+          <button class="ses-check-btn" id="sesCheckBtn" onclick="sesCheck()">
+            <span class="ses-check-icon">✓</span>
+            <span>Conferma serie</span>
+          </button>
+          <button
+            class="ses-nav-btn"
+            id="sesBtnNext"
+            onclick="sesNextEx()"
+            aria-label="Esercizio successivo"
+          >
             <small>Successivo</small><span>▶</span>
           </button>
         </div>
@@ -698,6 +707,122 @@
         >
           Annulla
         </button>
+      </div>
+    </div>
+    <!-- MODAL: USCITA SESSIONE PARZIALE -->
+    <div
+      id="mSesExit"
+      class="modal"
+      onclick="if(event.target===this)sesExitCancel()"
+    >
+      <div class="mc" style="max-width: 500px">
+        <h2>🏋️ Uscire dall'allenamento?</h2>
+        <p
+          style="
+            text-align: center;
+            color: var(--tx2);
+            font-size: 0.85rem;
+            margin-bottom: 16px;
+          "
+        >
+          Hai
+          <strong style="color: var(--acc)"
+            ><span id="sesExitDone">0</span>/<span id="sesExitTotal"
+              >0</span
+            ></strong
+          >
+          serie completate.
+        </p>
+        <div style="display: flex; flex-direction: column; gap: 10px">
+          <button
+            id="sesExitPauseBtn"
+            onclick="sesExitPause()"
+            style="
+              display: flex;
+              align-items: center;
+              text-align: left;
+              gap: 12px;
+              padding: 16px;
+              background: var(--c2);
+              border: 1px solid var(--acc);
+            "
+          >
+            <span style="font-size: 1.5rem">⏸️</span>
+            <div>
+              <div style="font-weight: 700; color: var(--acc)">
+                Metti in pausa
+              </div>
+              <div
+                style="
+                  font-size: 0.7rem;
+                  color: var(--tx2);
+                  font-weight: 400;
+                  margin-top: 2px;
+                "
+              >
+                Esci e riprendi più tardi da dove eri.
+              </div>
+            </div>
+          </button>
+          <button
+            id="sesExitFinishBtn"
+            onclick="sesExitFinish()"
+            style="
+              display: flex;
+              align-items: center;
+              text-align: left;
+              gap: 12px;
+              padding: 16px;
+              background: var(--c2);
+              border: 1px solid var(--yel);
+            "
+          >
+            <span style="font-size: 1.5rem">🏁</span>
+            <div>
+              <div style="font-weight: 700; color: var(--yel)">
+                Termina allenamento
+              </div>
+              <div
+                style="
+                  font-size: 0.7rem;
+                  color: var(--tx2);
+                  font-weight: 400;
+                  margin-top: 2px;
+                "
+              >
+                Chiudi la sessione e vedi il riepilogo.
+              </div>
+            </div>
+          </button>
+          <button
+            id="sesExitCancelBtn"
+            onclick="sesExitCancel()"
+            style="
+              display: flex;
+              align-items: center;
+              text-align: left;
+              gap: 12px;
+              padding: 16px;
+              background: var(--c2);
+              border: 1px solid var(--brd);
+            "
+          >
+            <span style="font-size: 1.5rem">✕</span>
+            <div>
+              <div style="font-weight: 700">Annulla</div>
+              <div
+                style="
+                  font-size: 0.7rem;
+                  color: var(--tx2);
+                  font-weight: 400;
+                  margin-top: 2px;
+                "
+              >
+                Continua l'allenamento.
+              </div>
+            </div>
+          </button>
+        </div>
       </div>
     </div>
     <!-- MODAL: SCELTA SESSIONE PARZIALE -->
