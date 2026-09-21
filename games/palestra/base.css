@@ -1467,12 +1467,14 @@ body.in-session .ses-nav {
   border-color: var(--acc);
 }
 
-/* Check button */
+/* Check button (nella barra di navigazione fissa in basso) */
 .ses-check-btn {
-  width: 100%;
+  flex: 1.6;
+  min-width: 0;
+  flex-wrap: wrap;
+  line-height: 1.15;
   padding: 10px;
-  margin-top: 24px;
-  margin-bottom: 24px;
+  margin: 0;
   border-radius: 16px;
   border: none;
   background: var(--acc);
@@ -1494,6 +1496,19 @@ body.in-session .ses-nav {
 }
 .ses-check-icon {
   font-size: 1.4rem;
+}
+.ses-check-btn[hidden] {
+  display: none;
+}
+/* Su schermi stretti restano le sole frecce: il testo va al pulsante di conferma */
+@media (max-width: 379px) {
+  .ses-nav-btn {
+    flex: 0 0 auto;
+    min-width: 56px;
+  }
+  .ses-nav-btn small {
+    display: none;
+  }
 }
 
 /* Navigazione */
@@ -1528,22 +1543,6 @@ body.in-session .ses-nav {
 .ses-nav-btn:active {
   background: var(--c3);
 }
-.ses-nav-end {
-  padding: 14px 16px;
-  border-radius: 12px;
-  border: none;
-  background: var(--red);
-  color: #fff;
-  font-size: 0.8rem;
-  font-weight: 700;
-  cursor: pointer;
-  min-height: 52px;
-  white-space: nowrap;
-}
-.ses-nav-end:active {
-  opacity: 0.8;
-}
-
 /* Summary */
 .ses-summary {
   flex: 1;

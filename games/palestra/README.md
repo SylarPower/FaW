@@ -7,7 +7,7 @@ La palestra rimane una pagina statica, senza build applicativa. Dal portale FaW 
 - **Allenamento**: scheda suggerita (prima una giornata con serie in corso; altrimenti la prima non allenata nella settimana), accesso a tutte le giornate, conteggio settimanale. Non è un calendario né una raccomandazione fisiologica.
 - **Schede**: creazione, duplicazione, riordino accessibile con pulsanti, eliminazione confermata, import/export e fase del programma.
 - **Giornata**: riepilogo leggibile e pulsante di avvio. L'editor è separato dietro “Modifica scheda”.
-- **Sessione focus**: una serie alla volta, ripetizioni e carico, pulsanti +/- da almeno 44px anche a 320px, selezione delle serie, correzione, elenco esercizi, timer recupero e cronometro.
+- **Sessione focus**: una serie alla volta, ripetizioni e carico, pulsanti +/- da almeno 44px anche a 320px, selezione delle serie, correzione, elenco esercizi, timer recupero e cronometro. “Conferma serie” vive nella barra fissa in basso tra Precedente/Successivo, sempre raggiungibile senza scorrere; l'uscita (←) con serie fatte propone pausa, termina con riepilogo o annulla.
 - **Progressi**: sessioni registrate e conteggi; volume pianificato in un pannello secondario, esplicitamente indicativo.
 
 Niente gestione di immagini, GIF, video, anteprime remote o confetti. Il logo applicativo esistente rimane come favicon. Le illustrazioni SVG del volume sono opzionali e renderizzate all'apertura del pannello; le icone UI sono SVG locali. Chart.js viene scaricato solo aprendo un grafico con dati sufficienti, con fallback in caso di errore.

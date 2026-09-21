@@ -811,10 +811,10 @@ body.in-session {
   font-weight: 400;
 }
 .ses-check-btn {
-  min-height: 56px;
+  min-height: 52px;
   border-radius: 14px;
-  margin: 22px 0 8px;
-  font-size: 1rem;
+  margin: 0;
+  font-size: 0.9rem;
 }
 .ses-stopwatch {
   margin: 14px 0 4px;
@@ -840,13 +840,6 @@ body.in-session {
 }
 .ses-nav-btn small {
   font-size: 0.68rem;
-}
-.ses-nav-end {
-  background: var(--c2);
-  border: 1px solid var(--brd);
-  color: var(--tx2);
-  font-size: 0.8rem;
-  padding: 12px;
 }
 .ses-exercise.ses-superserie {
   border-width: 1px;

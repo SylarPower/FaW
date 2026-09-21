@@ -1882,8 +1882,48 @@ function launchSession() {
 }
 
 function exitSession() {
-  if (!confirm("Uscire dalla sessione?\nI progressi sono salvati.")) return;
+  const day = gD();
+  const doneSets = day
+    ? day.exs.reduce(
+        (a, e) => a + (e.sd ? e.sd.filter((s) => s.done).length : 0),
+        0,
+      )
+    : 0;
 
+  // Sessione parziale: chiedi se terminare (con riepilogo) o mettere in pausa.
+  if (sesActive && !sessionFinalized && doneSets > 0) {
+    const totalSets = day.exs.reduce((a, e) => a + (e.sd ? e.sd.length : 0), 0);
+    document.getElementById("sesExitDone").textContent = doneSets;
+    document.getElementById("sesExitTotal").textContent = totalSets;
+    document.getElementById("mSesExit").style.display = "flex";
+    return;
+  }
+
+  if (
+    !sessionFinalized &&
+    !confirm("Uscire dalla sessione?\nI progressi sono salvati.")
+  )
+    return;
+  doExitSession();
+}
+
+function sesExitFinish() {
+  document.getElementById("mSesExit").style.display = "none";
+  if (typeof persistSessionInputs === "function") persistSessionInputs();
+  sesShowSummary();
+}
+
+function sesExitPause() {
+  document.getElementById("mSesExit").style.display = "none";
+  if (typeof persistSessionInputs === "function") persistSessionInputs();
+  doExitSession();
+}
+
+function sesExitCancel() {
+  document.getElementById("mSesExit").style.display = "none";
+}
+
+function doExitSession() {
   skipRestTimer();
   resetStopwatch();
   save();
@@ -2003,9 +2043,11 @@ function sesRender() {
   if (allSetsDone) {
     setArea.style.display = "none";
     doneArea.style.display = "block";
+    checkBtn.hidden = true;
   } else {
     setArea.style.display = "block";
     doneArea.style.display = "none";
+    checkBtn.hidden = false;
 
     const s = ex.sd[curSetIdx];
     document.getElementById("sesSetLabel").textContent =
@@ -2342,6 +2384,7 @@ function sesEditSet(setIdx) {
 
   // Se la serie era già fatta, il pulsante diventa "Aggiorna"
   const checkBtn = document.getElementById("sesCheckBtn");
+  checkBtn.hidden = false;
   if (s.done) {
     checkBtn.setAttribute("data-edit-idx", setIdx);
     checkBtn.innerHTML =
@@ -2466,25 +2509,6 @@ function sesAdj(inputId, delta) {
   );
   el.value = Number(value.toFixed(2));
   if (navigator.vibrate) navigator.vibrate(10);
-}
-
-// ===== Termina sessione =====
-function sesFinish() {
-  persistSessionInputs();
-  const day = gD();
-  const totalSets = day.exs.reduce((a, e) => a + (e.sd ? e.sd.length : 0), 0);
-  const doneSets = day.exs.reduce(
-    (a, e) => a + (e.sd ? e.sd.filter((s) => s.done).length : 0),
-    0,
-  );
-
-  if (doneSets === 0) {
-    exitSession();
-    return;
-  }
-
-  if (!confirm(`Completare con ${doneSets}/${totalSets} serie fatte?`)) return;
-  sesShowSummary();
 }
 
 function sesCompleteSave() {
