@@ -15,6 +15,7 @@ const fs = require('fs');
 const path = require('path');
 const { JSDOM } = require('jsdom');
 const { createMockFirestore, makeFirebaseGlobal } = require('../ncc/mock-firestore.js');
+const C = require(path.join(__dirname, '../../games/patata/js/game.js'));
 
 const ROOT = path.join(__dirname, '..', '..');
 const html = fs.readFileSync(path.join(ROOT, 'games/patata/index.html'), 'utf8');
@@ -47,9 +48,9 @@ async function until(fn, what, timeout = 25000) {
 
 const mock = createMockFirestore();
 
-function pagina(nome) {
+function pagina(nome, matchId) {
   const dom = new JSDOM(html, {
-    url: 'http://localhost/games/patata/index.html?matchId=P1',
+    url: 'http://localhost/games/patata/index.html?matchId=' + (matchId || 'P1'),
     runScripts: 'dangerously',
     pretendToBeVisual: true
   });
@@ -196,6 +197,213 @@ function invia(w) {
   await mock.collection('partite').doc('P1').update({ rivincitaRifiutataDa: ['BETA'] });
   ok(await until(() => a.document.getElementById('btn-rivincita').disabled, 'rivincita bloccata', 5000),
     'RIVINCITA bloccata solo dal rifiuto della rivincita fatto in partita');
+
+  /* ============================================================
+     [9] PAUSA PER TUTTI + RICHIESTA PAROLA NEL VOCABOLARIO (voto)
+     Nuova partita P2 con due pagine fresche.
+     ============================================================ */
+  console.log('\n[9] Pausa per tutti + proposta di parola con voto di tutti');
+  mock.store.set('partite/P2', {
+    gioco: 'patata',
+    partecipanti: ['ALFA', 'BETA'],
+    punteggi: {}, parole: {}, pronti: [], stato: 'attesa',
+    rivincitaAccettataDa: [], rivincitaRifiutataDa: [],
+    opzioni: { tempo: '30', turni: '1', lettere: '2', mode: 'classic', seed: 'PAUSATEST' },
+    dataOra: '2026-09-23 09:00:00',
+    timestamp: Date.now()
+  });
+  const c = pagina('ALFA', 'P2');
+  const d = pagina('BETA', 'P2');
+  ok(await until(() => {
+    const st = c.document.defaultView.__PATATA.state;
+    return st && st.stato === 'in_corso';
+  }, 'P2 avviata'), 'partita P2 avviata (auto-ready)');
+  ok(await until(() => {
+    const st = d.document.defaultView.__PATATA.state;
+    return st && st.stato === 'in_corso';
+  }, 'P2 visibile a BETA'), 'BETA vede P2 in gioco');
+
+  /* --- pausa semplice: la può premere chiunque, ferma il clock per TUTTI --- */
+  d.document.getElementById('btn-pausa').dispatchEvent(new d.Event('click', { bubbles: true }));
+  ok(await until(() => c.document.defaultView.__PATATA.state.pausa === true, 'pausa su entrambe le pagine'),
+    'chiunque preme ⏸: la partita va in pausa per tutti');
+  ok(await until(() => !c.document.getElementById('overlay-pausa').classList.contains('hidden'), 'overlay su ALFA'),
+    'ALFA vede l\'overlay di pausa');
+  ok(!d.document.getElementById('overlay-pausa').classList.contains('hidden'), 'BETA vede l\'overlay di pausa');
+  const dP2 = c.document.defaultView.__PATATA.state.turno.deadline;
+  await sleep(1100);
+  eq(c.document.defaultView.__PATATA.state.turno.deadline, dP2,
+    'clock FERMO durante la pausa (deadline invariata per 1,1s)');
+  ok(c.document.getElementById('word-input').disabled && d.document.getElementById('word-input').disabled,
+    'caselle disabilitate per tutti durante la pausa');
+  c.document.querySelector('#pausa-body button').dispatchEvent(new c.Event('click', { bubbles: true }));
+  ok(await until(() => c.document.defaultView.__PATATA.state.pausa === false, 'ripresa'), 'ripresa dal pulsante');
+  ok(await until(() => c.document.getElementById('overlay-pausa').classList.contains('hidden'), 'overlay chiuso'),
+    'overlay di pausa richiuso alla ripresa');
+
+  /* --- proposta di parola mancante: pausa + voto di tutti --- */
+  const winC = c.document.defaultView;
+  const stP2 = winC.__PATATA.state;
+  eq(stP2.turno.giocatore, 'ALFA', 'round 1: tocca ad ALFA');
+  const lettersP2 = winC.__PATATA.lettersFor(stP2);
+  console.log('   lettere P2:', lettersP2.join(''));
+  const parolaNuova = lettersP2.map((l) => 'Z' + l).join('') + 'ZZ';
+  ok(!winC.__PATATA.dict.has(parolaNuova), 'parola finta non presente nel dizionario: ' + parolaNuova);
+  scrivi(c, parolaNuova);
+  await until(() => !c.document.getElementById('btn-richiedi').classList.contains('hidden'), 'pulsante proposta', 3000);
+  ok(!c.document.getElementById('btn-richiedi').classList.contains('hidden'),
+    'al proprio turno il pulsante "Proponi al vocabolario" appare: ' +
+    c.document.getElementById('btn-richiedi').textContent);
+  /* da BETA (fuori turno) la casella si svuota e nessun pulsante proposta */
+  scrivi(d, parolaNuova);
+  await sleep(200);
+  eq(input(d).value, '', 'la casella di BETA si svuota: niente preparazione fuori turno');
+  ok(d.document.getElementById('btn-richiedi').classList.contains('hidden'),
+    'da BETA il pulsante "Proponi" resta nascosto (non è il suo turno)');
+  c.document.getElementById('btn-richiedi').dispatchEvent(new c.Event('click', { bubbles: true }));
+  ok(await until(() => c.document.defaultView.__PATATA.state.pausa === true &&
+    !!c.document.defaultView.__PATATA.state.richiesta, 'richiesta aperta'),
+  'la proposta mette in pausa per tutti');
+  ok(await until(() => !d.document.getElementById('overlay-pausa').classList.contains('hidden'), 'overlay vote BETA'),
+    'anche BETA vede il voto');
+  const rqTitle = c.document.getElementById('pausa-title').textContent;
+  ok(/VOCABOLARIO/.test(rqTitle), 'overlay di voto: ' + rqTitle);
+  ok(new RegExp(parolaNuova).test(c.document.getElementById('pausa-sub').textContent),
+    'la parola proposta è nell\'overlay: ' + c.document.getElementById('pausa-sub').textContent.trim().slice(0, 120));
+  /* proponente: ha già votato sì → vede "HAI VOTATO" + ritira, non i bottoni di voto */
+  const btnsC = Array.from(c.document.querySelectorAll('#pausa-body button')).map((b) => b.textContent);
+  ok(btnsC.some((t) => /HAI VOTATO/.test(t)), 'proponente: voto SÌ già registrato — ' + btnsC.join(' | '));
+  ok(btnsC.some((t) => /RITIRA/.test(t)), 'proponente: può ritirare la proposta');
+  ok(!btnsC.some((t) => /INSERISCI/.test(t) && !/HAI/.test(t)), 'proponente: nessun doppio bottone di voto');
+  /* BETA vota 👍 */
+  const btnsD = Array.from(d.document.querySelectorAll('#pausa-body button')).map((b) => b.textContent);
+  ok(btnsD.some((t) => /INSERISCI/.test(t)) && btnsD.some((t) => /NON INSERIRE/.test(t)),
+    'BETA vota: ' + btnsD.join(' | '));
+  const votoSi = d.document.querySelectorAll('#pausa-body button')[0];
+  eq(votoSi.textContent, '👍 INSERISCI', 'primo bottone per BETA = 👍 INSERISCI');
+  votoSi.dispatchEvent(new d.Event('click', { bubbles: true }));
+  ok(await until(() => {
+    const st = c.document.defaultView.__PATATA.state;
+    return !st.pausa && !st.richiesta && st.ultimaRichiesta;
+  }, 'risoluzione voto', 8000), 'tutti hanno votato → voto chiuso e pausa terminata');
+  const ur = c.document.defaultView.__PATATA.state.ultimaRichiesta;
+  eq(ur.esito, 'inserita', 'maggioranza di sì → parola APPROVATA');
+  eq(ur.parola, parolaNuova, 'esito sulla parola giusta');
+  ok(c.document.defaultView.__PATATA.dict.has(parolaNuova),
+    'parola nel dizionario LOCALE di ALFA dopo l\'approvazione');
+  ok(d.document.defaultView.__PATATA.dict.has(parolaNuova),
+    'parola nel dizionario LOCALE di BETA dopo l\'approvazione');
+  const cfgDoc = mock.store.get('config/dizionario');
+  ok(cfgDoc && Array.isArray(cfgDoc.extra) && cfgDoc.extra.indexOf(parolaNuova) !== -1,
+    'parola salvata nel vocabolario condiviso config/dizionario → extra');
+  const scrittureCfg = (mock.log || []).filter((e) => e.p === 'config/dizionario');
+  eq(scrittureCfg.length, 1, 'il vocabolario condiviso è scritto UNA SOLA volta (solo il referente)');
+  ok(await until(() => c.document.getElementById('overlay-pausa').classList.contains('hidden'),
+    'overlay chiuso anche su ALFA'), 'overlay di voto richiuso anche da ALFA');
+
+  /* --- la parola approvata ora è giocabile --- */
+  await until(() => !c.document.getElementById('word-input').disabled, 'input riattivato', 3000);
+  scrivi(c, parolaNuova);
+  invia(c);
+  ok(await until(() => (mock.store.get('partite/P2').storia || []).length === 1, 'parola approvata giocata'),
+    'dopo il sì la proposta si può usare: registrata in storia');
+  const pAlfa = mock.store.get('partite/P2').punteggi.ALFA;
+  eq(pAlfa, parolaNuova.length, 'punti = lunghezza della parola (' + parolaNuova.length + ')');
+  eq(mock.store.get('partite/P2').turno.giocatore, 'BETA', 'la patata passa a BETA');
+
+  /* ============================================================
+     [10] POWER-UP 🚀 "PASSA LA PATATA" — badge, scelta bersaglio,
+     0 punti, un solo utilizzo. Partita P3 con seed scelto affinché
+     il detentore del round sia ALFA (parte per prima).
+     ============================================================ */
+  console.log('\n[10] Power-up 🚀: passa la patata a chi vuoi (0 punti, 1 volta)');
+  let seedPow = null;
+  for (let i = 0; i < 500 && !seedPow; i++) {
+    const cand = 'POW' + i;
+    if (C.powerPassFor({ partecipanti: ['ALFA', 'BETA'], opzioni: { seed: cand }, round: 1 }) === 'ALFA') {
+      seedPow = cand;
+    }
+  }
+  ok(!!seedPow, 'seed trovato con power-up ad ALFA: ' + seedPow);
+  mock.store.set('partite/P3', {
+    gioco: 'patata',
+    partecipanti: ['ALFA', 'BETA'],
+    punteggi: {}, parole: {}, pronti: [], stato: 'attesa',
+    rivincitaAccettataDa: [], rivincitaRifiutataDa: [],
+    opzioni: { tempo: '30', turni: '1', lettere: '2', mode: 'classic', seed: seedPow },
+    dataOra: '2026-09-23 10:00:00',
+    timestamp: Date.now()
+  });
+  const e = pagina('ALFA', 'P3');
+  const f = pagina('BETA', 'P3');
+  ok(await until(() => {
+    const st = e.document.defaultView.__PATATA.state;
+    return st && st.stato === 'in_corso';
+  }, 'P3 avviata'), 'partita P3 avviata');
+  ok(await until(() => {
+    const st = f.document.defaultView.__PATATA.state;
+    return st && st.stato === 'in_corso';
+  }, 'P3 visibile a BETA'), 'BETA vede P3');
+
+  console.log('   lettere P3:', e.document.defaultView.__PATATA
+    .lettersFor(e.document.defaultView.__PATATA.state).join(''));
+
+  /* badge 🚀 sul chip del detentore, non sugli altri */
+  ok(await until(() => {
+    const chips = e.document.querySelectorAll('#game-players .pchip');
+    return chips.length === 2;
+  }, 'chip renderizzati'), 'chip giocatori renderizzati');
+  const chipsE = Array.from(e.document.querySelectorAll('#game-players .pchip'));
+  const chipAlfa = chipsE.find((c) => c.textContent.includes('ALFA'));
+  const chipBeta = chipsE.find((c) => c.textContent.includes('BETA'));
+  ok(!!chipAlfa.querySelector('.power-badge'), 'badge 🚀 sul chip di ALFA (detentore del round)');
+  ok(!chipBeta.querySelector('.power-badge'), 'NESSUN badge 🚀 sul chip di BETA');
+  ok(!f.document.querySelectorAll('#game-players .power-badge').length ||
+    Array.from(f.document.querySelectorAll('#game-players .pchip'))
+      .find((c) => c.textContent.includes('ALFA')).querySelector('.power-badge'),
+    'anche la pagina di BETA vede il badge sul detentore');
+
+  /* il pulsante 🚀 compare solo da chi ha patata + power-up */
+  ok(await until(() => !e.document.getElementById('btn-power').classList.contains('hidden'),
+    'btn-power visibile per ALFA', 4000), 'ALFA (patata + power-up) vede "🚀 PASSA LA PATATA A…"');
+  ok(f.document.getElementById('btn-power').classList.contains('hidden'),
+    'BETA non vede il pulsante (non è suo né il detentore)');
+  console.log('   pulsante:', e.document.getElementById('btn-power').textContent);
+
+  /* scelta bersaglio */
+  e.document.getElementById('btn-power').dispatchEvent(new e.Event('click', { bubbles: true }));
+  ok(await until(() => !e.document.getElementById('overlay-target').classList.contains('hidden'),
+    'picker bersagli'), 'overlay "A CHI PASSI LA PATATA?" aperto');
+  const targetBtns = Array.from(e.document.querySelectorAll('#target-body [data-target]'));
+  ok(targetBtns.length === 2, 'un pulsante per ogni avversario + ANNULLA (' + targetBtns.length + ')');
+  ok(targetBtns.some((b) => /PASSA A BETA/.test(b.textContent)), 'bersaglio BETA presente');
+  ok(targetBtns.some((b) => b.getAttribute('data-target') === ''), 'ANNULLA presente');
+  const btnPassaBeta = targetBtns.find((b) => b.getAttribute('data-target') === 'BETA');
+  btnPassaBeta.dispatchEvent(new e.Event('click', { bubbles: true }));
+
+  ok(await until(() => {
+    const st = e.document.defaultView.__PATATA.state;
+    return st && st.turno && st.turno.giocatore === 'BETA';
+  }, 'patata a BETA dopo il passaggio'), 'la patata arriva a BETA senza scrivere');
+  const docP3 = mock.store.get('partite/P3');
+  eq(docP3.roundData.powerPass && docP3.roundData.powerPass.target, 'BETA',
+    'power-up registrato come usato (roundData.powerPass)');
+  eq(docP3.roundData.powerPass.da, 'ALFA', 'usato da ALFA');
+  eq(docP3.storia || [], [], 'nessuna parola: il passaggio non entra nel feed parole');
+  eq(docP3.punteggi, { ALFA: 0, BETA: 0 }, 'nessun punto assegnato (0 punti come da regola)');
+  ok(await until(() => e.document.getElementById('overlay-target').classList.contains('hidden'),
+    'picker chiuso dopo la scelta'), 'overlay chiuso dopo il passaggio');
+  ok(await until(() => e.document.getElementById('btn-power').classList.contains('hidden'),
+    'pulsante nascosto dopo l\'uso'), 'pulsante 🚀 sparito (1 solo utilizzo per round)');
+  ok(await until(() => !e.document.querySelectorAll('#game-players .power-badge').length,
+    'badge sparito dopo l\'uso'), 'badge 🚀 rimosso da entrambi i chip dopo l\'uso');
+  ok(/passa la patata a BETA/i.test(e.document.getElementById('feedback').textContent),
+    'feedback dedicato: "' + e.document.getElementById('feedback').textContent.trim() + '"');
+  ok(e.document.getElementById('word-input').disabled,
+    'patata passata: la casella di ALFA si disattiva');
+  ok(f.document.defaultView.__PATATA.state.turno.giocatore === 'BETA' &&
+    !f.document.getElementById('word-input').disabled,
+    'BETA può a sua volta giocare normalmente dopo aver ricevuto la patata');
 
   console.log('\n=================');
   console.log('PASSATI: ' + passed + '  FALLITI: ' + failed);

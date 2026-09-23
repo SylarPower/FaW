@@ -45,11 +45,12 @@ eq(C.normalizeWord('  braciòlo  '), 'BRACIOLO', 'strip accenti/spazi');
 eq(C.normalizeWord('quìta'), 'QUITa'.toUpperCase(), 'Q accento');
 eq(C.normalizeWord('ciao-mondo!'), 'CIAOMONDO', 'strip non A-Z');
 eq(C.normalizeWord(''), '', 'vuoto');
-eq(C.pointsFor(4), 1, '4 lettere = 1');
-eq(C.pointsFor(5), 2, '5 lettere = 2');
-eq(C.pointsFor(6), 3, '6 lettere = 3');
-eq(C.pointsFor(7), 5, '7 lettere = 5');
-eq(C.pointsFor(12), 11, '8+ lettere = 11');
+eq(C.pointsFor(4), 4, '4 lettere = 4 punti (lunghezza effettiva)');
+eq(C.pointsFor(5), 5, '5 lettere = 5 punti');
+eq(C.pointsFor(6), 6, '6 lettere = 6 punti');
+eq(C.pointsFor(7), 7, '7 lettere = 7 punti');
+eq(C.pointsFor(8), 8, '8 lettere = 8 punti');
+eq(C.pointsFor(12), 12, '12 lettere = 12 punti');
 
 /* ---------- LetterIndex ---------- */
 console.log('\n[2] LetterIndex.countFor / countSequence');
@@ -96,6 +97,19 @@ eq(mixR1_c1, mixR1_c2, 'mix: deterministico tra due client sullo stesso round');
 ok(mixR1_c1 === 'classic' || mixR1_c1 === 'sequenza', 'mix r1 valore valido');
 const mixState = { opzioni: { mode: 'mix', seed: 'SEED_TEST' }, round: 1 };
 eq(C.ruleFor(mixState), mixR1_c1, 'ruleFor supporta oggetto state');
+/* MIX = 50% sparso + 50% sequenza, ALTERNANZA garantita round per round */
+{
+  const regole = [];
+  for (let r = 1; r <= 20; r++) regole.push(C.ruleFor('mix', r, 'QUALSIASI_SEED'));
+  const nSeq = regole.filter((x) => x === 'sequenza').length;
+  const nCla = regole.filter((x) => x === 'classic').length;
+  eq(nCla, 10, 'mix su 20 round: 50% in ordine sparso (10 classic)');
+  eq(nSeq, 10, 'mix su 20 round: 50% sequenza (10 sequenza)');
+  ok(regole.every((x, i) => x === (i % 2 === 0 ? 'classic' : 'sequenza')),
+    'mix: alternanza ferma round per round (pari/dispari)');
+  ok(C.ruleFor('mix', 3, 'SEED_A') === C.ruleFor('mix', 3, 'SEED_B'),
+    'mix indipendente dal seed: stesso risultato su ogni client');
+}
 
 /* ---------- validateWord ---------- */
 console.log('\n[4] validateWord (staccate vs consecutive)');
@@ -334,6 +348,212 @@ console.log('\n[6b] Bonus a scalare (5→4→3→2→1) e tetto del cronometro')
   C.applyPartial(st, C.mutNextRound(st, { now: now + 1000 }));
   eq(st.round, 2, 'round 2 avviato');
   eq(C.bonusPerParola(st, now + 1000 + 3000), 5, 'nuovo turno: bonus di nuovo +5');
+}
+
+/* ---------- timeout IMMEDIATO, pausa per tutti, richiesta parola ---------- */
+console.log('\n[6c] Timeout immediato + pausa + richiesta vocabolario (voto di tutti)');
+{
+  eq(C.TIMEOUT_GRACE, 0, 'TIMEOUT_GRACE = 0: la chiusura al zero è immediata');
+  const t0 = 4_000_000_000_000;
+  const mk = () => {
+    const st = C.normState({
+      partecipanti: ['ALFA', 'BETA', 'GAMMA'],
+      opzioni: { tempo: '30', turni: '2', lettere: '3', seed: 'PAUSA' },
+      punteggi: {}, pronti: ['ALFA', 'BETA', 'GAMMA'], stato: 'attesa'
+    });
+    C.applyPartial(st, C.mutStart(st, { me: 'ALFA', now: t0 }));
+    return st;
+  };
+  const ctxOf = (me, now, extra) => Object.assign({
+    me, now, letters: ['A', 'B', 'C'], used: new Set(),
+    dict: new Set(['CANE', 'BRANCA']), rule: 'classic'   // BRANCA contiene A+B+C
+  }, extra || {});
+
+  /* --- timeout: scatta ESATTAMENTE a zero, non dopo 2,5s --- */
+  const st1 = mk();
+  ok(C.mutTimeout(st1, ctxOf('ALFA', st1.turno.deadline - 1)) === null,
+    'un millisecondo PRIMA dello zero: nessuna scottatura');
+  const to1 = C.mutTimeout(st1, ctxOf('ALFA', st1.turno.deadline));
+  ok(to1 && !to1.__error, 'AL LO ZERO ESATTO la scottatura scatta subito (senza grazia)');
+  C.applyPartial(st1, to1);
+  eq(st1.roundData.fase, 'recap', 'timeout immediato → recap');
+
+  /* --- pausa per tutti --- */
+  const st = mk();
+  const deadlinePrima = st.turno.deadline;          // t0 + 30s
+  const pauseAt = t0 + 5000;
+  const p1 = C.mutPausa(st, ctxOf('BETA', pauseAt));
+  ok(p1 && p1.pausa === true, 'mutPausa: mette in pausa per tutti');
+  C.applyPartial(st, p1);
+  eq(st.pausaDa, 'BETA', 'pausaDa registra chi ha chiuso');
+  eq(st.turno.pausaIniziata, pauseAt, 'clock congelato a pauseAt');
+  eq(C.mutTimeout(st, ctxOf('ALFA', st.turno.deadline + 999999)), null,
+    'durante la pausa NON scatta mai la scottatura');
+  const subP = C.mutSubmitWord(st, ctxOf('ALFA', pauseAt + 100, { word: 'CANE' }));
+  ok(subP && subP.__error && subP.__error.code === 'PAUSED',
+    'durante la pausa non si possono giocare parole (PAUSED)');
+
+  /* ripresa dopo 20s di pausa: il clock riparte da dove si era congelato */
+  const resumeAt = pauseAt + 20000;
+  const p2 = C.mutPausa(st, ctxOf('BETA', resumeAt));
+  ok(p2 && p2.pausa === false, 'seconda chiamata: riprende il gioco');
+  C.applyPartial(st, p2);
+  eq(st.pausa, false, 'pausa azzerata alla ripresa');
+  eq(st.turno.deadline, deadlinePrima + 20000, 'deadline slitta esattamente della durata della pausa');
+  eq(st.turno.inizio, t0 + 20000, 'anche inizio slitta: il bonus non conteggia la pausa');
+  ok(!st.turno.pausaIniziata, 'pausaIniziata cancellato alla ripresa');
+  const subDopo = C.mutSubmitWord(st, ctxOf('ALFA', resumeAt + 100, { word: 'BRANCA' }));
+  ok(subDopo && !subDopo.__error, 'alla ripresa si torna a giocare normalmente');
+
+  /* --- richiesta parola + voto di TUTTI (pausa fino a tutti i voti) --- */
+  const st3 = mk();
+  const reqAt = t0 + 3000;
+  const rq = C.mutRichiediParola(st3, ctxOf('ALFA', reqAt, { word: 'BRUCIA' }));
+  ok(rq && !rq.__error, 'richiesta parola accettata (al proprio turno, non nel dizionario)');
+  C.applyPartial(st3, rq);
+  eq(st3.pausa, true, 'la richiesta mette in pausa per tutti');
+  eq(st3.richiesta.parola, 'BRUCIA', 'parola normalizzata nella richiesta');
+  eq(st3.richiesta.votiSi, ['ALFA'], 'il proponente conta subito come voto SÌ');
+  ok(C.mutTimeout(st3, ctxOf('BETA', st3.turno.deadline + 999999)) === null,
+    'nessuna scottatura durante la votazione');
+  eq(C.mutRisolviRichiesta(st3, ctxOf('ALFA', reqAt + 100)), null,
+    'con 1 voto su 3 la votazione NON si chiude');
+
+  const vB = C.mutVotoParola(st3, ctxOf('BETA', reqAt + 200, { votoSi: false }));
+  ok(vB && vB['richiesta.votiNo'], 'BETA vota 👎');
+  C.applyPartial(st3, vB);
+  eq(C.mutRisolviRichiesta(st3, ctxOf('ALFA', reqAt + 300)), null,
+    '2 voti su 3: ancora in attesa');
+  const vG = C.mutVotoParola(st3, ctxOf('GAMMA', reqAt + 400, { votoSi: false }));
+  ok(vG && vG['richiesta.votiNo'], 'GAMMA vota 👎');
+  C.applyPartial(st3, vG);
+  ok(C.mutVotoParola(st3, ctxOf('GAMMA', reqAt + 500, { votoSi: true })) === null,
+    'doppio voto rifiutato');
+  const res = C.mutRisolviRichiesta(st3, ctxOf('ALFA', reqAt + 600));
+  ok(res && res.ultimaRichiesta, 'tutti hanno votato → risoluzione');
+  C.applyPartial(st3, res);
+  ok(!st3.richiesta, 'votazione chiusa (richiesta rimossa)');
+  eq(st3.pausa, false, 'la pausa finisce con la votazione');
+  eq(st3.ultimaRichiesta.esito, 'rifiutata', 'maggioranza 1-2 contro → parola NON inserita');
+  eq(st3.turno.deadline, t0 + 30000 + (reqAt + 600 - reqAt),
+    'clock ripreso: la pausa di votazione (600ms) è stata aggiunta alla deadline');
+
+  /* esito positivo: maggioranza di sì */
+  const st4 = mk();
+  C.applyPartial(st4, C.mutRichiediParola(st4, ctxOf('ALFA', t0 + 1000, { word: 'ZEBRA' })));
+  C.applyPartial(st4, C.mutVotoParola(st4, ctxOf('BETA', t0 + 1100, { votoSi: true })));
+  ok(C.mutRisolviRichiesta(st4, ctxOf('ALFA', t0 + 1150)) === null,
+    '2 voti su 3: non si chiude ancora');
+  C.applyPartial(st4, C.mutVotoParola(st4, ctxOf('GAMMA', t0 + 1180, { votoSi: true })));
+  const resSi = C.mutRisolviRichiesta(st4, ctxOf('ALFA', t0 + 1200));
+  ok(resSi && resSi.ultimaRichiesta && resSi.ultimaRichiesta.esito === 'inserita',
+    'maggioranza di sì (3-0) → parola inserita');
+  C.applyPartial(st4, resSi);
+  eq(st4.pausa, false, 'ripresa anche in caso di esito positivo');
+
+  /* ritiro proposta dal proponente */
+  const st5 = mk();
+  C.applyPartial(st5, C.mutRichiediParola(st5, ctxOf('ALFA', t0 + 500, { word: 'PROVA' })));
+  eq(C.mutRitiraRichiesta(st5, ctxOf('BETA', t0 + 600)), null,
+    'solo il proponente può ritirare la proposta');
+  const rit = C.mutRitiraRichiesta(st5, ctxOf('ALFA', t0 + 600));
+  ok(rit && rit.ultimaRichiesta && rit.ultimaRichiesta.esito === 'annullata',
+    'proponente ritira → proposta annullata, pausa sciolta');
+  C.applyPartial(st5, rit);
+  eq(st5.pausa, false, 'dopo il ritiro si riprende a giocare');
+
+  /* non si propone fuori turno / parola già presente */
+  const st6 = mk();
+  const rqOff = C.mutRichiediParola(st6, ctxOf('BETA', t0 + 500, { word: 'CANE' }));
+  ok(rqOff && rqOff.__error && rqOff.__error.code === 'NOT_YOUR_TURN',
+    'fuori turno non si può proporre');
+  const rqAlready = C.mutRichiediParola(st6, ctxOf('ALFA', t0 + 500, { word: 'CANE' }));
+  ok(rqAlready && rqAlready.__error && rqAlready.__error.code === 'ALREADY',
+    'parola già nel dizionario: niente votazione');
+}
+
+/* ---------- POWER-UP 🚀 "passa la patata" ---------- */
+console.log('\n[6d] Power-up 🚀 passa la patata (estrazione + mutatore)');
+{
+  /* assegnazione deterministica (stessa su ogni client, zero scritture) */
+  const stBase = { partecipanti: ['ALFA', 'BETA', 'GAMMA'], opzioni: { seed: 'POWTEST' }, round: 1 };
+  const pu1 = C.powerPassFor(stBase);
+  const pu2 = C.powerPassFor(JSON.parse(JSON.stringify(stBase)));
+  eq(pu1, pu2, 'power-up deterministico: stesso detentore su ogni client');
+  ok(['ALFA', 'BETA', 'GAMMA'].indexOf(pu1) !== -1, 'detentore fra i partecipanti (' + pu1 + ')');
+  eq(C.powerPassFor({ partecipanti: ['SOL'], opzioni: { seed: 'X' }, round: 1 }), null,
+    'in solo non c\'è nessun power-up (nessuno a cui passare)');
+  {
+    const visti = new Set();
+    for (let r = 1; r <= 30; r++) visti.add(C.powerPassFor({ partecipanti: ['A', 'B', 'C'], opzioni: { seed: 'MIXPOW' }, round: r }));
+    ok(visti.size > 1, 'sui 30 round il power-up gira fra più giocatori (' + visti.size + ' distinti)');
+  }
+
+  /* mutatore */
+  const t0 = 5_000_000_000_000;
+  const mk = () => {
+    const st = C.normState({
+      partecipanti: ['ALFA', 'BETA', 'GAMMA'],
+      opzioni: { tempo: '30', turni: '2', lettere: '3', seed: 'POWTEST' },
+      punteggi: {}, pronti: ['ALFA', 'BETA', 'GAMMA'], stato: 'attesa'
+    });
+    C.applyPartial(st, C.mutStart(st, { me: 'ALFA', now: t0 }));
+    return st;
+  };
+  const ctxP = (me, extra) => Object.assign({
+    me, now: t0 + 1000, letters: ['A', 'B', 'C'], used: new Set(),
+    dict: new Set(['BRANCA']), rule: 'classic'
+  }, extra || {});
+
+  const st = mk();
+  const pu = C.powerPassFor(st);
+  const altro = st.partecipanti.find((p) => p !== pu);   // primo non-detentore
+  /* porta la patata dal detentore (i test stimano il mutatore, non la rotazione) */
+  C.applyPartial(st, { 'turno.giocatore': pu });
+
+  /* bersagli invalidi */
+  const self = C.mutPassaPatata(st, ctxP(pu, { target: pu }));
+  eq(self && self.__error && self.__error.code, 'BAD_TARGET', 'non puoi passarti la patata addosso');
+  const fuoriTurno = C.mutPassaPatata(st, ctxP(altro, { target: pu }));
+  eq(fuoriTurno && fuoriTurno.__error && fuoriTurno.__error.code, 'NOT_YOUR_TURN',
+    'solo chi ha la patata può usare il power-up');
+  /* pausa/voto bloccano il power-up come il resto */
+  C.applyPartial(st, { pausa: true, pausaTs: t0 + 900, 'turno.pausaIniziata': t0 + 900 });
+  const inPausa = C.mutPassaPatata(st, ctxP(pu, { target: altro, now: t0 + 1200 }));
+  eq(inPausa && inPausa.__error && inPausa.__error.code, 'PAUSED', ' durante la pausa il passaggio non si usa');
+  C.applyPartial(st, { pausa: false, pausaDa: { __op: 'delete' }, pausaTs: { __op: 'delete' }, 'turno.pausaIniziata': { __op: 'delete' } });
+
+  /* passaggio riuscito */
+  const deadlinePrima = st.turno.deadline;
+  const pass = C.mutPassaPatata(st, ctxP(pu, { target: altro }));
+  ok(pass && !pass.__error, 'passaggio concesso al detentore al proprio turno');
+  C.applyPartial(st, pass);
+  eq(st.turno.giocatore, altro, 'la patata è arrivata al bersaglio');
+  eq(st.roundData.powerPass, { da: pu, target: altro, ts: t0 + 1000 }, 'power-up segnato come usato');
+  eq(st.turno.ultimo.pass, true, 'ultimo.pass = true (feedback dedicato, non una parola)');
+  eq(st.turno.deadline, deadlinePrima, 'il clock non cambia: né secondi aggiunti né tolti');
+  eq(st.storia, [], 'nessuna parola in storia (0 punti, feed parole invariato)');
+  eq(st.punteggi, { ALFA: 0, BETA: 0, GAMMA: 0 }, 'nessun punto assegnato');
+
+  /* la rotazione riparte dalla posizione del ricevente */
+  const attesoDopo = C.nextPlayer(st, altro);
+  C.applyPartial(st, C.mutSubmitWord(st, ctxP(altro, { word: 'BRANCA' })));
+  eq(st.turno.giocatore, attesoDopo,
+    'dopo il passaggio la rotazione normale prosegue dalla posizione del ricevente (' + attesoDopo + ')');
+
+  /* uno solo per round */
+  C.applyPartial(st, { 'turno.giocatore': pu });
+  const seconda = C.mutPassaPatata(st, ctxP(pu, { target: st.partecipanti.find((p) => p !== pu && p !== altro) }));
+  eq(seconda && seconda.__error && seconda.__error.code, 'USED', 'secondo utilizzo nello stesso round rifiutato');
+
+  /* chi NON ha il power-up non può usarlo */
+  const st2 = mk();
+  const pu2b = C.powerPassFor(st2);
+  const senza = st2.partecipanti.find((p) => p !== pu2b);
+  C.applyPartial(st2, { 'turno.giocatore': senza });
+  const noPower = C.mutPassaPatata(st2, ctxP(senza, { target: pu2b }));
+  eq(noPower && noPower.__error && noPower.__error.code, 'NO_POWER',
+    'chi non è il detentore del round non può passare la patata');
 }
 
 /* ---------- SoloBackend con clock controllato ---------- */
