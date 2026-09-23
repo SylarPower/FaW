@@ -6,19 +6,34 @@
    - Ogni turno (round) estrae N lettere casuali (sempre "risolvibili":
      il dizionario deve contenere abbastanza parole che le includono).
    - Tre modalità:
-     * CLASSICA  → lettere anche staccate (comportamento base)
+     * CLASSICA  → lettere anche staccate (ordine sparso)
      * SEQUENZA  → lettere consecutive (sottostringa)
-     * MIX       → alternanza deterministica round per round
+     * MIX       → 50% CLASSICA e 50% SEQUENZA, alternanza deterministica
+                   round per round (round dispari = sparso, pari = sequenza)
    - Chi sta giocando deve scrivere una parola (min 4 lettere, presente
      nel dizionario Ruzzle) che rispetti la regola del turno.
+   - Punti = lunghezza della parola: 4 lettere = 4 punti, 8 = 8, ecc.
    - Parola corretta  → +secondi al timer (bonus a scalare: +5 nel primo minuto
      di turno, poi +4, +3, +2 e infine +1) e la patata passa al prossimo.
      Il timer ha un tetto: non supera mai il tempo configurato (es. 60s).
    - Si scrive SOLO al proprio turno: fuori turno la casella è disabilitata.
    - Parola sbagliata → feedback di errore, tempo invariato (nessuna penalità).
-   - Tempo a zero     → chi tiene la patata "si scotta" (−10 pt) e si
-     apre il recap: tutte le parole del turno, tutti confermano e si
-     passa al turno successivo (nuove lettere).
+   - Tempo a zero     → la chiusura è IMMEDIATA (nessuna grazia): chi tiene la
+     patata "si scotta" (−10 pt) e si apre il recap: tutte le parole del
+     turno, tutti confermano e si passa al turno successivo (nuove lettere).
+   - PAUSA per tutti   → chiunque può fermare il cronometro (⏸): durante la
+     pausa non si gioca, non scatta la scottatura e alla ripresa il tempo
+     resta esattamente quello congelato.
+   - RICHIESTA PAROLA  → chi ha la patata può proporre una parola nuova nel
+     vocabolario (come in Ruzzle): il gioco si mette in pausa per TUTTI finché
+     tutti i giocatori non hanno votato (👍 inserisci / 👎 non inserire).
+     A votazione conclusa (maggioranza di "sì") la parola entra nel dizionario
+     condiviso (config/dizionario → extra) e la pausa termina.
+   - POWER-UP 🚀 "PASSA LA PATATA" → a ogni turno (round) UN giocatore
+     estratto in modo deterministico dal seed (come le lettere, zero scritture
+     extra) riceve il power-up: al proprio turno, invece di scrivere, può
+     mandare la patata al giocatore che vuoi — 0 punti, 1 solo utilizzo per
+     round, mostrato da un badge 🚀 sul chip.
    - A fine partita  → classifica finale.
 
    Backend (Zero runTransaction):
@@ -43,7 +58,9 @@
   const TIME_BONUS_STEP_MS = 60000;
   const WRONG_PENALTY = 0;        // La parola sbagliata non toglie tempo
   const PATATA_PENALTY = 10;      // −10 pt per la scottatura
-  const TIMEOUT_GRACE = 2500;     // tolleranza prima di dichiarare la scottatura
+  /* Nessuna grazia: al raggiungimento dello zero la scottatura scatta SUBITO
+     (il client la invoca anche dal frame rAF, senza aspettare il tick). */
+  const TIMEOUT_GRACE = 0;
   const LETTER_THRESHOLD = 12;    // min parole nel dizionario per una combo valida
   const TICK_MS = 1000;           // tick logico (il timer visivo gira a parte, via rAF)
   const STUCK_FALLBACK_MS = 12000; // se chi "guida" l'azione non risponde, subentrano gli altri
@@ -74,12 +91,14 @@
     return TIME_BONUS_STEPS[Math.min(TIME_BONUS_STEPS.length - 1, minuti)];
   }
 
+  /**
+   * Punti = lunghezza EFFETTIVA della parola: 4 lettere = 4 punti,
+   * 5 = 5, …, 8 = 8, ecc. (minimo 4: sotto la soglia la parola non vale).
+   */
   function pointsFor(len) {
-    if (len <= 4) return 1;
-    if (len === 5) return 2;
-    if (len === 6) return 3;
-    if (len === 7) return 5;
-    return 11;
+    const n = Math.floor(Number(len));
+    if (!isFinite(n) || n <= 0) return MIN_WORD_LENGTH;
+    return Math.max(MIN_WORD_LENGTH, n);
   }
 
   /* ---------------- RNG DETERMINISTICO (schema Ruzzle) ---------------- */
@@ -203,9 +222,12 @@
 
   /**
    * Determina la regola del turno in modo deterministico:
-   * - 'classic': lettere anche staccate
+   * - 'classic': lettere anche staccate (ordine sparso)
    * - 'sequenza': lettere consecutive (sottostringa)
-   * - 'mix': alternanza deterministica per round
+   * - 'mix': 50% classic / 50% sequenza con ALTERNANZA GARANTITA round per
+   *   round (dispari = sparso, pari = sequenza): lo stesso mix su ogni client
+   *   e, su più turni, esattamente metà e metà (non un lancio casuale che
+   *   potrebbe produrre sequenze strozzate).
    */
   function ruleFor(stateOrMode, round, seed) {
     let mode = 'classic';
@@ -223,10 +245,26 @@
     }
     if (mode === 'sequenza') return 'sequenza';
     if (mode === 'mix') {
-      const rand = sfc32(...cyrb128(s + '::patata-rule::' + rnd))();
-      return rand < 0.5 ? 'classic' : 'sequenza';
+      return (rnd % 2 === 1) ? 'classic' : 'sequenza';
     }
     return 'classic';
+  }
+
+  /**
+   * Power-up 🚀 "Passa la patata": a ogni round UN solo giocatore, estratto
+   * DETERMINISTICAMENTE da seed + round (stessa identica estrazione su tutti
+   * i client, zero scritture extra — stesso schema delle lettere).
+   * Restituisce il nome del fortunato oppure null (partita in solo o senza
+   * partecipanti): da solo non c'è nessuno a cui passarla.
+   */
+  function powerPassFor(state) {
+    const ps = (state && state.partecipanti) || [];
+    if (ps.length < 2) return null;
+    const seed = (state.opzioni && state.opzioni.seed) || 'SEED';
+    const rnd = state.round || 1;
+    const rand = sfc32(...cyrb128(seed + '::patata-power::' + rnd));
+    const idx = Math.min(ps.length - 1, Math.floor(rand() * ps.length));
+    return ps[idx];
   }
 
   /**
@@ -395,6 +433,128 @@
     return flagsByOthers(state, word).length >= flagThreshold(state);
   }
 
+  /* ---- Pausa / votazione vocabolario ---- */
+  /**
+   * Aggiunge allo update lo sblocco del clock dopo una pausa: deadline,
+   * riferimento e inizio vengono spostati in avanti della durata della pausa,
+   * così né il cronometro né gli scalini del bonus conteggiano il tempo fermo.
+   */
+  function resumeClockUpdate(state, ctx, up) {
+    if (!state.turno) return up;
+    const pausaIniziata = Number(state.turno.pausaIniziata);
+    const shift = isFinite(pausaIniziata) ? Math.max(0, ctx.now - pausaIniziata) : 0;
+    if (shift > 0) {
+      up['turno.deadline'] = Number(state.turno.deadline || ctx.now) + shift;
+      if (state.turno.riferimento != null) up['turno.riferimento'] = Number(state.turno.riferimento) + shift;
+      if (state.turno.inizio != null) up['turno.inizio'] = Number(state.turno.inizio) + shift;
+    }
+    up['turno.pausaIniziata'] = { __op: 'delete' };
+    return up;
+  }
+  /** Pausa → riprende; ripresa → congela il clock. Solo nella fase di gioco. */
+  function mutPausa(state, ctx) {
+    if (state.stato !== 'in_corso' || !state.roundData || !state.turno) return null;
+    if (state.roundData.fase !== 'giochi') return null;
+    if (state.richiesta) return null;   // voto sul vocabolario in corso: la pausa la gestisce quello
+    if (state.pausa) {
+      const up = {
+        pausa: false,
+        pausaDa: { __op: 'delete' },
+        pausaTs: { __op: 'delete' }
+      };
+      return resumeClockUpdate(state, ctx, up);
+    }
+    // Non si ferma un cronometro già scaduto: la scottatura ha la precedenza.
+    if (!(ctx.now < state.turno.deadline)) return null;
+    return {
+      pausa: true,
+      pausaDa: ctx.me,
+      pausaTs: ctx.now,
+      'turno.pausaIniziata': ctx.now
+    };
+  }
+
+  /** Propone una parola mancante nel vocabolario: pausa per tutti + voto. */
+  function mutRichiediParola(state, ctx) {
+    if (state.stato !== 'in_corso' || !state.roundData || !state.turno) return { __error: { code: 'NOT_PLAYING' } };
+    if (state.roundData.fase !== 'giochi') return { __error: { code: 'NOT_PLAYING' } };
+    if (state.turno.giocatore !== ctx.me) return { __error: { code: 'NOT_YOUR_TURN' } };
+    if (state.pausa || state.richiesta) return null;
+    if (!(ctx.now < state.turno.deadline)) return null;
+    if (state.partecipanti.length < 2) return { __error: { code: 'ALONE' } };
+    const w = normalizeWord(ctx.word);
+    if (w.length < MIN_WORD_LENGTH) return { __error: { code: 'INVALID', detail: 'SHORT' } };
+    if (ctx.dict && ctx.dict.has(w)) return { __error: { code: 'ALREADY' } };
+    if (ctx.used && ctx.used.has(w)) return { __error: { code: 'USED' } };
+    return {
+      pausa: true,
+      pausaDa: ctx.me,
+      pausaTs: ctx.now,
+      'turno.pausaIniziata': ctx.now,
+      'richiesta': { parola: w, da: ctx.me, ts: ctx.now, votiSi: [ctx.me], votiNo: [] },
+      'ultimaRichiesta': { __op: 'delete' }
+    };
+  }
+
+  /** Registra il voto (👍/👎). L'esito lo calcola mutRisolviRichiesta. */
+  function mutVotoParola(state, ctx) {
+    const rq = state.richiesta;
+    if (state.stato !== 'in_corso' || !rq) return null;
+    if (state.roundData && state.roundData.fase !== 'giochi') return null;
+    if (state.partecipanti.indexOf(ctx.me) === -1) return null;
+    const si = rq.votiSi || [], no = rq.votiNo || [];
+    if (si.indexOf(ctx.me) !== -1 || no.indexOf(ctx.me) !== -1) return null;
+    return ctx.votoSi
+      ? { 'richiesta.votiSi': { __op: 'union', items: [ctx.me] } }
+      : { 'richiesta.votiNo': { __op: 'union', items: [ctx.me] } };
+  }
+
+  /**
+   * Chiude la votazione quando TUTTI hanno votato: maggioranza di "sì" →
+   * la parola entra nel vocabolario (lato client referente), la pausa finisce
+   * e il clock riparte da dove si era congelato.
+   */
+  function mutRisolviRichiesta(state, ctx) {
+    const rq = state.richiesta;
+    if (state.stato !== 'in_corso' || !rq) return null;
+    if (state.roundData && state.roundData.fase !== 'giochi') return null;
+    const si = rq.votiSi || [], no = rq.votiNo || [];
+    if (si.length + no.length < state.partecipanti.length) return null;
+    const inserita = si.length > no.length;
+    const up = {
+      pausa: false,
+      pausaDa: { __op: 'delete' },
+      pausaTs: { __op: 'delete' },
+      'richiesta': { __op: 'delete' },
+      'ultimaRichiesta': {
+        parola: rq.parola, da: rq.da,
+        esito: inserita ? 'inserita' : 'rifiutata',
+        si: si.length, no: no.length, ts: ctx.now
+      }
+    };
+    return resumeClockUpdate(state, ctx, up);
+  }
+
+  /** Il proponente può RITIRARE la propria proposta (sblocca tutti gli altri). */
+  function mutRitiraRichiesta(state, ctx) {
+    const rq = state.richiesta;
+    if (state.stato !== 'in_corso' || !rq) return null;
+    if (state.roundData && state.roundData.fase !== 'giochi') return null;
+    if (rq.da !== ctx.me) return null;
+    const si = rq.votiSi || [], no = rq.votiNo || [];
+    const up = {
+      pausa: false,
+      pausaDa: { __op: 'delete' },
+      pausaTs: { __op: 'delete' },
+      'richiesta': { __op: 'delete' },
+      'ultimaRichiesta': {
+        parola: rq.parola, da: rq.da, esito: 'annullata',
+        si: si.length, no: no.length, ts: ctx.now
+      }
+    };
+    return resumeClockUpdate(state, ctx, up);
+  }
+
   function esc(s) {
     return String(s).replace(/[&<>"']/g, (c) => (
       { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
@@ -481,13 +641,15 @@
         giocatore: state.partecipanti[0],
         ultimo: null
       },
-      confermaTurno: []
+      confermaTurno: [],
+      pausa: false
     };
   }
 
   function mutSubmitWord(state, ctx) {
     if (state.stato !== 'in_corso' || !state.roundData || !state.turno) return null;
     if (state.roundData.fase !== 'giochi') return { __error: { code: 'NOT_PLAYING' } };
+    if (state.pausa || state.richiesta) return { __error: { code: 'PAUSED' } };
     if (state.turno.giocatore !== ctx.me) return { __error: { code: 'NOT_YOUR_TURN' } };
     const rule = ctx.rule || ruleFor(state);
     const v = validateWord(ctx.word, ctx.letters, ctx.used, ctx.dict, rule);
@@ -513,6 +675,7 @@
   function mutWrongWord(state, ctx) {
     if (state.stato !== 'in_corso' || !state.roundData || !state.turno) return null;
     if (state.roundData.fase !== 'giochi') return null;
+    if (state.pausa || state.richiesta) return null;
     if (state.turno.giocatore !== ctx.me) return { __error: { code: 'NOT_YOUR_TURN' } };
     const ultimo = state.turno.ultimo;
     if (ultimo && ultimo.nome === ctx.me && ctx.now - ultimo.ts < 1000) return null;
@@ -528,7 +691,10 @@
   function mutTimeout(state, ctx) {
     if (state.stato !== 'in_corso' || !state.roundData || !state.turno) return null;
     if (state.roundData.fase !== 'giochi') return null;
-    if (ctx.now <= state.turno.deadline + TIMEOUT_GRACE) return null;
+    if (state.pausa || state.richiesta) return null;  // clock congelato: niente scottatura
+    /* Al raggiungimento dello zero la scottatura scatta SUBITO: nessuna
+       tolleranza (TIMEOUT_GRACE = 0). */
+    if (!(ctx.now >= state.turno.deadline)) return null;
     const holder = state.turno.giocatore;
     return {
       'roundData.fase': 'recap',
@@ -544,6 +710,31 @@
     if (state.stato !== 'in_corso' || !state.roundData || state.roundData.fase !== 'recap') return null;
     if (state.confermaTurno.indexOf(ctx.me) !== -1) return null;
     return { confermaTurno: { __op: 'union', items: [ctx.me] } };
+  }
+
+  /**
+   * POWER-UP 🚀 "Passa la patata": al proprio turno, il detentore del
+   * power-up del round può passare la patata a chiunque (0 punti, nessun
+   * secondo aggiunto, 1 solo utilizzo per round). La rotazione successiva
+   * riparte dalla posizione del ricevente (nextPlayer è già basato su indici).
+   */
+  function mutPassaPatata(state, ctx) {
+    if (state.stato !== 'in_corso' || !state.roundData || !state.turno) return { __error: { code: 'NOT_PLAYING' } };
+    if (state.roundData.fase !== 'giochi') return { __error: { code: 'NOT_PLAYING' } };
+    if (state.pausa || state.richiesta) return { __error: { code: 'PAUSED' } };
+    if (state.turno.giocatore !== ctx.me) return { __error: { code: 'NOT_YOUR_TURN' } };
+    if (powerPassFor(state) !== ctx.me) return { __error: { code: 'NO_POWER' } };
+    if (state.roundData.powerPass) return { __error: { code: 'USED' } };
+    const target = ctx.target;
+    if (!target || target === ctx.me || state.partecipanti.indexOf(target) === -1) {
+      return { __error: { code: 'BAD_TARGET' } };
+    }
+    return {
+      // Nessuna modifica al clock: il passaggio non aggiunge (né toglie) tempo.
+      'turno.giocatore': target,
+      'turno.ultimo': { nome: ctx.me, pass: true, target, ok: true, ts: ctx.now },
+      'roundData.powerPass': { da: ctx.me, target, ts: ctx.now }
+    };
   }
 
   function mutFlag(state, ctx) {
@@ -571,7 +762,15 @@
   function mutNextRound(state, ctx) {
     if (state.stato !== 'in_corso' || !state.roundData || state.roundData.fase !== 'recap') return null;
     if (state.confermaTurno.length < state.partecipanti.length) return null;
-    if (state.round >= state.opzioni.turni) return { stato: 'conclusa' };
+    if (state.round >= state.opzioni.turni) {
+      return {
+        stato: 'conclusa',
+        pausa: false,
+        pausaDa: { __op: 'delete' },
+        pausaTs: { __op: 'delete' },
+        richiesta: { __op: 'delete' }
+      };
+    }
     const parlate = {};
     state.partecipanti.forEach((p) => { parlate[p] = []; });
     const nextRound = state.round + 1;
@@ -586,7 +785,9 @@
         giocatore: starter,
         ultimo: null
       },
-      confermaTurno: []
+      confermaTurno: [],
+      pausa: false,
+      richiesta: { __op: 'delete' }
     };
   }
 
@@ -610,6 +811,11 @@
       roundData: d.roundData || null,
       turno: d.turno || null,
       confermaTurno: d.confermaTurno || [],
+      pausa: !!d.pausa,
+      pausaDa: d.pausaDa || null,
+      pausaTs: d.pausaTs || 0,
+      richiesta: d.richiesta || null,
+      ultimaRichiesta: d.ultimaRichiesta || null,
       storia: d.storia || [],
       prossimaPartita: d.prossimaPartita || null,
       prossimaPartitaCreataDa: d.prossimaPartitaCreataDa || null,
@@ -825,9 +1031,11 @@
     cyrb128, sfc32, normalizeWord, LetterIndex, pickLetters, weightedLetter,
     pointsFor, applyPartial, setPath, roundOrderFor, nextPlayer, usedWords,
     findWordAuthor, flagThreshold, flagsByOthers, flagResolved, validateWord,
-    highlightWord, ruleFor,
+    highlightWord, ruleFor, resumeClockUpdate, powerPassFor,
     mutReady, mutStart, mutSubmitWord, mutWrongWord, mutTimeout, mutConferma,
-    mutFlag, mutResolveFlag, mutNextRound, normState, SoloBackend, FirebaseBackend,
+    mutFlag, mutResolveFlag, mutNextRound, mutPausa, mutRichiediParola,
+    mutVotoParola, mutRisolviRichiesta, mutRitiraRichiesta, mutPassaPatata,
+    normState, SoloBackend, FirebaseBackend,
     toFirestoreUpdate, docExists, isRateLimitError, ActionGate,
     STUCK_FALLBACK_MS, ACTION_RETRY_MIN, ACTION_RETRY_MAX, TICK_MS,
     RATE_LIMIT_BACKOFF_MIN, RATE_LIMIT_BACKOFF_MAX
@@ -866,6 +1074,10 @@
     prevRound: 0,
     lastWholeSec: -1,
     lastBonus: -1,
+    lastStepSec: -1,      // secondi mancanti all'ultimo scalino mostrati
+    prevRichiestaTs: -1,  // ultimaRichiesta già processata (toast/dizionario)
+    richiestaBooted: false, // primo render eseguito (niente toast di esiti vecchi)
+    pickTarget: false,    // overlay di scelta bersaglio del power-up 🚀 aperto
     statsSaved: false,
     redirected: false,
     lastFeedbackTimer: null,
@@ -874,14 +1086,17 @@
 
   /* ---------------- ELEMENTI DOM ---------------- */
   const el = {};
-  ['screen-loading', 'load-status', 'load-count', 'app', 'round-badge',
+  ['screen-loading', 'load-status', 'load-count', 'app', 'round-badge', 'btn-pausa',
    'screen-lobby', 'cfg-tempo', 'cfg-turni', 'cfg-lettere', 'cfg-mode', 'lobby-players',
    'lobby-status', 'lobby-status-text', 'btn-start-solo', 'lobby-hint',
    'screen-game', 'letter-tiles', 'letters-rule-badge', 'letters-avail', 'ring-fill', 'timer-sec',
-   'turn-banner', 'game-players', 'input-card', 'word-input', 'btn-invia',
+   'bonus-chip', 'bonus-val', 'bonus-fill', 'bonus-caption',
+   'turn-banner', 'game-players', 'input-card', 'word-input', 'btn-invia', 'btn-richiedi', 'btn-power',
    'input-prep', 'input-hint', 'feedback', 'scoreboard', 'feed', 'feed-count',
    'overlay-recap', 'recap-round', 'recap-patata', 'recap-body',
    'conf-progress', 'btn-conferma',
+   'overlay-pausa', 'pausa-emoji', 'pausa-title', 'pausa-sub', 'pausa-body',
+   'overlay-target', 'target-body',
    'overlay-fine', 'fine-emoji', 'fine-title', 'fine-sub', 'podio', 'fine-stats',
    'btn-rivincita', 'banner', 'toast'
   ].forEach((id) => { el[id] = $(id); });
@@ -927,6 +1142,21 @@
   }
 
   /* Nessun audio in FaW: il feedback di gioco è solo visivo/tattile. */
+
+  /**
+   * Ora "di gioco": durante una pausa il tempo è congelato all'istante in cui
+   * è partita (così né il cronometro né gli scalini del bonus avanzano).
+   */
+  function nowEff(s) {
+    if (s && s.pausa && s.turno && isFinite(Number(s.turno.pausaIniziata))) {
+      return Number(s.turno.pausaIniziata);
+    }
+    return Date.now();
+  }
+  /** La fase di gioco è attiva (non recap, non fine partita). */
+  function inGiocoFase(s) {
+    return !!(s && s.stato === 'in_corso' && s.roundData && s.roundData.fase === 'giochi' && s.turno);
+  }
 
   /* ---------------- CONFETTI ---------------- */
   function confetti() {
@@ -1043,6 +1273,48 @@
     setLoadStatus('Dizionario pronto: ' + G.dict.size.toLocaleString('it-IT') + ' parole');
   }
 
+  /**
+   * Parola approvata da tutti: la aggiunge al vocabolario.
+   * - locale subito (G.dict + indice dei conteggi) → valida per TUTTI i client
+   *   della partita anche prima della scittura;
+   * - cache locale + Firestore `config/dizionario → extra` (best-effort) →
+   *   valida anche per le partite successive.
+   * Chiamata dal solo client referente che ha chiuso la votazione.
+   */
+  async function persistiParolaNelVocabolario(w) {
+    const parola = normalizeWord(w);
+    if (!parola || !G.dict) return;
+    aggiungiParolaLocale(parola);
+    try {
+      const raw = localStorage.getItem(DICT_CACHE_KEY);
+      let parsed = null;
+      try { parsed = raw ? JSON.parse(raw) : null; } catch (e) { parsed = null; }
+      const extra = (parsed && Array.isArray(parsed.extra)) ? parsed.extra.slice() : [];
+      if (extra.indexOf(parola) === -1) extra.push(parola);
+      localStorage.setItem(DICT_CACHE_KEY, JSON.stringify({
+        ts: Date.now(), extra, excluded: (parsed && parsed.excluded) || []
+      }));
+    } catch (e) { /* noop */ }
+    if (G.db && G.fs && G.fs.FieldValue) {
+      try {
+        await G.db.collection('config').doc('dizionario').set(
+          { extra: G.fs.FieldValue.arrayUnion(parola) },
+          { merge: true }
+        );
+      } catch (e) {
+        console.warn('[Patata] vocabolario condiviso non aggiornato:', e && e.message);
+        toast('⚠️ "' + parola + '" valida per questa partita, ma il vocabolario condiviso non è stato aggiornato', 'err');
+      }
+    }
+  }
+  /** Inserimento a caldo nel Set + ricostruzione dell'indice (conteggi). */
+  function aggiungiParolaLocale(w) {
+    if (!G.dict || G.dict.has(w)) return;
+    G.dict.add(w);
+    try { G.index = new LetterIndex(Array.from(G.dict)); }
+    catch (e) { /* l'indice serve solo ai conteggi: la validazione usa G.dict */ }
+  }
+
   /* ---------------- DERIVATI ---------------- */
   function lettersFor(state) {
     if (!state || !state.opzioni) return ['A', 'E'];
@@ -1122,7 +1394,26 @@
       if (s.stato !== 'in_corso' || !s.roundData) return;
 
       if (s.roundData.fase === 'giochi' && s.turno) {
-        if (Date.now() > s.turno.deadline + TIMEOUT_GRACE) {
+        /* Voto sul vocabolario: quando TUTTI hanno votato, un solo client
+           (il referente) risolve e, se la maggioranza ha detto sì, salva la
+           parola nel dizionario condiviso. */
+        if (s.richiesta) {
+          const rq = s.richiesta;
+          const nVoti = (rq.votiSi || []).length + (rq.votiNo || []).length;
+          if (nVoti >= s.partecipanti.length && mayAct(s, 'richiesta', s.partecipanti[0])) {
+            const inserita = (rq.votiSi || []).length > (rq.votiNo || []).length;
+            const r = await G.backend.applyAtomic(mutRisolviRichiesta);
+            if (r && r.ok) {
+              actionOk(s, 'richiesta');
+              if (inserita) persistiParolaNelVocabolario(rq.parola);
+            } else {
+              actionFailed(s, 'richiesta', r);
+            }
+          }
+          return; // voto aperto: il clock resta congelato, nient'altro scorre
+        }
+        if (!s.pausa && Date.now() >= s.turno.deadline) {
+          // Al zero la scottatura scatta SUBITO (nessuna grazia).
           // Agisce chi tiene la patata; se è offline subentrano gli altri.
           if (mayAct(s, 'timeout', s.turno.giocatore)) {
             const r = await G.backend.applyAtomic(mutTimeout);
@@ -1233,20 +1524,31 @@
   function renderPlayersGame(s) {
     const order = roundOrderFor(s.partecipanti, s.round || 1);
     const active = (s.roundData && s.roundData.fase === 'giochi') ? s.turno && s.turno.giocatore : null;
+    /* Power-up 🚀 del round: badge sul chip di chi lo possiede (finché non
+       lo usa — roundData.powerPass sparisce a ogni nuovo round). */
+    const power = (s.roundData && s.roundData.fase === 'giochi' && !s.roundData.powerPass)
+      ? powerPassFor(s) : null;
     el['game-players'].innerHTML = order.map((p) =>
       '<span class="pchip' + (p === active ? ' active' : '') + (p === G.me ? ' mine' : '') + '">' +
       (p === active ? '<span class="potato">🥔</span>' : '') +
+      (p === power ? '<span class="power-badge" title="Power-up di questo round: passa la patata a chi vuoi">🚀</span>' : '') +
       '<span class="avatar" style="background:' + avatarColor(p) + '">' + esc(p.slice(0, 2).toUpperCase()) + '</span>' +
       esc(p) + (p === G.me ? ' (TU)' : '') +
-      (s.patate[p] ? '<span class="scottato">🔥×' + s.patate[p] + '</span>' : '') +
+      /* Round persi = teschio 💀 (non un "fuocherello" positivo). */
+      (s.patate[p] ? '<span class="scottato" title="Round persi">💀×' + s.patate[p] + '</span>' : '') +
       '</span>'
     ).join('');
 
     // Turn banner
     if (s.roundData && s.roundData.fase === 'giochi' && s.turno) {
       el['turn-banner'].classList.remove('hidden');
-      const bonusCorrente = bonusPerParola(s, Date.now());
-      if (s.turno.giocatore === G.me) {
+      const bonusCorrente = bonusPerParola(s, nowEff(s));
+      if (s.pausa || s.richiesta) {
+        el['turn-banner'].textContent = s.richiesta
+          ? '📖 VOTO IN CORSO — GIOCO IN PAUSA'
+          : '⏸ PAUSA — IL TEMPO È FERMO';
+        el['turn-banner'].classList.remove('mine');
+      } else if (s.turno.giocatore === G.me) {
         el['turn-banner'].textContent = '🔥 TOCCA A TE — SCRIVI UNA PAROLA! (+' + bonusCorrente + 's)';
         el['turn-banner'].classList.add('mine');
       } else {
@@ -1271,15 +1573,23 @@
   function aggiornaInput(s) {
     if (!s) return;
     const inGioco = !!(s.roundData && s.roundData.fase === 'giochi' && s.turno);
-    const myTurn = inGioco && s.turno.giocatore === G.me;
-    if (!myTurn && el['word-input'].value) el['word-input'].value = '';
+    const bloccata = !!(s.pausa || s.richiesta);          // pausa o voto aperto
+    const myTurn = inGioco && !bloccata && s.turno.giocatore === G.me;
+    /* Fuori turno la casella si svuota; durante una PAUSA la parola già
+       digitata resta (il turno non è passato: si riprende da dove si era). */
+    if (!myTurn && !bloccata && el['word-input'].value) el['word-input'].value = '';
     el['word-input'].disabled = !myTurn;
     el['btn-invia'].disabled = !myTurn;
     el['word-input'].classList.toggle('ready', myTurn);
     el['btn-invia'].classList.toggle('btn-fire', myTurn);
     el['btn-invia'].classList.toggle('btn-ghost', !myTurn);
-    const bonus = inGioco ? bonusPerParola(s, Date.now()) : 0;
-    if (myTurn) {
+    const bonus = inGioco ? bonusPerParola(s, nowEff(s)) : 0;
+    if (bloccata && inGioco) {
+      el['word-input'].placeholder = s.richiesta
+        ? '📖 Voto in corso sul vocabolario…'
+        : '⏸ In pausa — il tempo è fermo…';
+      el['btn-invia'].textContent = '⏸';
+    } else if (myTurn) {
       el['word-input'].placeholder = 'Scrivi la parola… (INVIO)';
       el['btn-invia'].textContent = 'INVIA';
       if (document.hasFocus() && document.activeElement !== el['word-input']) {
@@ -1290,16 +1600,46 @@
       el['btn-invia'].textContent = '⏳';
     }
 
+    // Pulsante "proponi al vocabolario" (come in Ruzzle): visibile solo al
+    // proprio turno, per una parola ancora assente dal dizionario.
+    if (el['btn-richiedi']) {
+      const w = normalizeWord(el['word-input'].value || '');
+      const proponibile = !G.solo && myTurn && !G.rateLimited &&
+        w.length >= MIN_WORD_LENGTH &&
+        !(G.dict && G.dict.has(w)) &&
+        !(s.storia || []).some((e) => e.w === w);
+      el['btn-richiedi'].classList.toggle('hidden', !proponibile);
+      if (proponibile) {
+        el['btn-richiedi'].textContent = '📖 Proponi "' + w + '" al vocabolario';
+      }
+    }
+
+    // Power-up 🚀 "passa la patata": al mio turno, se possiedo il power-up
+    // del round e non è ancora stato usato.
+    if (el['btn-power']) {
+      const hoPower = myTurn &&
+        powerPassFor(s) === G.me &&
+        !(s.roundData && s.roundData.powerPass);
+      el['btn-power'].classList.toggle('hidden', !hoPower);
+    }
+
     // Striscia informativa: dice quando si può scrivere e quanto vale il bonus
     if (el['input-prep']) {
       el['input-prep'].classList.toggle('hidden', !inGioco);
-      el['input-prep'].innerHTML = myTurn
-        ? '<b>🔥 Tocca a te:</b> invia una parola per passare la patata — ' +
-          '<b>+' + bonus + 's</b> sul cronometro.'
-        : '<b>⏳ Tocca a ' + esc(s.turno ? s.turno.giocatore : '') + ':</b> ' +
-          'potrai scrivere solo al tuo turno. ' +
-          'Ogni parola vale <b>+' + bonus + 's</b>' +
-          (bonus < TIME_BONUS_STEPS[0] ? ' (il bonus cala di 1s ogni minuto di turno)' : '') + '.';
+      if (bloccata && inGioco) {
+        el['input-prep'].innerHTML = s.richiesta
+          ? '<b>📖 Parola proposta:</b> il gioco è in pausa finché <b>tutti</b> non votano ' +
+            'se inserire <b>' + esc(s.richiesta.parola) + '</b> nel vocabolario.'
+          : '<b>⏸ Pausa:</b> il cronometro è fermo per tutti — il tempo riprende esattamente da dove si era.';
+      } else {
+        el['input-prep'].innerHTML = myTurn
+          ? '<b>🔥 Tocca a te:</b> invia una parola per passare la patata — ' +
+            '<b>+' + bonus + 's</b> sul cronometro.'
+          : '<b>⏳ Tocca a ' + esc(s.turno ? s.turno.giocatore : '') + ':</b> ' +
+            'potrai scrivere solo al tuo turno. ' +
+            'Ogni parola vale <b>+' + bonus + 's</b>' +
+            (bonus < TIME_BONUS_STEPS[0] ? ' (il bonus cala di 1s ogni minuto di turno)' : '') + '.';
+      }
     }
   }
 
@@ -1358,7 +1698,7 @@
       '<span class="rank">' + (i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i + 1)) + '</span>' +
       '<span class="avatar" style="background:' + avatarColor(r.p) + '">' + esc(r.p.slice(0, 2).toUpperCase()) + '</span>' +
       '<span class="sname">' + esc(r.p) + (r.p === G.me ? ' (TU)' : '') + '</span>' +
-      (r.patate ? '<span class="spat">🥔×' + r.patate + '</span>' : '') +
+      (r.patate ? '<span class="spat" title="Round persi">💀×' + r.patate + '</span>' : '') +
       '<span class="spts' + (r.pts < 0 ? ' neg' : '') + '">' + r.pts + '</span>' +
       '</div>'
     ).join('');
@@ -1432,6 +1772,230 @@
       : (lastRound ? '✔ CONFERMA E CHIUDI PARTITA' : '✔ CONFERMA E PROSEGUI');
   }
 
+  /* ---------------- OVERLAY: PAUSA + VOTO VOCABOLARIO ---------------- */
+  function renderPausa(s) {
+    const attivo = inGiocoFase(s);
+    const mostra = attivo && !!(s.pausa || s.richiesta);
+    el['overlay-pausa'].classList.toggle('hidden', !mostra);
+
+    // Pulsante ⏸ nel topbar: visibile solo durante il gioco attivo
+    if (el['btn-pausa']) {
+      el['btn-pausa'].classList.toggle('hidden', !(attivo && !s.pausa && !s.richiesta));
+    }
+    if (!mostra) return;
+
+    const body = el['pausa-body'];
+    body.innerHTML = '';
+
+    if (s.richiesta) {
+      /* ---- Voto su proposta di parola (come in Ruzzle) ---- */
+      const rq = s.richiesta;
+      const si = rq.votiSi || [], no = rq.votiNo || [];
+      const tot = s.partecipanti.length;
+      const votati = si.length + no.length;
+      const mioVoto = si.indexOf(G.me) !== -1 ? 'si' : (no.indexOf(G.me) !== -1 ? 'no' : null);
+      el['pausa-emoji'].textContent = '📖';
+      el['pausa-title'].textContent = 'PAROLA DA INSERIRE NEL VOCABOLARIO';
+      el['pausa-sub'].innerHTML =
+        '<b>' + esc(rq.parola) + '</b> non è nel dizionario — proposta da <b>' + esc(rq.da) + '</b>. ' +
+        'Il gioco resta in pausa finché <b>tutti</b> non hanno votato.';
+
+      const righe = s.partecipanti.map((p) => {
+        const v = si.indexOf(p) !== -1 ? '<span class="pv si">👍</span>'
+          : no.indexOf(p) !== -1 ? '<span class="pv no">👎</span>'
+          : '<span class="pv att">…</span>';
+        return '<div class="pausa-voter">' +
+          '<span class="avatar" style="background:' + avatarColor(p) + '">' + esc(p.slice(0, 2).toUpperCase()) + '</span>' +
+          '<span class="pv-name">' + esc(p) + (p === G.me ? ' (TU)' : '') +
+          (p === rq.da ? ' <span class="pv-prop">proponente</span>' : '') + '</span>' + v + '</div>';
+      }).join('');
+      body.innerHTML =
+        '<div class="pausa-voters">' + righe + '</div>' +
+        '<div class="conf-progress pausa-progress">' +
+        (mioVoto ? '✔ Hai votato — ' : 'Votazione: ') + '<b>' + votati + '/' + tot + '</b>' +
+        '<div class="conf-bar"><i style="width:' + Math.round((votati / tot) * 100) + '%"></i></div></div>';
+
+      const azioni = [];
+      if (!mioVoto) {
+        azioni.push({ id: 'si', label: '👍 INSERISCI', kind: 'btn-fire', fn: () => votaRichiesta(true) });
+        azioni.push({ id: 'no', label: '👎 NON INSERIRE', kind: 'btn-ghost', fn: () => votaRichiesta(false) });
+      } else {
+        azioni.push({ id: 'attesa', label: mioVoto === 'si' ? '✔ HAI VOTATO 👍' : '✔ HAI VOTATO 👎', kind: 'btn-ghost', fn: () => {} });
+      }
+      if (rq.da === G.me) {
+        azioni.push({ id: 'ritira', label: '✖ RITIRA LA PROPOSTA', kind: 'btn-ghost', fn: ritiraRichiesta });
+      }
+      azioni.forEach((b) => {
+        const btn = document.createElement('button');
+        btn.className = 'btn ' + b.kind;
+        btn.textContent = b.label;
+        if (b.id === 'attesa') btn.disabled = true;
+        btn.addEventListener('click', b.fn);
+        body.appendChild(btn);
+      });
+      body.classList.add('pausa-actions');
+    } else {
+      /* ---- Pausa semplice per tutti ---- */
+      el['pausa-emoji'].textContent = '⏸';
+      el['pausa-title'].textContent = 'PAUSA';
+      const da = s.pausaDa;
+      el['pausa-sub'].innerHTML = !da || da === G.me
+        ? 'Hai messo in pausa il gioco per tutti: il cronometro è <b>fermo</b>.'
+        : '<b>' + esc(da) + '</b> ha messo in pausa il gioco per tutti: il cronometro è <b>fermo</b>.';
+      const btn = document.createElement('button');
+      btn.className = 'btn btn-fire';
+      btn.textContent = '▶ RIPRENDI IL GIOCO';
+      btn.addEventListener('click', riprendiGioco);
+      body.appendChild(btn);
+      body.classList.add('pausa-actions');
+    }
+  }
+
+  /* ---------------- AZIONI: PAUSA / VOTO / RICHIESTA ---------------- */
+
+  /* ---------------- POWER-UP 🚀: SCELTA BERSAGLIO ---------------- */
+  /**
+   * Overlay per scegliere a chi passare la patata. Si apre con il pulsante
+   * 🚀 e si chiude alla selezione, ad ANNULLA o non appena le condizioni
+   * (mio turno, power-up ancora disponibili) non valgono più.
+   */
+  function renderTargetPicker(s) {
+    if (!el['overlay-target']) return;
+    if (!G.pickTarget) { el['overlay-target'].classList.add('hidden'); return; }
+    const pu = powerPassFor(s);
+    const puòPassare = inGiocoFase(s) && !s.pausa && !s.richiesta &&
+      s.turno && s.turno.giocatore === G.me &&
+      pu === G.me && !(s.roundData && s.roundData.powerPass);
+    if (!puòPassare) {
+      G.pickTarget = false;
+      el['overlay-target'].classList.add('hidden');
+      return;
+    }
+    const bersagli = s.partecipanti.filter((p) => p !== G.me);
+    el['target-body'].innerHTML =
+      bersagli.map((p) =>
+        '<button class="btn btn-power target-btn" data-target="' + esc(p) + '">' +
+        '<span class="avatar" style="background:' + avatarColor(p) + '">' + esc(p.slice(0, 2).toUpperCase()) + '</span>' +
+        'PASSA A ' + esc(p.toUpperCase()) + '</button>'
+      ).join('') +
+      '<button class="btn btn-ghost target-btn" data-target="">✖ ANNULLA</button>';
+    el['target-body'].querySelectorAll('[data-target]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const target = btn.getAttribute('data-target');
+        if (!target) { G.pickTarget = false; renderTargetPicker(G.state); return; }
+        passaPatata(target);
+      });
+    });
+    el['overlay-target'].classList.remove('hidden');
+  }
+
+  function apriTargetPicker() {
+    const s = G.state;
+    if (!s) return;
+    G.pickTarget = true;
+    renderTargetPicker(s);
+  }
+
+  async function passaPatata(target) {
+    const s = G.state;
+    if (!s || !target) return;
+    G.pickTarget = false;
+    el['overlay-target'].classList.add('hidden');
+    const r = await G.backend.applyAtomic(mutPassaPatata, { target });
+    if (r && r.ok) {
+      toast('🚀 Patata passata a ' + target.toUpperCase() + ' — 0 punti, nessun secondo');
+    } else if (r && r.error) {
+      const msg = {
+        NO_POWER: 'Non hai il power-up di questo round',
+        USED: 'Power-up già usato in questo round',
+        BAD_TARGET: 'Bersaglio non valido',
+        NOT_YOUR_TURN: '⏳ Aspetta il tuo turno',
+        PAUSED: '⏸ Prima riprendi il gioco',
+        NOT_PLAYING: 'Non puoi usarlo adesso'
+      }[r.error.code] || 'Non puoi passare la patata adesso';
+      toast('🚀 ' + msg, 'err');
+    } else if (r && r.failed) {
+      toast('Connessione instabile, riprova', 'err');
+    }
+  }
+
+  async function pausaToggle() {
+    const s = G.state;
+    if (!s || !inGiocoFase(s) || s.richiesta) return;
+    const eraInPausa = !!s.pausa;
+    const r = await G.backend.applyAtomic(mutPausa);
+    if (r && r.ok) {
+      toast(eraInPausa ? '▶ Gioco ripreso: il cronometro riparte' : '⏸ Pausa per tutti: il tempo è fermo');
+    } else if (r && r.aborted) {
+      toast(eraInPausa ? 'Non puoi riprendere ora' : 'Pausa non disponibile in questo momento', 'err');
+    } else if (r && r.failed) {
+      toast('Connessione instabile, riprova', 'err');
+    }
+  }
+  async function riprendiGioco() { return pausaToggle(); }
+
+  async function votaRichiesta(votoSi) {
+    const s = G.state;
+    if (!s || !s.richiesta) return;
+    /* mutVotoParola legge ctx.me/ctx.votoSi: il ctx lo costruisce applyAtomic. */
+    const r = await G.backend.applyAtomic(mutVotoParola, { votoSi });
+    if (r && r.ok) toast(votoSi ? '👍 Voto registrato' : '👎 Voto registrato');
+    else if (r && r.aborted) toast('Il tuo voto è già stato registrato', 'err');
+    else if (r && r.failed) toast('Connessione instabile, riprova', 'err');
+  }
+  async function ritiraRichiesta() {
+    const s = G.state;
+    if (!s || !s.richiesta) return;
+    const r = await G.backend.applyAtomic(mutRitiraRichiesta);
+    if (r && r.ok) toast('✖ Proposta ritirata: si riprende a giocare');
+  }
+
+  async function richiediParola() {
+    const s = G.state;
+    if (!s) return;
+    const raw = el['word-input'].value;
+    const w = normalizeWord(raw);
+    if (w.length < MIN_WORD_LENGTH) { toast('Scrivi una parola di almeno ' + MIN_WORD_LENGTH + ' lettere'); return; }
+    const r = await G.backend.applyAtomic((st) => mutRichiediParola(st, ctxFor({ word: raw })));
+    if (r && r.ok) {
+      toast('📖 Proposta inviata: tutti votano per "' + w + '"');
+      return;
+    }
+    if (r && r.error) {
+      if (r.error.code === 'ALREADY') toast('"' + w + '" è già nel vocabolario', 'err');
+      else if (r.error.code === 'USED') toast('"' + w + '" è già stata usata in questa partita', 'err');
+      else if (r.error.code === 'NOT_YOUR_TURN') toast('⏳ Aspetta il tuo turno', 'err');
+      else if (r.error.code === 'INVALID') toast('Minimo ' + MIN_WORD_LENGTH + ' lettere', 'err');
+      else toast('Non si può proporre adesso', 'err');
+      return;
+    }
+    if (r && r.failed) toast('Connessione instabile, riprova', 'err');
+  }
+
+  /**
+   * Esito di una votazione (su TUTTI i client): parola approvata → entra nel
+   * dizionario locale subito, così chi l'ha proposta può usarla.
+   */
+  function gestisciEsitoRichiesta(s) {
+    const primaVolta = !G.richiestaBooted;
+    G.richiestaBooted = true;
+    const ur = s.ultimaRichiesta;
+    if (!ur) return;
+    if (ur.ts === G.prevRichiestaTs) return;
+    G.prevRichiestaTs = ur.ts;
+    if (ur.esito === 'inserita') {
+      aggiungiParolaLocale(ur.parola);
+      if (primaVolta) return;            // allo riaprire: niente toast di riga vecchia
+      toast('✅ "' + ur.parola + '" aggiunta al vocabolario (+' + ur.parola.length + ' pt)', 'ok');
+    } else if (primaVolta) {
+      return;
+    } else if (ur.esito === 'rifiutata') {
+      toast('❌ "' + ur.parola + '" non è stata inserita nel vocabolario', 'err');
+    } else if (ur.esito === 'annullata') {
+      toast('✖ Proposta di "' + ur.parola + '" annullata');
+    }
+  }
+
   function computeRanking(s) {
     return s.partecipanti
       .map((p) => ({
@@ -1469,7 +2033,7 @@
     window.FAWPodio.render(el.podio, ranking.map((r) => ({
       nome: r.p,
       punti: r.pts,
-      sottotitolo: r.parole + ' parole' + (r.patate ? ' · 🥔×' + r.patate : '')
+      sottotitolo: r.parole + ' parole' + (r.patate ? ' · 💀×' + r.patate : '')
     })), { io: G.me });
 
     const storia = s.storia || [];
@@ -1660,6 +2224,7 @@
       G.prevTurn = null;
       G.prevUltimoTs = 0;
       G.lastWholeSec = -1;
+      G.lastBonus = -1;           // il bonus del nuovo turno riparte pieno: nessun flash "calo"
       gate.reset();
       el.feedback.className = 'feedback';
       el.feedback.textContent = '';
@@ -1673,6 +2238,9 @@
     renderPlayersGame(s);
     renderFeed(s);
     renderScoreboard(s);
+    renderPausa(s);
+    renderTargetPicker(s);
+    gestisciEsitoRichiesta(s);
 
     if (s.roundData && s.roundData.fase === 'recap') {
       renderRecap(s);
@@ -1701,7 +2269,12 @@
   }
 
   function onUltimo(ultimo, s) {
-    if (ultimo.ok) {
+    if (ultimo.pass) {
+      // Power-up 🚀 usato: comunicazione ben diversa da una parola valida.
+      showFeedback('ok', '🚀 ' + ultimo.nome.toUpperCase() + ' passa la patata a ' +
+        String(ultimo.target || '').toUpperCase() + ' (power-up!)');
+      if (ultimo.nome === G.me) { el['word-input'].value = ''; updateInputHint(); }
+    } else if (ultimo.ok) {
       showFeedback('ok', '✅ ' + ultimo.w + '  +' + ultimo.p + ' pt — passa a ' + nextPlayer(s, ultimo.nome).toUpperCase());
       // Svuota la casella di chi ha appena giocato (nessuna parola
       // preparata in anticipo: ogni turno riparte dalla casella vuota).
@@ -1724,20 +2297,78 @@
     }, 3200);
   }
 
-  /* ---------------- TIMER RING (rAF) ---------------- */
+  /* ---------------- TIMER RING (rAF) + BONUS METER ---------------- */
   const RING_C = 2 * Math.PI * 88;
+  let bonusFlashT = 0;  // anti-doppio flash nello stesso frame
+
+  /**
+   * Evidenza dello SCALINO del bonus (es. +4s → +3s):
+   * - il chip +Ns lampeggia;
+   * - un toast annuncia il nuovo valore;
+   * - la barra sottile sotto il cronometro mostra QUANDO scatta il prossimo
+   *   scalino (secondary timer: si svuota nel corso del minuto di turno).
+   */
+  function aggiornaBonusMeter(s, now, b) {
+    if (!el['bonus-chip']) return;
+    const attivo = inGiocoFase(s);
+    document.querySelector('.bonus-meter').classList.toggle('hidden', !attivo);
+    if (!attivo) return;
+    el['bonus-val'].textContent = '+' + b + 's';
+    const inizio = isFinite(Number(s.turno.inizio)) ? Number(s.turno.inizio) : now;
+    const nelPassato = Math.max(0, now - inizio);
+    const nelPasso = nelPassato % TIME_BONUS_STEP_MS;
+    const alProssimo = TIME_BONUS_STEP_MS - nelPasso;
+    el['bonus-fill'].style.width = (100 * alProssimo / TIME_BONUS_STEP_MS).toFixed(2) + '%';
+    const sec = Math.ceil(alProssimo / 1000);
+    if (sec !== G.lastStepSec) {
+      G.lastStepSec = sec;
+      el['bonus-caption'].textContent = b > 1
+        ? 'prossimo scalino (+' + (b - 1) + 's) tra ' + sec + 's'
+        : 'bonus minimo: +1s per ogni parola';
+    }
+  }
+
+  function flashBonusMeter(prev, b) {
+    if (prev === -1 || b >= prev) return;         // solo un CALO (o primo frame)
+    const now = Date.now();
+    if (now - bonusFlashT < 800) return;          // niente doppio flash ravvicinato
+    bonusFlashT = now;
+    const chip = el['bonus-chip'];
+    if (chip) {
+      chip.classList.remove('step-flash');
+      void chip.offsetWidth;                       // riavvia l'animazione
+      chip.classList.add('step-flash');
+    }
+    toast('⏳ BONUS CALATO: ora +'+b+'s per ogni parola (scalino ogni minuto di turno)');
+  }
+
   function ringFrame() {
     const s = G.state;
-    // Il bonus cala nel tempo: la striscia va rinfrescata "a ogni secondo
-    // intero" anche senza snapshot (altrimenti mostrerebbe il valore vecchio).
-    if (s && s.stato === 'in_corso' && s.roundData && s.roundData.fase === 'giochi' && s.turno) {
-      const b = bonusPerParola(s, Date.now());
-      if (b !== G.lastBonus) { G.lastBonus = b; aggiornaInput(s); }
+    if (s && inGiocoFase(s)) {
+      const now = nowEff(s);
+      /* Il bonus cala nel tempo: la striscia va rinfrescata "a ogni secondo
+         intero" anche senza snapshot (altrimenti mostrerebbe il valore vecchio). */
+      const b = bonusPerParola(s, now);
+      if (b !== G.lastBonus) {
+        const prev = G.lastBonus;
+        G.lastBonus = b;
+        aggiornaInput(s);
+        flashBonusMeter(prev, b);
+      }
+      aggiornaBonusMeter(s, now, b);
+    } else if (el['bonus-chip']) {
+      document.querySelector('.bonus-meter').classList.add('hidden');
+      G.lastStepSec = -1;
     }
-    const attivo = s && s.stato === 'in_corso' && s.roundData && s.roundData.fase === 'giochi' && s.turno;
+    const attivo = inGiocoFase(s);
     if (attivo) {
       const now = Date.now();
-      const remaining = Math.max(0, s.turno.deadline - now);
+      const inPausa = !!(s.pausa || s.richiesta);
+      /* Congelamento visivo: durante la pausa il cronometro resta esattamente
+         a quanto rimaneva quando è partita. */
+      const remaining = inPausa
+        ? Math.max(0, s.turno.deadline - (Number(s.turno.pausaIniziata) || now))
+        : Math.max(0, s.turno.deadline - now);
       const ref = s.turno.riferimento || s.turno.inizio || s.turno.deadline - 1;
       const span = Math.max(1, s.turno.deadline - ref);
       const frac = Math.min(1, Math.max(0, remaining / span));
@@ -1746,11 +2377,14 @@
       const danger = sec <= 10;
       el['ring-fill'].classList.toggle('danger', danger);
       el['timer-sec'].classList.toggle('danger', danger);
-      ringWrap.classList.toggle('urgent', danger && remaining > 0);
+      ringWrap.classList.toggle('urgent', danger && remaining > 0 && !inPausa);
       if (sec !== G.lastWholeSec) {
         G.lastWholeSec = sec;
         el['timer-sec'].textContent = String(sec);
       }
+      /* AL ZERO LA CHIUSURA È IMMEDIATA: il frame stesso invoca la
+         scottatura senza aspettare il tick logico di 1s. */
+      if (!inPausa && remaining <= 0) logicaTick();
     } else if (s && s.stato === 'in_corso') {
       el['timer-sec'].textContent = '—';
       el['ring-fill'].style.strokeDashoffset = '0';
@@ -1769,6 +2403,11 @@
     const s = G.state;
     if (!s) return;
     if (s.stato !== 'in_corso' || !s.roundData || s.roundData.fase !== 'giochi') return;
+    // Pausa o voto aperto: il clock è congelato, nessuna parola accettata.
+    if (s.pausa || s.richiesta) {
+      toast(s.richiesta ? '📖 Prima vota la proposta di parola' : '⏸ Gioco in pausa');
+      return;
+    }
     const rule0 = ruleFor(s);
     const ctx0 = ctxFor({ word: el['word-input'].value, rule: rule0 });
 
@@ -1803,6 +2442,7 @@
     if (r.error) {
       if (r.error.code === 'NOT_YOUR_TURN') { toast('È già passato il turno!'); showFeedback('err', '⏳ Il turno è già passato'); }
       else if (r.error.code === 'NOT_PLAYING') { toast('Il tempo è scaduto! 🥔'); }
+      else if (r.error.code === 'PAUSED') { toast('⏸ Gioco in pausa: aspetta la ripresa'); }
       else { toast('Ops, riprova…', 'err'); }
       return;
     }
@@ -1851,6 +2491,9 @@
     el['btn-conferma'].addEventListener('click', confermaTurno);
     el['btn-start-solo'].addEventListener('click', startSolo);
     el['btn-rivincita'].addEventListener('click', creaRivincita);
+    if (el['btn-pausa']) el['btn-pausa'].addEventListener('click', pausaToggle);
+    if (el['btn-richiedi']) el['btn-richiedi'].addEventListener('click', richiediParola);
+    if (el['btn-power']) el['btn-power'].addEventListener('click', apriTargetPicker);
 
     // Multiplayer: login obbligatorio
     if (!G.solo && !G.me) {

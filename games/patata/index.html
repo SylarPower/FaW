@@ -53,6 +53,7 @@
       </div>
       <div class="topbar-right">
         <span id="round-badge" class="badge-round hidden"></span>
+        <button id="btn-pausa" class="btn btn-ghost btn-pausa hidden" title="Metti in pausa il gioco per tutti">⏸ PAUSA</button>
       </div>
     </header>
 
@@ -70,7 +71,12 @@
             di turno). Il cronometro non supera mai il tempo configurato.
             Chi tiene la patata quando arriva a zero… <b class="red">si scotta (−10 pt)</b>. 🫠<br>
             Si scrive <b>solo al proprio turno</b>: la casella si attiva con la patata e la invii
-            prima che scada il tempo. ⚡
+            prima che scada il tempo. ⚡<br>
+            I punti valgono <b>quanto la parola è lunga</b> (4 lettere = 4 pt, 8 lettere = 8 pt).
+            Serve una pausa? Fermi il tempo <b>per tutti</b> ⏸ — e se una parola non è nel
+            dizionario la <b>proponi al vocabolario</b>: tutti votano, come in Ruzzle. 📖<br>
+            Ogni turno un giocatore a caso (segno 🚀) riceve il power-up <b>Passa la patata</b>:
+            la mandi a chi vuoi senza scrivere, ma così non guadagni punti.
           </p>
         </div>
 
@@ -127,6 +133,14 @@
               </div>
             </div>
             <div id="turn-banner" class="turn-banner hidden"></div>
+
+            <!-- Secondo timer: quando scatta il prossimo scalino del bonus
+                 (es. da +4s a +3s) e lampeggia al momento del cambio -->
+            <div class="bonus-meter hidden" id="bonus-meter" title="Prossimo scalino del bonus">
+              <span class="bonus-chip" id="bonus-chip"><b id="bonus-val">+5s</b> BONUS</span>
+              <div class="bonus-track"><i id="bonus-fill"></i></div>
+              <div class="bonus-caption" id="bonus-caption">—</div>
+            </div>
           </div>
 
           <div class="players players-compact" id="game-players"></div>
@@ -141,6 +155,11 @@
             <!-- La casella si attiva solo al proprio turno: fuori turno è disabilitata -->
             <div class="input-prep" id="input-prep"></div>
             <div class="input-hint" id="input-hint"></div>
+            <!-- Power-up 🚀 del round: passa la patata senza scrivere (0 punti) -->
+            <button id="btn-power" class="btn btn-power hidden">🚀 PASSA LA PATATA A…</button>
+            <!-- Proponi una parola mancante al vocabolario (come in Ruzzle):
+                 per tutti la partita va in pausa finché non si vota -->
+            <button id="btn-richiedi" class="btn btn-ghost btn-proponi hidden">📖 Proponi al vocabolario</button>
             <div class="feedback" id="feedback" aria-live="polite"></div>
           </div>
         </div>
@@ -175,6 +194,27 @@
         <div id="conf-progress" class="conf-progress"></div>
         <button id="btn-conferma" class="btn btn-fire">✔ CONFERMA E PROSEGUI</button>
       </div>
+    </div>
+  </div>
+
+  <!-- ============ PAUSA / VOTO VOCABOLARIO ============ -->
+  <div id="overlay-pausa" class="overlay hidden" role="dialog" aria-modal="true" aria-label="Pausa">
+    <div class="card pausa-card">
+      <div class="pausa-emoji" id="pausa-emoji">⏸</div>
+      <h3 id="pausa-title">PAUSA</h3>
+      <p id="pausa-sub"></p>
+      <div id="pausa-body"></div>
+    </div>
+  </div>
+
+  <!-- ============ POWER-UP 🚀: SCEGLI A CHI PASSARE ============ -->
+  <div id="overlay-target" class="overlay hidden" role="dialog" aria-modal="true" aria-label="Scegli a chi passare la patata">
+    <div class="card pausa-card target-card">
+      <div class="pausa-emoji">🚀</div>
+      <h3>A CHI PASSI LA PATATA?</h3>
+      <p>Power-up di questo round: la patata va a chi scegli — <b>0 punti</b> per te,
+        il tempo resta invariato e lo usi <b>una sola volta</b>.</p>
+      <div id="target-body"></div>
     </div>
   </div>
 

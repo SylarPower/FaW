@@ -973,6 +973,188 @@ button { font-family: var(--font); }
   border-radius: 2px;
 }
 
+/* ---------- Pausa (topbar) ---------- */
+.btn-pausa {
+  padding: 8px 14px;
+  font-size: 0.78rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.btn-pausa:hover { background: var(--gold-soft); border-color: #fde68a; color: var(--gold); }
+
+/* ---------- Bonus meter (secondo timer degli scalini +5→+4→+3…) ---------- */
+.bonus-meter {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: min(210px, 58vw);
+}
+.bonus-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: var(--gold);
+  background: var(--gold-soft);
+  border: 1px solid #fde68a;
+  border-radius: 999px;
+  padding: 5px 14px;
+  font-variant-numeric: tabular-nums;
+}
+.bonus-chip b { font-size: 0.88rem; }
+.bonus-chip.step-flash { animation: bonus-step 1s ease 2; }
+@keyframes bonus-step {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(234, 88, 12, 0.55); }
+  30% { transform: scale(1.18); box-shadow: 0 0 0 10px rgba(234, 88, 12, 0); color: var(--fire-0); border-color: var(--fire-0); }
+  100% { transform: scale(1); }
+}
+.bonus-track {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--card-2);
+  border: 1px solid var(--card-border);
+  overflow: hidden;
+}
+.bonus-track i {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--gold), var(--fire-0));
+  transition: width 0.3s linear;
+}
+.bonus-caption {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+  min-height: 14px;
+}
+
+/* ---------- Pulsante "proponi al vocabolario" ---------- */
+.btn-proponi {
+  margin-top: 10px;
+  width: 100%;
+  padding: 10px 16px;
+  font-size: 0.8rem;
+  border-style: dashed;
+  border-color: #bae6fd;
+  color: var(--info);
+  background: #f0f9ff;
+}
+.btn-proponi:hover { background: #e0f2fe; color: var(--info); }
+
+/* ---------- Power-up 🚀: passa la patata ---------- */
+.btn-power {
+  background: #7c3aed;
+  color: #fff;
+  border-color: #7c3aed;
+}
+.btn-power:hover:not(:disabled) { background: #6d28d9; border-color: #6d28d9; }
+#btn-power {
+  margin-top: 10px;
+  width: 100%;
+  padding: 10px 16px;
+  font-size: 0.82rem;
+}
+.power-badge {
+  font-size: 0.78rem;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: #f3e8ff;
+  border: 1px solid #e9d5ff;
+  animation: power-pop 0.35s ease;
+}
+@keyframes power-pop {
+  from { transform: scale(0.6); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+.target-card { max-width: 380px; }
+.target-card .target-btn {
+  width: 100%;
+  justify-content: center;
+  gap: 10px;
+}
+.target-card .target-btn .avatar {
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.62rem;
+  font-weight: 800;
+  color: #1f2937;
+}
+#target-body { display: flex; flex-direction: column; gap: 9px; }
+
+/* ---------- Overlay pausa / voto vocabolario ---------- */
+.pausa-card {
+  width: 100%;
+  max-width: 440px;
+  padding: 28px 24px;
+  text-align: center;
+  animation: card-in 0.3s ease;
+}
+.pausa-emoji { font-size: 2.6rem; line-height: 1; }
+.pausa-card h3 {
+  margin: 10px 0 6px;
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+.pausa-card p {
+  margin: 0 0 16px;
+  font-size: 0.86rem;
+  color: var(--text-1);
+  line-height: 1.5;
+}
+.pausa-card p b { color: var(--text-0); }
+.pausa-body { display: flex; flex-direction: column; gap: 10px; }
+.pausa-body.pausa-actions { margin-top: 6px; }
+.pausa-body .btn { width: 100%; }
+.pausa-voters { display: flex; flex-direction: column; gap: 7px; text-align: left; }
+.pausa-voter {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--row-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-sm);
+}
+.pausa-voter .avatar {
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.62rem;
+  font-weight: 800;
+  color: #1f2937;
+  flex-shrink: 0;
+}
+.pausa-voter .pv-name { flex: 1; font-size: 0.85rem; font-weight: 700; }
+.pausa-voter .pv-prop {
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: var(--info);
+  background: #e0f2fe;
+  border-radius: 999px;
+  padding: 2px 8px;
+  vertical-align: middle;
+}
+.pausa-voter .pv { font-size: 1rem; font-weight: 800; }
+.pausa-voter .pv.si { color: var(--ok); }
+.pausa-voter .pv.no { color: var(--danger); }
+.pausa-voter .pv.att { color: var(--text-2); font-weight: 700; }
+.pausa-progress { text-align: left; }
+
 /* ---------- Responsive ---------- */
 @media (max-width: 900px) {
   .game-grid { grid-template-columns: 1fr; }
