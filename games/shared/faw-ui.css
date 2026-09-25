@@ -149,7 +149,8 @@ a:hover { text-decoration: underline; }
    BOTTONI
    ========================================================================== */
 .faw-btn {
-  --btn-bg: var(--faw-panel);
+  /* I controlli secondari si distinguono dalla superficie, ma restano neutri. */
+  --btn-bg: var(--faw-panel-2);
   --btn-fg: var(--faw-text);
   position: relative;
   display: inline-flex;

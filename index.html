@@ -233,7 +233,10 @@
 				padding: 16px 14px 14px;
 				border-radius: 16px;
 				border: 2px solid var(--faw-border);
-				background: var(--faw-panel);
+				/* Base calda di fallback; nei browser moderni ogni gioco riceve una
+				   tinta appena percettibile del proprio colore, senza diventare rumoroso. */
+				background: #FFF7ED;
+				background: color-mix(in srgb, var(--g1) 7%, var(--faw-panel-solid));
 				cursor: pointer;
 				transition: border-color var(--faw-fast) var(--faw-ease),
 					box-shadow var(--faw-fast) var(--faw-ease),
@@ -250,6 +253,10 @@
 				background: color-mix(in srgb, var(--g1) 12%, white);
 				border: 2px solid color-mix(in srgb, var(--g1) 20%, white);
 				transition: transform var(--faw-fast) var(--faw-ease);
+			}
+			:root[data-theme='dark'] .game-card {
+				background: #332D26;
+				background: color-mix(in srgb, var(--g1) 14%, var(--faw-panel-solid));
 			}
 			:root[data-theme='dark'] .game-card .g-tile {
 				background: color-mix(in srgb, var(--g1) 18%, transparent);
