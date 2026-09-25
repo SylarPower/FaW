@@ -13,8 +13,12 @@ if (!firebaseConfig) {
 let db = null;
 try {
   if (window.firebase && firebaseConfig) {
-    firebase.initializeApp(firebaseConfig);
-    db = firebase.firestore();
+    db = typeof window.FAW_INIT_FIRESTORE === "function"
+      ? window.FAW_INIT_FIRESTORE()
+      : (() => {
+          if (!firebase.apps || firebase.apps.length === 0) firebase.initializeApp(firebaseConfig);
+          return firebase.firestore();
+        })();
   }
 } catch (error) {
   console.warn("Cloud non disponibile", error);

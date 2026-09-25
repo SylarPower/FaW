@@ -122,7 +122,7 @@ window.FAW_REQUIRE_FIREBASE_CONFIG = function(){ return window.FAW_FIREBASE_CONF
   ok(window.eval('REFRESH_PARTITE_MS') === 60000, 'cadenza automatica = 60000 ms');
   ok(!/setInterval\(caricaPartitePictionary/.test(HTML), 'nessun polling pictionary a pochi secondi');
   const hb = window.eval('PRESENZA_HEARTBEAT_MS');
-  ok(hb === 30000, 'battito presenza ogni 30s (finestra online 60s): ' + hb);
+  ok(hb === 60000, 'battito presenza ogni 60s (finestra online 130s): ' + hb);
 
   const sfida = (extra) => Object.assign({
     id: 'match-123',

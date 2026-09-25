@@ -158,6 +158,13 @@ console.log('\n[5] Hub: lista partite con refresh manuale e cadenza 1 minuto');
   ok(/REFRESH_PARTITE_MS\s*=\s*60000/.test(hub), 'cadenza automatica di 60s');
   ok(!/setInterval\([^)]*,\s*5000\s*\)/.test(hub), 'nessun polling a 5 secondi');
   ok(/firmaListaPartite/.test(hub), 'render saltato quando i dati non cambiano');
+  ok(/collection\("presenze"\)\.where\("last",\s*">",\s*soglia\)/.test(hub),
+    'listener presenze limitato alla finestra online');
+  ok(/collection\("amicizie"\)\.where\("da",\s*"==",\s*mioNome\)/.test(hub) &&
+    /collection\("amicizie"\)\.where\("a",\s*"==",\s*mioNome\)/.test(hub),
+    'listener amicizie limitati alle relazioni dell’utente');
+  ok(/function chiudiListenerHub\(\)/.test(hub),
+    'listener hub precedenti chiusi prima di un nuovo login');
 }
 
 console.log('\n[5b] Hub: inviti in tempo reale, rifiuto non distruttivo');
@@ -277,7 +284,7 @@ console.log('\n[8] Nomi, Cose, Città: regole strutturali');
   ok(/class="fixed-home-btn" href="\.\.\/\.\.\/index\.html"/.test(pagina), 'pulsante HOME verso ../../index.html');
   ok(/shared\/faw-ui\.css/.test(pagina) && /shared\/faw-layout\.js/.test(pagina), 'risorse condivise collegate');
   ok(/shared\/firebase-config\.js/.test(pagina), 'config Firebase condivisa');
-  ok(/9\.1\.1\/firebase-firestore-compat/.test(pagina), 'SDK compat 9.1.1');
+  ok(/12\.19\.0\/firebase-firestore-compat/.test(pagina), 'SDK compat 12.19.0');
   ok(!AUDIO_RE.test(codice), 'nessun costrutto audio');
   ok(!/navigator\.vibrate/.test(codice), 'nessuna vibrazione');
 }

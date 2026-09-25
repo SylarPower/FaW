@@ -7,8 +7,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore-compat.js"></script>
     <!-- Config Firebase condivisa (prima dello script che inizializza Firebase) -->
     <script src="../shared/firebase-config.js"></script>
     <link rel="stylesheet" href="../shared/faw-ui.css">
@@ -618,11 +618,15 @@
 const firebaseConfig = window.FAW_REQUIRE_FIREBASE_CONFIG
     ? window.FAW_REQUIRE_FIREBASE_CONFIG()
     : window.FAW_FIREBASE_CONFIG;
-if (!firebaseConfig) {
-    console.error("[FaW] Impossibile inizializzare Firebase: config condivisa non caricata.");
+if (!firebaseConfig || typeof firebase === 'undefined') {
+    throw new Error('[FaW] Impossibile inizializzare Firebase: config condivisa o SDK mancanti.');
 }
-firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
+const db = (typeof window.FAW_INIT_FIRESTORE === 'function')
+    ? window.FAW_INIT_FIRESTORE()
+    : (() => {
+        if (!firebase.apps || firebase.apps.length === 0) firebase.initializeApp(firebaseConfig);
+        return firebase.firestore();
+    })();
 
 // ============================================
 // 🎮 MULTIPLAYER
@@ -638,6 +642,40 @@ let unsubscribePartita = null;
 let matchSeed = null;
 let matchData = null;
 let mpReadyBusy = false;
+let mpStartRequestedFor = null;
+let mpCompletionRequestedFor = null;
+
+function tuttiPronti(data) {
+    const players = (data && data.partecipanti) || [];
+    const ready = (data && data.pronti) || [];
+    return players.length > 0 && players.every(name => ready.includes(name));
+}
+
+/* Il listener è già la fonte di verità. Il primo partecipante fa da referente:
+   così una transizione di fase non richiede riletture get() né N update
+   concorrenti da tutti i browser. */
+function sincronizzaFaseMultiplayer(data) {
+    const players = data.partecipanti || [];
+    if (players[0] !== mioNome) return;
+
+    if (data.stato === 'attesa' && tuttiPronti(data)) {
+        const key = 'start:' + players.join('|') + ':' + (data.pronti || []).join('|');
+        if (mpStartRequestedFor !== key) {
+            mpStartRequestedFor = key;
+            db.collection('partite').doc(matchId).update({ stato: 'in_corso' })
+                .catch(e => { mpStartRequestedFor = null; console.error('[15] avvio multiplayer:', e); });
+        }
+    }
+    if (data.stato === 'in_corso' && players.length > 0 &&
+        players.every(name => (data.finito || []).includes(name))) {
+        const key = 'finish:' + players.join('|') + ':' + (data.finito || []).join('|');
+        if (mpCompletionRequestedFor !== key) {
+            mpCompletionRequestedFor = key;
+            db.collection('partite').doc(matchId).update({ stato: 'conclusa' })
+                .catch(e => { mpCompletionRequestedFor = null; console.error('[15] chiusura multiplayer:', e); });
+        }
+    }
+}
 
 if (matchId && mioNome) {
     isMultiplayer = true;
@@ -645,6 +683,7 @@ if (matchId && mioNome) {
         const data = doc.data();
         if (!data) return;
         matchData = data;
+        sincronizzaFaseMultiplayer(data);
         if (data.opzioni) {
             if (data.opzioni.durata) {
                 gameDuration = parseInt(data.opzioni.durata);
@@ -704,26 +743,21 @@ function renderMpLobby(data) {
 
 async function toggleMpReady() {
     if (!matchId || mpReadyBusy) return;
+    const data = matchData;
+    if (!data || data.stato !== 'attesa') return;
+
     mpReadyBusy = true;
     try {
-        const snap = await db.collection("partite").doc(matchId).get();
-        const data = snap.data();
-        if (!data || data.stato === 'in_corso') return;
-        const pronti = data.pronti || [];
-        const meReady = pronti.includes(mioNome);
+        const meReady = (data.pronti || []).includes(mioNome);
         await db.collection("partite").doc(matchId).update({
             pronti: meReady
                 ? firebase.firestore.FieldValue.arrayRemove(mioNome)
                 : firebase.firestore.FieldValue.arrayUnion(mioNome)
         });
-        const fresh = await db.collection("partite").doc(matchId).get();
-        const d = fresh.data();
-        const allReady = (d.partecipanti || []).every(n => (d.pronti || []).includes(n));
-        if (allReady && (d.partecipanti || []).length > 0) {
-            await db.collection("partite").doc(matchId).update({ stato: 'in_corso' });
-        }
+        /* L'onSnapshot riceverà lo stato aggiornato e il referente avvierà la
+           partita se tutti sono pronti: zero letture extra per questo gesto. */
     } catch (e) {
-        console.error(e);
+        console.error('[15] disponibilità:', e);
     } finally {
         mpReadyBusy = false;
     }
@@ -1528,15 +1562,8 @@ async function winGame() {
             [`punteggi.${mioNome}`]: mpScore,
             finito: firebase.firestore.FieldValue.arrayUnion(mioNome)
         });
-        const snap = await db.collection("partite").doc(matchId).get();
-        const data = snap.data();
-        if (data && data.punteggi) {
-            renderPodioFinale(data);
-            const finiti = data.finito || [];
-            if ((data.partecipanti || []).every(n => finiti.includes(n))) {
-                await db.collection("partite").doc(matchId).update({ stato: 'conclusa' });
-            }
-        }
+        /* Il listener rende il podio e chiude una sola volta tramite il
+           referente. Non rileggiamo il documento appena scritto. */
     } else if (isMultiplayer && matchData && matchData.punteggi) {
         renderPodioFinale(matchData);
     }

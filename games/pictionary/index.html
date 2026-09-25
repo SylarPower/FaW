@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>PICTIONARY 🎨</title>
-    <script src="https://www.gstatic.com/firebasejs/9.1.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.1.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore-compat.js"></script>
     <!-- Config Firebase condivisa (prima dello script che inizializza Firebase) -->
     <script src="../shared/firebase-config.js"></script>
     <!-- Spazio per i banner di stato fissi in cima (evita che coprano il testo) -->
@@ -1374,11 +1374,15 @@
 const firebaseConfig = window.FAW_REQUIRE_FIREBASE_CONFIG
     ? window.FAW_REQUIRE_FIREBASE_CONFIG()
     : window.FAW_FIREBASE_CONFIG;
-if (!firebaseConfig) {
-    console.error("[FaW] Impossibile inizializzare Firebase: config condivisa non caricata.");
+if (!firebaseConfig || typeof firebase === 'undefined') {
+    throw new Error('[FaW] Impossibile inizializzare Firebase: config condivisa o SDK mancanti.');
 }
-firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
+const db = (typeof window.FAW_INIT_FIRESTORE === 'function')
+    ? window.FAW_INIT_FIRESTORE()
+    : (() => {
+        if (!firebase.apps || firebase.apps.length === 0) firebase.initializeApp(firebaseConfig);
+        return firebase.firestore();
+    })();
 
 // ========================================
 // DATABASE TEMI PICTIONARY - 500+ PAROLE
@@ -2453,22 +2457,15 @@ async function finishCurrentPhase() {
     });
     
     state.receivedDrawing = null;
-    
-    // Leggi dati freschi
-    const freshDoc = await db.collection("pictionary_rooms").doc(state.roomId).get();
-    const freshData = freshDoc.data();
-    state.roomData = freshData;
-    
-    const completed = freshData.completedRound?.[currentRound] || [];
-    const total = freshData.players.length;
-    
-    console.log(`📊 Completati: ${completed.length}/${total}, isHost=${state.isHost}`);
-    
-    if (completed.length >= total && state.isHost) {
-        await advanceToNextRound(freshData);
-    } else {
-        showWaitingScreen(freshData);
-    }
+
+    /* La room ha già un listener attivo. Evitiamo un get() immediatamente dopo
+       l'update: lo snapshot confermato renderà la schermata d'attesa e farà
+       avanzare l'host quando l'ultimo giocatore ha davvero completato il round. */
+    const optimistic = { ...data, completedRound: { ...(data.completedRound || {}) } };
+    const completed = new Set(optimistic.completedRound[currentRound] || []);
+    completed.add(state.playerName);
+    optimistic.completedRound[currentRound] = [...completed];
+    showWaitingScreen(optimistic);
 }
 
 // ✅ AVANZAMENTO FASE - CORRETTO
@@ -2819,9 +2816,11 @@ async function checkAndCalculateResults() {
     isCalculatingResults = true;
     
     try {
-        const doc = await db.collection("pictionary_rooms").doc(state.roomId).get();
-        const newData = doc.data();
-        
+        /* Il listener della room ha già fornito questo stato; una lettura server
+           qui trasformava ogni chiusura votazione in un costo inutile. */
+        const newData = state.roomData;
+        if (!newData) return;
+
         // ✅ Doppio controllo: non ricalcolare se già in results
         if (newData.stato === 'results') {
             console.log("⚠️ Già in results, skip");
@@ -3088,7 +3087,6 @@ function undo() {
     // Ridisegna tutto
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
     history.forEach(act => applyAction(act, ctx));
 }
 
@@ -4053,36 +4051,48 @@ function redrawGuessItCanvas() {
 // ========================================
 let lastCanvasHash = '';
 let lastStreamTime = 0;
+let canvasWriteInFlight = false;
+const CANVAS_STREAM_MIN_MS = 1800;
+const CANVAS_STREAM_SCAN_MS = 500;
 
 function startGuessItStreaming() {
     if (guessIt.streamInterval) clearInterval(guessIt.streamInterval);
     lastCanvasHash = '';
-    lastStreamTime = Date.now();
+    lastStreamTime = 0;
+    canvasWriteInFlight = false;
 
-    guessIt.streamInterval = setInterval(async () => {
-        if (!guessIt.isDrawer || !guessIt.canvas) return;
+    /* Prima veniva scritto anche un canvas invariato ogni ~800 ms: fino a 75
+       scritture/minuto per disegnatore e uno snapshot pesante per ogni player.
+       Ora trasmettiamo solo se il disegno cambia, al massimo una volta ogni
+       1,8 s, e non sovrapponiamo richieste lente. La preview resta fluida
+       localmente e la room non viene saturata. */
+    guessIt.streamInterval = setInterval(() => {
+        if (!guessIt.isDrawer || !guessIt.canvas || canvasWriteInFlight) return;
 
+        const now = Date.now();
+        if (now - lastStreamTime < CANVAS_STREAM_MIN_MS) return;
         try {
-            const now = Date.now();
             const dataUrl = guessIt.canvas.toDataURL('image/jpeg', 0.68);
             const currentHash = simpleCanvasHash(dataUrl);
+            if (currentHash === lastCanvasHash) return;
 
-            // Aggiorna più frequentemente se c'è stato un cambiamento recente
-            const shouldForceUpdate = (now - lastStreamTime > 800); // ogni 800ms forza comunque
-
-            if (currentHash === lastCanvasHash && !shouldForceUpdate) return;
-            
+            canvasWriteInFlight = true;
             lastCanvasHash = currentHash;
             lastStreamTime = now;
-
-            await db.collection("pictionary_rooms").doc(state.roomId).update({
-                'guessIt.canvasData': dataUrl,
-                'guessIt.lastUpdate': Date.now()   // aiuta il sync
+            db.collection("pictionary_rooms").doc(state.roomId).update({
+                'guessIt.canvasData': dataUrl
+            }).catch((e) => {
+                /* Permette un nuovo tentativo se il server non ha accettato il
+                   frame; non si martella Firestore con retry concorrenti. */
+                lastCanvasHash = '';
+                console.error('Errore streaming canvas:', e);
+            }).finally(() => {
+                canvasWriteInFlight = false;
             });
         } catch (e) {
-            console.error('Errore streaming canvas:', e);
+            console.error('Errore preparazione canvas:', e);
         }
-    }, 320); // Ridotto a 320ms per maggiore reattività
+    }, CANVAS_STREAM_SCAN_MS);
 }
 
 function startGuessItTimer(seconds) {
@@ -4220,13 +4230,14 @@ async function markAsWinner(guesser, drawer) {
 async function advanceGuessItRound() {
     if (guessIt.streamInterval) clearInterval(guessIt.streamInterval);
     if (guessIt.timerInterval) clearInterval(guessIt.timerInterval);
-    
+    canvasWriteInFlight = false;
+
     removeBanner();
     document.getElementById('winner-overlay')?.remove();
 
-    // Forza refresh dati freschi prima di avanzare
-    const freshDoc = await db.collection("pictionary_rooms").doc(state.roomId).get();
-    const freshData = freshDoc.data();
+    /* La room è già in ascolto. Usiamo l'ultimo snapshot coerente invece di
+       rileggere Firestore prima di ogni round. */
+    const freshData = state.roomData;
     if (!freshData) return;
 
     const gi = freshData.guessIt;

@@ -1,9 +1,8 @@
 /* ==========================================================================
-   FaW — Design System "Clean"
-   Sistema condiviso da hub e giochi. Stile pulito e moderno:
-   superfici chiare, bordi sottili, ombre morbide, nessun effetto neon.
-   Ogni gioco può impostare il proprio accento:
-   --faw-acc / --faw-acc-2 / --faw-acc-soft
+   FaW — Design System "Playful editoriale"
+   Sistema condiviso da hub e giochi: avorio caldo, inchiostro leggibile,
+   corallo per le CTA, bordi decisi da 2px e ombre corte. Ogni gioco può
+   mantenere una propria coppia cromatica tramite --faw-acc / --faw-acc-2.
    ========================================================================== */
 
 :root {
@@ -14,42 +13,42 @@
   --faw-font-mono: 'Nunito', ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, Consolas, monospace;
 
   /* --- Accento (override per pagina) --- */
-  --faw-acc: #4f46e5;
-  --faw-acc-2: #4338ca;
-  --faw-acc-soft: #eef2ff;
-  --faw-acc-glow: rgba(79, 70, 229, 0.12);
+  --faw-acc: #E24A3B;
+  --faw-acc-2: #B9382D;
+  --faw-acc-soft: #FDE4DE;
+  --faw-acc-glow: rgba(226, 74, 59, 0.22);
 
   /* --- Superfici (tema chiaro) --- */
-  --faw-bg: #f6f7f9;
-  --faw-bg-2: #ffffff;
-  --faw-bg-3: #eef1f5;
-  --faw-panel: #ffffff;
-  --faw-panel-2: #f3f4f6;
-  --faw-panel-solid: #ffffff;
-  --faw-border: #e5e7eb;
-  --faw-border-2: #d4d7de;
-  --faw-text: #111827;
-  --faw-text-2: #4b5563;
-  --faw-text-3: #9ca3af;
+  --faw-bg: #FFFBF5;
+  --faw-bg-2: #FFF7ED;
+  --faw-bg-3: #F5EEE4;
+  --faw-panel: #FFFDF9;
+  --faw-panel-2: #F8F0E6;
+  --faw-panel-solid: #FFFDF9;
+  --faw-border: #D9D0C5;
+  --faw-border-2: #9C9287;
+  --faw-text: #202124;
+  --faw-text-2: #5D5A54;
+  --faw-text-3: #7B746B;
 
   /* --- Semantica --- */
-  --faw-ok: #15803d;
-  --faw-ok-soft: #f0fdf4;
-  --faw-warn: #b45309;
-  --faw-warn-soft: #fffbeb;
-  --faw-danger: #dc2626;
-  --faw-danger-soft: #fef2f2;
-  --faw-info: #0369a1;
-  --faw-info-soft: #f0f9ff;
+  --faw-ok: #237A57;
+  --faw-ok-soft: #E3F3EA;
+  --faw-warn: #9A5A00;
+  --faw-warn-soft: #FFF0CC;
+  --faw-danger: #B42318;
+  --faw-danger-soft: #FBE5E3;
+  --faw-info: #2B5DAA;
+  --faw-info-soft: #E6EEFC;
 
   /* --- Forma --- */
-  --faw-r-sm: 8px;
-  --faw-r-md: 12px;
-  --faw-r-lg: 16px;
-  --faw-r-xl: 20px;
-  --faw-shadow-1: 0 1px 2px rgba(16, 24, 40, 0.05);
-  --faw-shadow-2: 0 1px 3px rgba(16, 24, 40, 0.08), 0 4px 12px rgba(16, 24, 40, 0.05);
-  --faw-shadow-3: 0 2px 8px rgba(16, 24, 40, 0.06), 0 12px 32px rgba(16, 24, 40, 0.1);
+  --faw-r-sm: 6px;
+  --faw-r-md: 10px;
+  --faw-r-lg: 14px;
+  --faw-r-xl: 18px;
+  --faw-shadow-1: 2px 2px 0 rgba(32, 33, 36, 0.14);
+  --faw-shadow-2: 3px 3px 0 rgba(32, 33, 36, 0.16);
+  --faw-shadow-3: 5px 5px 0 rgba(32, 33, 36, 0.18);
   --faw-glow-acc: 0 0 0 3px var(--faw-acc-glow);
 
   /* --- Movimento --- */
@@ -72,25 +71,27 @@
 /* --- Tema scuro pulito (solo hub: <html data-theme="dark">) --- */
 :root[data-theme='dark'] {
   color-scheme: dark;
-  --faw-acc-soft: rgba(99, 102, 241, 0.14);
-  --faw-bg: #0f141d;
-  --faw-bg-2: #131a26;
-  --faw-bg-3: #1a2230;
-  --faw-panel: #161e2c;
-  --faw-panel-2: #1d2737;
-  --faw-panel-solid: #161e2c;
-  --faw-border: rgba(255, 255, 255, 0.08);
-  --faw-border-2: rgba(255, 255, 255, 0.14);
-  --faw-text: #f1f5f9;
-  --faw-text-2: #a8b3c5;
-  --faw-text-3: #64748b;
-  --faw-ok-soft: rgba(34, 197, 94, 0.12);
-  --faw-warn-soft: rgba(245, 158, 11, 0.12);
-  --faw-danger-soft: rgba(239, 68, 68, 0.12);
-  --faw-info-soft: rgba(56, 189, 248, 0.12);
-  --faw-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --faw-shadow-2: 0 1px 3px rgba(0, 0, 0, 0.35), 0 4px 12px rgba(0, 0, 0, 0.3);
-  --faw-shadow-3: 0 2px 8px rgba(0, 0, 0, 0.4), 0 12px 32px rgba(0, 0, 0, 0.45);
+  --faw-acc: #FF796A;
+  --faw-acc-2: #FF9B8F;
+  --faw-acc-soft: rgba(255, 121, 106, 0.16);
+  --faw-bg: #211F1B;
+  --faw-bg-2: #29251F;
+  --faw-bg-3: #332E27;
+  --faw-panel: #2A2621;
+  --faw-panel-2: #383129;
+  --faw-panel-solid: #2A2621;
+  --faw-border: rgba(255, 248, 238, 0.16);
+  --faw-border-2: rgba(255, 248, 238, 0.34);
+  --faw-text: #FFF8EE;
+  --faw-text-2: #D7CEC2;
+  --faw-text-3: #A99E91;
+  --faw-ok-soft: rgba(81, 187, 132, 0.16);
+  --faw-warn-soft: rgba(247, 184, 73, 0.16);
+  --faw-danger-soft: rgba(235, 106, 94, 0.16);
+  --faw-info-soft: rgba(93, 145, 225, 0.16);
+  --faw-shadow-1: 2px 2px 0 rgba(0, 0, 0, 0.34);
+  --faw-shadow-2: 3px 3px 0 rgba(0, 0, 0, 0.4);
+  --faw-shadow-3: 5px 5px 0 rgba(0, 0, 0, 0.48);
 }
 
 /* ==========================================================================
@@ -155,7 +156,7 @@ a:hover { text-decoration: underline; }
   align-items: center;
   justify-content: center;
   gap: 8px;
-  border: 1px solid var(--faw-border);
+  border: 2px solid var(--faw-border);
   background: var(--btn-bg);
   color: var(--btn-fg);
   font-family: var(--faw-font-body);
@@ -179,7 +180,7 @@ a:hover { text-decoration: underline; }
 
 /* CTA primaria: tinta unita */
 .faw-btn--primary {
-  border: 1px solid transparent;
+  border: 2px solid var(--faw-acc-2);
   background: var(--faw-acc);
   color: #fff;
   font-weight: 600;
@@ -187,12 +188,12 @@ a:hover { text-decoration: underline; }
   overflow: hidden;
 }
 .faw-btn--primary::after { content: none; }
-.faw-btn--primary:hover { background: var(--faw-acc-2); border-color: transparent; }
+.faw-btn--primary:hover { background: var(--faw-acc-2); border-color: var(--faw-text); }
 .faw-btn--primary .arr { transition: transform var(--faw-fast) var(--faw-ease); }
 .faw-btn--primary:hover .arr { transform: translateX(3px); }
 
 .faw-btn--gold {
-  border: 1px solid transparent;
+  border: 2px solid transparent;
   background: #f59e0b;
   color: #fff;
   font-weight: 600;
@@ -231,7 +232,7 @@ a:hover { text-decoration: underline; }
   gap: 8px;
   padding: 10px 16px;
   border-radius: 999px;
-  border: 1px solid var(--faw-border);
+  border: 2px solid var(--faw-border);
   background: var(--faw-panel-solid);
   color: var(--faw-text);
   font-family: var(--faw-font-body);
@@ -284,7 +285,7 @@ body.faw-has-banner::before {
 .faw-card {
   position: relative;
   background: var(--faw-panel);
-  border: 1px solid var(--faw-border);
+  border: 2px solid var(--faw-border);
   border-radius: var(--faw-r-xl);
   padding: 22px 24px;
   box-shadow: var(--faw-shadow-1);
@@ -314,7 +315,7 @@ body.faw-has-banner::before {
   gap: 7px;
   padding: 5px 12px;
   border-radius: 999px;
-  border: 1px solid var(--faw-border);
+  border: 2px solid var(--faw-border);
   background: var(--faw-panel-2);
   font-size: 0.76rem;
   font-weight: 600;
@@ -323,10 +324,10 @@ body.faw-has-banner::before {
 }
 .faw-pill b { color: var(--faw-text); }
 .faw-pill--live { border-color: #bbf7d0; background: var(--faw-ok-soft); color: var(--faw-ok); }
-.faw-pill--acc { border-color: #c7d2fe; background: var(--faw-acc-soft); color: var(--faw-acc-2); }
+.faw-pill--acc { border-color: #F5B8AF; background: var(--faw-acc-soft); color: var(--faw-acc-2); }
 .faw-pill--warn { border-color: #fde68a; background: var(--faw-warn-soft); color: var(--faw-warn); }
 :root[data-theme='dark'] .faw-pill--live { border-color: rgba(34, 197, 94, 0.35); }
-:root[data-theme='dark'] .faw-pill--acc { border-color: rgba(99, 102, 241, 0.4); color: #c7d2fe; }
+:root[data-theme='dark'] .faw-pill--acc { border-color: rgba(255, 121, 106, 0.45); color: #F5B8AF; }
 :root[data-theme='dark'] .faw-pill--warn { border-color: rgba(245, 158, 11, 0.4); }
 
 .faw-dot {
@@ -347,9 +348,9 @@ body.faw-has-banner::before {
   letter-spacing: 0.6px;
   text-transform: uppercase;
 }
-.faw-badge--online { background: var(--faw-ok-soft); color: var(--faw-ok); border: 1px solid #bbf7d0; }
-.faw-badge--solo { background: var(--faw-info-soft); color: var(--faw-info); border: 1px solid #bae6fd; }
-.faw-badge--hot { background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; }
+.faw-badge--online { background: var(--faw-ok-soft); color: var(--faw-ok); border: 2px solid #bbf7d0; }
+.faw-badge--solo { background: var(--faw-info-soft); color: var(--faw-info); border: 2px solid #bae6fd; }
+.faw-badge--hot { background: #fff7ed; color: #c2410c; border: 2px solid #fed7aa; }
 
 /* ==========================================================================
    INPUT
@@ -358,7 +359,7 @@ body.faw-has-banner::before {
   width: 100%;
   padding: 11px 14px;
   border-radius: var(--faw-r-md);
-  border: 1px solid var(--faw-border-2);
+  border: 2px solid var(--faw-border-2);
   background: var(--faw-panel-solid);
   color: var(--faw-text);
   font-family: var(--faw-font-body);
@@ -397,7 +398,7 @@ body.faw-has-banner::before {
   font-weight: 700;
   letter-spacing: 0.3px;
   text-transform: uppercase;
-  border: 1px solid hsl(var(--h) 50% 86%);
+  border: 2px solid hsl(var(--h) 50% 86%);
 }
 :root[data-theme='dark'] .faw-avatar {
   background: hsl(var(--h) 45% 26%);
@@ -425,7 +426,7 @@ body.faw-has-banner::before {
   max-height: min(86vh, 900px);
   overflow-y: auto;
   background: var(--faw-panel-solid);
-  border: 1px solid var(--faw-border);
+  border: 2px solid var(--faw-border);
   border-radius: var(--faw-r-xl);
   box-shadow: var(--faw-shadow-3);
   animation: faw-pop var(--faw-med) var(--faw-ease);
@@ -441,7 +442,7 @@ body.faw-has-banner::before {
   width: 32px; height: 32px;
   display: inline-flex; align-items: center; justify-content: center;
   border-radius: 50%;
-  border: 1px solid var(--faw-border);
+  border: 2px solid var(--faw-border);
   background: var(--faw-panel-2);
   color: var(--faw-text-2);
   font-size: 0.95rem;
@@ -464,7 +465,7 @@ body.faw-has-banner::before {
   gap: 9px;
   padding: 12px 20px;
   border-radius: 12px;
-  border: 1px solid var(--faw-border);
+  border: 2px solid var(--faw-border);
   background: #111827;
   color: #fff;
   font-weight: 500;
