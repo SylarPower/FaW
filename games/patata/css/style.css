@@ -14,7 +14,7 @@
   --row-bg: #f9fafb;
   --text-0: #111827;
   --text-1: #4b5563;
-  --text-2: #9ca3af;
+  --text-2: #5b6470;
   --fire-0: #ea580c;
   --fire-1: #c2410c;
   --fire-soft: #fff7ed;
@@ -324,11 +324,11 @@ button { font-family: var(--font); }
 .btn:active { transform: scale(0.98); }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
 .btn-fire {
-  background: var(--fire-0);
+  background: #c2410c;
   color: #fff;
   box-shadow: var(--shadow-card);
 }
-.btn-fire:hover:not(:disabled) { background: var(--fire-1); }
+.btn-fire:hover:not(:disabled) { background: #9a3412; }
 .btn-ghost {
   background: var(--card);
   border-color: var(--card-border);
@@ -468,8 +468,8 @@ button { font-family: var(--font); }
   box-shadow: var(--shadow-card);
 }
 .turn-banner.mine {
-  background: var(--fire-0);
-  border-color: var(--fire-0);
+  background: #c2410c;
+  border-color: #9a3412;
   color: #fff;
 }
 .turn-banner.flash { animation: pop-in 0.3s ease; }

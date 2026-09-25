@@ -32,7 +32,8 @@ const JS = [
   'games/palestra/premium.js',
   'games/palestra/workout-metrics.js',
   'games/palestra/cargo-art.js',
-  'games/shared/firebase-config.js'
+  'games/shared/firebase-config.js',
+  'games/shared/rivincita.js'
 ];
 const GIOCHI = [
   { dir: 'games/ruzzle', cssInHtml: true },

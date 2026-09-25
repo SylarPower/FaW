@@ -11,6 +11,7 @@
     <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore-compat.js"></script>
     <!-- Config Firebase condivisa (prima dello script che inizializza Firebase) -->
     <script src="../shared/firebase-config.js"></script>
+    <script src="../shared/rivincita.js"></script>
     <link rel="stylesheet" href="../shared/faw-ui.css">
     <!-- Podio di fine partita (condiviso tra i giochi) -->
     <link rel="stylesheet" href="../shared/podio.css">
@@ -86,10 +87,10 @@
         }
         .btn:hover { transform: scale(1.05) translateY(-1px); background: rgba(255,255,255,0.14); border-color: rgba(255,255,255,0.45); }
         .btn:active { transform: scale(0.97); }
-        .btn-play { background: linear-gradient(135deg, #7c3aed, #6366f1); color: #fff; border: none; box-shadow: 0 4px 15px rgba(124,58,237,0.4); border-radius: 10px; }
+        .btn-play { background: linear-gradient(135deg, #6d28d9, #4f46e5); color: #fff; border: none; box-shadow: 0 4px 15px rgba(124,58,237,0.4); border-radius: 10px; }
         .btn-play:hover { box-shadow: 0 6px 25px rgba(124,58,237,0.6); transform: translateY(-2px); }
-        .btn-shop { background: linear-gradient(135deg, #f59e0b, #d97706); color: #fff; border: none; box-shadow: 0 4px 15px rgba(245,158,11,0.3); border-radius: 10px; }
-        .btn-danger { background: #ff3333; color: #fff; border-color: #ff3333; }
+        .btn-shop { background: linear-gradient(135deg, #f59e0b, #d97706); color: #241500; border: none; box-shadow: 0 4px 15px rgba(245,158,11,0.3); border-radius: 10px; }
+        .btn-danger { background: #ff3333; color: #241500; border-color: #ff3333; }
         .btn-small { padding: 10px 18px; font-size: 0.6rem; }
 
         /* ===== TITOLO ===== */
@@ -557,6 +558,8 @@
         <button class="btn" onclick="resumeFromPause()">▶ RIPRENDI</button>
     </div>
 
+    <div id="rivincita-15" style="position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:80;width:min(520px,92vw);"></div>
+
     <!-- ===== VITTORIA ===== -->
     <div id="win-screen" class="overlay-screen" style="display:none;">
         <h1 style="color:#22c55e; font-size:2.5rem;" id="win-title">🎉 RISOLTO!</h1>
@@ -575,6 +578,7 @@
         </div>
         <div>
             <button class="btn btn-play" onclick="startGame()">🔄 RIGIOCA</button>
+            <button class="btn btn-play" id="btn-rivincita-15" style="display:none;" onclick="apriSceltaRivincita15()">🔁 ALTRA SFIDA</button>
             <button class="btn" onclick="openModeSelect()">📐 CAMBIA</button>
             <button class="btn btn-shop" onclick="openShop()">🛒 NEGOZIO</button>
         </div>
@@ -684,6 +688,7 @@ if (matchId && mioNome) {
         if (!data) return;
         matchData = data;
         sincronizzaFaseMultiplayer(data);
+        if (data.prossimaPartita) mostraProposta15(data);
         if (data.opzioni) {
             if (data.opzioni.durata) {
                 gameDuration = parseInt(data.opzioni.durata);
@@ -708,6 +713,93 @@ if (matchId && mioNome) {
     });
 }
 
+function preparaContestoRivincita15() {
+    if (!window.FAW_RIVINCITA || !matchData) return;
+    window.FAW_RIVINCITA.prepara({
+        db: db,
+        ref: db.collection('partite').doc(matchId),
+        me: mioNome,
+        partecipanti: matchData.partecipanti || [],
+        giocoCorrente: 'gameof15',
+        proposta: matchData,
+        onErrore: (msg) => alert(msg || 'Invito non riuscito')
+    });
+}
+function apriSceltaRivincita15() {
+    preparaContestoRivincita15();
+    const box = document.getElementById('rivincita-15');
+    if (!box || !window.FAW_RIVINCITA) return;
+    const n = (matchData && matchData.partecipanti || []).length;
+    box.innerHTML = `<div style="background:#1c2438;color:#fff;border-radius:12px;padding:12px 14px;text-align:left;">
+        <div style="font-weight:800;margin-bottom:8px;">RIVINCITA</div>
+        <div style="font-size:0.85rem;margin-bottom:10px;">Stessa partita, oppure invita tutti a un altro gioco.</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-play" onclick="creaRivincita15()">🧩 STESSA PARTITA</button>
+            ${window.FAW_RIVINCITA.htmlAltri('gameof15', n)}
+        </div>
+    </div>`;
+}
+function esc15(s) {
+    return String(s || '').replace(/[&<>"']/g, function (c) {
+        return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c];
+    });
+}
+async function creaRivincita15() {
+    if (!window.FAW_RIVINCITA || !matchData || !matchData.partecipanti) return;
+    if (matchData.prossimaPartita && !(matchData.rivincitaRifiutataDa || []).length) return;
+    const persone = matchData.partecipanti;
+    if (window.FAW_RIVINCITA) await window.FAW_RIVINCITA.scarta(db, matchData.prossimaPartita, matchData.prossimaPartitaGioco);
+    const opzioni = Object.assign({}, matchData.opzioni || window.FAW_RIVINCITA.opzioniDefault('gameof15'), {
+        seed: Math.random().toString(36).substring(7).toUpperCase()
+    });
+    const doc = await db.collection('partite').add(window.FAW_RIVINCITA.documentoPartita('gameof15', persone, opzioni));
+    await db.collection('partite').doc(matchId).update(window.FAW_RIVINCITA.campiCollegamento(doc.id, 'gameof15', mioNome));
+}
+function mostraProposta15(data) {
+    const box = document.getElementById('rivincita-15');
+    if (!box || !window.FAW_RIVINCITA) return;
+    const fase = window.FAW_RIVINCITA.fase(data, mioNome);
+    if (fase.fase === 'nessuna') { box.innerHTML = ''; return; }
+    const nomi = (fase.rifiutanti || []).map(esc15).join(', ');
+    const mancanti = (fase.mancanti || []).map(esc15).join(', ');
+    const nome = esc15(fase.nome);
+    if (fase.fase === 'vai') {
+        box.innerHTML = `<div style="background:#1c2438;color:#fff;border-radius:12px;padding:12px 14px;font-weight:800;">Si entra in ${nome}…</div>`;
+        window.FAW_RIVINCITA.vai(data, 'gameof15');
+        return;
+    }
+    if (fase.fase === 'rifiutata') {
+        box.innerHTML = `<div style="background:#1c2438;color:#fff;border-radius:12px;padding:12px 14px;">${nomi} ha rifiutato.
+            <button class="btn" onclick="apriSceltaRivincita15()">🔁 ALTRA</button></div>`;
+        return;
+    }
+    if (fase.fase === 'attesa') {
+        box.innerHTML = `<div style="background:#1c2438;color:#fff;border-radius:12px;padding:12px 14px;">In attesa di ${mancanti} per ${nome}.
+            <button class="btn" onclick="annullaRivincita15()">🚫 ANNULLA</button></div>`;
+        return;
+    }
+    if (fase.fase === 'accettata') {
+        box.innerHTML = `<div style="background:#1c2438;color:#fff;border-radius:12px;padding:12px 14px;">Hai accettato. In attesa degli altri per ${nome}.</div>`;
+        return;
+    }
+    box.innerHTML = `<div style="background:#1c2438;color:#fff;border-radius:12px;padding:12px 14px;font-weight:800;">${esc15(fase.creatore)} propone ${nome}</div>
+        <button class="btn btn-play" onclick="accettaRivincita15()">✅ ACCETTA</button>
+        <button class="btn" onclick="rifiutaRivincita15()">❌ RIFIUTA</button>`;
+}
+async function accettaRivincita15() {
+    await db.collection('partite').doc(matchId).update({
+        rivincitaAccettataDa: firebase.firestore.FieldValue.arrayUnion(mioNome)
+    });
+}
+async function rifiutaRivincita15() {
+    await db.collection('partite').doc(matchId).update({
+        rivincitaRifiutataDa: firebase.firestore.FieldValue.arrayUnion(mioNome)
+    });
+}
+async function annullaRivincita15() {
+    if (!window.FAW_RIVINCITA) return;
+    await window.FAW_RIVINCITA.annulla(db, db.collection('partite').doc(matchId), matchData);
+}
 function tornaHome() {
     if (unsubscribePartita) unsubscribePartita();
     window.location.href = '../../index.html';
@@ -1555,6 +1647,9 @@ async function winGame() {
     document.getElementById('earnedCoins').textContent = coinsEarned;
     document.getElementById('win-record').style.display = isNewRecord ? 'block' : 'none';
 
+    const btnRiv = document.getElementById('btn-rivincita-15');
+    if (btnRiv) btnRiv.style.display = (isMultiplayer && matchId) ? 'inline-block' : 'none';
+
     // Multiplayer results
     if (isMultiplayer && matchId && mioNome && !fromRemote) {
         const mpScore = solved ? Math.max(1, 10000 - moves * 10 - elapsedSeconds) : 0;
@@ -1655,7 +1750,7 @@ function renderShopItems() {
                 <span style="color:${theme.textColor};font-size:0.8rem;font-family:inherit;">15</span>
             </div>
             <div style="font-size:0.55rem;color:${getRarityColor(theme.rarity)};font-weight:bold;">${theme.name}</div>
-            <div style="font-size:0.45rem;color:#666;text-transform:uppercase;">${theme.rarity}</div>
+            <div style="font-size:0.45rem;color:#c5cdd8;text-transform:uppercase;">${theme.rarity}</div>
             <div class="${owned?'owned-tag':'price-tag'}">${owned?(equipped?'✅ IN USO':'POSSIEDI'):theme.price+' 🪙'}</div>
         `;
 
@@ -1711,7 +1806,7 @@ function openStats() {
     });
 
     if (Object.keys(saveData.records).length === 0) {
-        html += `<p style="color:#555;">Nessun record ancora. Gioca per registrarne!</p>`;
+        html += `<p style="color:#c5cdd8;">Nessun record ancora. Gioca per registrarne!</p>`;
     }
 
     document.getElementById('stats-content').innerHTML = html;

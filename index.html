@@ -3,7 +3,7 @@
 	<head>
 		<meta charset="UTF-8">
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
-		<meta name="theme-color" content="#FFFBF5">
+		<meta name="theme-color" content="#F4F6F8">
 		<meta name="description" content="FaW — Focus at Work: la piattaforma di giochi e sfide tra colleghi.">
 		<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23E24A3B'/%3E%3Ctext x='32' y='43' font-family='Arial, sans-serif' font-size='32' font-weight='800' fill='white' text-anchor='middle'%3EF%3C/text%3E%3C/svg%3E">
 		<!-- Tema prima del paint (evita flash). Default: chiaro. -->
@@ -33,13 +33,13 @@
 		<link rel="stylesheet" href="games/shared/faw-ui.css">
 		<style>
 			/* ==========================================================================
-			   HUB FaW — tema "Playful editoriale" (desktop-first)
+			   HUB FaW — tema chiaro bianco/grigio, non pastello (desktop-first)
 			   ========================================================================== */
 			:root {
-				--faw-acc: #E24A3B;
-				--faw-acc-2: #B9382D;
-				--faw-acc-soft: #FDE4DE;
-				--faw-acc-glow: rgba(226, 74, 59, 0.22);
+				--faw-acc: #C2253A;
+				--faw-acc-2: #9F1239;
+				--faw-acc-soft: #F3F5F8;
+				--faw-acc-glow: rgba(194, 37, 58, 0.22);
 				--hub-max: 1200px;
 			}
 			:root[data-theme='dark'] {
@@ -233,10 +233,9 @@
 				padding: 16px 14px 14px;
 				border-radius: 16px;
 				border: 2px solid var(--faw-border);
-				/* Base calda di fallback; nei browser moderni ogni gioco riceve una
-				   tinta appena percettibile del proprio colore, senza diventare rumoroso. */
-				background: #FFF7ED;
-				background: color-mix(in srgb, var(--g1) 7%, var(--faw-panel-solid));
+				/* Superficie bianca. Il colore del gioco sta nel bordo, non in una tinta lavata. */
+				background: var(--faw-panel-solid);
+				border-color: color-mix(in srgb, var(--g1) 62%, #667085);
 				cursor: pointer;
 				transition: border-color var(--faw-fast) var(--faw-ease),
 					box-shadow var(--faw-fast) var(--faw-ease),
@@ -250,8 +249,8 @@
 				align-items: center;
 				justify-content: center;
 				font-size: 1.35rem;
-				background: color-mix(in srgb, var(--g1) 12%, white);
-				border: 2px solid color-mix(in srgb, var(--g1) 20%, white);
+				background: #F3F5F8;
+				border: 2px solid color-mix(in srgb, var(--g1) 72%, #1C2430);
 				transition: transform var(--faw-fast) var(--faw-ease);
 			}
 			:root[data-theme='dark'] .game-card {
@@ -283,7 +282,7 @@
 				border: 2px solid var(--faw-border);
 				color: var(--faw-text-2);
 			}
-			.game-card .game-badge.online { background: var(--faw-ok-soft); border-color: #bbf7d0; color: var(--faw-ok); }
+			.game-card .game-badge.online { background: var(--faw-ok-soft); border-color: var(--faw-ok); color: var(--faw-ok); }
 			:root[data-theme='dark'] .game-card .game-badge.online { border-color: rgba(34, 197, 94, 0.4); }
 			.game-card:hover {
 				transform: translateY(-2px);
@@ -350,7 +349,7 @@
 			.u-btn--enter:hover { background: var(--faw-acc-2); filter: none; }
 			.u-btn--join, .u-btn--accept { background: #16a34a; color: #fff; }
 			.u-btn--join:hover, .u-btn--accept:hover { background: #15803d; filter: none; }
-			.u-btn--decline { background: var(--faw-danger-soft); color: var(--faw-danger); border-color: #fecaca; }
+			.u-btn--decline { background: var(--faw-danger-soft); color: var(--faw-danger); border-color: var(--faw-danger); }
 			:root[data-theme='dark'] .u-btn--decline { border-color: rgba(239, 68, 68, 0.4); }
 			.u-btn--del { background: transparent; border-color: var(--faw-border); color: var(--faw-text-3); padding: 7px 10px; }
 			.u-btn--del:hover { color: var(--faw-danger); border-color: var(--faw-danger); }
@@ -358,19 +357,19 @@
 			/* Stati riga */
 			.user-item.u-row--solo {
 				background: var(--faw-acc-soft);
-				border-color: #F5B8AF;
+				border-color: var(--faw-acc-2);
 				cursor: pointer;
 			}
 			:root[data-theme='dark'] .user-item.u-row--solo { border-color: rgba(255, 121, 106, 0.45); }
 			.user-item.u-row--solo:hover { border-color: var(--faw-acc); }
 			.user-item.u-row--live:hover { border-color: var(--faw-border-2); }
-			.user-item.u-row--wait { background: var(--faw-info-soft); border-color: #bae6fd; }
+			.user-item.u-row--wait { background: var(--faw-info-soft); border-color: var(--faw-info); }
 			:root[data-theme='dark'] .user-item.u-row--wait { border-color: rgba(56, 189, 248, 0.35); }
-			.user-item.u-row--accepted { background: var(--faw-ok-soft); border-color: #bbf7d0; }
+			.user-item.u-row--accepted { background: var(--faw-ok-soft); border-color: var(--faw-ok); }
 			:root[data-theme='dark'] .user-item.u-row--accepted { border-color: rgba(34, 197, 94, 0.35); }
 			.user-item.u-row--challenge {
 				background: var(--faw-warn-soft);
-				border-color: #fcd34d;
+				border-color: var(--faw-warn);
 			}
 			:root[data-theme='dark'] .user-item.u-row--challenge { border-color: rgba(245, 158, 11, 0.45); }
 			.user-item.u-row--challenge > span { font-weight: 700; }
@@ -507,7 +506,7 @@
 			}
 			.stat-box.highlight {
 				background: var(--faw-acc-soft);
-				border-color: #F5B8AF;
+				border-color: var(--faw-acc-2);
 			}
 			:root[data-theme='dark'] .stat-box.highlight { border-color: rgba(255, 121, 106, 0.45); }
 			.stat-box.highlight .stat-number { color: var(--faw-acc); }
@@ -541,7 +540,7 @@
 			.btn-danger {
 				padding: 8px 16px;
 				border-radius: 10px;
-				border: 2px solid #fecaca;
+				border: 2px solid var(--faw-danger);
 				background: var(--faw-danger-soft);
 				color: var(--faw-danger);
 				font-weight: 600;
@@ -620,18 +619,26 @@
 				color: var(--faw-text-3);
 				white-space: nowrap;
 			}
-			.banner-right select {
-				padding: 6px 8px;
-				border-radius: 8px;
-				border: 2px solid var(--faw-border-2);
-				background: var(--faw-panel-2);
-				color: var(--faw-text);
-				font-family: var(--faw-font-body);
-				font-weight: 600;
-				font-size: 0.78rem;
-				cursor: pointer;
-				white-space: nowrap;
-			}
+		.banner-right select,
+		.banner-right select option {
+			padding: 6px 8px;
+			border-radius: 8px;
+			border: 2px solid var(--faw-border-2);
+			background-color: var(--faw-panel-solid);
+			color: var(--faw-text);
+			color-scheme: light;
+			font-family: var(--faw-font-body);
+			font-weight: 600;
+			font-size: 0.78rem;
+			cursor: pointer;
+			white-space: nowrap;
+		}
+		:root[data-theme='dark'] .banner-right select,
+		:root[data-theme='dark'] .banner-right select option {
+			color-scheme: dark;
+			background-color: #2a2621;
+			color: #fff8ee;
+		}
 			.btn-banner {
 				padding: 7px 11px;
 				border: 2px solid var(--faw-border);
@@ -705,8 +712,8 @@
 			}
 			.invite-sub { font-size: 0.84rem; color: var(--faw-text-2); margin-top: 3px; overflow-wrap: anywhere; }
 			/* Coda inviti: quanti altri inviti stanno aspettando dietro a questo */
-			.invite-more { margin-top: 12px; padding: 8px 12px; border-radius: 10px; border: 1px dashed #f59e0b; background: rgba(245, 158, 11, 0.10); font-size: 0.82rem; font-weight: 700; color: #b45309; }
-			:root[data-theme='light'] .invite-more { background: rgba(245, 158, 11, 0.14); }
+			.invite-more { margin-top: 12px; padding: 8px 12px; border-radius: 10px; border: 1px dashed var(--faw-warn); background: var(--faw-panel-2); font-size: 0.82rem; font-weight: 700; color: var(--faw-warn); }
+			:root[data-theme='light'] .invite-more { background: #F3F5F8; color: #9A5A00; border-color: #9A5A00; }
 			.invite-actions { display: flex; gap: 10px; margin-top: 16px; }
 			.invite-btn {
 				flex: 1;
@@ -725,7 +732,7 @@
 			.invite-btn:active { transform: scale(0.97); }
 			.invite-btn--acc { background: #16a34a; color: #fff; }
 			.invite-btn--acc:hover { background: #15803d; filter: none; }
-			.invite-btn--rif { background: var(--faw-panel-2); color: var(--faw-danger); border: 2px solid #fecaca; }
+			.invite-btn--rif { background: var(--faw-panel-2); color: var(--faw-danger); border: 2px solid var(--faw-danger); }
 			.invite-close {
 				position: absolute;
 				top: 8px;
@@ -2377,8 +2384,11 @@ function renderPartitaPictionary(p, div) {
 			  // Genera HTML modalità dinamicamente
 			  let modalitaHtml = '';
 			  (config.modalita || []).forEach(m => {
-			    modalitaHtml += `
-										<button class="btn-banner" style="background:${m.colore}; color:${m.testo};" onclick="creaPartitaDaBanner('${m.id}')">${m.label}</button>`;
+			const coppia = window.FAW_coppiaLeggibile
+			  ? window.FAW_coppiaLeggibile(m.colore, m.testo)
+			  : { bg: m.colore, fg: m.testo };
+			modalitaHtml += `
+								<button class="btn-banner" style="background:${coppia.bg}; color:${coppia.fg};" onclick="creaPartitaDaBanner('${m.id}')">${m.label}</button>`;
 			  });
 			  removeGameBanner();
 			  const banner = document.createElement('div');
@@ -2594,12 +2604,12 @@ if (giocoSelezionato === 'pictionary') {
 			      let vincitore = classif[0][0];
 			      let nomeGiocoStorico = (GIOCHI_CONFIG[p.gioco] || {}).nome || p.gioco.toUpperCase();
 			      div.innerHTML += `
-											<div class="history-item">
-												<span>${p.dataOra} - ${nomeGiocoStorico}</span>
-												<span>Vinto da:
-													<b>${vincitore}</b>
-												</span>
-											</div>`;
+							<div class="history-item">
+								<span>${p.dataOra} - ${nomeGiocoStorico}</span>
+								<span>Vinto da:
+									<b>${vincitore}</b>
+								</span>
+							</div>`;
 			    });
 			  });
 			}

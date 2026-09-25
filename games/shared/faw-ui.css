@@ -1,7 +1,7 @@
 /* ==========================================================================
-   FaW — Design System "Playful editoriale"
-   Sistema condiviso da hub e giochi: avorio caldo, inchiostro leggibile,
-   corallo per le CTA, bordi decisi da 2px e ombre corte. Ogni gioco può
+   FaW — Design System
+   Tema chiaro: bianco nitido e grigi freddi, non avorio pastello.
+   Accento corallo saturo, bordi da 2px, ombre corte. Ogni gioco può
    mantenere una propria coppia cromatica tramite --faw-acc / --faw-acc-2.
    ========================================================================== */
 
@@ -13,33 +13,34 @@
   --faw-font-mono: 'Nunito', ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, Consolas, monospace;
 
   /* --- Accento (override per pagina) --- */
-  --faw-acc: #E24A3B;
-  --faw-acc-2: #B9382D;
-  --faw-acc-soft: #FDE4DE;
-  --faw-acc-glow: rgba(226, 74, 59, 0.22);
+  --faw-acc: #C2253A;
+  --faw-acc-2: #9F1239;
+  --faw-acc-soft: #F3F5F8;
+  --faw-acc-glow: rgba(194, 37, 58, 0.22);
 
-  /* --- Superfici (tema chiaro) --- */
-  --faw-bg: #FFFBF5;
-  --faw-bg-2: #FFF7ED;
-  --faw-bg-3: #F5EEE4;
-  --faw-panel: #FFFDF9;
-  --faw-panel-2: #F8F0E6;
-  --faw-panel-solid: #FFFDF9;
-  --faw-border: #D9D0C5;
-  --faw-border-2: #9C9287;
-  --faw-text: #202124;
-  --faw-text-2: #5D5A54;
-  --faw-text-3: #7B746B;
+  /* --- Superfici (tema chiaro: bianco, non crema) --- */
+  --faw-bg: #F4F6F8;
+  --faw-bg-2: #ECEFF3;
+  --faw-bg-3: #E2E6EC;
+  --faw-panel: #FFFFFF;
+  --faw-panel-2: #F3F5F8;
+  --faw-panel-solid: #FFFFFF;
+  --faw-border: #D0D5DD;
+  --faw-border-2: #667085;
+  --faw-text: #1C2430;
+  --faw-text-2: #3E4A5A;
+  --faw-text-3: #526072;
+  --faw-acc-text: #9F1239;
 
   /* --- Semantica --- */
   --faw-ok: #237A57;
-  --faw-ok-soft: #E3F3EA;
+  --faw-ok-soft: #F3F5F8;
   --faw-warn: #9A5A00;
-  --faw-warn-soft: #FFF0CC;
+  --faw-warn-soft: #F3F5F8;
   --faw-danger: #B42318;
-  --faw-danger-soft: #FBE5E3;
+  --faw-danger-soft: #F3F5F8;
   --faw-info: #2B5DAA;
-  --faw-info-soft: #E6EEFC;
+  --faw-info-soft: #F3F5F8;
 
   /* --- Forma --- */
   --faw-r-sm: 6px;
@@ -85,6 +86,7 @@
   --faw-text: #FFF8EE;
   --faw-text-2: #D7CEC2;
   --faw-text-3: #A99E91;
+  --faw-acc-text: #ffb1a6;
   --faw-ok-soft: rgba(81, 187, 132, 0.16);
   --faw-warn-soft: rgba(247, 184, 73, 0.16);
   --faw-danger-soft: rgba(235, 106, 94, 0.16);
@@ -114,7 +116,7 @@ h1, h2, h3, h4 {
   margin: 0;
   font-weight: 700;
 }
-a { color: var(--faw-acc); text-decoration: none; }
+a { color: var(--faw-acc-text); text-decoration: none; }
 a:hover { text-decoration: underline; }
 ::selection { background: var(--faw-acc-soft); }
 :focus-visible { outline: 2px solid var(--faw-acc); outline-offset: 2px; border-radius: 6px; }
@@ -181,30 +183,40 @@ a:hover { text-decoration: underline; }
 
 /* CTA primaria: tinta unita */
 .faw-btn--primary {
-  border: 2px solid var(--faw-acc-2);
-  background: var(--faw-acc);
+  border: 2px solid #9F1239;
+  background: #C2253A;
   color: #fff;
   font-weight: 600;
   box-shadow: var(--faw-shadow-1);
   overflow: hidden;
 }
 .faw-btn--primary::after { content: none; }
-.faw-btn--primary:hover { background: var(--faw-acc-2); border-color: var(--faw-text); }
+.faw-btn--primary:hover { background: #7f1d1d; border-color: var(--faw-text); color: #fff; }
+:root[data-theme='dark'] .faw-btn--primary {
+  background: #ff8f84;
+  color: #2a1210;
+  border-color: #ffb1a6;
+}
+:root[data-theme='dark'] .faw-btn--primary:hover {
+  background: #ffb1a6;
+  color: #2a1210;
+  border-color: #fff8ee;
+}
 .faw-btn--primary .arr { transition: transform var(--faw-fast) var(--faw-ease); }
 .faw-btn--primary:hover .arr { transform: translateX(3px); }
 
 .faw-btn--gold {
   border: 2px solid transparent;
   background: #f59e0b;
-  color: #fff;
+  color: #241500;
   font-weight: 600;
 }
-.faw-btn--gold:hover { background: #d97706; }
+.faw-btn--gold:hover { background: #d97706; color: #241500; }
 
 .faw-btn--danger {
   background: var(--faw-danger-soft);
   color: var(--faw-danger);
-  border-color: var(--faw-border);
+  border-color: var(--faw-danger);
 }
 .faw-btn--danger:hover { border-color: var(--faw-danger); }
 
@@ -324,9 +336,9 @@ body.faw-has-banner::before {
   color: var(--faw-text-2);
 }
 .faw-pill b { color: var(--faw-text); }
-.faw-pill--live { border-color: #bbf7d0; background: var(--faw-ok-soft); color: var(--faw-ok); }
-.faw-pill--acc { border-color: #F5B8AF; background: var(--faw-acc-soft); color: var(--faw-acc-2); }
-.faw-pill--warn { border-color: #fde68a; background: var(--faw-warn-soft); color: var(--faw-warn); }
+.faw-pill--live { border-color: var(--faw-ok); background: var(--faw-ok-soft); color: var(--faw-ok); }
+.faw-pill--acc { border-color: var(--faw-acc-2); background: var(--faw-acc-soft); color: var(--faw-acc-2); }
+.faw-pill--warn { border-color: var(--faw-warn); background: var(--faw-warn-soft); color: var(--faw-warn); }
 :root[data-theme='dark'] .faw-pill--live { border-color: rgba(34, 197, 94, 0.35); }
 :root[data-theme='dark'] .faw-pill--acc { border-color: rgba(255, 121, 106, 0.45); color: #F5B8AF; }
 :root[data-theme='dark'] .faw-pill--warn { border-color: rgba(245, 158, 11, 0.4); }
@@ -349,9 +361,9 @@ body.faw-has-banner::before {
   letter-spacing: 0.6px;
   text-transform: uppercase;
 }
-.faw-badge--online { background: var(--faw-ok-soft); color: var(--faw-ok); border: 2px solid #bbf7d0; }
-.faw-badge--solo { background: var(--faw-info-soft); color: var(--faw-info); border: 2px solid #bae6fd; }
-.faw-badge--hot { background: #fff7ed; color: #c2410c; border: 2px solid #fed7aa; }
+.faw-badge--online { background: var(--faw-ok-soft); color: var(--faw-ok); border: 2px solid var(--faw-ok); }
+.faw-badge--solo { background: var(--faw-info-soft); color: var(--faw-info); border: 2px solid var(--faw-info); }
+.faw-badge--hot { background: #F3F5F8; color: #9a3412; border: 2px solid #9a3412; }
 
 /* ==========================================================================
    INPUT
@@ -379,10 +391,35 @@ body.faw-has-banner::before {
   background-position: calc(100% - 18px) 55%, calc(100% - 13px) 55%;
   background-size: 5px 5px;
   background-repeat: no-repeat;
+  color-scheme: light;
+}
+.faw-select option,
+select option {
+  /* Il popup nativo ignora il colore ereditato e segue color-scheme. */
+  background-color: #ffffff;
+  color: #1c2430;
+}
+:root[data-theme='dark'] .faw-select,
+:root[data-theme='dark'] .faw-select option,
+:root[data-theme='dark'] select option {
+  color-scheme: dark;
+  background-color: #2a2621;
+  color: #fff8ee;
+}
+
+/* Select su banner/modali scuri: controllo chiaro, come i bottoni solidi. */
+.game-banner select,
+.game-banner select option,
+.modal-content select,
+.modal-content select option {
+  color-scheme: light;
+  background-color: #ffffff;
+  color: #1c2438;
+  border: 2px solid #5b6470;
 }
 
 /* ==========================================================================
-   AVATAR (iniziali, tinta pastello deterministica via --h)
+   AVATAR (iniziali, tinta satura via --h, non pastello)
    ========================================================================== */
 .faw-avatar {
   --h: 240;
@@ -392,14 +429,14 @@ body.faw-has-banner::before {
   width: 34px; height: 34px;
   border-radius: 50%;
   flex: 0 0 auto;
-  background: hsl(var(--h) 65% 92%);
-  color: hsl(var(--h) 45% 32%);
+  background: hsl(var(--h) 55% 28%);
+  color: #ffffff;
   font-family: var(--faw-font-display);
   font-size: 0.8rem;
   font-weight: 700;
   letter-spacing: 0.3px;
   text-transform: uppercase;
-  border: 2px solid hsl(var(--h) 50% 86%);
+  border: 2px solid hsl(var(--h) 50% 22%);
 }
 :root[data-theme='dark'] .faw-avatar {
   background: hsl(var(--h) 45% 26%);

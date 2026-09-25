@@ -6,7 +6,7 @@
     "test:gym:chromium": "playwright test --project=chromium",
     "test:patata": "node tests/patata/core.test.js && node tests/patata/multiplayer.test.js && node tests/patata/quota.test.js && node tests/patata/browser.test.js && node tests/patata/browser-multiplayer.test.js",
     "test:ncc": "node tests/ncc/core.test.js && node tests/ncc/multiplayer.test.js && node tests/ncc/quota.test.js && node tests/ncc/browser.test.js && node tests/ncc/browser-multiplayer.test.js",
-    "test:shared": "node tests/shared/podio.test.js && node tests/shared/podio-giochi.test.js",
+    "test:shared": "node tests/shared/podio.test.js && node tests/shared/podio-giochi.test.js && node tests/shared/rivincita.test.js",
     "test:ruzzle": "node tests/ruzzle/timer.test.js && node tests/ruzzle/punteggi-finali.test.js",
     "test:hub": "node tests/hub/firebase-down.test.js && node tests/hub/login-flow.test.js && node tests/hub/inviti-realtime.test.js",
     "test:static": "node tests/static/syntax.test.js",

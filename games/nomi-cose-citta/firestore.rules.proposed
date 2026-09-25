@@ -102,6 +102,7 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys()
              .hasOnly(['stato', 'pronti', 'round', 'roundData', 'risultati',
                        'punteggi', 'prossimaPartita', 'prossimaPartitaCreataDa',
+                       'prossimaPartitaGioco',
                        'rivincitaAccettataDa', 'rivincitaRifiutataDa',
                        'dataOra', 'timestamp', 'finito', 'confermaVerifica'])
 

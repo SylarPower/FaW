@@ -8,6 +8,7 @@
     <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore-compat.js"></script>
     <!-- Config Firebase condivisa (prima dello script che inizializza Firebase) -->
     <script src="../shared/firebase-config.js"></script>
+    <script src="../shared/rivincita.js"></script>
     <!-- Spazio per i banner di stato fissi in cima (evita che coprano il testo) -->
     <script src="../shared/faw-layout.js" defer></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -115,8 +116,8 @@
 
         .canvas-badge {
             position: absolute; top: 10px; left: 10px; 
-            background: linear-gradient(135deg, var(--primary) 0%, #ff6b9d 100%);
-            color: white; padding: 8px 15px; border-radius: 8px; 
+            background: linear-gradient(135deg, var(--primary) 0%, #ff87ab 100%);
+            color: #241500; padding: 8px 15px; border-radius: 8px; 
             font-size: 0.85rem; font-weight: 700;
             pointer-events: none; z-index: 20; text-transform: uppercase;
             box-shadow: 0 4px 15px rgba(233, 69, 96, 0.4);
@@ -173,7 +174,7 @@
             left: 0;
             right: 0;
             background: var(--success);
-            color: white;
+            color: #06282a;
             font-size: 0.5rem;
             font-weight: bold;
             text-align: center;
@@ -218,7 +219,7 @@
         }
         .tool-btn:hover { background: var(--accent); }
         .tool-btn.active { 
-            background: linear-gradient(135deg, var(--primary) 0%, #ff87ab 100%); color: white; 
+            background: linear-gradient(135deg, var(--primary) 0%, #ff87ab 100%); color: #241500; 
             box-shadow: 0 4px 18px rgba(255, 77, 125, 0.45), inset 0 1px 0 rgba(255,255,255,0.3);
         }
 
@@ -230,7 +231,7 @@
         .btn:active { transform: scale(0.95); }
         .btn-primary { 
             background: linear-gradient(135deg, var(--primary) 0%, #ff87ab 100%); 
-            color: white; box-shadow: 0 4px 20px rgba(255, 77, 125, 0.4); 
+            color: #241500; box-shadow: 0 4px 20px rgba(255, 77, 125, 0.4); 
         }
         .btn-primary:hover { box-shadow: 0 6px 30px rgba(255, 77, 125, 0.6); transform: translateY(-1px); }
         .btn-success { 
@@ -241,7 +242,7 @@
         .btn-success:hover { transform: translateY(-1px); box-shadow: 0 6px 28px rgba(47, 214, 200, 0.5); }
         .btn-secondary { background: var(--accent); color: var(--text); border: 1px solid var(--border); }
         .btn-secondary:hover { background: #243158; }
-        .btn-danger { background: linear-gradient(135deg, var(--danger) 0%, #d63650 100%); color: white; }
+        .btn-danger { background: linear-gradient(135deg, #c0392b 0%, #9f1239 100%); color: #ffffff; }
         .btn-gold { 
             background: linear-gradient(135deg, #ffd700 0%, #ffaa00 100%); 
             color: #1a1a2e; 
@@ -276,6 +277,16 @@
             outline: none; color: var(--text);
             transition: border-color 0.15s ease, box-shadow 0.15s ease;
         }
+        select, select option {
+            color-scheme: dark;
+            background-color: #121832;
+            color: #eef1fa;
+        }
+        .game-banner select, .game-banner select option {
+            color-scheme: light;
+            background-color: #ffffff;
+            color: #1c2438;
+        }
         input:focus, select:focus, textarea:focus {
             border-color: var(--primary);
             box-shadow: 0 0 0 3px rgba(255, 77, 125, 0.18);
@@ -285,7 +296,7 @@
         .theme-box {
             background: linear-gradient(135deg, var(--primary) 0%, #ff6b9d 100%);
             padding: 25px; border-radius: 15px; margin: 15px 0;
-            font-size: 1.8rem; font-weight: 900; color: white;
+            font-size: 1.8rem; font-weight: 900; color: #241500;
             text-transform: uppercase; letter-spacing: 2px;
             border-radius: 18px;
             box-shadow: 0 12px 34px rgba(255, 77, 125, 0.4);
@@ -409,7 +420,7 @@
             background: var(--accent); border: none; border-radius: 6px;
             color: white; font-weight: 700; cursor: pointer; transition: all 0.2s;
         }
-        .vote-btn:hover { background: var(--primary); }
+        .vote-btn:hover { background: var(--primary); color: #241500; }
         .vote-btn.voted { background: var(--gold); color: #1a1a2e; }
 /* ✅ Evidenzia i propri disegni durante la votazione */
 .chain-step.my-drawing {
@@ -424,7 +435,7 @@
     top: 5px;
     right: 5px;
     background: var(--primary);
-    color: white;
+    color: #241500;
     font-size: 0.6rem;
     font-weight: bold;
     padding: 3px 8px;
@@ -629,7 +640,7 @@
 .toolbar-left .tool-btn.active {
     background: linear-gradient(135deg, var(--primary) 0%, #ff87ab 100%);
     border-color: transparent;
-    color: white;
+    color: #241500;
     box-shadow: 0 6px 18px rgba(255, 77, 125, 0.45), inset 0 1px 0 rgba(255,255,255,0.3);
 }
 
@@ -825,7 +836,7 @@
     left: 50%;
     transform: translateX(-50%);
     background: linear-gradient(135deg, var(--primary) 0%, #ff87ab 100%);
-    color: white;
+    color: #241500;
     padding: 11px 26px;
     border-radius: 30px;
     font-family: var(--font-display);
@@ -876,7 +887,7 @@
     left: 0;
     right: 0;
     background: var(--success);
-    color: white;
+    color: #06282a;
     font-size: 0.5rem;
     font-weight: bold;
     text-align: center;
@@ -1206,7 +1217,7 @@
         <div class="full-ranking" id="full-ranking"></div>
         
         <div style="display: flex; gap: 15px; margin-top: 30px;">
-            <button class="btn btn-primary" style="flex: 1;" onclick="playAgain()">
+            <button class="btn btn-primary" style="flex: 1;" onclick="apriSceltaRivincita()">
                 🔄 RIVINCITA
             </button>
             <button class="btn btn-secondary" style="flex: 1;" onclick="goHome()">
@@ -1853,7 +1864,11 @@ function showBanner(options) {
     const banner = document.createElement('div');
     banner.id = 'game-banner';
     banner.className = 'game-banner';
-    banner.style.background = `linear-gradient(135deg, ${options.color} 0%, ${adjustColor(options.color, -30)} 100%)`;
+    const bannerFill = (window.FAW_fillPerTestoChiaro && options.color)
+        ? window.FAW_fillPerTestoChiaro(options.color)
+        : options.color;
+    banner.style.background = `linear-gradient(135deg, ${bannerFill} 0%, ${adjustColor(bannerFill, -30)} 100%)`;
+    banner.style.color = '#ffffff';
     
     let buttonsHtml = (options.buttons || []).map(btn => 
         `<button class="btn ${btn.class || 'btn-secondary'}" onclick="${btn.onclick}" 
@@ -1958,8 +1973,8 @@ function enterLobby() {
     removeBanner();
     showScreen('lobby-screen');
     showHomeButton();
-    
-    if (unsubscribeRoom) unsubscribeRoom();
+    /* Se l'ingresso ha già aperto il listener, non rileggere il documento. */
+    if (unsubscribeRoom) return;
     unsubscribeRoom = db.collection("pictionary_rooms").doc(state.roomId).onSnapshot(handleRoomUpdate);
 }
 
@@ -1983,7 +1998,7 @@ function handleRoomUpdate(doc) {
             <div style="text-align: center; padding: 40px;">
                 <h2 style="color: #f39c12;">⚠️ Room Eliminata</h2>
                 <button onclick="window.location.href='../../index.html'" 
-                        style="padding: 15px 30px; background: #e94560; color: white; 
+                        style="padding: 15px 30px; background: #c2253a; color: #ffffff; 
                                border: none; border-radius: 10px; cursor: pointer; margin-top: 20px;">
                     🏠 Torna alla Home
                 </button>
@@ -1997,10 +2012,13 @@ function handleRoomUpdate(doc) {
 
     const prevStato = state.roomData?.stato;
     const statoChanged = prevStato !== data.stato;
+    const propostaCambiata = (state.roomData?.prossimaPartita || null) !== (data.prossimaPartita || null)
+        || JSON.stringify(state.roomData?.rivincitaAccettataDa || []) !== JSON.stringify(data.rivincitaAccettataDa || [])
+        || JSON.stringify(state.roomData?.rivincitaRifiutataDa || []) !== JSON.stringify(data.rivincitaRifiutataDa || []);
 
-    // ✅ Throttle intelligente: bypassa il limite solo se cambia stato
+    // ✅ Throttle intelligente: bypassa il limite se cambia stato o la proposta di rivincita
     const now = Date.now();
-    if (!statoChanged && now - lastUpdateTime < 400) {
+    if (!statoChanged && !propostaCambiata && now - lastUpdateTime < 400) {
         return;
     }
 
@@ -2024,10 +2042,14 @@ if (data.stato !== 'lobby' && data.players.length > 0 && !data.players.includes(
 
         if (data.stato === 'guessit') {
             handleGuessItPhase(data);
+            if (data.prossimaPartita) gestisciPropostaPictionary(data);
             return;
         }
 
-        if (state.isDrawing) return;
+        if (state.isDrawing) {
+            if (data.prossimaPartita) gestisciPropostaPictionary(data);
+            return;
+        }
 
         switch(data.stato) {
             case 'lobby':   renderLobby(data); break;
@@ -2035,6 +2057,7 @@ if (data.stato !== 'lobby' && data.players.length > 0 && !data.players.includes(
             case 'voting':  handleVotingPhase(data); break;
             case 'results': handleResultsPhase(data); break;
         }
+        if (data.prossimaPartita) gestisciPropostaPictionary(data);
     } catch (e) {
         console.error('❌ Errore handleRoomUpdate:', e);
     } finally {
@@ -2053,7 +2076,7 @@ function renderLobby(data) {
     if (playersDisplay) {
         playersDisplay.innerHTML = data.players.map(p => `
             <div style="background: ${data.ready.includes(p) ? 'var(--success)' : 'var(--accent)'}; 
-                        color: white; padding: 10px 20px; border-radius: 25px; font-weight: bold; 
+                        color: ${data.ready.includes(p) ? '#06282a' : '#ffffff'}; padding: 10px 20px; border-radius: 25px; font-weight: bold; 
                         display: flex; align-items: center; gap: 8px;">
                 ${p === data.host ? '👑' : ''} ${p}
                 ${data.ready.includes(p) ? '✅' : '⏳'}
@@ -2094,7 +2117,7 @@ function renderLobby(data) {
         if (state.isHost && !data.sfidaDiretta) {
             const currentTime = data.settings?.timePerRound || 60;
             timeSelector = `
-                <select onchange="updateSettings()" id="banner-time-select" style="padding:8px 12px;border-radius:8px;border:none;font-weight:bold;cursor:pointer;">
+                <select onchange="updateSettings()" id="banner-time-select" class="faw-select" style="padding:8px 12px;border-radius:8px;font-weight:bold;cursor:pointer;">
                     <option value="30" ${currentTime==30?'selected':''}>30s</option>
                     <option value="45" ${currentTime==45?'selected':''}>45s</option>
                     <option value="60" ${currentTime==60?'selected':''}>60s</option>
@@ -2162,8 +2185,7 @@ async function leaveRoom() {
     clearInterval(timerInterval);
 
     try {
-        const doc = await db.collection("pictionary_rooms").doc(state.roomId).get();
-        const data = doc.data();
+        const data = state.roomData;
 
         if (!data) {
             location.reload();
@@ -2902,11 +2924,98 @@ function handleResultsPhase(data) {
     });
 }
 
+function preparaContestoRivincita() {
+    if (!window.FAW_RIVINCITA || !state.roomData) return;
+    window.FAW_RIVINCITA.prepara({
+        db: db,
+        ref: db.collection('pictionary_rooms').doc(state.roomId),
+        me: state.playerName,
+        partecipanti: state.roomData.players || [],
+        giocoCorrente: 'pictionary',
+        proposta: state.roomData,
+        onErrore: (msg) => alert(msg || 'Invito non riuscito')
+    });
+}
+function apriSceltaRivincita() {
+    preparaContestoRivincita();
+    const n = (state.roomData?.players || []).length;
+    const altri = window.FAW_RIVINCITA ? window.FAW_RIVINCITA.htmlAltri('pictionary', n) : '';
+    const stessa = state.isHost
+        ? `<button class="btn btn-primary" onclick="playAgain()" style="padding:10px 16px;">🎨 STESSA PARTITA</button>`
+        : `<button class="btn btn-secondary" disabled title="Solo l'host può rifare questa room" style="padding:10px 16px;">🎨 STESSA PARTITA</button>`;
+    showBanner({
+        icon: '🔁',
+        title: 'RIVINCITA',
+        subtitle: 'Stessa partita, oppure invita tutti a un altro gioco',
+        color: '#1c2438',
+        buttons: []
+    });
+    const right = document.querySelector('#game-banner .banner-right');
+    if (right) {
+        right.innerHTML = stessa + `<div style="flex-basis:100%;display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><span style="font-size:0.78rem;font-weight:800;">Oppure un altro gioco</span>${altri}</div>`;
+    }
+}
+function gestisciPropostaPictionary(data) {
+    if (!data || !data.prossimaPartita || !window.FAW_RIVINCITA) return;
+    const fase = window.FAW_RIVINCITA.fase(data, state.playerName);
+    if (fase.fase === 'nessuna') return;
+    if (fase.fase === 'vai') {
+        showBanner({ icon: '✅', title: 'ACCETTATA DA TUTTI', subtitle: 'Si entra in ' + fase.nome + '…', color: '#1e8449', spinner: true, buttons: [] });
+        window.FAW_RIVINCITA.vai(data, 'pictionary');
+        return;
+    }
+    if (fase.fase === 'rifiutata') {
+        showBanner({
+            icon: '👋', title: 'RIVINCITA RIFIUTATA',
+            subtitle: fase.rifiutanti.join(', ') + ' ha rifiutato',
+            color: '#c0392b',
+            buttons: [{ text: '🔁 ALTRA', onclick: 'apriSceltaRivincita()' }, { text: '🏠 HOME', onclick: 'goHome()' }]
+        });
+        return;
+    }
+    if (fase.fase === 'attesa') {
+        showBanner({
+            icon: '⏳', title: 'PROPOSTA INVIATA',
+            subtitle: 'In attesa di ' + (fase.mancanti || []).join(', ') + ' per ' + fase.nome,
+            color: '#9b59b6', spinner: true,
+            buttons: [{ text: '🚫 ANNULLA', onclick: 'annullaRivincitaPictionary()' }]
+        });
+        return;
+    }
+    if (fase.fase === 'accettata') {
+        showBanner({ icon: '✅', title: 'HAI ACCETTATO', subtitle: 'In attesa che tutti accettino ' + fase.nome, color: '#1e8449', spinner: true, buttons: [] });
+        return;
+    }
+    showBanner({
+        icon: '🔁', title: fase.nome.toUpperCase(),
+        subtitle: (fase.creatore || 'Qualcuno') + ' propone ' + fase.nome,
+        color: '#c0392b',
+        buttons: [
+            { text: '✅ ACCETTA', onclick: 'accettaRivincitaPictionary()' },
+            { text: '❌ RIFIUTA', onclick: 'rifiutaRivincitaPictionary()' }
+        ]
+    });
+}
+async function accettaRivincitaPictionary() {
+    await db.collection('pictionary_rooms').doc(state.roomId).update({
+        rivincitaAccettataDa: firebase.firestore.FieldValue.arrayUnion(state.playerName)
+    });
+}
+async function rifiutaRivincitaPictionary() {
+    await db.collection('pictionary_rooms').doc(state.roomId).update({
+        rivincitaRifiutataDa: firebase.firestore.FieldValue.arrayUnion(state.playerName)
+    });
+}
+async function annullaRivincitaPictionary() {
+    if (!window.FAW_RIVINCITA) return;
+    await window.FAW_RIVINCITA.annulla(db, db.collection('pictionary_rooms').doc(state.roomId), state.roomData);
+}
 async function playAgain() {
     if (!state.isHost) {
         return alert("Solo l'host può avviare una nuova partita!");
     }
     
+    const FV = firebase.firestore.FieldValue;
     await db.collection("pictionary_rooms").doc(state.roomId).update({
         stato: 'lobby',
         currentRound: 0,
@@ -2916,7 +3025,12 @@ async function playAgain() {
         scores: {},
         completedRound: {},
         ready: [],
-        playerOrder: []
+        playerOrder: [],
+        prossimaPartita: FV.delete(),
+        prossimaPartitaCreataDa: FV.delete(),
+        prossimaPartitaGioco: FV.delete(),
+        rivincitaAccettataDa: FV.delete(),
+        rivincitaRifiutataDa: FV.delete()
     });
     
     state.myVotes = {};
@@ -3314,7 +3428,7 @@ window.onload = async () => {
             <div style="text-align: center; padding: 40px;">
                 <h2 style="color: #e94560;">❌ Login richiesto</h2>
                 <button onclick="window.location.href='../../index.html'" 
-                        style="padding: 15px 30px; background: #e94560; color: white; 
+                        style="padding: 15px 30px; background: #c2253a; color: #ffffff; 
                                border: none; border-radius: 10px; cursor: pointer; margin-top: 20px;">
                     🏠 Torna alla Home
                 </button>
@@ -3331,59 +3445,93 @@ window.onload = async () => {
     state.roomId = roomCode;
     
     showScreen('loading-screen');
-    
+
+    /* Un solo listener: il vecchio get() + onSnapshot leggeva lo stesso
+       documento due volte, e i 500 ms di attesa non garantivano nulla.
+       Se la room è appena stata creata, il primo snapshot vuoto aspetta
+       un attimo prima di dichiararla assente. */
+    let ingressoFatto = false;
+    let roomAssenteTimer = null;
+    const mostraErrore = (msg) => {
+        document.getElementById('loading-screen').innerHTML = `
+            <div style="text-align: center; padding: 40px;">
+                <h2 style="color: #ff8fa3;">❌ Errore</h2>
+                <p>${msg || 'Ingresso non riuscito'}</p>
+                <button onclick="window.location.href='../../index.html'"
+                        style="padding: 15px 30px; background: #c2253a; color: #ffffff;
+                               border: none; border-radius: 10px; cursor: pointer; margin-top: 20px;">
+                    🏠 Torna alla Home
+                </button>
+            </div>
+        `;
+    };
+    const mostraAssente = () => {
+        document.getElementById('loading-screen').innerHTML = `
+            <div style="text-align: center; padding: 40px;">
+                <h2 style="color: #ff8fa3;">❌ Room Non Trovata</h2>
+                <p>La room "${roomCode}" non esiste</p>
+                <button onclick="window.location.href='../../index.html'"
+                        style="padding: 15px 30px; background: #c2253a; color: #ffffff;
+                               border: none; border-radius: 10px; cursor: pointer; margin-top: 20px;">
+                    🏠 Torna alla Home
+                </button>
+            </div>
+        `;
+    };
     try {
-        await new Promise(r => setTimeout(r, 500)); // Attendi propagazione Firebase
-        
-        const doc = await db.collection("pictionary_rooms").doc(roomCode).get();
-        
-        if (!doc.exists) {
-            document.getElementById('loading-screen').innerHTML = `
-                <div style="text-align: center; padding: 40px;">
-                    <h2 style="color: #e94560;">❌ Room Non Trovata</h2>
-                    <p>La room "${roomCode}" non esiste</p>
-                    <button onclick="window.location.href='../../index.html'" 
-                            style="padding: 15px 30px; background: #e94560; color: white; 
-                                   border: none; border-radius: 10px; cursor: pointer; margin-top: 20px;">
-                        🏠 Torna alla Home
-                    </button>
-                </div>
-            `;
-            return; // ✅ STOP QUI
-        }
-        
-        const data = doc.data();
-        state.roomData = data;
-        
-        // Imposta settings se mancante
-        if (!data.settings?.mode) {
-            await db.collection("pictionary_rooms").doc(roomCode).update({
-                settings: { mode: 'classic', timePerRound: 60 }
-            });
-        }
-        
-        // Auto-join
-        if (data.players.includes(mioNome)) {
-            state.isHost = data.host === mioNome;
-            enterLobby();
-        } else if (data.stato === 'lobby') {
-            await db.collection("pictionary_rooms").doc(roomCode).update({
-                players: firebase.firestore.FieldValue.arrayUnion(mioNome)
-            });
-            enterLobby();
-        } else {
-            document.getElementById('loading-screen').innerHTML = `
-                <div style="text-align: center; padding: 40px;">
-                    <h2 style="color: #f39c12;">⚠️ Partita già iniziata</h2>
-                    <button onclick="window.location.href='../../index.html'" 
-                            style="padding: 15px 30px; background: #e94560; color: white; 
-                                   border: none; border-radius: 10px; cursor: pointer; margin-top: 20px;">
-                        🏠 Torna alla Home
-                    </button>
-                </div>
-            `;
-        }
-        
+        unsubscribeRoom = db.collection("pictionary_rooms").doc(roomCode).onSnapshot(async (doc) => {
+            if (!doc.exists) {
+                if (!ingressoFatto && !roomAssenteTimer) {
+                    roomAssenteTimer = setTimeout(() => {
+                        if (!ingressoFatto) mostraAssente();
+                    }, 1500);
+                }
+                return;
+            }
+            if (roomAssenteTimer) { clearTimeout(roomAssenteTimer); roomAssenteTimer = null; }
+            const data = doc.data() || {};
+            state.roomData = data;
+            if (!ingressoFatto) {
+                ingressoFatto = true;
+                try {
+                    if (!data.settings?.mode) {
+                        await db.collection("pictionary_rooms").doc(roomCode).update({
+                            settings: { mode: 'classic', timePerRound: 60 }
+                        });
+                    }
+                    if ((data.players || []).includes(mioNome)) {
+                        state.isHost = data.host === mioNome;
+                        enterLobby();
+                    } else if (data.stato === 'lobby') {
+                        await db.collection("pictionary_rooms").doc(roomCode).update({
+                            players: firebase.firestore.FieldValue.arrayUnion(mioNome)
+                        });
+                        enterLobby();
+                        return;
+                    } else {
+                        document.getElementById('loading-screen').innerHTML = `
+                            <div style="text-align: center; padding: 40px;">
+                                <h2 style="color: #f39c12;">⚠️ Partita già iniziata</h2>
+                                <button onclick="window.location.href='../../index.html'"
+                                        style="padding: 15px 30px; background: #c2253a; color: #ffffff;
+                                               border: none; border-radius: 10px; cursor: pointer; margin-top: 20px;">
+                                    🏠 Torna alla Home
+                                </button>
+                            </div>
+                        `;
+                        return;
+                    }
+                } catch (e) {
+                    console.error("Errore ingresso room:", e);
+                    mostraErrore(e.message);
+                    return;
+                }
+            }
+            handleRoomUpdate(doc);
+        }, (e) => {
+            console.error("Errore:", e);
+            mostraErrore(e.message);
+        });
     } catch (e) {
         console.error("Errore:", e);
         document.getElementById('loading-screen').innerHTML = `
@@ -3391,7 +3539,7 @@ window.onload = async () => {
                 <h2 style="color: #e94560;">❌ Errore</h2>
                 <p>${e.message}</p>
                 <button onclick="window.location.href='../../index.html'" 
-                        style="padding: 15px 30px; background: #e94560; color: white; 
+                        style="padding: 15px 30px; background: #c2253a; color: #ffffff; 
                                border: none; border-radius: 10px; cursor: pointer; margin-top: 20px;">
                     🏠 Torna alla Home
                 </button>
@@ -4164,7 +4312,7 @@ async function submitGuessItAnswer() {
     
     const guessId = Date.now().toString();
     
-    await db.collection("pictionary_rooms").doc(state.roomId).update({
+    const guessPatch = {
         [`guessIt.guesses.${guessId}`]: {
             id: guessId,
             player: state.playerName,
@@ -4173,16 +4321,17 @@ async function submitGuessItAnswer() {
             approved: false,
             timestamp: Date.now()
         }
-    });
-    
+    };
     if (isCorrect) {
-        await markAsWinner(state.playerName, gi.currentDrawer);
+        await markAsWinner(state.playerName, gi.currentDrawer, guessPatch);
         
         // Trigger locale immediato
         if (!guessIt.roundEndedLocally) {
             guessIt.roundEndedLocally = true;
             showRoundWinnerBanner(state.playerName, gi.currentWord, gi.currentDrawer, state.roomData);
         }
+    } else {
+        await db.collection("pictionary_rooms").doc(state.roomId).update(guessPatch);
     }
 }
 
@@ -4191,19 +4340,20 @@ async function approveAnswer(guessId, playerName) {
     const gi = state.roomData?.guessIt;
     if (!gi || gi.currentDrawer !== state.playerName) return;
     
-    // Marca come approvato
-    await db.collection("pictionary_rooms").doc(state.roomId).update({
+    await markAsWinner(playerName, gi.currentDrawer, {
         [`guessIt.guesses.${guessId}.approved`]: true,
         [`guessIt.guesses.${guessId}.correct`]: true
     });
-    
-    // Assegna punti
-    await markAsWinner(playerName, gi.currentDrawer);
 }
 
-async function markAsWinner(guesser, drawer) {
+async function markAsWinner(guesser, drawer, extraPatch) {
     const gi = state.roomData?.guessIt;
-    if (!gi || gi.roundWinner) return;
+    if (!gi || gi.roundWinner) {
+        if (extraPatch) {
+            await db.collection("pictionary_rooms").doc(state.roomId).update(extraPatch);
+        }
+        return;
+    }
 
     const totalTime = gi.timePerRound || 60;
     const startedAt = gi.roundStartedAt || Date.now();
@@ -4218,13 +4368,13 @@ async function markAsWinner(guesser, drawer) {
 
     console.log(`🏆 Punteggio: ${guesser}=+${pointsGuesser} | ${drawer}=+${pointsDrawer} (${elapsedSeconds}s/${totalTime}s)`);
 
-    await db.collection("pictionary_rooms").doc(state.roomId).update({
+    await db.collection("pictionary_rooms").doc(state.roomId).update(Object.assign({
         [`guessIt.scores.${guesser}`]: firebase.firestore.FieldValue.increment(pointsGuesser),
         [`guessIt.scores.${drawer}`]: firebase.firestore.FieldValue.increment(pointsDrawer),
         'guessIt.roundWinner': guesser,
-        'guessIt.roundWinnerPoints': pointsGuesser,   // ← Salviamo i punti
-        'guessIt.roundDrawerPoints': pointsDrawer     // ← Salviamo i punti
-    });
+        'guessIt.roundWinnerPoints': pointsGuesser,
+        'guessIt.roundDrawerPoints': pointsDrawer
+    }, extraPatch || {}));
 }
 
 async function advanceGuessItRound() {
@@ -4310,7 +4460,7 @@ function updateGuessItFeed(guesses, currentDrawer) {
             approveBtn = `
                 <button onclick="approveAnswer('${g.id}', '${g.player}')" 
                         style="margin-top: 8px; padding: 5px 12px; background: var(--success); 
-                               color: white; border: none; border-radius: 5px; 
+                               color: #06282a; border: none; border-radius: 5px; 
                                font-size: 0.75rem; font-weight: bold; cursor: pointer;">
                     ✅ ACCETTA
                 </button>
