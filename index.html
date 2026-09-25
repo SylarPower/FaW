@@ -3,9 +3,9 @@
 	<head>
 		<meta charset="UTF-8">
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
-		<meta name="theme-color" content="#ffffff">
+		<meta name="theme-color" content="#FFFBF5">
 		<meta name="description" content="FaW — Focus at Work: la piattaforma di giochi e sfide tra colleghi.">
-		<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%234f46e5'/%3E%3Ctext x='32' y='43' font-family='Arial, sans-serif' font-size='32' font-weight='800' fill='white' text-anchor='middle'%3EF%3C/text%3E%3C/svg%3E">
+		<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23E24A3B'/%3E%3Ctext x='32' y='43' font-family='Arial, sans-serif' font-size='32' font-weight='800' fill='white' text-anchor='middle'%3EF%3C/text%3E%3C/svg%3E">
 		<!-- Tema prima del paint (evita flash). Default: chiaro. -->
 		<script>
 			(function () {
@@ -24,26 +24,28 @@
 		<link rel="preconnect" href="https://www.gstatic.com">
 		<link rel="preconnect" href="https://firestore.googleapis.com">
 		<title>FaW — Focus at Work</title>
-		<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-		<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
-		<!-- <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-check-compat.js"></script> -->
+		<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-app-compat.js"></script>
+		<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore-compat.js"></script>
+		<!-- <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-app-check-compat.js"></script> -->
 		<!-- Config Firebase condivisa (deve stare prima dello script che inizializza Firebase) -->
 		<script src="games/shared/firebase-config.js"></script>
 		<!-- Design system FaW -->
 		<link rel="stylesheet" href="games/shared/faw-ui.css">
 		<style>
 			/* ==========================================================================
-			   HUB FaW — tema "Clean" (desktop-first)
+			   HUB FaW — tema "Playful editoriale" (desktop-first)
 			   ========================================================================== */
 			:root {
-				--faw-acc: #4f46e5;
-				--faw-acc-2: #4338ca;
-				--faw-acc-soft: #eef2ff;
-				--faw-acc-glow: rgba(79, 70, 229, 0.12);
+				--faw-acc: #E24A3B;
+				--faw-acc-2: #B9382D;
+				--faw-acc-soft: #FDE4DE;
+				--faw-acc-glow: rgba(226, 74, 59, 0.22);
 				--hub-max: 1200px;
 			}
 			:root[data-theme='dark'] {
-				--faw-acc-soft: rgba(99, 102, 241, 0.14);
+				--faw-acc: #FF796A;
+				--faw-acc-2: #FF9B8F;
+				--faw-acc-soft: rgba(255, 121, 106, 0.16);
 			}
 			html, body { min-height: 100%; }
 			body { overflow-x: hidden; }
@@ -61,7 +63,7 @@
 			.login-card {
 				width: min(400px, 100%);
 				background: var(--faw-panel-solid);
-				border: 1px solid var(--faw-border);
+				border: 2px solid var(--faw-border);
 				border-radius: 20px;
 				padding: 36px 32px 28px;
 				box-shadow: var(--faw-shadow-3);
@@ -98,7 +100,7 @@
 				padding: 12px 14px;
 				margin-bottom: 10px;
 				border-radius: var(--faw-r-md);
-				border: 1px solid var(--faw-border-2);
+				border: 2px solid var(--faw-border-2);
 				background: var(--faw-panel-solid);
 				color: var(--faw-text);
 				font-family: var(--faw-font-body);
@@ -176,7 +178,7 @@
 				gap: 9px;
 				padding: 4px 13px 4px 4px;
 				border-radius: 999px;
-				border: 1px solid var(--faw-border);
+				border: 2px solid var(--faw-border);
 				background: var(--faw-panel-2);
 			}
 			#user-display { font-weight: 600; font-size: 0.88rem; white-space: nowrap; }
@@ -230,8 +232,11 @@
 				position: relative;
 				padding: 16px 14px 14px;
 				border-radius: 16px;
-				border: 1px solid var(--faw-border);
-				background: var(--faw-panel);
+				border: 2px solid var(--faw-border);
+				/* Base calda di fallback; nei browser moderni ogni gioco riceve una
+				   tinta appena percettibile del proprio colore, senza diventare rumoroso. */
+				background: #FFF7ED;
+				background: color-mix(in srgb, var(--g1) 7%, var(--faw-panel-solid));
 				cursor: pointer;
 				transition: border-color var(--faw-fast) var(--faw-ease),
 					box-shadow var(--faw-fast) var(--faw-ease),
@@ -246,8 +251,12 @@
 				justify-content: center;
 				font-size: 1.35rem;
 				background: color-mix(in srgb, var(--g1) 12%, white);
-				border: 1px solid color-mix(in srgb, var(--g1) 20%, white);
+				border: 2px solid color-mix(in srgb, var(--g1) 20%, white);
 				transition: transform var(--faw-fast) var(--faw-ease);
+			}
+			:root[data-theme='dark'] .game-card {
+				background: #332D26;
+				background: color-mix(in srgb, var(--g1) 14%, var(--faw-panel-solid));
 			}
 			:root[data-theme='dark'] .game-card .g-tile {
 				background: color-mix(in srgb, var(--g1) 18%, transparent);
@@ -271,7 +280,7 @@
 				font-weight: 700;
 				letter-spacing: 0.6px;
 				background: var(--faw-panel-2);
-				border: 1px solid var(--faw-border);
+				border: 2px solid var(--faw-border);
 				color: var(--faw-text-2);
 			}
 			.game-card .game-badge.online { background: var(--faw-ok-soft); border-color: #bbf7d0; color: var(--faw-ok); }
@@ -313,7 +322,7 @@
 				padding: 12px 14px;
 				margin-bottom: 8px;
 				border-radius: 12px;
-				border: 1px solid var(--faw-border);
+				border: 2px solid var(--faw-border);
 				background: var(--faw-panel);
 				transition: border-color var(--faw-fast) var(--faw-ease), background var(--faw-fast) var(--faw-ease);
 				animation: faw-rise 300ms var(--faw-ease) both;
@@ -324,7 +333,7 @@
 			.user-item button {
 				padding: 7px 13px;
 				border-radius: 8px;
-				border: 1px solid transparent;
+				border: 2px solid transparent;
 				background: var(--faw-panel-2);
 				color: var(--faw-text);
 				font-family: var(--faw-font-body);
@@ -349,10 +358,10 @@
 			/* Stati riga */
 			.user-item.u-row--solo {
 				background: var(--faw-acc-soft);
-				border-color: #c7d2fe;
+				border-color: #F5B8AF;
 				cursor: pointer;
 			}
-			:root[data-theme='dark'] .user-item.u-row--solo { border-color: rgba(99, 102, 241, 0.4); }
+			:root[data-theme='dark'] .user-item.u-row--solo { border-color: rgba(255, 121, 106, 0.45); }
 			.user-item.u-row--solo:hover { border-color: var(--faw-acc); }
 			.user-item.u-row--live:hover { border-color: var(--faw-border-2); }
 			.user-item.u-row--wait { background: var(--faw-info-soft); border-color: #bae6fd; }
@@ -380,7 +389,7 @@
 			#lista-amici .user-item .btn-del {
 				padding: 5px 9px;
 				border-radius: 8px;
-				border: 1px solid var(--faw-border);
+				border: 2px solid var(--faw-border);
 				background: transparent;
 				color: var(--faw-text-3);
 				font-weight: 700;
@@ -406,7 +415,7 @@
 				width: 100%;
 				margin-bottom: 14px;
 				padding: 12px 18px;
-				border: 1px solid transparent;
+				border: 2px solid transparent;
 				border-radius: var(--faw-r-md);
 				background: #111827;
 				color: #fff;
@@ -433,7 +442,7 @@
 				padding: 10px 14px;
 				margin-bottom: 8px;
 				border-radius: 12px;
-				border: 1px solid var(--faw-border);
+				border: 2px solid var(--faw-border);
 				background: var(--faw-panel);
 				font-size: 0.85rem;
 				color: var(--faw-text-2);
@@ -449,7 +458,7 @@
 				margin-bottom: 18px;
 				border-radius: 12px;
 				background: var(--faw-panel-2);
-				border: 1px solid var(--faw-border);
+				border: 2px solid var(--faw-border);
 			}
 			.stats-tab {
 				padding: 7px 18px;
@@ -474,7 +483,7 @@
 			.stat-box {
 				padding: 16px 12px;
 				border-radius: 14px;
-				border: 1px solid var(--faw-border);
+				border: 2px solid var(--faw-border);
 				background: var(--faw-panel);
 				text-align: center;
 				transition: border-color var(--faw-fast) var(--faw-ease);
@@ -498,11 +507,11 @@
 			}
 			.stat-box.highlight {
 				background: var(--faw-acc-soft);
-				border-color: #c7d2fe;
+				border-color: #F5B8AF;
 			}
-			:root[data-theme='dark'] .stat-box.highlight { border-color: rgba(99, 102, 241, 0.4); }
+			:root[data-theme='dark'] .stat-box.highlight { border-color: rgba(255, 121, 106, 0.45); }
 			.stat-box.highlight .stat-number { color: var(--faw-acc); }
-			:root[data-theme='dark'] .stat-box.highlight .stat-number { color: #a5b4fc; }
+			:root[data-theme='dark'] .stat-box.highlight .stat-number { color: #FFB8AF; }
 			/* Grafico settimanale */
 			.weekly-bars { display: flex; gap: 10px; align-items: flex-end; height: 150px; padding-top: 8px; }
 			.day-bar {
@@ -521,7 +530,7 @@
 				min-height: 5px;
 				border-radius: 7px;
 				background: var(--faw-panel-2);
-				border: 1px solid var(--faw-border);
+				border: 2px solid var(--faw-border);
 				transition: height 400ms var(--faw-ease);
 			}
 			.day-bar .bar.today {
@@ -532,7 +541,7 @@
 			.btn-danger {
 				padding: 8px 16px;
 				border-radius: 10px;
-				border: 1px solid #fecaca;
+				border: 2px solid #fecaca;
 				background: var(--faw-danger-soft);
 				color: var(--faw-danger);
 				font-weight: 600;
@@ -557,7 +566,7 @@
 				gap: 14px;
 				padding: 10px 16px;
 				border-radius: 0 0 16px 16px;
-				border: 1px solid var(--faw-border);
+				border: 2px solid var(--faw-border);
 				border-top: none;
 				background: var(--faw-panel-solid);
 				color: var(--faw-text);
@@ -614,7 +623,7 @@
 			.banner-right select {
 				padding: 6px 8px;
 				border-radius: 8px;
-				border: 1px solid var(--faw-border-2);
+				border: 2px solid var(--faw-border-2);
 				background: var(--faw-panel-2);
 				color: var(--faw-text);
 				font-family: var(--faw-font-body);
@@ -625,7 +634,7 @@
 			}
 			.btn-banner {
 				padding: 7px 11px;
-				border: 1px solid var(--faw-border);
+				border: 2px solid var(--faw-border);
 				border-radius: 8px;
 				font-family: var(--faw-font-body);
 				font-weight: 700;
@@ -716,7 +725,7 @@
 			.invite-btn:active { transform: scale(0.97); }
 			.invite-btn--acc { background: #16a34a; color: #fff; }
 			.invite-btn--acc:hover { background: #15803d; filter: none; }
-			.invite-btn--rif { background: var(--faw-panel-2); color: var(--faw-danger); border: 1px solid #fecaca; }
+			.invite-btn--rif { background: var(--faw-panel-2); color: var(--faw-danger); border: 2px solid #fecaca; }
 			.invite-close {
 				position: absolute;
 				top: 8px;
@@ -724,7 +733,7 @@
 				width: 30px;
 				height: 30px;
 				border-radius: 50%;
-				border: 1px solid var(--faw-border);
+				border: 2px solid var(--faw-border);
 				background: var(--faw-panel-2);
 				color: var(--faw-text-2);
 				font-size: 0.8rem;
@@ -794,7 +803,7 @@
 						<div><b>FaW</b><small>Focus at Work</small></div>
 					</div>
 					<div class="header-right">
-						<div class="faw-pill faw-pill--live" title="Giocatori attivi negli ultimi 60s"><span class="faw-dot"></span><b id="online-count">0</b>&nbsp;online</div>
+						<div class="faw-pill faw-pill--live" title="Giocatori attivi negli ultimi 2 minuti"><span class="faw-dot"></span><b id="online-count">0</b>&nbsp;online</div>
 						<button id="theme-toggle" class="faw-btn faw-btn--icon" onclick="fawToggleTheme()" title="Cambia tema chiaro/scuro" aria-label="Cambia tema">🌙</button>
 						<div class="user-chip"><span class="faw-avatar" id="user-avatar">FA</span><span id="user-display"></span></div>
 						<button class="faw-btn faw-btn--ghost faw-btn--sm" onclick="logout()" title="Esci">Esci ⏻</button>
@@ -969,23 +978,20 @@
 				if (typeof firebase === 'undefined') {
 					throw new Error('script Firebase non caricati (CDN gstatic.com irraggiungibile?). Verifica la connessione / eventuali ad-blocker e ricarica la pagina.');
 				}
-				const firebaseConfig = window.FAW_REQUIRE_FIREBASE_CONFIG
-					? window.FAW_REQUIRE_FIREBASE_CONFIG()
-					: window.FAW_FIREBASE_CONFIG;
-				if (!firebaseConfig) {
-					throw new Error('config Firebase condivisa mancante (games/shared/firebase-config.js non caricato).');
-				}
-				firebase.initializeApp(firebaseConfig);
-				/*const appCheck = firebase.appCheck();
-				appCheck.activate(
-					    '6Lcm8XcsAAAAAM0hTFXbGRLHYZAW9ZPcZkKbxGIR', // 👈 LA TUA CHIAVE
-					    true
-				);*/
-				db = firebase.firestore();
-				if (window.FAW_ENABLE_PERSISTENCE) {
-					window.FAW_ENABLE_PERSISTENCE(db);
-				} else if (db && typeof db.enableIndexedDbPersistence === 'function') {
-					db.enableIndexedDbPersistence({ synchronizeTabs: true }).catch(function () {});
+				/* Unico bootstrap condiviso: evita duplicate-app, abilita la cache IndexedDB
+				   una sola volta e mantiene tutte le pagine sullo stesso comportamento. */
+				if (typeof window.FAW_INIT_FIRESTORE === 'function') {
+					db = window.FAW_INIT_FIRESTORE();
+				} else {
+					/* Fallback diagnostico per CDN/config caricati parzialmente. */
+					const firebaseConfig = window.FAW_REQUIRE_FIREBASE_CONFIG
+						? window.FAW_REQUIRE_FIREBASE_CONFIG()
+						: window.FAW_FIREBASE_CONFIG;
+					if (!firebaseConfig) {
+						throw new Error('config Firebase condivisa mancante (games/shared/firebase-config.js non caricato).');
+					}
+					if (!firebase.apps || firebase.apps.length === 0) firebase.initializeApp(firebaseConfig);
+					db = firebase.firestore();
 				}
 			} catch (e) {
 				firebaseErr = (e && e.message) ? e.message : String(e);
@@ -1303,7 +1309,7 @@
 					/* Una sola modalità: prima una classica funzionante,
 						niente BONUS/CRAZY/MIX ereditati da altri giochi. */
 					modalita: [{
-						id: "classica", label: "CLASSICA 📝", colore: "#4f46e5", testo: "#ffffff"
+						id: "classica", label: "CLASSICA 📝", colore: "#E24A3B", testo: "#ffffff"
 					}],
 					minGiocatori: 2,
 					maxGiocatori: 8
@@ -1417,8 +1423,7 @@ if (mioNome && passwordHashSalvato) {
         document.getElementById('main-app').style.display = 'block';
         document.getElementById('user-display').textContent = "👤 " + mioNome;
         fawSyncUserChip();
-        aggiornaPresenza();
-        setInterval(aggiornaPresenza, PRESENZA_HEARTBEAT_MS);
+        avviaPresenzaHeartbeat();
         listen();
         caricaStorico();
     };
@@ -1469,8 +1474,7 @@ if (mioNome && passwordHashSalvato) {
 			    document.getElementById('main-app').style.display = 'block';
 			    document.getElementById('user-display').textContent = "👤 " + mioNome;
 			    fawSyncUserChip();
-			    aggiornaPresenza();
-			    setInterval(aggiornaPresenza, PRESENZA_HEARTBEAT_MS);
+			    avviaPresenzaHeartbeat();
 			    listen();
 			    caricaStorico();
 			  } catch (e) {
@@ -1515,49 +1519,83 @@ if (mioNome && passwordHashSalvato) {
 			  });
 			  return { inPartita, partitaId };
 			}
-			async function aggiornaPresenza() {
-			  if (!db || !mioNome) return;
-			  const { inPartita, partitaId } = partitaAttivaCorrente();
-			  try {
-			    await db.collection("presenze").doc(mioNome).set({
-			      nome: mioNome,
-			      last: Date.now(),
-			      inPartita: inPartita,
-			      partitaId: partitaId
-			    });
-			  } catch (e) {
-			    console.error("Errore aggiornaPresenza:", e);
-			  }
-			}
+				async function aggiornaPresenza(forza) {
+				  if (!db || !mioNome || (document.hidden && !forza)) return;
+				  const { inPartita, partitaId } = partitaAttivaCorrente();
+				  try {
+				    await db.collection("presenze").doc(mioNome).set({
+				      nome: mioNome,
+				      last: Date.now(),
+				      inPartita: inPartita,
+				      partitaId: partitaId
+				    }, { merge: true });
+				  } catch (e) {
+				    console.error("Errore aggiornaPresenza:", e);
+				  }
+				}
+
+let presenzaHeartbeatTimer = null;
+function avviaPresenzaHeartbeat() {
+    if (presenzaHeartbeatTimer) clearInterval(presenzaHeartbeatTimer);
+    aggiornaPresenza(true);
+    presenzaHeartbeatTimer = setInterval(() => aggiornaPresenza(false), PRESENZA_HEARTBEAT_MS);
+}
+
+let unsubscribeHub = [];
+function chiudiListenerHub() {
+    unsubscribeHub.forEach(fn => { try { fn(); } catch (e) { /* noop */ } });
+    unsubscribeHub = [];
+}
+function snapshotDaMap(mappa) {
+    const docs = Array.from(mappa.values());
+    return { forEach: (cb) => docs.forEach(cb) };
+}
 
 function listen() {
-    if (!db) { console.warn('[FaW] listen(): Firebase non disponibile, listener non avviati.'); return; }
+    if (!db || !mioNome) { console.warn('[FaW] listen(): Firebase non disponibile, listener non avviati.'); return; }
+    chiudiListenerHub();
     let presenzeData = {};
-    let amicizieSnapshot = null;
+    const amicizieInviate = new Map();
+    const amicizieRicevute = new Map();
+    let amicizieSnapshot = snapshotDaMap(new Map());
+    const renderAmici = () => {
+        const amicizie = new Map();
+        amicizieInviate.forEach((doc, id) => amicizie.set(id, doc));
+        amicizieRicevute.forEach((doc, id) => amicizie.set(id, doc));
+        amicizieSnapshot = snapshotDaMap(amicizie);
+        window.amicizieSnapshotGlobal = amicizieSnapshot;
+        aggiornaListaAmici(amicizieSnapshot, presenzeData);
+    };
 
-    // LISTENER 1: Presenze
-    db.collection("presenze").onSnapshot(presSnap => {
+    /* Solo le presenze ancora vive entrano nello stream. Il vecchio listener
+       sull'intera collection cresceva senza limite e ad ogni heartbeat leggeva
+       anche utenti ormai offline. */
+    const soglia = Date.now() - PRESENZA_STALE_MS;
+    unsubscribeHub.push(db.collection("presenze").where("last", ">", soglia).onSnapshot(presSnap => {
         presenzeData = {};
         presSnap.forEach(doc => {
             const u = doc.data();
-            if (u.last > Date.now() - 60000) {
-                presenzeData[u.nome] = u;
-            }
+            if (u && u.nome && u.last > Date.now() - PRESENZA_STALE_MS) presenzeData[u.nome] = u;
         });
         window.presenzeDataGlobal = presenzeData;
         aggiornaOnlineCount(Object.keys(presenzeData).length);
-        if (amicizieSnapshot) {
-            aggiornaListaAmici(amicizieSnapshot, presenzeData);
-        }
+        renderAmici();
         aggiornaListaGlobale(presenzeData);
-    });
+    }, e => console.warn('[FaW] presenze non disponibili:', e && e.message)));
 
-    // LISTENER 2: Amicizie
-    db.collection("amicizie").onSnapshot(snap => {
-        amicizieSnapshot = snap;
-        window.amicizieSnapshotGlobal = snap;
-        aggiornaListaAmici(snap, presenzeData);
-    });
+    /* Una relazione riguarda solo mittente o destinatario: due query mirate
+       sostituiscono il listener globale sulla collection amicizie. */
+    const riceviAmicizie = (destinazione, snap) => {
+        destinazione.clear();
+        snap.forEach(doc => destinazione.set(doc.id, doc));
+        renderAmici();
+    };
+    unsubscribeHub.push(db.collection("amicizie").where("da", "==", mioNome).onSnapshot(
+        snap => riceviAmicizie(amicizieInviate, snap),
+        e => console.warn('[FaW] amicizie inviate non disponibili:', e && e.message)));
+    unsubscribeHub.push(db.collection("amicizie").where("a", "==", mioNome).onSnapshot(
+        snap => riceviAmicizie(amicizieRicevute, snap),
+        e => console.warn('[FaW] amicizie ricevute non disponibili:', e && e.message)));
 
     // LISTA "Partite in Corso": niente listener in tempo reale (sfarfallerebbe a
     // ogni variazione). Si aggiorna una volta al minuto, o a mano con il pulsante ⟳.
@@ -1571,9 +1609,11 @@ function listen() {
 /* ========================================
    🔄 LISTA PARTITE — aggiornamento manuale + 1/min
    ======================================== */
-/* La finestra "online" dell'hub e' di 60 secondi: un battito ogni 30s resta
-   ampiamente dentro la finestra e taglia di un terzo le scritture Firestore. */
-const PRESENZA_HEARTBEAT_MS = 30000;
+/* Presenza: 130 s di validità e un heartbeat ogni 60 s dimezzano le scritture
+   rispetto al precedente ciclo da 30 s, mantenendo margine per una scheda in
+   background o un breve rallentamento di rete. */
+const PRESENZA_HEARTBEAT_MS = 60000;
+const PRESENZA_STALE_MS = 130000;
 const REFRESH_PARTITE_MS = 60000;   // cadenza automatica: ogni minuto
 const REFRESH_MIN_GAP_MS = 4000;    // anti-rimbalzo su focus/click ravvicinati
 let ultimoRefreshPartite = 0;
@@ -1581,6 +1621,7 @@ let refreshPartiteInCorso = null;
 let refreshPartiteTimer = null;
 let refreshRinviato = null;
 let refreshMetaTimer = null;
+let refreshPageHooksInstalled = false;
 let ultimaFirmaPartite = '';
 
 function partiteInCache() {
@@ -1670,10 +1711,17 @@ function avviaRefreshPartite() {
     refreshMetaTimer = setInterval(aggiornaRefreshMeta, 15000);
     // Al ritorno sulla scheda: aggiornamento immediato (con anti-rimbalzo),
     // cosi' un invito appena arrivato compare senza aspettare il minuto.
-    document.addEventListener('visibilitychange', () => {
-        if (!document.hidden) refreshPartite(false);
-    });
-    window.addEventListener('focus', () => refreshPartite(false));
+    // Gli hook sono globali alla pagina: non vanno registrati a ogni login.
+    if (!refreshPageHooksInstalled) {
+        refreshPageHooksInstalled = true;
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) {
+                aggiornaPresenza(true);
+                refreshPartite(false);
+            }
+        });
+        window.addEventListener('focus', () => refreshPartite(false));
+    }
 }
 
 function aggiornaRefreshMeta() {
@@ -2199,7 +2247,7 @@ function renderPartitaPictionary(p, div) {
 			  div.innerHTML = "";
 			  const amiciSet = window.amiciSetGlobal || new Set();
 			  Object.values(presenzeData).forEach(u => {
-			    if (u.nome !== mioNome && !amiciSet.has(u.nome) && u.last > Date.now() - 3600000) {
+			    if (u.nome !== mioNome && !amiciSet.has(u.nome) && u.last > Date.now() - PRESENZA_STALE_MS) {
 			      div.innerHTML += `
 											<div class="user-item">
 												<span>${u.nome}</span>

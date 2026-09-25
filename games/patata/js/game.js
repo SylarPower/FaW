@@ -1221,6 +1221,7 @@
         try {
           localStorage.setItem(DICT_CACHE_KEY, JSON.stringify({ ts: Date.now(), extra, excluded }));
         } catch (e) { /* noop */ }
+        if (window.FAW_WRITE_TTL_CACHE) window.FAW_WRITE_TTL_CACHE('dictionary-overrides-v1', { extra, excluded });
         return { extra, excluded };
       }
     } catch (e) {
@@ -2510,17 +2511,14 @@
           if (typeof firebase.firestore === 'undefined') {
             console.warn('[Patata] firebase-firestore-compat.js non caricato: solo allenamento disponibile.');
           } else {
-            // Evita "duplicate-app" in caso di doppia inizializzazione (HMR, reload parziali, test)
-            if (!firebase.apps || firebase.apps.length === 0) {
-              firebase.initializeApp(cfg);
-            }
+            // Bootstrap condiviso: una sola app, una sola attivazione della cache.
             G.fs = firebase.firestore;
-            G.db = firebase.firestore();
-            if (window.FAW_ENABLE_PERSISTENCE) {
-              window.FAW_ENABLE_PERSISTENCE(G.db);
-            } else if (G.db && typeof G.db.enableIndexedDbPersistence === 'function') {
-              G.db.enableIndexedDbPersistence({ synchronizeTabs: true }).catch(() => {});
-            }
+            G.db = typeof window.FAW_INIT_FIRESTORE === 'function'
+              ? window.FAW_INIT_FIRESTORE()
+              : (function () {
+                  if (!firebase.apps || firebase.apps.length === 0) firebase.initializeApp(cfg);
+                  return firebase.firestore();
+                })();
           }
         }
       } catch (e) {

@@ -4,8 +4,8 @@
 		<meta charset="UTF-8">
 		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 		<title>Ruzzle dei 🐷</title>
-		<script src="https://www.gstatic.com/firebasejs/9.1.1/firebase-app-compat.js"></script>
-		<script src="https://www.gstatic.com/firebasejs/9.1.1/firebase-firestore-compat.js"></script>
+		<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-app-compat.js"></script>
+		<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore-compat.js"></script>
 		<!-- Config Firebase condivisa (prima dello script che inizializza Firebase) -->
 		<script src="../shared/firebase-config.js"></script>
 		<!-- Spazio per i banner di stato fissi in cima (evita che coprano il testo) -->
@@ -1611,14 +1611,18 @@
 		<script>
 			// --- CONFIGURAZIONE FIREBASE ---
 			// Config condivisa da ../shared/firebase-config.js
-			const firebaseConfig = window.FAW_REQUIRE_FIREBASE_CONFIG
-				? window.FAW_REQUIRE_FIREBASE_CONFIG()
-				: window.FAW_FIREBASE_CONFIG;
-			if (!firebaseConfig) {
-				console.error("[FaW] Impossibile inizializzare Firebase: config condivisa non caricata.");
-			}
-			firebase.initializeApp(firebaseConfig);
-			const db = firebase.firestore();
+				const firebaseConfig = window.FAW_REQUIRE_FIREBASE_CONFIG
+					? window.FAW_REQUIRE_FIREBASE_CONFIG()
+					: window.FAW_FIREBASE_CONFIG;
+				if (!firebaseConfig || typeof firebase === 'undefined') {
+					throw new Error('[FaW] Impossibile inizializzare Firebase: config condivisa o SDK mancanti.');
+				}
+				const db = (typeof window.FAW_INIT_FIRESTORE === 'function')
+					? window.FAW_INIT_FIRESTORE()
+					: (function () {
+						if (!firebase.apps || firebase.apps.length === 0) firebase.initializeApp(firebaseConfig);
+						return firebase.firestore();
+					})();
 			const DEBUG_MODE = false;
 			// Variabili per il match live
 			const urlParams = new URLSearchParams(window.location.search);
@@ -1811,13 +1815,22 @@
 			let dictionaryReady = false;
 			let unsubscribeEliminazioni = null;
 			let pendingEliminazioni = new Map(); // parola -> dati proposta in corso
+			/* Il listener della sottocollezione può notificare l'update della room
+			   prima del delete della proposta: evita una seconda applicazione. */
+			const eliminazioniInApplicazione = new Set();
 			let currentWinner = null;
 			let currentBannerPriority = 0; // 0=nessuno, 1=stato, 10=votazione
 			/* La verifica parole e' automatica: quando l'ultimo giocatore finisce,
 			   ogni client si conferma da solo. Questi flag evitano che il listener
 			   (che si risveglia a ogni modifica del documento) riscriva in loop. */
-			let verificaAutoInviata = false;
-			// --- TRIE ---
+				let verificaAutoInviata = false;
+				/* Le parole possono arrivare rapidamente: il punteggio live è solo una
+				   preview, quindi lo coalesciamo invece di fare una scrittura per parola.
+				   L'elenco completo viene scritto una sola volta alla fine. */
+				let liveScoreTimer = null;
+				let lastLiveScoreWritten = null;
+				const LIVE_SCORE_DEBOUNCE_MS = 1500;
+				// --- TRIE ---
 			class TrieNode {
 			  constructor() {
 			    this.children = {};
@@ -2032,36 +2045,50 @@
 			    };
 			    texts.forEach(t => addWordsToDictionary(t));
 			    EXTRA_WORDS.forEach(w => dictionary.add(w));
-			    console.log("🔥 Caricamento dizionario Firebase...");
-			    try {
-			      const globalDocPromise = db.collection("config").doc("dizionario").get();
-			      const globalDoc = await Promise.race([
-			        globalDocPromise,
-			        new Promise((_, reject) => setTimeout(() => reject(new Error('Firebase timeout')), 5000))
-			      ]);
-			      if (globalDoc.exists) {
-			        const data = globalDoc.data();
-			        if (data.extra) {
-			          data.extra.forEach(w => {
-			            if (w && !EXTRA_WORDS.includes(w)) {
-			              EXTRA_WORDS.push(w);
-			              dictionary.add(w);
-			            }
-			          });
-			        }
-			        if (data.excluded) {
-			          data.excluded.forEach(w => {
-			            if (w && !EXCLUDED_WORDS.includes(w)) {
-			              EXCLUDED_WORDS.push(w);
-			              dictionary.delete(w);
-			            }
-			          });
-			        }
-			        console.log("✅ Dizionario Firebase caricato");
-			      }
-			    } catch (fbError) {
-			      console.warn("⚠️ Firebase non disponibile (continuo comunque):", fbError);
-			    }
+				    /* config/dizionario cambia raramente: una cache TTL condivisa tra Ruzzle,
+				       Patata e NCC evita una lettura Firestore ad ogni apertura, senza
+				       mettere in cache stato, inviti o punteggi di una partita. */
+				    const applyDictionaryOverrides = (data) => {
+				      const safe = data || {};
+				      (safe.extra || []).forEach(w => {
+				        if (w && !EXTRA_WORDS.includes(w)) {
+				          EXTRA_WORDS.push(w);
+				          dictionary.add(w);
+				        }
+				      });
+				      (safe.excluded || []).forEach(w => {
+				        if (w && !EXCLUDED_WORDS.includes(w)) {
+				          EXCLUDED_WORDS.push(w);
+				          dictionary.delete(w);
+				        }
+				      });
+				    };
+				    const cachedOverrides = window.FAW_READ_TTL_CACHE &&
+				      window.FAW_READ_TTL_CACHE('dictionary-overrides-v1', 24 * 60 * 60 * 1000);
+				    if (cachedOverrides) {
+				      applyDictionaryOverrides(cachedOverrides);
+				      console.log("✅ Dizionario condiviso dalla cache locale");
+				    } else {
+				      console.log("🔥 Caricamento dizionario Firebase...");
+				      try {
+				        const globalDoc = await Promise.race([
+				          db.collection("config").doc("dizionario").get(),
+				          new Promise((_, reject) => setTimeout(() => reject(new Error('Firebase timeout')), 5000))
+				        ]);
+				        if (globalDoc.exists) {
+				          const data = globalDoc.data() || {};
+				          applyDictionaryOverrides(data);
+				          if (window.FAW_WRITE_TTL_CACHE) {
+				            window.FAW_WRITE_TTL_CACHE('dictionary-overrides-v1', {
+				              extra: data.extra || [], excluded: data.excluded || []
+				            });
+				          }
+				          console.log("✅ Dizionario Firebase caricato");
+				        }
+				      } catch (fbError) {
+				        console.warn("⚠️ Firebase non disponibile (continuo comunque):", fbError);
+				      }
+				    }
 			    console.log("🌳 Costruzione Trie...");
 			    buildTrie();
 			    dictionaryReady = true;
@@ -2116,8 +2143,8 @@
 			  copySeedNewGame();
 			}
 			async function creaRivincitaPersonalizzata(bonus, crazy) {
-			  const snap = await db.collection("partite").doc(matchId).get();
-			  const v = snap.data();
+			  const v = currentGameData;
+			  if (!v || !Array.isArray(v.partecipanti)) throw new Error('Stato partita non ancora disponibile');
 			  let mode = crazy ? 'crazy' : (bonus ? 'bonus' : 'classic');
 			  let pts = {};
 			  let words = {};
@@ -2574,9 +2601,10 @@
 			    stats.totals.ruzzle = (stats.totals.ruzzle || 0) + 1;
 			    localStorage.setItem(STATS_KEY, JSON.stringify(stats));
 			  }
-			  clearInterval(timerInterval);
-			  isGameActive = false;
-			  if (typeof matchId !== 'undefined' && matchId) {
+				  clearInterval(timerInterval);
+				  isGameActive = false;
+				  if (liveScoreTimer) { clearTimeout(liveScoreTimer); liveScoreTimer = null; }
+				  if (typeof matchId !== 'undefined' && matchId) {
 			    const mieParole = [];
 			    foundWords.forEach((v, k) => {
 			      mieParole.push({
@@ -3095,27 +3123,27 @@
 			let chiusuraFinaleInCorso = false;
 			let timerSubentroFinale = null;
 
-			/* Chiusura della verifica: rilegge il documento (una lettura sola) e scrive
-			solo se lo stato e' ancora "verifica", cosi' due client non si sovrappongono. */
-			async function chiusuraVerifica() {
-			  if (chiusuraFinaleInCorso) return;
-			  chiusuraFinaleInCorso = true;
-			  try {
-			    const docRef = db.collection("partite").doc(matchId);
-			    const snap = await docRef.get();
-			    const fresco = snap.data();
-			    if (!fresco || fresco.stato !== "verifica") return;
-			    if ((fresco.confermaVerifica || []).length < (fresco.partecipanti || []).length) return;
-			    await docRef.update({
-			      punteggi: calcolaPunteggiFinali(fresco),
-			      stato: "conclusa"
-			    });
-			  } catch (e) {
-			    console.error("Errore calcolo punteggi finali:", e);
-			  } finally {
-			    chiusuraFinaleInCorso = false;
-			  }
-			}
+				/* Chiusura della verifica: usa l'ultimo snapshot (già pagato) e scrive
+				   solo se lo stato locale è ancora "verifica". L'arbitro designato fa il
+				   primo tentativo, gli altri controllano di nuovo il loro snapshot dopo il
+				   subentro: nessuna rilettura get() nel percorso finale. */
+				async function chiusuraVerifica() {
+				  if (chiusuraFinaleInCorso) return;
+				  chiusuraFinaleInCorso = true;
+				  try {
+				    const fresco = currentGameData;
+				    if (!fresco || fresco.stato !== "verifica") return;
+				    if ((fresco.confermaVerifica || []).length < (fresco.partecipanti || []).length) return;
+				    await db.collection("partite").doc(matchId).update({
+				      punteggi: calcolaPunteggiFinali(fresco),
+				      stato: "conclusa"
+				    });
+				  } catch (e) {
+				    console.error("Errore calcolo punteggi finali:", e);
+				  } finally {
+				    chiusuraFinaleInCorso = false;
+				  }
+				}
 
 			function pianificaChiusuraVerifica(data) {
 			  if (arbitroPunteggi(data) === mioNome) { chiusuraVerifica(); return; }
@@ -3151,27 +3179,39 @@
 			  }
 			}
 
-			function updateTotalScore() {
-			  score = 0;
-			  foundWords.forEach(v => {
-			    if (v.active) score += v.points;
-			  });
-			  scoreDisplay.textContent = score;
-			  if (isAnalysisPhase) updateHistoryScore();
-			  if (typeof matchId !== 'undefined' && matchId && db) {
-			      /* A fine partita il punteggio condiviso non e' la somma locale: duplicati e
-			         parole eliminate valgono 0. Quel valore lo scrive chi ricalcola con la
-			         regola condivisa, non il live score, che altrimenti disallineerebbe gli
-			         altri giocatori. */
-			      const partitaFinita = isAnalysisPhase ||
-			        (currentGameData && currentGameData.stato === 'conclusa');
-			      if (!partitaFinita) {
-			        db.collection("partite").doc(matchId).update({
-			          [`punteggi.${mioNome}`]: score
-			        }).catch(e => {});
-			      }
-			  }
-			}
+				function programmaPunteggioLive() {
+				  if (!matchId || !db || !mioNome || liveScoreTimer) return;
+				  liveScoreTimer = setTimeout(async () => {
+				    liveScoreTimer = null;
+				    const partitaFinita = isAnalysisPhase || !isGameActive ||
+				      (currentGameData && currentGameData.stato === 'conclusa');
+				    if (partitaFinita || score === lastLiveScoreWritten) return;
+				    try {
+				      await db.collection("partite").doc(matchId).update({
+				        [`punteggi.${mioNome}`]: score
+				      });
+				      lastLiveScoreWritten = score;
+				    } catch (e) {
+				      /* Un prossimo cambiamento ritenterà; niente loop aggressivo. */
+				      console.warn('[Ruzzle] punteggio live non sincronizzato:', e && e.message);
+				    }
+				  }, LIVE_SCORE_DEBOUNCE_MS);
+				}
+
+				function updateTotalScore() {
+				  score = 0;
+				  foundWords.forEach(v => {
+				    if (v.active) score += v.points;
+				  });
+				  scoreDisplay.textContent = score;
+				  if (isAnalysisPhase) updateHistoryScore();
+				  /* A fine partita il punteggio condiviso non è la somma locale: duplicati e
+				     parole eliminate valgono 0. Il ricalcolo finale resta l'unica fonte
+				     autorevole, mentre la preview live viene coalesciata. */
+				  if (!isAnalysisPhase && !(currentGameData && currentGameData.stato === 'conclusa')) {
+				    programmaPunteggioLive();
+				  }
+				}
 			
 			async function toggleWord(w, li) {
 			    const d = foundWords.get(w);
@@ -4424,23 +4464,18 @@ if (data.stato === "in_corso") {
 			    pronti: firebase.firestore.FieldValue.arrayUnion(mioNome),
 			  });
 			}
-			async function avviaVerificaUnificata() {
-			  // Aggiungi il giocatore alla lista conferme E cambia stato se necessario
-			  const docRef = db.collection("partite").doc(matchId);
-			  await docRef.update({
-			    confermaVerifica: firebase.firestore.FieldValue.arrayUnion(mioNome)
-			  });
-			  // Leggi i dati aggiornati
-			  const snap = await docRef.get();
-			  const data = snap.data();
-			  // Se lo stato è ancora "in_corso", cambialo a "verifica"
-			  if (data.stato === "in_corso") {
-			    await docRef.update({
-			      stato: "verifica"
-			    });
-			  }
-			  // Il calcolo finale avviene automaticamente nel listener quando tutti hanno confermato
-			}
+				async function avviaVerificaUnificata() {
+				  /* La partita è già mantenuta fresca da onSnapshot. Uniamo conferma e
+				     cambio di fase in una sola scrittura, senza rileggere il documento
+				     appena aggiornato. */
+				  const docRef = db.collection("partite").doc(matchId);
+				  const patch = {
+				    confermaVerifica: firebase.firestore.FieldValue.arrayUnion(mioNome)
+				  };
+				  if (currentGameData && currentGameData.stato === "in_corso") patch.stato = "verifica";
+				  await docRef.update(patch);
+				  // Il calcolo finale avviene automaticamente nel listener quando tutti hanno confermato.
+				}
 			
 			function getConteggioGlobale() {
 			    let conteggio = {};
@@ -4454,11 +4489,12 @@ if (data.stato === "in_corso") {
 			}
 			async function attivaAnalisiMultiplayer() {
 			  const loadingDiv = document.createElement('div');
-			  loadingDiv.innerHTML = ' < div style = "text-align:center; padding:20px;" > ⏳Caricamento analisi... < /div>';
+			  loadingDiv.textContent = '⏳ Caricamento analisi...';
 			  document.getElementById('found-words').appendChild(loadingDiv);
-			  const snap = await db.collection("partite").doc(matchId).get();
-			  const data = snap.data();
+			  /* Il listener principale contiene già l'istantanea più recente. */
+			  const data = currentGameData;
 			  loadingDiv.remove();
+			  if (!data) return;
 			  document.getElementById('multiplayer-lobby').style.display = 'none';
 			  document.getElementById('proposta-manuale-container').style.display = 'block';
 			  isAnalysisPhase = true;
@@ -4613,7 +4649,12 @@ async function applicaModificaDizionario(parola, tipo) {
             excluded: firebase.firestore.FieldValue.arrayUnion(parola)
         }, { merge: true });
     }
-    
+    if (window.FAW_WRITE_TTL_CACHE) {
+        window.FAW_WRITE_TTL_CACHE('dictionary-overrides-v1', {
+            extra: EXTRA_WORDS.slice(), excluded: EXCLUDED_WORDS.slice()
+        });
+    }
+
     alert(`${tipo === 'extra' ? '✅ Aggiunta' : '🚫 Rimossa'} PERMANENTEMENTE: "${parola}"`);
     
     // ✅ Forza refresh dell'analisi
@@ -4778,8 +4819,8 @@ async function applicaModificaDizionario(parola, tipo) {
 			});
 			
 			try {
-			  const snap = await db.collection("partite").doc(matchId).get();
-			  const v = snap.data();
+			  const v = currentGameData;
+			  if (!v || !Array.isArray(v.partecipanti)) throw new Error('Stato partita non ancora disponibile');
 			  let mode = crazy ? 'crazy' : (bonus ? 'bonus' : 'classic');
 			  
 			  let pts = {}; 
@@ -4830,8 +4871,10 @@ async function applicaModificaDizionario(parola, tipo) {
 			}
 			}
 async function attivaAnalisiMultiplayerSilent() {
-    const snap = await db.collection("partite").doc(matchId).get();
-    const data = snap.data();
+    /* Il documento partita è già in ascolto: evitare una lettura extra quando
+       il listener porta l'utente nella schermata di analisi. */
+    const data = currentGameData;
+    if (!data) return;
 
     document.getElementById('proposta-manuale-container').style.display = 'block';
     isAnalysisPhase = true;
@@ -5039,14 +5082,20 @@ function startEliminazioniListener() {
 
                 // ✅ Se tutti hanno accettato → applica eliminazione
                 if (proposta.accettati.length >= numPartecipanti) {
-                    await applicaEliminazioneParola(proposta.parola);
-                    await db.collection("partite").doc(matchId).collection("eliminazioni").doc(proposta.parola).delete().catch(e => {});
+                    /* Un solo referente materializza esito e cleanup: tutti gli altri
+                       client aggiornano la UI dal listener, senza write duplicate. */
+                    if (arbitroPunteggi(currentGameData) === mioNome) {
+                        await applicaEliminazioneParola(proposta.parola);
+                        await db.collection("partite").doc(matchId).collection("eliminazioni").doc(proposta.parola).delete().catch(e => {});
+                    }
                     return;
                 }
 
-                // ✅ Se qualcuno ha rifiutato → cancella proposta
+                // ✅ Se qualcuno ha rifiutato → pulizia eseguita una sola volta
                 if (proposta.rifiutati.length > 0) {
-                    await db.collection("partite").doc(matchId).collection("eliminazioni").doc(proposta.parola).delete().catch(e => {});
+                    if (arbitroPunteggi(currentGameData) === mioNome) {
+                        await db.collection("partite").doc(matchId).collection("eliminazioni").doc(proposta.parola).delete().catch(e => {});
+                    }
                     alert(`❌ Eliminazione di "${proposta.parola}" rifiutata da ${proposta.rifiutati.join(', ')}.`);
                     return;
                 }
@@ -5139,52 +5188,51 @@ function checkPendingEliminazioni() {
 }
 // ✅ APPLICA ELIMINAZIONE PAROLA (tutti hanno accettato)
 async function applicaEliminazioneParola(parola) {
-    if (!currentGameData) return;
+    const data = currentGameData;
+    if (!data || eliminazioniInApplicazione.has(parola)) return;
+    eliminazioniInApplicazione.add(parola);
 
     try {
-        // 1. Aggiungi a paroleEscluse nella partita corrente
-        await db.collection("partite").doc(matchId).update({
-            paroleEscluse: firebase.firestore.FieldValue.arrayUnion(parola)
-        });
-
-        // 2. Aggiungi al dizionario excluded globale
-        await db.collection("config").doc("dizionario").set({
-            excluded: firebase.firestore.FieldValue.arrayUnion(parola)
-        }, { merge: true });
-
-        // 3. Aggiungi al dizionario custom della partita
-        await db.collection("partite").doc(matchId).update({
+        /* Il listener della partita possiede già i dati necessari al ricalcolo.
+           Aggiorniamo i due campi della partita insieme e calcoliamo una sola
+           volta: prima erano tre write alla stessa room più un get aggiuntivo. */
+        const escluse = (data.paroleEscluse || []).includes(parola)
+            ? (data.paroleEscluse || [])
+            : (data.paroleEscluse || []).concat([parola]);
+        const aggiornati = Object.assign({}, data, { paroleEscluse: escluse });
+        const nuoviPunteggi = calcolaPunteggiFinali(aggiornati);
+        const patch = {
+            paroleEscluse: firebase.firestore.FieldValue.arrayUnion(parola),
             'dizionarioCustom.excluded': firebase.firestore.FieldValue.arrayUnion(parola)
-        });
+        };
+        if (!stessiPunteggi(data.punteggi || {}, nuoviPunteggi)) patch.punteggi = nuoviPunteggi;
 
-        // 4. Aggiorna dizionario locale
+        await Promise.all([
+            db.collection("partite").doc(matchId).update(patch),
+            db.collection("config").doc("dizionario").set({
+                excluded: firebase.firestore.FieldValue.arrayUnion(parola)
+            }, { merge: true })
+        ]);
+
         if (!EXCLUDED_WORDS.includes(parola)) EXCLUDED_WORDS.push(parola);
         dictionary.delete(parola);
         buildTrie();
+        if (window.FAW_WRITE_TTL_CACHE) {
+            window.FAW_WRITE_TTL_CACHE('dictionary-overrides-v1', {
+                extra: EXTRA_WORDS.slice(), excluded: EXCLUDED_WORDS.slice()
+            });
+        }
 
-        // 5. Ricalcola i punteggi per tutti con la regola condivisa
-                const snap = await db.collection("partite").doc(matchId).get();
-                const data = snap.data();
-                const nuoviPunteggi = calcolaPunteggiFinali(data);
-
-                /* Scrittura solo se i conti sono davvero cambiati: questa funzione
-                   parte su ogni client che vede il voto, ma il valore e' lo stesso. */
-                if (!stessiPunteggi(data.punteggi || {}, nuoviPunteggi)) {
-                    await db.collection("partite").doc(matchId).update({
-                        punteggi: nuoviPunteggi
-                    });
-                }
-
-                // Aggiorna locale
-                score = nuoviPunteggi[mioNome] !== undefined ? nuoviPunteggi[mioNome] : 0;
-                scoreDisplay.textContent = score;
-
+        score = nuoviPunteggi[mioNome] !== undefined ? nuoviPunteggi[mioNome] : 0;
+        scoreDisplay.textContent = score;
     } catch (e) {
         console.error("Errore applicazione eliminazione:", e);
+    } finally {
+        eliminazioniInApplicazione.delete(parola);
     }
 }
 
-			function apriModalRivincita() {
+				function apriModalRivincita() {
 			  document.getElementById('multiplayer-lobby').style.display = 'none';
 			  apriRivincitaBanner();
 			}

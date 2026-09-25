@@ -212,6 +212,7 @@
       var d = doc.data() || {};
       var out = { extra: d.extra || [], excluded: d.excluded || [] };
       try { localStorage.setItem(C.DICT_CACHE_KEY, JSON.stringify({ ts: Date.now(), extra: out.extra, excluded: out.excluded })); } catch (e) { /* noop */ }
+      if (global.FAW_WRITE_TTL_CACHE) global.FAW_WRITE_TTL_CACHE('dictionary-overrides-v1', out);
       return out;
     }).catch(function (e) {
       console.warn('[NCC] override dizionario non disponibili:', e && e.message);
@@ -1474,10 +1475,13 @@
           if (typeof firebase.firestore === 'undefined') {
             console.warn('[NCC] firebase-firestore-compat.js non caricato: solo allenamento disponibile.');
           } else {
-            if (!firebase.apps || firebase.apps.length === 0) firebase.initializeApp(cfg);
             G.fs = firebase.firestore;
-            G.db = firebase.firestore();
-            if (window.FAW_ENABLE_PERSISTENCE) window.FAW_ENABLE_PERSISTENCE(G.db);
+            G.db = typeof window.FAW_INIT_FIRESTORE === 'function'
+              ? window.FAW_INIT_FIRESTORE()
+              : (function () {
+                  if (!firebase.apps || firebase.apps.length === 0) firebase.initializeApp(cfg);
+                  return firebase.firestore();
+                })();
           }
         }
       } catch (e) {
