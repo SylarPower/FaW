@@ -8,6 +8,7 @@
 		<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore-compat.js"></script>
 		<!-- Config Firebase condivisa (prima dello script che inizializza Firebase) -->
 		<script src="../shared/firebase-config.js"></script>
+		<script src="../shared/rivincita.js"></script>
 		<!-- Spazio per i banner di stato fissi in cima (evita che coprano il testo) -->
 		<script src="../shared/faw-layout.js" defer></script>
 		<!-- Podio di fine partita (condiviso tra i giochi) -->
@@ -33,9 +34,10 @@
 			--panel-bg: rgba(255, 255, 255, 0.85);
 			--item-bg: #f4f7fc;
 			/* testo sopra --item-bg e varianti scure per il tema chiaro (contrasto) */
-			--item-text: #1c2438;
-			--accent-strong: #b91c3c;
-			--primary-strong: #0e7490;
+		--item-text: #1c2438;
+		--accent-strong: #b91c3c;
+		--primary-strong: #0e7490;
+		--text-muted: #5b6470;
 			--line-soft: rgba(28, 36, 56, 0.12);
 			--line-color: rgba(28, 36, 56, 0.75);
 			--overlay-bg: rgba(16, 22, 42, 0.92);
@@ -55,9 +57,11 @@
 			--tile-valid: #2fd67b;
 			--panel-bg: rgba(255, 255, 255, 0.045);
 			--item-bg: rgba(255, 255, 255, 0.075);
-			--item-text: #eef1fa;
-			--accent-strong: #ff5a6e;
-			--primary-strong: #22d3ee;
+		--item-text: #eef1fa;
+		--accent-strong: #ff5a6e;
+		--primary-strong: #22d3ee;
+		--text-muted: #c5cdd8;
+		color-scheme: dark;
 			--line-soft: rgba(255, 255, 255, 0.09);
 			--line-color: rgba(34, 211, 238, 0.85);
 			--overlay-bg: rgba(5, 8, 16, 0.94);
@@ -391,8 +395,8 @@
 			font-weight: 700;
 			font-size: 1.02rem;
 			letter-spacing: 4px;
-			color: var(--primary);
-			background: var(--item-bg);
+		color: var(--primary-strong);
+		background: var(--item-bg);
 			padding: 7px 12px;
 			border-radius: 10px;
 			cursor: pointer;
@@ -403,13 +407,34 @@
 			border-color: var(--primary);
 			box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.18);
 			}
-			select {
-			padding: 5px;
-			border-radius: 4px;
-			background: var(--bg);
-			color: var(--text-main);
-			border: 1px solid #7f8c8d;
-			}
+		select,
+		select option {
+		padding: 8px 10px;
+		border-radius: 8px;
+		background-color: #ffffff;
+		color: #1c2438;
+		border: 2px solid #5b6470;
+		color-scheme: light;
+		font-weight: 700;
+		}
+		body.dark-mode select,
+		body.dark-mode select option {
+		background-color: #1a2134;
+		color: #eef1fa;
+		border-color: #8b9bb8;
+		color-scheme: dark;
+		}
+		/* Modali e banner sono scuri in entrambi i temi: il controllo resta chiaro,
+		   così le option non ereditano il testo chiaro del contenitore. */
+		.modal-content select,
+		.modal-content select option,
+		.game-banner select,
+		.game-banner select option {
+		background-color: #ffffff !important;
+		color: #1c2438 !important;
+		border: 2px solid #5b6470;
+		color-scheme: light;
+		}
 			.board-wrapper {
 			display: flex;
 			flex-direction: column;
@@ -424,8 +449,8 @@
 			font-size: 1.2rem;
 			align-items: center;
 			}
-			#timer {
-			color: var(--accent);
+		#timer {
+		color: var(--accent-strong);
 			font-family: var(--font-display);
 			font-weight: 700;
 			font-feature-settings: "tnum";
@@ -555,12 +580,12 @@
 			    opacity: 0.8;
 			    filter: blur(0px); /* Solo il testo è offuscato via text-shadow */
 			}
-			.tile.selected {
-			background-color: var(--tile-selected);
-			transform: translateY(2px);
-			box-shadow: 0 1px 0 var(--tile-shadow);
-			color: #fff;
-			}
+		.tile.selected {
+		background-color: var(--tile-selected);
+		transform: translateY(2px);
+		box-shadow: 0 1px 0 var(--tile-shadow);
+		color: #241500;
+		}
 			.tile.anim-valid {
 			animation: pulseGreen 0.3s;
 			}
@@ -585,18 +610,19 @@
 			top: 1px;
 			right: 1px;
 			}
-			.b-2l {
-			background: #3498db;
-			}
-			.b-3l {
-			background: #2980b9;
-			}
-			.b-2p {
-			background: #e67e22;
-			}
-			.b-3p {
-			background: #e74c3c;
-			}
+		.b-2l {
+		background: #1f6fa8;
+		}
+		.b-3l {
+		background: #154360;
+		}
+		.b-2p {
+		background: #e67e22;
+		color: #1c2438;
+		}
+		.b-3p {
+		background: #c0392b;
+		}
 			.rotate-btn {
 			background: none;
 			border: none;
@@ -639,17 +665,22 @@
 			.score-box {
 			display: inline-block;
 			}
-			.score-val {
-			font-family: var(--font-display);
-			font-size: 2.5rem;
-			font-weight: 800;
-			line-height: 1.1;
-			background: linear-gradient(135deg, var(--primary), #22d3ee);
-			-webkit-background-clip: text;
-			background-clip: text;
-			-webkit-text-fill-color: transparent;
-			}
-			.info-btn {
+		.score-val {
+		font-family: var(--font-display);
+		font-size: 2.5rem;
+		font-weight: 800;
+		line-height: 1.1;
+		color: var(--primary-strong);
+		-webkit-text-fill-color: var(--primary-strong);
+		}
+		body.dark-mode .score-val {
+		background: linear-gradient(135deg, #67e8f9, #22d3ee);
+		-webkit-background-clip: text;
+		background-clip: text;
+		-webkit-text-fill-color: transparent;
+		color: transparent;
+		}
+		.info-btn {
 			position: absolute;
 			right: 0;
 			top: 2px;
@@ -658,8 +689,8 @@
 			border-radius: 50%;
 			background: var(--item-bg);
 			border: 1px solid var(--line-soft);
-			color: var(--primary);
-			font-weight: 800;
+		color: var(--primary-strong);
+		font-weight: 800;
 			cursor: pointer;
 			transition: transform 0.15s ease, border-color 0.15s ease;
 			}
@@ -786,12 +817,12 @@
 			color: #04150b !important;
 			box-shadow: 0 5px 18px rgba(47, 214, 123, 0.35);
 			}
-			.btn-end-now {
-			background: linear-gradient(135deg, #ff5a6e, #d63650) !important;
-			color: white !important;
-			border: none !important;
-			box-shadow: 0 5px 18px rgba(255, 90, 110, 0.35);
-			}
+		.btn-end-now {
+		background: linear-gradient(135deg, #c0392b, #9f1239) !important;
+		color: #ffffff !important;
+		border: none !important;
+		box-shadow: 0 5px 18px rgba(159, 18, 57, 0.35);
+		}
 			.btn-new {
 			display: block;
 			}
@@ -808,8 +839,8 @@
 			display: none;
 			margin-top: 0;
 			margin-bottom: 10px;
-			background: linear-gradient(135deg, #ff5a6e, #d63650);
-			color: #fff;
+		background: linear-gradient(135deg, #c0392b, #9f1239);
+		color: #fff;
 			border: none;
 			box-shadow: 0 5px 18px rgba(255, 90, 110, 0.35);
 			}
@@ -838,8 +869,8 @@
 			font-weight: 800;
 			letter-spacing: 0.5px;
 			}
-			.missed-words-list .mw-p {
-			color: var(--accent);
+		.missed-words-list .mw-p {
+		color: var(--accent-strong);
 			font-size: 0.78rem;
 			font-weight: 800;
 			white-space: nowrap;
@@ -851,8 +882,8 @@
 			letter-spacing: 1px;
 			border: none;
 			border-radius: 12px;
-			background: linear-gradient(135deg, #ff5a6e, #d63650);
-			color: white;
+		background: linear-gradient(135deg, #c0392b, #9f1239);
+		color: #ffffff;
 			cursor: pointer;
 			font-weight: 800;
 			box-shadow: 0 6px 20px rgba(255, 90, 110, 0.4);
@@ -980,8 +1011,8 @@
 			font-family: var(--font-display);
 			font-size: 1.25rem;
 			font-weight: 800;
-			color: var(--primary);
-			display: block;
+		color: var(--primary-strong);
+		display: block;
 			white-space: nowrap;
 			overflow: hidden;
 			text-overflow: ellipsis;
@@ -1052,9 +1083,9 @@
 			color: var(--text-main);
 			transition: all 0.15s ease;
 			}
-			.sort-btn.active {
-			background: linear-gradient(135deg, var(--primary), #22d3ee);
-			color: #04222b;
+		.sort-btn.active {
+		background: linear-gradient(135deg, #22d3ee, #67e8f9);
+		color: #04222b;
 			border-color: transparent;
 			box-shadow: 0 4px 14px rgba(34, 211, 238, 0.3);
 			}
@@ -1136,8 +1167,8 @@
 			font-size: 1.25rem;
 			font-weight: 700;
 			letter-spacing: 1px;
-			color: var(--primary);
-			z-index: 5000;
+		color: var(--primary-strong);
+		z-index: 5000;
 			}
 			#ach-notification {
 			position: absolute;
@@ -1145,8 +1176,8 @@
 			left: 50%;
 			transform: translate(-50%, -50%) scale(0);
 			width: 90%;
-			background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
-			color: white;
+		background: linear-gradient(135deg, #1e8449 0%, #146c3a 100%);
+		color: #ffffff;
 			padding: 15px;
 			border-radius: 10px;
 			font-weight: bold;
@@ -1220,8 +1251,8 @@
 			border: 1px solid rgba(255, 255, 255, 0.2);
 			}
 			#game-end-modal .btn-action {
-			background: white;
-			color: #2980b9;
+		background: white;
+		color: #0e7490;
 			font-size: 1.1rem;
 			font-weight: 900;
 			box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
@@ -1251,8 +1282,8 @@
 			flex-direction: column;
 			justify-content: center;
 			align-items: center;
-			z-index: 100;
-			color: var(--text-main);
+		z-index: 100;
+		color: #eef1fa;
 			text-align: center;
 			padding: 20px;
 			}
@@ -1362,7 +1393,7 @@
 		</div>
 		<div id="loading-msg">
 			Caricamento Dizionario... 
-			<div style="font-size:0.9rem; color:#777; margin-top:10px; font-weight:normal;">(Database parole)</div>
+			<div style="font-size:0.9rem; color:var(--text-muted); margin-top:10px; font-weight:normal;">(Database parole)</div>
 		</div>
 		<div class="app-wrapper">
 			<div class="header-bar">
@@ -1447,7 +1478,7 @@
 						<button class="sort-btn" title="Ordinamento" onclick="toggleSortDirection()" id="sort-dir-btn">⬇️</button>
 					</div>
 					<button id="btn-missed" class="btn-action btn-missed" onclick="showMissedWords()">🔍 COSA MI SONO PERSO?</button>
-					<div style="font-size:0.8rem; color:var(--accent); margin-bottom:5px; display:none; flex-shrink:0;" id="analysis-msg">
+					<div style="font-size:0.8rem; color:var(--accent-strong); margin-bottom:5px; display:none; flex-shrink:0;" id="analysis-msg">
 						 Clicca su una parola per proporne l'eliminazione
 					</div>
 					<div id="ach-notification">🏆 <span id="ach-text">Obiettivo Sbloccato!</span>
@@ -1463,7 +1494,7 @@
 				<h2>Nuova Partita</h2>
 				<div style="margin-bottom: 20px;">
 					<label for="modal-timer-select" style="font-weight:bold; display:block; margin-bottom:5px;">Durata:</label>
-					<select id="modal-timer-select" style="width: 100%; padding: 8px; font-size: 1rem;">
+					<select id="modal-timer-select" class="faw-select" style="width: 100%; padding: 8px; font-size: 1rem;">
 						<option value="30">30s (Fulmine)</option>
 						<option value="60">60s (Blitz)</option>
 						<option value="90">90s</option>
@@ -1473,7 +1504,7 @@
 				</div>
 				<div style="margin-bottom: 20px;">
 					<label for="modal-grid-select" style="font-weight:bold; display:block; margin-bottom:5px;">Dimensione Griglia:</label>
-					<select id="modal-grid-select" style="width: 100%; padding: 8px; font-size: 1rem;">
+					<select id="modal-grid-select" class="faw-select" style="width: 100%; padding: 8px; font-size: 1rem;">
 						<option value="3">3x3 (Mini)</option>
 						<option value="4">4x4 (Easy)</option>
 						<option value="5" selected>5x5 (Classica)</option>
@@ -1603,8 +1634,8 @@
 					<div id="end-score-val" style="font-size: 5rem; font-weight: 900; line-height: 1; text-shadow: 0 5px 0 rgba(0,0,0,0.2);">0</div>
 				</div>
 				<div style="display:flex; gap:15px; justify-content:center; margin-top:20px; flex-wrap:wrap;">
-					<button onclick="closeEndGameModal()" class="btn-action" style="width:auto; padding:12px 25px; background:white; color:#2980b9; border:none;">🔍 ESPLORA GRIGLIA</button>
-					<button onclick="tornaHome()" class="btn-action" style="width:auto; padding:12px 25px; background:white; color:#2980b9; border:none;">🏠 HOME</button>
+		<button onclick="closeEndGameModal()" class="btn-action" style="width:auto; padding:12px 25px; background:white; color:#0e7490; border:none;">🔍 ESPLORA GRIGLIA</button>
+		<button onclick="tornaHome()" class="btn-action" style="width:auto; padding:12px 25px; background:white; color:#0e7490; border:none;">🏠 HOME</button>
 				</div>
 			</div>
 		</div>
@@ -1943,7 +1974,11 @@
 			    }
 			    
 			    // ✅ Aggiorna stile senza ricreare
-			    banner.style.background = `linear-gradient(135deg, ${options.color} 0%, ${adjustColor(options.color, -20)} 100%)`;
+			    const bannerFill = (window.FAW_fillPerTestoChiaro && options.color)
+		      ? window.FAW_fillPerTestoChiaro(options.color)
+		      : options.color;
+		    banner.style.background = `linear-gradient(135deg, ${bannerFill} 0%, ${adjustColor(bannerFill, -20)} 100%)`;
+		    banner.style.color = '#ffffff';
 				 // ✅ Gestisci vibrazione vittoria
 				 if (options.vibrate) {
 					  banner.classList.add('banner-victory');
@@ -2063,8 +2098,9 @@
 				        }
 				      });
 				    };
-				    const cachedOverrides = window.FAW_READ_TTL_CACHE &&
-				      window.FAW_READ_TTL_CACHE('dictionary-overrides-v1', 24 * 60 * 60 * 1000);
+				    const cachedOverrides = window.FAW_READ_DICTIONARY_OVERRIDES
+				      ? window.FAW_READ_DICTIONARY_OVERRIDES()
+				      : (window.FAW_READ_TTL_CACHE && window.FAW_READ_TTL_CACHE('dictionary-overrides-v1', 24 * 60 * 60 * 1000));
 				    if (cachedOverrides) {
 				      applyDictionaryOverrides(cachedOverrides);
 				      console.log("✅ Dizionario condiviso dalla cache locale");
@@ -2078,8 +2114,8 @@
 				        if (globalDoc.exists) {
 				          const data = globalDoc.data() || {};
 				          applyDictionaryOverrides(data);
-				          if (window.FAW_WRITE_TTL_CACHE) {
-				            window.FAW_WRITE_TTL_CACHE('dictionary-overrides-v1', {
+				          if (window.FAW_WRITE_DICTIONARY_OVERRIDES) {
+				            window.FAW_WRITE_DICTIONARY_OVERRIDES({
 				              extra: data.extra || [], excluded: data.excluded || []
 				            });
 				          }
@@ -2142,38 +2178,42 @@
 			  initGame(null);
 			  copySeedNewGame();
 			}
-			async function creaRivincitaPersonalizzata(bonus, crazy) {
-			  const v = currentGameData;
-			  if (!v || !Array.isArray(v.partecipanti)) throw new Error('Stato partita non ancora disponibile');
-			  let mode = crazy ? 'crazy' : (bonus ? 'bonus' : 'classic');
-			  let pts = {};
-			  let words = {};
-			  v.partecipanti.forEach(p => {
-			    pts[p] = 0;
-			    words[p] = [];
-			  });
-			  const doc = await db.collection("partite").add({
-			    gioco: 'ruzzle',
-			    partecipanti: v.partecipanti,
-			    opzioni: {
-			      tempo: document.getElementById('modal-timer-select').value,
-			      griglia: document.getElementById('modal-grid-select').value,
-			      mode: mode,
-			      seed: Math.random().toString(36).substring(7).toUpperCase()
-			    },
-			    punteggi: pts,
-			    parole: words,
-			    pronti: [],
-			    finito: [],
-			    confermaVerifica: [],
-			    stato: "attesa",
-			    timestamp: Date.now(),
-			    dataOra: new Date().toLocaleString('it-IT')
-			  });
-			  db.collection("partite").doc(matchId).update({
-			    prossimaPartita: doc.id
-			  });
-			}
+		async function creaRivincitaPersonalizzata(bonus, crazy) {
+		  const v = currentGameData;
+		  if (!v || !Array.isArray(v.partecipanti)) throw new Error('Stato partita non ancora disponibile');
+		  let mode = crazy ? 'crazy' : (bonus ? 'bonus' : 'classic');
+		  let pts = {};
+		  let words = {};
+		  v.partecipanti.forEach(p => {
+		    pts[p] = 0;
+		    words[p] = [];
+		  });
+		  if (window.FAW_RIVINCITA) {
+		    await window.FAW_RIVINCITA.scarta(db, v.prossimaPartita, v.prossimaPartitaGioco);
+		  }
+		  const doc = await db.collection("partite").add({
+		    gioco: 'ruzzle',
+		    partecipanti: v.partecipanti,
+		    opzioni: {
+		      tempo: document.getElementById('modal-timer-select').value,
+		      griglia: document.getElementById('modal-grid-select').value,
+		      mode: mode,
+		      seed: Math.random().toString(36).substring(7).toUpperCase()
+		    },
+		    punteggi: pts,
+		    parole: words,
+		    pronti: [],
+		    finito: [],
+		    confermaVerifica: [],
+		    stato: "attesa",
+		    timestamp: Date.now(),
+		    dataOra: new Date().toLocaleString('it-IT')
+		  });
+		  const collegamento = window.FAW_RIVINCITA
+		    ? window.FAW_RIVINCITA.campiCollegamento(doc.id, 'ruzzle', mioNome)
+		    : { prossimaPartita: doc.id, prossimaPartitaCreataDa: mioNome };
+		  await db.collection("partite").doc(matchId).update(collegamento);
+		}
 			
 			function closeNewGameModal() {
 			  newGameModal.style.display = 'none';
@@ -2405,7 +2445,7 @@
 			        errorTimeout = null;
 			      }
 			      wordDisplayLocked = false;
-			      wordDisplay.style.background = "#dfe6e9";
+			      ripristinaParola();
 			      wordDisplay.textContent = '';
 			      document.querySelectorAll('.tile').forEach(t => {
 			        t.classList.remove('selected');
@@ -2822,7 +2862,7 @@
 			  selectedCells = [];
 			  lineLayer.innerHTML = '';
 			  wordDisplay.textContent = "";
-			  wordDisplay.style.background = "#dfe6e9";
+			  ripristinaParola();
 			  currentHighlightedWord = null;
 			}
 			
@@ -2911,7 +2951,20 @@
 			    }
 			};
 			
-			function validateWord(wordParam = null, cellsParam = null) {
+			function flashParola(bg) {
+		  const coppia = window.FAW_coppiaLeggibile
+		    ? window.FAW_coppiaLeggibile(bg, '#1c2438')
+		    : { bg: bg, fg: '#1c2438' };
+		  wordDisplay.style.background = coppia.bg;
+		  wordDisplay.style.color = coppia.fg;
+		  wordDisplay.style.webkitTextFillColor = coppia.fg;
+		}
+		function ripristinaParola() {
+		  wordDisplay.style.background = '';
+		  wordDisplay.style.color = '';
+		  wordDisplay.style.webkitTextFillColor = '';
+		}
+		function validateWord(wordParam = null, cellsParam = null) {
 			  const word = wordParam || wordDisplay.textContent;
 			  const currentCells = cellsParam || [...selectedCells];
 			  if (!word || word.length === 0 || currentCells.length === 0) {
@@ -2927,7 +2980,7 @@
 			      const pts = calculateScoreWithBonuses(word, currentCells);
 			      wordDisplayLocked = true;
 			      wordDisplay.textContent = `${word} (+${pts} pt)`;
-			      wordDisplay.style.background = "#2ecc71";
+			      flashParola("#2ecc71");
 			      selectedCells = [];
 			      lineLayer.innerHTML = '';
 			      document.querySelectorAll('.tile').forEach(t => t.classList.remove('selected'));
@@ -2936,7 +2989,7 @@
 			      });
 			      errorTimeout = setTimeout(() => {
 			        document.querySelectorAll('.tile').forEach(t => t.classList.remove('anim-valid'));
-			        wordDisplay.style.background = "#dfe6e9";
+			        ripristinaParola();
 			        wordDisplayLocked = false;
 			        wordDisplay.textContent = '';
 			        errorTimeout = null;
@@ -2954,11 +3007,11 @@
 				    return;
 				}
 			  if (foundWords.has(word)) {
-			    wordDisplay.style.background = "#f1c40f";
+			    flashParola("#f1c40f");
 			    selectedCells = [];
 			    lineLayer.innerHTML = '';
 			    document.querySelectorAll('.tile').forEach(t => t.classList.remove('selected'));
-			    setTimeout(() => wordDisplay.style.background = "#dfe6e9", 300);
+			    setTimeout(() => ripristinaParola(), 300);
 			    return;
 			  }
 			  if (dictionary.has(word)) {
@@ -3005,10 +3058,10 @@
 			    // Mostra conferma BREVE
 			    wordDisplayLocked = true;
 			    wordDisplay.textContent = `${word} (+${pts})`;
-			    wordDisplay.style.background = "#2ecc71";
+			    flashParola("#2ecc71");
 			    setTimeout(() => {
 			      if (!inputState.isDragging) {
-			        wordDisplay.style.background = "#dfe6e9";
+			        ripristinaParola();
 			        wordDisplayLocked = false;
 			        wordDisplay.textContent = "";
 			      }
@@ -3020,7 +3073,7 @@
 			
 			function shakeAndClear(cells) {
 			  errorCount++;
-			  wordDisplay.style.background = "#e74c3c";
+			  flashParola("#e74c3c");
 			  cells.forEach(i => {
 			    if (gridEl.children[i]) gridEl.children[i].classList.add('anim-invalid');
 			  });
@@ -3031,7 +3084,7 @@
 			    });
 			    selectedCells = [];
 			    lineLayer.innerHTML = '';
-			    wordDisplay.style.background = "#dfe6e9";
+			    ripristinaParola();
 			    wordDisplay.textContent = "";
 			    wordDisplayLocked = false;
 			  }, 200);
@@ -4149,8 +4202,10 @@ if (data.stato === "attesa") {
     });
     
     // ✅ Tutti pronti? Passa a "in_corso"
-    if (pronti.length >= data.partecipanti.length) {
-        db.collection("partite").doc(matchId).update({ stato: "in_corso" });
+    if (pronti.length >= data.partecipanti.length && !avvioInCorsoInviato) {
+        avvioInCorsoInviato = true;
+        db.collection("partite").doc(matchId).update({ stato: "in_corso" })
+          .catch(() => { avvioInCorsoInviato = false; });
     }
 }
 
@@ -4313,14 +4368,16 @@ if (data.stato === "in_corso") {
 					 const btnNewEl = document.querySelector('.btn-new');
 					 if (btnNewEl) btnNewEl.style.display = 'block';
 
-					 if (data.prossimaPartita) {
-						  const rifiutanti = data.rivincitaRifiutataDa || [];
-						  const accettanti = data.rivincitaAccettataDa || [];
-						  const creatore = data.prossimaPartitaCreataDa;
-						  const altri = data.partecipanti.filter(p => p !== creatore);
+		 if (data.prossimaPartita) {
+				  const faseRv = window.FAW_RIVINCITA ? window.FAW_RIVINCITA.fase(data, mioNome) : null;
+				  const nomeGiocoRv = (faseRv && faseRv.nome) || 'Ruzzle';
+				  const rifiutanti = data.rivincitaRifiutataDa || [];
+				  const accettanti = data.rivincitaAccettataDa || [];
+				  const creatore = data.prossimaPartitaCreataDa;
+				  const altri = data.partecipanti.filter(p => p !== creatore);
 
-						  // === FIX SINCRONIZZAZIONE RIVINCITA ===
-						  if (rifiutanti.length > 0) {
+		  // Un rifiuto blocca la proposta anche se la lista accettanti è già piena.
+				  if (rifiutanti.length > 0) {
 							  const ioHoRifiutato = rifiutanti.includes(mioNome);
 							  const altriRifiutanti = rifiutanti.filter(r => r !== mioNome);
 							  
@@ -4347,57 +4404,53 @@ if (data.stato === "in_corso") {
 										 ]
 									});
 							  }
-							  return;
-							}
-						  else if (creatore === mioNome) {
+						  return;
+						}
+				  if (window.FAW_RIVINCITA && window.FAW_RIVINCITA.tuttiAccettati(data.partecipanti, creatore, accettanti)) {
+					  showGameBanner({
+						  icon: '✅',
+						  title: 'RIVINCITA ACCETTATA DA TUTTI!',
+						  subtitle: 'Si entra in ' + nomeGiocoRv + '…',
+						  color: '#1e8449',
+						  buttons: [],
+						  spinner: true
+					  });
+					  vaiAllaRivincita(data);
+					  return;
+				  }
+				  if (creatore === mioNome) {
 								// Sono io che ho creato la rivincita
-								if (accettanti.length >= altri.length) {   // tutti hanno accettato
-									 showGameBanner({
-										  icon: '✅',
-										  title: 'RIVINCITA ACCETTATA DA TUTTI!',
-										  subtitle: 'Reindirizzamento in corso...',
-										  color: '#27ae60',
-										  buttons: [],
-										  spinner: true
-									 });
-									 setTimeout(() => {
-										  window.location.href = `index.html?matchId=${data.prossimaPartita}`;
-									 }, 1200);
-								} else {
-									 showGameBanner({
-										  icon: '⏳',
-										  title: 'RIVINCITA CREATA',
-										  subtitle: `In attesa di ${altri.filter(p => !accettanti.includes(p)).join(', ')}...`,
-										  color: '#9b59b6',
-										  buttons: [{ text: '🚫 ANNULLA', onclick: 'annullaRivincita()' }],
-										  spinner: true
-									 });
-								}
-						  } 
-						  else if (accettanti.includes(mioNome)) {
-								// Ho accettato io
-								showGameBanner({
-									 icon: '✅',
-									 title: 'HAI ACCETTATO LA RIVINCITA',
-									 subtitle: 'In attesa che tutti accettino...',
-									 color: '#27ae60',
-									 buttons: [],
-									 spinner: true
-								});
-						  } 
-						  else {
-								// Devo ancora decidere
-								showGameBanner({
-									 icon: '🔄',
-									 title: 'RIVINCITA PROPOSTA!',
-									 subtitle: `${creatore} vuole la rivincita`,
-									 color: '#e74c3c',
-									 buttons: [
-										  { text: '✅ ACCETTA', onclick: `accettaRivincita('${data.prossimaPartita}')` },
-										  { text: '❌ RIFIUTA', onclick: 'rifiutaRivincita()' }
-									 ]
-								});
-						  }
+				showGameBanner({
+					 icon: '⏳',
+					 title: 'RIVINCITA CREATA',
+					 subtitle: `In attesa di ${altri.filter(p => !accettanti.includes(p)).join(', ')} per ${nomeGiocoRv}…`,
+					 color: '#9b59b6',
+					 buttons: [{ text: '🚫 ANNULLA', onclick: 'annullaRivincita()' }],
+					 spinner: true
+				});
+			  } 
+			  else if (accettanti.includes(mioNome)) {
+				showGameBanner({
+					 icon: '✅',
+					 title: 'HAI ACCETTATO',
+					 subtitle: 'In attesa che tutti accettino ' + nomeGiocoRv + '…',
+					 color: '#1e8449',
+					 buttons: [],
+					 spinner: true
+				});
+			  } 
+			  else {
+				showGameBanner({
+					 icon: '🔄',
+					 title: nomeGiocoRv.toUpperCase(),
+					 subtitle: `${creatore || 'Qualcuno'} propone ${nomeGiocoRv}`,
+					 color: '#c0392b',
+					 buttons: [
+						  { text: '✅ ACCETTA', onclick: 'accettaRivincita()' },
+						  { text: '❌ RIFIUTA', onclick: 'rifiutaRivincita()' }
+					 ]
+				});
+			  }
 						  return;
 					 }
 
@@ -4459,11 +4512,15 @@ if (data.stato === "in_corso") {
 			  loadDictionary();
 			}
 			
-			function setProntoOnline() {
-			  db.collection("partite").doc(matchId).update({
-			    pronti: firebase.firestore.FieldValue.arrayUnion(mioNome),
-			  });
-			}
+		let prontoInviato = false;
+		function setProntoOnline() {
+		  if (prontoInviato || !matchId || !mioNome) return;
+		  prontoInviato = true;
+		  db.collection("partite").doc(matchId).update({
+		    pronti: firebase.firestore.FieldValue.arrayUnion(mioNome),
+		  }).catch(() => { prontoInviato = false; });
+		}
+		let avvioInCorsoInviato = false;
 				async function avviaVerificaUnificata() {
 				  /* La partita è già mantenuta fresca da onSnapshot. Uniamo conferma e
 				     cambio di fase in una sola scrittura, senza rileggere il documento
@@ -4514,7 +4571,7 @@ if (data.stato === "in_corso") {
 			    headerDiv.style = "background:#2c3e50; color:#eef1fa; padding:10px; border-radius:5px; margin-bottom:10px;";
 			    headerDiv.innerHTML = `
 																<label style="font-size:0.7rem; font-weight:bold; display:block; margin-bottom:5px;">MOSTRA PAROLE DI:</label>
-																<select id="sel-analisi" style="width:100%; background:#1e1e1e; color:white; border:1px solid #444; padding:5px;"></select>`;
+																<select id="sel-analisi" class="faw-select" style="width:100%; padding:8px; font-size:1rem;"></select>`;
 			    wordsListEl.parentNode.insertBefore(headerDiv, wordsListEl);
 			    const sel = document.getElementById('sel-analisi');
 			    data.partecipanti.forEach(p => {
@@ -4649,8 +4706,8 @@ async function applicaModificaDizionario(parola, tipo) {
             excluded: firebase.firestore.FieldValue.arrayUnion(parola)
         }, { merge: true });
     }
-    if (window.FAW_WRITE_TTL_CACHE) {
-        window.FAW_WRITE_TTL_CACHE('dictionary-overrides-v1', {
+    if (window.FAW_WRITE_DICTIONARY_OVERRIDES) {
+        window.FAW_WRITE_DICTIONARY_OVERRIDES({
             extra: EXTRA_WORDS.slice(), excluded: EXCLUDED_WORDS.slice()
         });
     }
@@ -4696,46 +4753,67 @@ async function applicaModificaDizionario(parola, tipo) {
 			  window.location.href = '../../index.html';
 			}
 			
-			async function accettaRivincita(nuovoMatchId) {
-			showGameBanner({
-			  icon: '🎮',
-			  title: 'RIVINCITA ACCETTATA!',
-			  subtitle: 'Caricamento...',
-			  color: '#27ae60',
-			  buttons: [],
-			  spinner: true
-			});
-			
-			// ✅ Scrivi che ho accettato nella partita vecchia
-			await db.collection("partite").doc(matchId).update({
-			  rivincitaAccettataDa: firebase.firestore.FieldValue.arrayUnion(mioNome)
-			});
-			
-			setTimeout(() => {
-			  window.location.href = `index.html?matchId=${nuovoMatchId}`;
-			}, 800);
-			}
-			async function annullaRivincita() {
-			if (!confirm("Sicuro di voler annullare la rivincita?")) return;
-			
-			try {
-			  // Elimina la partita creata
-			  if (currentGameData?.prossimaPartita) {
-			      await db.collection("partite").doc(currentGameData.prossimaPartita).delete();
-			  }
-			  
-			  // Rimuovi il riferimento dalla partita corrente
-			  await db.collection("partite").doc(matchId).update({
-			      prossimaPartita: firebase.firestore.FieldValue.delete(),
-			      prossimaPartitaCreataDa: firebase.firestore.FieldValue.delete(),
-			      rivincitaAccettataDa: firebase.firestore.FieldValue.delete(),
-			      rivincitaRifiutataDa: firebase.firestore.FieldValue.delete()
-			  });
-			  
-			} catch(e) {
-			  console.error("Errore annullamento:", e);
-			}
-			}
+		let rivincitaRedirectAvviato = false;
+		function vaiAllaRivincita(data) {
+		  if (rivincitaRedirectAvviato || !data || !data.prossimaPartita) return;
+		  if (window.FAW_RIVINCITA) {
+		    if (!window.FAW_RIVINCITA.vai(data, 'ruzzle')) return;
+		  } else {
+		    setTimeout(() => { window.location.href = `index.html?matchId=${data.prossimaPartita}`; }, 1200);
+		  }
+		  rivincitaRedirectAvviato = true;
+		}
+		function preparaContestoRivincita() {
+		  if (!window.FAW_RIVINCITA || !currentGameData) return;
+		  window.FAW_RIVINCITA.prepara({
+		    db: db,
+		    ref: db.collection('partite').doc(matchId),
+		    me: mioNome,
+		    partecipanti: currentGameData.partecipanti || [],
+		    giocoCorrente: 'ruzzle',
+		    proposta: currentGameData,
+		    onFatto: function () { removeGameBanner(); },
+		    onErrore: function (msg) {
+		      showGameBanner({ icon: '❌', title: 'INVITO NON RIUSCITO', subtitle: msg || 'Riprova', color: '#c0392b', buttons: [{ text: '🔄 RIPROVA', onclick: 'apriRivincitaBanner()' }] });
+		    }
+		  });
+		}
+		async function accettaRivincita() {
+		  try {
+		    await db.collection("partite").doc(matchId).update({
+		      rivincitaAccettataDa: firebase.firestore.FieldValue.arrayUnion(mioNome)
+		    });
+		  } catch (e) {
+		    showGameBanner({
+		      icon: '❌',
+		      title: 'ERRORE',
+		      subtitle: 'Accettazione non riuscita',
+		      color: '#c0392b',
+		      buttons: []
+		    });
+		  }
+		}
+		async function annullaRivincita() {
+		if (!confirm("Sicuro di voler annullare la rivincita?")) return;
+		try {
+		  if (window.FAW_RIVINCITA) {
+		    await window.FAW_RIVINCITA.annulla(db, db.collection("partite").doc(matchId), currentGameData);
+		  } else {
+		    if (currentGameData?.prossimaPartita) {
+		      await db.collection("partite").doc(currentGameData.prossimaPartita).delete();
+		    }
+		    await db.collection("partite").doc(matchId).update({
+		      prossimaPartita: firebase.firestore.FieldValue.delete(),
+		      prossimaPartitaCreataDa: firebase.firestore.FieldValue.delete(),
+		      prossimaPartitaGioco: firebase.firestore.FieldValue.delete(),
+		      rivincitaAccettataDa: firebase.firestore.FieldValue.delete(),
+		      rivincitaRifiutataDa: firebase.firestore.FieldValue.delete()
+		    });
+		  }
+		} catch(e) {
+		  console.error("Errore annullamento:", e);
+		}
+		}
 			
 			async function rifiutaRivincita() {
 			  // ✅ Scrivi su Firebase chi ha rifiutato
@@ -4757,15 +4835,19 @@ async function applicaModificaDizionario(parola, tipo) {
 			  });
 			}
 			
-			function apriRivincitaBanner() {
-			  if (!matchId) {
-			    startNewGame();
-			    return;
-			  }
-			  // ✅ Prendi i valori dalla partita appena giocata
-			  const tempoCorrente = currentGameData?.opzioni?.tempo || '180';
-			  const grigliaCorrente = currentGameData?.opzioni?.griglia || '5';
-			  removeGameBanner();
+		function apriRivincitaBanner() {
+		  if (!matchId) {
+		    startNewGame();
+		    return;
+		  }
+		  preparaContestoRivincita();
+		  // ✅ Prendi i valori dalla partita appena giocata
+		  const tempoCorrente = currentGameData?.opzioni?.tempo || '180';
+		  const grigliaCorrente = currentGameData?.opzioni?.griglia || '5';
+		  const altriGiochi = window.FAW_RIVINCITA
+		    ? window.FAW_RIVINCITA.htmlAltri('ruzzle', (currentGameData?.partecipanti || []).length)
+		    : '';
+		  removeGameBanner();
 			  const banner = document.createElement('div');
 			  banner.id = 'game-banner';
 			  banner.className = 'game-banner';
@@ -4783,14 +4865,14 @@ async function applicaModificaDizionario(parola, tipo) {
 																	</div>
 																</div>
 																<div class="banner-right" style="flex-wrap:wrap; gap:8px;">
-																	<select id="rivincita-tempo" style="padding:6px; border-radius:4px; border:none; font-size:0.85rem;">
+																	<select id="rivincita-tempo" class="faw-select" style="padding:8px 10px; border-radius:8px; font-size:0.85rem;">
 																		<option value="30" ${tempoCorrente === '30' ? 'selected' : ''}>30s</option>
 																		<option value="60" ${tempoCorrente === '60' ? 'selected' : ''}>60s</option>
 																		<option value="90" ${tempoCorrente === '90' ? 'selected' : ''}>90s</option>
 																		<option value="180" ${tempoCorrente === '180' ? 'selected' : ''}>180s</option>
 																		<option value="300" ${tempoCorrente === '300' ? 'selected' : ''}>300s</option>
 																	</select>
-																	<select id="rivincita-griglia" style="padding:6px; border-radius:4px; border:none; font-size:0.85rem;">
+																	<select id="rivincita-griglia" class="faw-select" style="padding:8px 10px; border-radius:8px; font-size:0.85rem;">
 																		<option value="3" ${grigliaCorrente === '3' ? 'selected' : ''}>3x3</option>
 																		<option value="4" ${grigliaCorrente === '4' ? 'selected' : ''}>4x4</option>
 																		<option value="5" ${grigliaCorrente === '5' ? 'selected' : ''}>5x5</option>
@@ -4800,9 +4882,13 @@ async function applicaModificaDizionario(parola, tipo) {
 																	</select>
 																	<button onclick="creaRivincitaConSelettori(false, false)" style="padding:6px 12px; border:none; border-radius:4px; background:white; color:#333; cursor:pointer; font-weight:bold;">CLASSICA</button>
 																	<button onclick="creaRivincitaConSelettori(true, false)" style="padding:6px 12px; border:none; border-radius:4px; background:#f1c40f; color:#333; cursor:pointer; font-weight:bold;">BONUS ⭐</button>
-																	<button onclick="creaRivincitaConSelettori(true, true)" style="padding:6px 12px; border:none; border-radius:4px; background:#e74c3c; color:white; cursor:pointer; font-weight:bold;">CRAZY 🤪</button>
-																	</div>
-			`;
+									<button onclick="creaRivincitaConSelettori(true, true)" style="padding:6px 12px; border:none; border-radius:4px; background:#c0392b; color:#ffffff; cursor:pointer; font-weight:bold;">CRAZY 🤪</button>
+									<div style="flex-basis:100%; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+										<span style="font-size:0.78rem; font-weight:800;">Oppure un altro gioco</span>
+										${altriGiochi}
+									</div>
+									</div>
+		`;
 			  document.body.appendChild(banner);
 			}
 			async function creaRivincitaConSelettori(bonus, crazy) {
@@ -4827,32 +4913,30 @@ async function applicaModificaDizionario(parola, tipo) {
 			  let words = {}; 
 			  v.partecipanti.forEach(p => { pts[p]=0; words[p]=[]; });
 			  
-			  const doc = await db.collection("partite").add({
-			      gioco: 'ruzzle',
-			      partecipanti: v.partecipanti,
-			      opzioni: {
-			          tempo: tempo,
-			          griglia: griglia,
-			          mode: mode,
-			          seed: Math.random().toString(36).substring(7).toUpperCase()
-			      },
-			      punteggi: pts, 
-			      parole: words, 
-			      pronti: [], 
-			      finito: [], 
-			      confermaVerifica: [], 
-			      stato: "attesa", 
-			      timestamp: Date.now(), 
-			      dataOra: new Date().toLocaleString('it-IT')
-			  });
-			  
-			  // ✅ Salva chi ha creato la rivincita MA NON redirigere subito
-			  await db.collection("partite").doc(matchId).update({ 
-			      prossimaPartita: doc.id,
-			      prossimaPartitaCreataDa: mioNome,
-			      rivincitaAccettataDa: [],
-			      rivincitaRifiutataDa: []
-			  });
+		  if (window.FAW_RIVINCITA) await window.FAW_RIVINCITA.scarta(db, v.prossimaPartita, v.prossimaPartitaGioco);
+		  const doc = await db.collection("partite").add({
+		      gioco: 'ruzzle',
+		      partecipanti: v.partecipanti,
+		      opzioni: {
+		          tempo: tempo,
+		          griglia: griglia,
+		          mode: mode,
+		          seed: Math.random().toString(36).substring(7).toUpperCase()
+		      },
+		      punteggi: pts, 
+		      parole: words, 
+		      pronti: [], 
+		      finito: [], 
+		      confermaVerifica: [], 
+		      stato: "attesa", 
+		      timestamp: Date.now(), 
+		      dataOra: new Date().toLocaleString('it-IT')
+		  });
+		  
+		  const collegamento = window.FAW_RIVINCITA
+		    ? window.FAW_RIVINCITA.campiCollegamento(doc.id, 'ruzzle', mioNome)
+		    : { prossimaPartita: doc.id, prossimaPartitaCreataDa: mioNome, rivincitaAccettataDa: [], rivincitaRifiutataDa: [] };
+		  await db.collection("partite").doc(matchId).update(collegamento);
 			  
 			  // ✅ Il listener Firebase mostrerà "In attesa che gli altri accettino"
 			  // Il redirect avverrà quando qualcuno accetta
@@ -4907,7 +4991,7 @@ async function attivaAnalisiMultiplayerSilent() {
         headerDiv.style = "background:#2c3e50; color:#eef1fa; padding:10px; border-radius:5px; margin-bottom:10px;";
         headerDiv.innerHTML = `
             <label style="font-size:0.7rem; font-weight:bold; display:block; margin-bottom:5px;">MOSTRA PAROLE DI:</label>
-            <select id="sel-analisi" style="width:100%; background:#1e1e1e; color:white; border:1px solid #444; padding:5px;"></select>`;
+            <select id="sel-analisi" class="faw-select" style="width:100%; padding:8px; font-size:1rem;"></select>`;
 
         wordsListEl.parentNode.insertBefore(headerDiv, wordsListEl);
 
@@ -4978,7 +5062,7 @@ function renderizzaAnalisiPlayerSilent(nomePlayer, data, conteggioParoleGlobali)
             const propData = pendingEliminazioni.get(item.w);
             const totale = data.partecipanti.length;
             const accettati = propData.accettati ? propData.accettati.length : 0;
-            pendingBadge = `<span style="font-size:0.7rem; background:#f39c12; color:white; padding:2px 6px; border-radius:3px; margin-left:5px;">⏳ ${accettati}/${totale}</span>`;
+            pendingBadge = `<span style="font-size:0.7rem; background:#f39c12; color:#241500; padding:2px 6px; border-radius:3px; margin-left:5px;">⏳ ${accettati}/${totale}</span>`;
         }
 
         li.innerHTML = `
@@ -5217,8 +5301,8 @@ async function applicaEliminazioneParola(parola) {
         if (!EXCLUDED_WORDS.includes(parola)) EXCLUDED_WORDS.push(parola);
         dictionary.delete(parola);
         buildTrie();
-        if (window.FAW_WRITE_TTL_CACHE) {
-            window.FAW_WRITE_TTL_CACHE('dictionary-overrides-v1', {
+        if (window.FAW_WRITE_DICTIONARY_OVERRIDES) {
+            window.FAW_WRITE_DICTIONARY_OVERRIDES({
                 extra: EXTRA_WORDS.slice(), excluded: EXCLUDED_WORDS.slice()
             });
         }

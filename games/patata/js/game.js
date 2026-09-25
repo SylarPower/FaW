@@ -1125,7 +1125,8 @@
       '<div class="b-actions">' +
       (opts.spinner ? '<span class="spinner"></span>' : '') +
       (opts.buttons || []).map((b) =>
-        '<button class="btn ' + (b.kind || 'btn-ghost') + '" data-bid="' + b.id + '">' + esc(b.label) + '</button>'
+        '<button class="btn ' + (b.kind || 'btn-ghost') + '" data-bid="' + b.id + '"' +
+        (b.disabled ? ' disabled' : '') + (b.title ? ' title="' + esc(b.title) + '"' : '') + '>' + esc(b.label) + '</button>'
       ).join('') +
       '</div>';
     el.banner.classList.remove('hidden');
@@ -1196,7 +1197,11 @@
   }
 
   async function getSharedDictionaryOverrides(fb) {
-    // 1. Controlla localStorage (TTL 24 ore)
+    // 1. Cache condivisa (Ruzzle / NCC / Patata): niente lettura se è ancora valida
+    if (window.FAW_READ_DICTIONARY_OVERRIDES) {
+      const shared = window.FAW_READ_DICTIONARY_OVERRIDES();
+      if (shared) return shared;
+    }
     try {
       const cached = localStorage.getItem(DICT_CACHE_KEY);
       if (cached) {
@@ -1218,10 +1223,13 @@
         const d = doc.data() || {};
         const extra = d.extra || [];
         const excluded = d.excluded || [];
-        try {
-          localStorage.setItem(DICT_CACHE_KEY, JSON.stringify({ ts: Date.now(), extra, excluded }));
-        } catch (e) { /* noop */ }
-        if (window.FAW_WRITE_TTL_CACHE) window.FAW_WRITE_TTL_CACHE('dictionary-overrides-v1', { extra, excluded });
+        if (window.FAW_WRITE_DICTIONARY_OVERRIDES) {
+          window.FAW_WRITE_DICTIONARY_OVERRIDES({ extra, excluded });
+        } else {
+          try {
+            localStorage.setItem(DICT_CACHE_KEY, JSON.stringify({ ts: Date.now(), extra, excluded }));
+          } catch (e) { /* noop */ }
+        }
         return { extra, excluded };
       }
     } catch (e) {
@@ -1292,9 +1300,12 @@
       try { parsed = raw ? JSON.parse(raw) : null; } catch (e) { parsed = null; }
       const extra = (parsed && Array.isArray(parsed.extra)) ? parsed.extra.slice() : [];
       if (extra.indexOf(parola) === -1) extra.push(parola);
-      localStorage.setItem(DICT_CACHE_KEY, JSON.stringify({
-        ts: Date.now(), extra, excluded: (parsed && parsed.excluded) || []
-      }));
+      const excluded = (parsed && parsed.excluded) || [];
+      if (window.FAW_WRITE_DICTIONARY_OVERRIDES) {
+        window.FAW_WRITE_DICTIONARY_OVERRIDES({ extra, excluded });
+      } else {
+        localStorage.setItem(DICT_CACHE_KEY, JSON.stringify({ ts: Date.now(), extra, excluded }));
+      }
     } catch (e) { /* noop */ }
     if (G.db && G.fs && G.fs.FieldValue) {
       try {
@@ -2078,8 +2089,9 @@
     const s = G.state;
     if (!s || s.stato !== 'conclusa') return;
     if (G.solo || !G.db) { toast('Rivincita disponibile solo in sfida'); return; }
-    if (s.prossimaPartita) { toast('Rivincita già creata, in attesa…'); return; }
+    if (s.prossimaPartita && !(s.rivincitaRifiutataDa || []).length) { toast('Rivincita già creata, in attesa…'); return; }
     try {
+      if (window.FAW_RIVINCITA) await window.FAW_RIVINCITA.scarta(G.db, s.prossimaPartita, s.prossimaPartitaGioco);
       const newRef = G.db.collection('partite').doc();
       const punteggi = {};
       const parole = {};
@@ -2103,12 +2115,10 @@
           seed: Math.random().toString(36).substring(7).toUpperCase()
         }
       });
-      await G.backend.ref.update({
-        prossimaPartita: newRef.id,
-        prossimaPartitaCreataDa: G.me,
-        rivincitaAccettataDa: [],
-        rivincitaRifiutataDa: []
-      });
+      const collegamento = window.FAW_RIVINCITA
+        ? window.FAW_RIVINCITA.campiCollegamento(newRef.id, 'patata', G.me)
+        : { prossimaPartita: newRef.id, prossimaPartitaCreataDa: G.me, rivincitaAccettataDa: [], rivincitaRifiutataDa: [] };
+      await G.backend.ref.update(collegamento);
       hideBanner();
     } catch (e) {
       console.error('[Patata] rivincita:', e);
@@ -2130,47 +2140,104 @@
     if (!G.backend || !FV) return;
     G.backend.ref.update({ rivincitaRifiutataDa: FV.arrayUnion(G.me) }).catch(() => {});
   }
+  function nomeRivincita(s) {
+    if (window.FAW_RIVINCITA) return window.FAW_RIVINCITA.nome(s.prossimaPartitaGioco || 'patata');
+    return 'Patata Bollente';
+  }
+  function vaiAllaRivincita(s) {
+    if (G.redirected || !s || !s.prossimaPartita) return;
+    if (window.FAW_RIVINCITA) {
+      if (!window.FAW_RIVINCITA.vai(s, 'patata')) return;
+    } else {
+      setTimeout(() => { window.location.href = 'index.html?matchId=' + s.prossimaPartita; }, 1200);
+    }
+    G.redirected = true;
+  }
+  function preparaContestoRivincita() {
+    if (!window.FAW_RIVINCITA || !G.backend) return;
+    window.FAW_RIVINCITA.prepara({
+      db: G.db,
+      ref: G.backend.ref,
+      me: G.me,
+      partecipanti: (G.state && G.state.partecipanti) || [],
+      giocoCorrente: 'patata',
+      proposta: G.state,
+      onFatto: hideBanner,
+      onErrore: (msg) => toast(msg || 'Invito non riuscito', 'err')
+    });
+  }
+  function apriSceltaRivincita() {
+    const s = G.state;
+    if (!s || s.stato !== 'conclusa' || G.solo) return;
+    if (s.prossimaPartita && !(s.rivincitaRifiutataDa || []).length) {
+      toast('Rivincita già creata, in attesa…');
+      return;
+    }
+    preparaContestoRivincita();
+    const altri = window.FAW_RIVINCITA
+      ? window.FAW_RIVINCITA.azioniAltri('patata', s.partecipanti.length, (id) => {
+          window.FAW_invitaAltroGioco(id);
+        })
+      : [];
+    banner({
+      icon: '🔁',
+      title: 'RIVINCITA',
+      subtitle: 'Stessa partita, oppure invita tutti a un altro gioco',
+      sticky: true,
+      buttons: [
+        { id: 'stessa', label: '🥔 STESSA PARTITA', kind: 'btn-fire', fn: creaRivincita },
+        { id: 'chiudi', label: '✖️', kind: 'btn-ghost', fn: hideBanner }
+      ].concat(altri)
+    });
+  }
+  function annullaRivincita() {
+    if (!G.backend || !window.FAW_RIVINCITA) return;
+    window.FAW_RIVINCITA.annulla(G.db, G.backend.ref, G.state).catch(() => toast('Annullamento non riuscito', 'err'));
+  }
   function renderRematch(s) {
-    const N = s.partecipanti.length;
     const rifiutanti = s.rivincitaRifiutataDa || [];
     const accettanti = s.rivincitaAccettataDa || [];
     const id = s.prossimaPartita;
+    const nome = nomeRivincita(s);
+    const pronti = window.FAW_RIVINCITA
+      ? window.FAW_RIVINCITA.tuttiAccettati(s.partecipanti, s.prossimaPartitaCreataDa, accettanti)
+      : accettanti.length >= s.partecipanti.length - 1;
 
-    if (!id) {
-      if (s.stato === 'conclusa' && !G.solo) el['btn-rivincita'].disabled = rifiutanti.length > 0;
-      return;
-    }
     if (rifiutanti.length > 0) {
       el['btn-rivincita'].disabled = true;
       el['btn-rivincita'].textContent = '🔁 RIVINCITA RIFIUTATA';
       banner({
         icon: '👋', title: 'RIVINCITA RIFIUTATA',
-        subtitle: rifiutanti.join(', ') + ' ha rifiutato la rivincita',
-        buttons: [{ id: 'home', label: '🏠 HOME', kind: 'btn-ghost', fn: () => { hideBanner(); } }]
+        subtitle: rifiutanti.join(', ') + ' ha rifiutato',
+        buttons: [
+          { id: 'altra', label: '🔁 ALTRA', kind: 'btn-fire', fn: apriSceltaRivincita },
+          { id: 'home', label: '🏠 HOME', kind: 'btn-ghost', fn: hideBanner }
+        ]
       });
       return;
     }
-    if (accettanti.length >= N - 1) {
-      if (!G.redirected) {
-        G.redirected = true;
-        el['btn-rivincita'].disabled = true;
-        el['btn-rivincita'].textContent = '🔄 REINDIRIZZAMENTO…';
-        banner({
-          icon: '✅', title: 'RIVINCITA ACCETTATA DA TUTTI!',
-          subtitle: 'Ripartenza imminente…', spinner: true, sticky: true
-        });
-        setTimeout(() => { window.location.href = 'index.html?matchId=' + id; }, 1600);
-      }
+    if (!id) {
+      if (s.stato === 'conclusa' && !G.solo) el['btn-rivincita'].disabled = false;
+      return;
+    }
+    if (pronti) {
+      el['btn-rivincita'].disabled = true;
+      el['btn-rivincita'].textContent = '🔄 REINDIRIZZAMENTO…';
+      banner({
+        icon: '✅', title: 'ACCETTATA DA TUTTI',
+        subtitle: 'Si entra in ' + nome + '…', spinner: true, sticky: true
+      });
+      vaiAllaRivincita(s);
       return;
     }
     if (s.prossimaPartitaCreataDa === G.me) {
       el['btn-rivincita'].disabled = true;
       el['btn-rivincita'].textContent = '⏳ RIVINCITA IN ATTESA…';
       banner({
-        icon: '🔁', title: 'RIVINCITA CREATA',
-        subtitle: 'In attesa di ' + s.partecipanti.filter((p) => p !== G.me && accettanti.indexOf(p) === -1).join(', ') + '…',
+        icon: '🔁', title: 'PROPOSTA INVIATA',
+        subtitle: 'In attesa di ' + s.partecipanti.filter((p) => p !== G.me && accettanti.indexOf(p) === -1).join(', ') + ' per ' + nome,
         sticky: true,
-        buttons: []
+        buttons: [{ id: 'ann', label: '🚫 ANNULLA', kind: 'btn-ghost', fn: annullaRivincita }]
       });
       return;
     }
@@ -2178,14 +2245,14 @@
       el['btn-rivincita'].disabled = true;
       el['btn-rivincita'].textContent = '⏳ HAI ACCETTATO…';
       banner({
-        icon: '✅', title: 'RIVINCITA ACCETTATA',
-        subtitle: 'In attesa che tutti accettino…', sticky: true, buttons: []
+        icon: '✅', title: 'HAI ACCETTATO',
+        subtitle: 'In attesa che tutti accettino ' + nome, sticky: true, buttons: []
       });
       return;
     }
     banner({
-      icon: '🔁', title: 'RIVINCITA PROPOSTA',
-      subtitle: s.prossimaPartitaCreataDa + ' vuole rifare la partita',
+      icon: '🔁', title: nome.toUpperCase(),
+      subtitle: (s.prossimaPartitaCreataDa || 'Qualcuno') + ' propone ' + nome,
       sticky: true,
       buttons: [
         { id: 'acc', label: '✅ ACCETTA', kind: 'btn-fire', fn: accettaRivincita },
@@ -2491,7 +2558,7 @@
     el['btn-invia'].addEventListener('click', inviaParola);
     el['btn-conferma'].addEventListener('click', confermaTurno);
     el['btn-start-solo'].addEventListener('click', startSolo);
-    el['btn-rivincita'].addEventListener('click', creaRivincita);
+    el['btn-rivincita'].addEventListener('click', apriSceltaRivincita);
     if (el['btn-pausa']) el['btn-pausa'].addEventListener('click', pausaToggle);
     if (el['btn-richiedi']) el['btn-richiedi'].addEventListener('click', richiediParola);
     if (el['btn-power']) el['btn-power'].addEventListener('click', apriTargetPicker);

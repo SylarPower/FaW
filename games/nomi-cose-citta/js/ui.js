@@ -133,7 +133,8 @@
       '<div class="b-actions">' +
       (opts.spinner ? '<span class="spinner"></span>' : '') +
       (opts.buttons || []).map(function (b) {
-        return '<button class="btn btn-sm ' + (b.kind || 'btn-ghost') + '" data-bid="' + esc(b.id) + '">' + esc(b.label) + '</button>';
+        return '<button class="btn btn-sm ' + (b.kind || 'btn-ghost') + '" data-bid="' + esc(b.id) + '"' +
+          (b.disabled ? ' disabled' : '') + (b.title ? ' title="' + esc(b.title) + '"' : '') + '>' + esc(b.label) + '</button>';
       }).join('') +
       '</div>';
     el.banner.classList.remove('hidden');
@@ -199,6 +200,10 @@
    * apertura. `forza` salta la cache e serve solo al riallineamento mirato.
    */
   function leggiOverride(forza) {
+    if (!forza && global.FAW_READ_DICTIONARY_OVERRIDES) {
+      var condivisa = global.FAW_READ_DICTIONARY_OVERRIDES();
+      if (condivisa) return Promise.resolve({ extra: condivisa.extra, excluded: condivisa.excluded, daCache: true });
+    }
     if (!forza) {
       var hit = leggiOverrideDaCache();
       if (hit) return Promise.resolve(hit);
@@ -211,8 +216,10 @@
       if (!C.docExists(doc)) return { extra: [], excluded: [] };
       var d = doc.data() || {};
       var out = { extra: d.extra || [], excluded: d.excluded || [] };
-      try { localStorage.setItem(C.DICT_CACHE_KEY, JSON.stringify({ ts: Date.now(), extra: out.extra, excluded: out.excluded })); } catch (e) { /* noop */ }
-      if (global.FAW_WRITE_TTL_CACHE) global.FAW_WRITE_TTL_CACHE('dictionary-overrides-v1', out);
+      if (global.FAW_WRITE_DICTIONARY_OVERRIDES) global.FAW_WRITE_DICTIONARY_OVERRIDES(out);
+      else {
+        try { localStorage.setItem(C.DICT_CACHE_KEY, JSON.stringify({ ts: Date.now(), extra: out.extra, excluded: out.excluded })); } catch (e) { /* noop */ }
+      }
       return out;
     }).catch(function (e) {
       console.warn('[NCC] override dizionario non disponibili:', e && e.message);
@@ -1120,11 +1127,14 @@
     var s = G.state;
     if (!s || s.stato !== 'conclusa') return;
     if (G.solo || !G.db) { toast('Rivincita disponibile solo in sfida'); return; }
-    if (s.prossimaPartita) { toast('Rivincita già creata, in attesa…'); return; }
+    if (s.prossimaPartita && !(s.rivincitaRifiutataDa || []).length) { toast('Rivincita già creata, in attesa…'); return; }
     var nuove = {};
     s.partecipanti.forEach(function (p) { nuove[p] = 0; });
     var newRef = G.db.collection('partite').doc();
-    return newRef.set({
+    var scarto = (global.FAW_RIVINCITA && s.prossimaPartita)
+      ? global.FAW_RIVINCITA.scarta(G.db, s.prossimaPartita, s.prossimaPartitaGioco)
+      : Promise.resolve();
+    return scarto.then(function () { return newRef.set({
       gioco: 'nomi-cose-citta',
       partecipanti: s.partecipanti,
       punteggi: nuove,
@@ -1146,13 +1156,11 @@
         // seed nuovo: nessuna contaminazione con la partita appena finita
         seed: Math.random().toString(36).substring(7).toUpperCase()
       }
-    }).then(function () {
-      return G.backend.ref.update({
-        prossimaPartita: newRef.id,
-        prossimaPartitaCreataDa: G.me,
-        rivincitaAccettataDa: [],
-        rivincitaRifiutataDa: []
-      });
+    }); }).then(function () {
+      var collegamento = global.FAW_RIVINCITA
+        ? global.FAW_RIVINCITA.campiCollegamento(newRef.id, 'nomi-cose-citta', G.me)
+        : { prossimaPartita: newRef.id, prossimaPartitaCreataDa: G.me, rivincitaAccettataDa: [], rivincitaRifiutataDa: [] };
+      return G.backend.ref.update(collegamento);
     }).then(function () { hideBanner(); })
       .catch(function (e) {
         console.error('[NCC] rivincita:', e);
@@ -1169,59 +1177,120 @@
     G.backend.ref.update({ rivincitaRifiutataDa: G.fs.FieldValue.arrayUnion(G.me) }).catch(function () { });
   }
 
+  function nomeRivincita(s) {
+    if (global.FAW_RIVINCITA) return global.FAW_RIVINCITA.nome(s.prossimaPartitaGioco || 'nomi-cose-citta');
+    return 'Nomi, Cose, Città';
+  }
+  function vaiAllaRivincita(s) {
+    if (G.redirected || !s || !s.prossimaPartita) return;
+    if (global.FAW_RIVINCITA) {
+      if (!global.FAW_RIVINCITA.vai(s, 'nomi-cose-citta')) return;
+    } else {
+      setTimeout(function () { global.location.href = 'index.html?matchId=' + s.prossimaPartita; }, 1200);
+    }
+    G.redirected = true;
+  }
+  function preparaContestoRivincita() {
+    if (!global.FAW_RIVINCITA || !G.backend) return;
+    global.FAW_RIVINCITA.prepara({
+      db: G.db,
+      ref: G.backend.ref,
+      me: G.me,
+      partecipanti: (G.state && G.state.partecipanti) || [],
+      giocoCorrente: 'nomi-cose-citta',
+      proposta: G.state,
+      onFatto: hideBanner,
+      onErrore: function (msg) { toast(msg || 'Invito non riuscito', 'err'); }
+    });
+  }
+  function apriSceltaRivincita() {
+    var s = G.state;
+    if (!s || s.stato !== 'conclusa' || G.solo) return;
+    if (s.prossimaPartita && !(s.rivincitaRifiutataDa || []).length) {
+      toast('Rivincita già creata, in attesa…');
+      return;
+    }
+    preparaContestoRivincita();
+    var altri = global.FAW_RIVINCITA
+      ? global.FAW_RIVINCITA.azioniAltri('nomi-cose-citta', s.partecipanti.length, function (id) {
+          global.FAW_invitaAltroGioco(id);
+        })
+      : [];
+    banner({
+      icon: '🔁',
+      title: 'RIVINCITA',
+      subtitle: 'Stessa partita, oppure invita tutti a un altro gioco',
+      sticky: true,
+      buttons: [
+        { id: 'stessa', label: '📝 STESSA PARTITA', kind: 'btn-fire', fn: creaRivincita },
+        { id: 'chiudi', label: '✖️', kind: 'btn-ghost', fn: hideBanner }
+      ].concat(altri)
+    });
+  }
+  function annullaRivincita() {
+    if (!G.backend || !global.FAW_RIVINCITA) return;
+    global.FAW_RIVINCITA.annulla(G.db, G.backend.ref, G.state).catch(function () {
+      toast('Annullamento non riuscito', 'err');
+    });
+  }
   function renderRematch(s) {
     if (G.solo) return;
-    var N = s.partecipanti.length;
     var rifiutanti = s.rivincitaRifiutataDa || [];
     var accettanti = s.rivincitaAccettataDa || [];
     var id = s.prossimaPartita;
-    if (!id) {
-      el['btn-rivincita'].disabled = rifiutanti.length > 0;
-      return;
-    }
+    var nome = nomeRivincita(s);
+    var pronti = global.FAW_RIVINCITA
+      ? global.FAW_RIVINCITA.tuttiAccettati(s.partecipanti, s.prossimaPartitaCreataDa, accettanti)
+      : accettanti.length >= s.partecipanti.length - 1;
     if (rifiutanti.length > 0) {
       el['btn-rivincita'].disabled = true;
       el['btn-rivincita'].textContent = '🔁 RIVINCITA RIFIUTATA';
       banner({
         icon: '👋', title: 'RIVINCITA RIFIUTATA',
-        subtitle: rifiutanti.join(', ') + ' ha rifiutato la rivincita',
-        buttons: [{ id: 'home', label: '🏠 HOME', kind: 'btn-ghost', fn: hideBanner }]
+        subtitle: rifiutanti.join(', ') + ' ha rifiutato',
+        buttons: [
+          { id: 'altra', label: '🔁 ALTRA', kind: 'btn-fire', fn: apriSceltaRivincita },
+          { id: 'home', label: '🏠 HOME', kind: 'btn-ghost', fn: hideBanner }
+        ]
       });
       return;
     }
-    if (accettanti.length >= N - 1) {
-      if (!G.redirected) {
-        G.redirected = true;
-        el['btn-rivincita'].disabled = true;
-        el['btn-rivincita'].textContent = '🔄 REINDIRIZZAMENTO…';
-        banner({ icon: '✅', title: 'RIVINCITA ACCETTATA DA TUTTI!', subtitle: 'Ripartenza imminente…', spinner: true, sticky: true });
-        setTimeout(function () { window.location.href = 'index.html?matchId=' + id; }, 1600);
-      }
+    if (!id) {
+      el['btn-rivincita'].disabled = false;
+      el['btn-rivincita'].textContent = '🔁 RIVINCITA';
+      return;
+    }
+    if (pronti) {
+      el['btn-rivincita'].disabled = true;
+      el['btn-rivincita'].textContent = '🔄 REINDIRIZZAMENTO…';
+      banner({ icon: '✅', title: 'ACCETTATA DA TUTTI', subtitle: 'Si entra in ' + nome + '…', spinner: true, sticky: true });
+      vaiAllaRivincita(s);
       return;
     }
     if (s.prossimaPartitaCreataDa === G.me) {
       el['btn-rivincita'].disabled = true;
       el['btn-rivincita'].textContent = '⏳ RIVINCITA IN ATTESA…';
       banner({
-        icon: '🔁', title: 'RIVINCITA CREATA',
+        icon: '🔁', title: 'PROPOSTA INVIATA',
         subtitle: 'In attesa di ' + s.partecipanti.filter(function (p) {
           return p !== G.me && accettanti.indexOf(p) === -1;
-        }).join(', ') + '…',
-        sticky: true
+        }).join(', ') + ' per ' + nome,
+        sticky: true,
+        buttons: [{ id: 'ann', label: '🚫 ANNULLA', kind: 'btn-ghost', fn: annullaRivincita }]
       });
       return;
     }
     if (accettanti.indexOf(G.me) !== -1) {
       el['btn-rivincita'].disabled = true;
       el['btn-rivincita'].textContent = '⏳ HAI ACCETTATO…';
-      banner({ icon: '✅', title: 'RIVINCITA ACCETTATA', subtitle: 'In attesa che tutti accettino…', sticky: true });
+      banner({ icon: '✅', title: 'HAI ACCETTATO', subtitle: 'In attesa che tutti accettino ' + nome, sticky: true });
       return;
     }
     el['btn-rivincita'].disabled = false;
     el['btn-rivincita'].textContent = '🔁 RIVINCITA';
     banner({
-      icon: '🔁', title: 'RIVINCITA PROPOSTA',
-      subtitle: s.prossimaPartitaCreataDa + ' vuole rifare la partita',
+      icon: '🔁', title: nome.toUpperCase(),
+      subtitle: (s.prossimaPartitaCreataDa || 'Qualcuno') + ' propone ' + nome,
       sticky: true,
       buttons: [
         { id: 'acc', label: '✅ ACCETTA', kind: 'btn-fire', fn: accettaRivincita },
@@ -1460,7 +1529,7 @@
     el['btn-stop'].addEventListener('click', premiStop);
     el['btn-conferma'].addEventListener('click', confermaRevisione);
     el['btn-start-solo'].addEventListener('click', startSolo);
-    el['btn-rivincita'].addEventListener('click', creaRivincita);
+    el['btn-rivincita'].addEventListener('click', apriSceltaRivincita);
 
     if (!G.solo && !G.me) {
       alert('Effettua il login per giocare in multiplayer.');

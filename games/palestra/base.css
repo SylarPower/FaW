@@ -78,7 +78,7 @@ body {
 }
 .toast.ok {
   background: rgba(39, 174, 96, 0.95);
-  color: #fff;
+  color: #06282a;
 }
 .toast.warn {
   background: rgba(241, 196, 15, 0.95);
@@ -86,7 +86,7 @@ body {
 }
 .toast.err {
   background: rgba(207, 102, 121, 0.95);
-  color: #fff;
+  color: #241500;
 }
 .toast.info {
   background: rgba(30, 30, 30, 0.95);
@@ -210,9 +210,10 @@ button:active {
 }
 .bd {
   background: var(--red) !important;
-  color: #fff !important;
+  color: #241500 !important;
   border: none !important;
 }
+[data-theme="light"] .bd { color: #fff !important; }
 .bs {
   background: #333 !important;
   color: #eee !important;
@@ -225,9 +226,10 @@ button:active {
 }
 .bg {
   background: var(--grn) !important;
-  color: #fff !important;
+  color: #1a2917 !important;
   border: none !important;
 }
+[data-theme="light"] .bg { color: #fff !important; }
 .tb {
   background: var(--c2);
   color: var(--tx);
@@ -501,9 +503,10 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 .set-row.done .set-num {
   background: var(--grn);
-  color: #fff;
+  color: #1a2917;
   border-color: var(--grn);
 }
+[data-theme="light"] .set-row.done .set-num { color: #fff; }
 .set-input {
   width: 100%;
   padding: 10px 6px;
@@ -550,10 +553,11 @@ input[type="number"]::-webkit-outer-spin-button {
 .set-check.done {
   background: var(--grn);
   border-color: var(--grn);
-  color: #fff;
+  color: #1a2917;
   box-shadow: 0 4px 15px rgba(39, 174, 96, 0.35);
   transform: scale(1.05);
 }
+[data-theme="light"] .set-check.done { color: #fff; }
 .set-check.done:active {
   transform: scale(0.95);
 }
