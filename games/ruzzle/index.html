@@ -819,9 +819,6 @@
 			.btn-new {
 			display: block;
 			}
-			.btn-reset {
-			display: none;
-			}
 			.btn-sandbox {
 			display: none;
 			}
@@ -885,51 +882,6 @@
 			.btn-rivincita:hover {
 			filter: brightness(1.1);
 			box-shadow: 0 8px 26px rgba(255, 90, 110, 0.55);
-			}
-			.switch-container {
-			display: flex;
-			align-items: center;
-			font-size: 0.9rem;
-			}
-			.switch {
-			position: relative;
-			display: inline-block;
-			width: 40px;
-			height: 22px;
-			margin-left: 10px;
-			}
-			.switch input {
-			opacity: 0;
-			width: 0;
-			height: 0;
-			}
-			.slider {
-			position: absolute;
-			cursor: pointer;
-			top: 0;
-			left: 0;
-			right: 0;
-			bottom: 0;
-			background-color: #ccc;
-			transition: .4s;
-			border-radius: 22px;
-			}
-			.slider:before {
-			position: absolute;
-			content: "";
-			height: 16px;
-			width: 16px;
-			left: 3px;
-			bottom: 3px;
-			background-color: white;
-			transition: .4s;
-			border-radius: 50%;
-			}
-			input:checked+.slider {
-			background-color: var(--primary);
-			}
-			input:checked+.slider:before {
-			transform: translateX(18px);
 			}
 			.modal-overlay {
 			position: fixed;
@@ -1377,13 +1329,6 @@
 							<span style="font-weight:bold; opacity:0.8;">Codice:</span>
 							<span class="code-display" id="display-seed" onclick="copySeed()" title="Copia">----</span>
 						</div>
-						<div class="config-row">
-							<div class="switch-container">Modalità Click <label class="switch">
-								<input type="checkbox" id="input-mode-toggle" aria-label="Modalità Click (tocca le lettere invece di trascinare)">
-								<span class="slider"></span>
-								</label>
-							</div>
-						</div>
 					</div>
 					<div class="status-bar">
 						<span>Tempo: <span id="timer">03:00</span>
@@ -1417,7 +1362,6 @@
 						<button id="btn-terminate" class="btn-action btn-end-now" onclick="endGameManually()" style="display:none;">TERMINA ORA</button>
 					</div>
 					<button id="btn-sandbox" class="btn-action btn-sandbox" onclick="startSandbox()">SBLOCCA GRIGLIA (LIBERA)</button>
-					<button id="btn-reset-selection" class="btn-action btn-reset" onclick="clearSelection()">AZZERA SELEZIONE</button>
 					<div class="btn-group">
 						<button class="btn-action btn-new" onclick="startNewGame()">NUOVA</button>
 					</div>
@@ -1797,7 +1741,6 @@
 			let isGameActive = false;
 			let isPaused = false;
 			let isSandboxMode = false;
-			let inputMode = 'drag';
 			let currentSeed = "";
 			let isAnalysisPhase = false;
 			let wordCounter = 0;
@@ -1921,9 +1864,7 @@
 			const achNotif = document.getElementById('ach-notification');
 			const newGameModal = document.getElementById('new-game-modal');
 			const btnSandbox = document.getElementById('btn-sandbox');
-			const btnResetSelection = document.getElementById('btn-reset-selection');
 			const btnTerminate = document.getElementById('btn-terminate');
-			const toggleInput = document.getElementById('input-mode-toggle');
 			const modalGridSelect = document.getElementById('modal-grid-select');
 			const gameEndModal = document.getElementById('game-end-modal');
 			// --- BANNER SYSTEM ---
@@ -2178,8 +2119,6 @@
 			  pauseOverlay.style.display = 'none';
 			  btnPause.textContent = "PAUSA";
 			  btnPause.style.backgroundColor = "#f39c12";
-			  inputMode = toggleInput.checked ? 'click' : 'drag';
-			  btnResetSelection.style.display = (inputMode === 'click') ? 'block' : 'none';
 			  btnTerminate.style.display = 'none';
 			  if (forceSeed) {
 			    currentSeed = forceSeed;
@@ -2364,15 +2303,13 @@
 			      selectedCells = [];
 			      lineLayer.innerHTML = '';
 			      currentHighlightedWord = null;
-			      if (!isGameActive) return;
-			      if (inputMode === 'drag') {
-			        e.preventDefault();
-			        inputState.isDragging = true;
-			        selectTile(i);
-			      } else {
-			        handleClickMode(i);
-			      }
-			    };
+		      if (!isGameActive) return;
+		      /* Selezione SOLO trascinando (desktop): il click singolo non fa
+		         più parte del gioco, è stato rimosso. */
+		      e.preventDefault();
+		      inputState.isDragging = true;
+		      selectTile(i);
+		    };
 			    tile.addEventListener('mousedown', startHandler);
 			    tile.addEventListener('touchstart', startHandler, {
 			      passive: false
@@ -2645,22 +2582,8 @@
 			  return Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2));
 			}
 			
-			function handleClickMode(i) {
-			  if (selectedCells.includes(i)) {
-			    if (i === selectedCells[selectedCells.length - 1]) validateWord();
-			    else if (selectedCells.length > 1 && i === selectedCells[selectedCells.length - 2]) {
-			      selectedCells.pop();
-			      updateVisuals();
-			    }
-			    return;
-			  }
-			  if (selectedCells.length === 0 || isAdjacent(selectedCells[selectedCells.length - 1], i)) {
-			    selectedCells.push(i);
-			    updateVisuals();
-			  }
-			}
 			const moveListener = (x, y) => {
-			  if (inputMode !== 'drag' || !inputState.isDragging || !isGameActive) return;
+			  if (!inputState.isDragging || !isGameActive) return;
 			  let closest = -1,
 			    minD = 9999;
 			  const last = selectedCells[selectedCells.length - 1];
@@ -2682,10 +2605,10 @@
 			};
 			// ✅ MANAGED LISTENERS
 			addManagedListener(document, 'mousemove', (e) => {
-			  if (inputMode === 'drag' && inputState.isDragging) moveListener(e.clientX, e.clientY);
+			  if (inputState.isDragging) moveListener(e.clientX, e.clientY);
 			});
 			addManagedListener(document, 'touchmove', (e) => {
-			  if (inputMode === 'drag' && inputState.isDragging) {
+			  if (inputState.isDragging) {
 			    e.preventDefault();
 			    moveListener(e.touches[0].clientX, e.touches[0].clientY);
 			  }
@@ -3634,12 +3557,7 @@
 			function toggleTheme() {
 			  document.body.classList.toggle('dark-mode');
 			}
-			toggleInput.addEventListener('change', () => {
-			  clearSelection();
-			  inputMode = toggleInput.checked ? 'click' : 'drag';
-			  btnResetSelection.style.display = inputMode === 'click' ? 'block' : 'none';
-			});
-			
+
 			function fireConfetti(originElement = null) {
 			  const colors = ['#f1c40f', '#e74c3c', '#3498db', '#2ecc71', '#9b59b6', '#ffffff', '#ff00ff'];
 			  const count = 150;

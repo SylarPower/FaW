@@ -233,11 +233,60 @@ console.log('\n[6b] Ruzzle: punteggi finali condivisi e allineati');
     'il podio di Ruzzle usa i colori del tema');
 }
 
+console.log('\n[6c] Ruzzle: selezione solo a trascinamento (modalità click rimossa)');
+{
+  const rz = leggi('games/ruzzle/index.html');
+  ok(!/input-mode-toggle/.test(rz), 'nessun interruttore "Modalità Click"');
+  ok(!/Modalità Click/.test(rz), 'nessuna etichetta "Modalità Click"');
+  ok(!/inputMode/.test(rz), 'nessuna variabile inputMode (un solo sistema di selezione)');
+  ok(!/handleClickMode/.test(rz), 'nessun ramo di codice della modalità click');
+  ok(!/btn-reset-selection/.test(rz), 'nessun pulsante AZZERA SELEZIONE (serviva solo al click)');
+  ok(/selectTile\(i\)/.test(rz) && /inputState\.isDragging = true/.test(rz),
+    'la griglia si seleziona iniziando il trascinamento (mousedown/touchstart)');
+  ok((rz.match(/addManagedListener\(document, '(mousemove|touchmove)'/g) || []).length === 2,
+    'i listener di trascinamento restano agganciati (mousemove + touchmove)');
+}
+
 console.log('\n[7] Patata Bollente: zero runTransaction (modello Ruzzle)');
 {
   const patataSrc = leggi('games/patata/js/game.js');
   // Nessuna chiamata a runTransaction nel codice JS di Patata
   ok(!/\.runTransaction\s*\(/.test(patataSrc), 'games/patata/js/game.js non usa runTransaction');
+  /* Le lettere del turno si estraggono SOLO dal dizionario base condiviso:
+     con l'indice del dizionario locale (parole approvate, esclusioni, cache)
+     due client con dizionari diversi mostravano lettere diverse. */
+  ok(/const baseWords = Array\.from\(words\)/.test(patataSrc) &&
+    /G\.index = new LetterIndex\(baseWords\)/.test(patataSrc),
+  'l\'indice delle lettere nasce dal dizionario BASE (stesse lettere su ogni client)');
+  ok(!/G\.index = new LetterIndex\(Array\.from\(G\.dict\)\)/.test(patataSrc),
+    'nessuna ricostruzione dell\'indice dal dizionario completo (rimetterebbe in circolo il bug)');
+  ok(/segnaAccettazioneOrigine/.test(patataSrc) && /s\.rivincitaDi/.test(patataSrc) &&
+    /s\.rivincitaCollezione/.test(patataSrc),
+    'entrando in una lobby di rivincita si segna l\'accettazione sull\'origine (collezione inclusa)');
+}
+
+console.log('\n[7b] Rivincita: lobby nuova marcata, hub e giochi d\'accordo');
+{
+  const hub = leggi('index.html');
+  const riv = leggi('games/shared/rivincita.js');
+  ok(/daRivincita/.test(riv) && /rivincitaDi/.test(riv),
+    'games/shared/rivincita.js marca la lobby con daRivincita + rivincitaDi');
+  ok(/function segnaAccettazione/.test(riv), 'helper condiviso segnaAccettazione()');
+  ok(/if \(p\.daRivincita\) return;/.test(hub) || /p\.daRivincita\) return;/.test(hub),
+    'l\'hub non tratta la lobby di rivincita come invito');
+  ok(/function entraRivincita/.test(hub) && /rivincitaAccettataDa: firebase\.firestore\.FieldValue\.arrayUnion/.test(hub),
+    'ENTRA dall\'hub segna l\'accettazione sulla partita di origine');
+  /* La lobby dichiara ANCHE dove vive l'origine: una rivincita può cambiare
+     gioco, e l'accettazione deve finire nella collezione giusta
+     (partite per i giochi "tipo Ruzzle", pictionary_rooms per le room). */
+  ok(/function collezioneOrigine/.test(riv) && /rivincitaCollezione/.test(riv),
+    'rivincita.js mappa collezione dell\'origine + campo rivincitaCollezione');
+  ok(/function segnaAccettazione\(db, origineId, me, collezione\)/.test(riv),
+    'segnaAccettazione sceglie la collezione dell\'origine');
+  ok(/entraRivincita\(partitaId, gioco, origine, origineCollezione\)/.test(hub) &&
+    /gioco === 'pictionary' \? 'room' : 'matchId'/.test(hub),
+    'dall\'hub si entra con ?matchId= o ?room= secondo il gioco');
+  ok(/p\.rivincitaCollezione/.test(hub), 'la riga ENTRA passa la collezione dell\'origine');
 }
 
 console.log('\n[8] Nomi, Cose, Città: regole strutturali');

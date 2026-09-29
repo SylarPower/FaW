@@ -256,6 +256,86 @@ window.FAW_REQUIRE_FIREBASE_CONFIG = function(){ return window.FAW_FIREBASE_CONF
   ok(window.eval(`invitiLive.partite.some(function(p){ return p.id === 'INV-5'; })`) === false,
     'snapshot senza la partita cancellata');
 
+  console.log('\n[K] La lobby di una RIVINCITA non e\' un invito: si entra, non si accetta');
+  /* La lobby nuova di una rivincita nasce in stato 'attesa' come una sfida,
+     ma le accettazioni vivono sulla partita finita: trattarla da invito faceva
+     scrivere il "si" sul documento sbagliato (nessun altro partiva) e offriva
+     ACCETTA/RIFIUTA e un 🗑️ che lasciava la partita finita con un
+     prossimaPartita che puntava nel vuoto. */
+  window.eval(`__MOCK_DB__.__pushDoc('partite', {
+    id: 'OLD-1', gioco: 'patata', stato: 'conclusa',
+    partecipanti: ['ALFA', 'TEST'], punteggi: { ALFA: 12, TEST: 7 },
+    prossimaPartita: 'REM-1', prossimaPartitaCreataDa: 'ALFA', prossimaPartitaGioco: 'patata',
+    rivincitaAccettataDa: [], rivincitaRifiutataDa: [], timestamp: 5500
+  })`);
+  window.eval(`__MOCK_DB__.__pushDoc('partite', {
+    id: 'REM-1', gioco: 'patata', stato: 'attesa',
+    partecipanti: ['ALFA', 'TEST'], punteggi: { ALFA: 0, TEST: 0 },
+    pronti: [], rivincitaAccettataDa: [], rivincitaRifiutataDa: [],
+    daRivincita: true, rivincitaDi: 'OLD-1', timestamp: 6000
+  })`);
+  await sleep(1600);   // listener inviti + refresh della lista
+  ok(window.eval(`invitiPendenti().some(function(i){ return i.id === 'REM-1'; })`) === false,
+    'la lobby di rivincita NON entra tra gli inviti pendenti');
+  ok(!visibile() || !/ALFA ti sfida/.test(titolo()),
+    'nessun popup "ti sfida" per una rivincita (' + titolo() + ')');
+  const listaRiv = window.document.getElementById('lista-partite').textContent;
+  ok(/Rivincita di ALFA/.test(listaRiv), 'riga dedicata in lista: ' + listaRiv.replace(/\s+/g, ' ').trim().slice(0, 160));
+  ok(!/SFIDA DA ALFA/.test(listaRiv), 'niente pulsanti ACCETTA/RIFIUTA per la rivincita');
+  ok(window.eval(`partitaAttivaCorrente().partitaId`) === 'REM-1',
+    'presenza: chi e\' nella lobby di rivincita risulta occupato (' +
+    window.eval('JSON.stringify(partitaAttivaCorrente())') + ')');
+  /* ENTRA: segna l'accettazione sulla partita di ORIGINE e poi entra. */
+  const navPrima = JSON.parse(window.eval('JSON.stringify(__nav)'));
+  window.eval(`entraRivincita('REM-1', 'patata', 'OLD-1')`);
+  await sleep(200);
+  const accOriginaria = JSON.parse(window.eval(
+    'JSON.stringify(__MOCK_DB__.__scritture.filter(function(w){ return w.coll === "partite" && w.id === "OLD-1" && w.update && w.update.rivincitaAccettataDa; }))'));
+  ok(accOriginaria.length === 1 &&
+     accOriginaria[0].update.rivincitaAccettataDa.__op === 'array-union' &&
+     accOriginaria[0].update.rivincitaAccettataDa.args[0] === 'TEST',
+    'entrando si segna l\'accettazione sulla partita di origine (non sulla lobby nuova)');
+  const origine = JSON.parse(docDi('partite', 'OLD-1') || 'null');
+  ok(!!origine && (origine.rivincitaAccettataDa || []).indexOf('TEST') !== -1,
+    'partita di origine aggiornata: gli altri smettono di aspettare');
+  const nav = JSON.parse(window.eval('JSON.stringify(__nav)'));
+  ok(nav.length === navPrima.length + 1 && /REM-1/.test(nav[nav.length - 1]),
+    'si entra davvero nella lobby nuova: ' + nav[nav.length - 1]);
+  ok(window.eval(`invitiLive.partite.some(function(p){ return p.id === 'REM-1'; })`),
+    'la lobby resta comunque raggiungibile dalla lista');
+
+  console.log('\n[K2] Rivincita nata da una room Pictionary: si entra segnando il "si" sulla room di origine');
+  /* Stessa regola per le room: la rivincita non e' un invito da accettare, e
+     l'accettazione vive sulla room di ORIGINE (collezione pictionary_rooms),
+     non su partite/<codice>. Senza il campo rivincitaCollezione il "si"
+     finiva nel vuoto e sulla room di origine nessuno partiva. */
+  window.eval(`__MOCK_DB__.__pushDoc('pictionary_rooms', {
+    id: 'REM-PIC', host: 'ALFA', players: ['ALFA', 'TEST'], stato: 'lobby',
+    ready: [], settings: { mode: 'classic', timePerRound: 60 },
+    daRivincita: true, rivincitaDi: 'OLD-PIC', rivincitaCollezione: 'pictionary_rooms',
+    timestamp: 7000
+  })`);
+  await sleep(1600);
+  ok(window.eval(`invitiPendenti().some(function(i){ return i.id === 'REM-PIC'; })`) === false,
+    'la room di rivincita NON e\' un invito pendente');
+  const listaPic = window.document.getElementById('lista-partite').innerHTML;
+  const righePic = listaPic.split('<div class="user-item').filter(r => /REM-PIC/.test(r));
+  ok(righePic.length === 1 && /🔁 Rivincita di ALFA — Pictionary/.test(righePic[0]),
+    'riga dedicata per la room di rivincita');
+  ok(righePic.length === 1 && /ENTRA/.test(righePic[0]) && !/🗑️/.test(righePic[0]),
+    'niente 🗑️ (cancellare la room lascerebbe la partita di origine puntata nel vuoto)');
+  const navPicPrima = JSON.parse(window.eval('JSON.stringify(__nav)'));
+  window.eval(`entraRivincita('REM-PIC', 'pictionary', 'OLD-PIC', 'pictionary_rooms')`);
+  await sleep(200);
+  const accPic = JSON.parse(window.eval(
+    'JSON.stringify(__MOCK_DB__.__scritture.filter(function(w){ return w.id === "OLD-PIC" && w.update && w.update.rivincitaAccettataDa; }))'));
+  ok(accPic.length === 1 && accPic[0].coll === 'pictionary_rooms' &&
+     accPic[0].update.rivincitaAccettataDa.args[0] === 'TEST',
+    'accettazione scritta su pictionary_rooms/OLD-PIC (non su partite/OLD-PIC)');
+  const navPic = JSON.parse(window.eval('JSON.stringify(__nav)'));
+  ok(navPic.length === navPicPrima.length + 1 && /room=REM-PIC/.test(navPic[navPic.length - 1]),
+    'si entra nella room nuova: ' + navPic[navPic.length - 1]);
+
   ok(errors.length === 0, 'nessun errore uncaught finale: ' + errors.join('; '));
 
   console.log('\n=================');

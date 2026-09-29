@@ -77,6 +77,20 @@ const doc = R.documentoPartita('nomi-cose-citta', ['A', 'B'], R.opzioniDefault('
 ok(doc.gioco === 'nomi-cose-citta' && doc.stato === 'attesa' && doc.round === 0, 'ncc nasce in attesa, senza round');
 ok(doc.opzioni.categorie === 'multi', 'categorie di default multi');
 ok(doc.punteggi.A === 0 && doc.punteggi.B === 0, 'punteggi azzerati');
+/* La lobby nasce da una rivincita: l'hub deve saperlo (l'accettazione vive
+   sulla partita di origine, non su questo documento). */
+const docRem = R.documentoPartita('patata', ['A', 'B'], R.opzioniDefault('patata'), 'ORIGINE-1');
+ok(docRem.daRivincita === true && docRem.rivincitaDi === 'ORIGINE-1',
+  'documento marcato daRivincita + rivincitaDi');
+eq(docRem.rivincitaCollezione, 'partite', 'origine nei "partite": la lobby lo dichiara');
+const docRemCross = R.documentoPartita('patata', ['A', 'B'], R.opzioniDefault('patata'),
+  'ROOM-1', 'pictionary_rooms');
+eq([docRemCross.rivincitaDi, docRemCross.rivincitaCollezione], ['ROOM-1', 'pictionary_rooms'],
+  'rivincita da una room Pictionary: la lobby sa dove segnare l\'accettazione');
+const roomRem = R.documentoRoom(['A', 'B'], 'A', R.opzioniDefault('pictionary'), 'ORIGINE-2');
+ok(roomRem.data.daRivincita === true && roomRem.data.rivincitaDi === 'ORIGINE-2',
+  'anche la room Pictionary è marcata');
+eq(roomRem.data.rivincitaCollezione, 'partite', 'room con origine in "partite"');
 
 console.log('\n[6] Schema delle impostazioni (unica fonte per la modale)');
 {
@@ -227,6 +241,8 @@ console.log('\n[6] Schema delle impostazioni (unica fonte per la modale)');
       mock.store.get('partite/C1').prossimaPartitaGioco === 'patata',
     'proposta collegata alla partita corrente');
     ok(mock.store.get('partite/C1').rivincitaAccettataDa.length === 0, 'nessuna accettazione di partenza');
+    eq([nuovo.daRivincita, nuovo.rivincitaDi], [true, 'C1'],
+      'lobby nuova marcata daRivincita con la partita di origine (l\'hub non la tratta come invito)');
 
     /* pictionary: stanza nuova con le impostazioni della modale */
     const corrente2 = { gioco: 'patata', partecipanti: ['ALFA', 'BETA'], stato: 'conclusa', opzioni: {} };
@@ -241,6 +257,65 @@ console.log('\n[6] Schema delle impostazioni (unica fonte per la modale)');
     eq(room.settings, { mode: 'guessit', timePerRound: 45 }, 'room con modalità e tempo scelti');
     eq(room.players, ['ALFA', 'BETA'], 'tutti i giocatori nella room');
     ok(mock.store.get('partite/C2').prossimaPartita === r2.id, 'proposta pictionary collegata');
+    eq([room.daRivincita, room.rivincitaDi], [true, 'C2'], 'room marcata come rivincita di C2');
+  }
+
+  console.log('\n[9] segnaAccettazione: chi entra nella lobby nuova libera gli altri');
+  {
+    const vm2 = require('vm');
+    const sandbox2 = {
+      console, Math, Date, setTimeout,
+      firebase: {
+        firestore: {
+          FieldValue: {
+            arrayUnion: function () { return { __op: 'array-union', args: [].slice.call(arguments) }; }
+          }
+        }
+      }
+    };
+    sandbox2.global = sandbox2;
+    vm2.createContext(sandbox2);
+    vm2.runInContext(src, sandbox2);
+    const R2 = sandbox2.FAW_RIVINCITA;
+    const scritture = [];
+    let fallisci = false;
+    const dbFinto = {
+      collection: function (c) {
+        return {
+          doc: function (id) {
+            return {
+              update: function (patch) {
+                scritture.push({ c: c, id: id, patch: patch });
+                return fallisci ? Promise.reject(new Error('not-found')) : Promise.resolve();
+              }
+            };
+          }
+        };
+      }
+    };
+    ok(await R2.segnaAccettazione(dbFinto, 'ORIGINE-1', 'BETA'),
+      'prima chiamata: accettazione segnata');
+    eq(scritture.length, 1, 'una sola scrittura');
+    eq([scritture[0].c, scritture[0].id], ['partite', 'ORIGINE-1'], 'scrive sulla partita di ORIGINE');
+    eq(scritture[0].patch.rivincitaAccettataDa,
+      { __op: 'array-union', args: ['BETA'] }, 'accettazione con arrayUnion (idempotente)');
+    ok(await R2.segnaAccettazione(dbFinto, 'ORIGINE-1', 'BETA') === false && scritture.length === 1,
+      'seconda chiamata: nessuna scrittura doppia');
+    ok(await R2.segnaAccettazione(dbFinto, 'ALTRA', 'BETA'),
+      'origine diversa: si segna anche quella');
+    /* Origine in un'altra collezione (rivincita nata da una room Pictionary):
+       il "si" deve finire sulla room di origine, non su partite/<codice>. */
+    ok(await R2.segnaAccettazione(dbFinto, 'ROOM-9', 'BETA', 'pictionary_rooms'),
+      'origine Pictionary: accettazione segnata');
+    const ultima = scritture[scritture.length - 1];
+    eq([ultima.c, ultima.id], ['pictionary_rooms', 'ROOM-9'],
+      'scrive nella collezione giusta (pictionary_rooms)');
+    eq(ultima.patch.rivincitaAccettataDa, { __op: 'array-union', args: ['BETA'] },
+      'stessa modalità idempotente');
+    fallisci = true;
+    ok(await R2.segnaAccettazione(dbFinto, 'SPARITA', 'BETA') === false,
+      'origine inesistente: fallisce in silenzio (nessuna eccezione)');
+    ok(await R2.segnaAccettazione(null, 'ORIGINE-1', 'BETA') === false, 'senza db non fa nulla');
   }
 
   console.log('\n=================');

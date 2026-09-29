@@ -83,7 +83,7 @@ Gli altri power-up valutati (scudo, +secondi, jolly lettera, furto punti)
 sono stati **valutati e scartati** in fase di design: il gioco resta una
 corsa pulita al timer con un solo colpo di scena sociale.
 
-### Lettere "ovviamente non impossibili"
+### Lettere "ovviamente non impossibili" (e **identiche per tutti**)
 
 Le lettere di ogni turno sono estratte **deterministicamente** da
 `seed + numero di turno` (stessa combinazione su tutti i client, senza
@@ -91,6 +91,18 @@ scritture extra) e vengono accettate solo se nel dizionario esistono almeno
 12 parole che le contengono tutte (conteggio in tempo reale via indice a
 bitset: ~1 ms sul dizionario completo di 286k parole). L'UI mostra sempre
 quante parole valide esistono per il turno in corso.
+
+L'estrazione usa **solo il dizionario BASE** (`../../dizionario.txt`, identico
+su ogni client), non il dizionario completo del client: le parole approvate
+col voto 📖, le esclusioni proposte e la cache locale di un giocatore non
+entrano nel calcolo. Era questo il bug delle «lettere diverse tra
+giocatori»: bastava una parola in più (o una cache diversa) su un client per
+far cambiare l'estrazione, in particolare in modalità SEQUENZA dove si pesca
+una parola dall'elenco (un elemento in più sposta tutte le estrazioni). Anche
+il **conteggio delle parole valide** mostrato sotto le lettere viene ora dal
+dizionario base, quindi è lo stesso numero su tutti gli schermi. La
+validazione delle parole resta sul dizionario completo (`G.dict`), così una
+parola appena approvata è giocabile subito.
 
 ### Punteggio parola = lunghezza effettiva
 
@@ -155,6 +167,14 @@ Stesse convenzioni degli altri giochi FaW:
   turno, non sulla partita.
 - La rivincita riusa i campi `prossimaPartita` / `rivincitaAccettataDa` /
   `rivincitaRifiutataDa` già usati da Ruzzle e dall'hub.
+- La lobby della rivincita nasce **marcata** (`daRivincita: true`,
+  `rivincitaDi: <partita finita>` e `rivincitaCollezione`, la collezione dove
+  vive l'origine): l'hub non la tratta come una nuova sfida da accettare ma
+  come la partita in cui entrare (`🔁 Rivincita di … · in attesa (n/N pronti)` +
+  **ENTRA →**). Chi entra — dall'hub, da un link o dal proprio banner —
+  **segna l'accettazione sulla partita di origine**: entrare vale come
+  accettare, così nessuno resta bloccato ad aspettare un "sì" che non arriva
+  più (era il motivo per cui «a volte la rivincita non funzionava»).
 
 ## Allenamento solo
 
@@ -206,7 +226,7 @@ Cinque suite in [`tests/patata/`](../../tests/patata/):
   partita → parola corretta (bonus, punti = lunghezza, feed) → parola
   sbagliata (tempo invariato) → timeout (scottatura immediata) → recap →
   conferma → fine (podio + statistiche hub).
-- `browser-multiplayer.test.js` — E2E 92 test con **due pagine reali** su
+- `browser-multiplayer.test.js` — E2E 114 test con **due pagine reali** su
   mock Firestore: la casella di chi non ha la patata è **disabilitata e
   vuota** (nessuna parola preparata, nessuna scrittura), si attiva al
   passaggio della patata, il cronometro resta entro il tetto configurato, a
@@ -214,7 +234,12 @@ Cinque suite in [`tests/patata/`](../../tests/patata/):
   completo **pausa per tutti**, **proposta parola con voto di tutti**
   (approvazione → dizionario condiviso scritto una volta → parola giocabile)
   e **power-up 🚀 passa la patata** (badge, scelta bersaglio, 0 punti,
-  un solo utilizzo).
+  un solo utilizzo). In più: **lettere identiche anche con dizionari locali
+  diversi** (due client con parole approvate diverse mostrano la stessa
+  combinazione e lo stesso numero di parole valide, e il test verifica che
+  con l'indice locale divergerebbero) e **rivincita** (lobby marcata
+  `daRivincita`/`rivincitaDi`, accettazione dal banner → tutti entrano, e chi
+  entra nella lobby nuova segna l'accettazione sulla partita di origine).
 
 ## Note / limiti
 

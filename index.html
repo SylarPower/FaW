@@ -1524,6 +1524,13 @@ if (mioNome && passwordHashSalvato) {
 			      inPartita = true; partitaId = p.id;
 			      return;
 			    }
+			    /* Lobby di rivincita: ci si entra e basta (l'accettazione vive
+			       sulla partita di origine), quindi tutti i partecipanti sono
+			       impegnati fin dal primo istante. */
+			    if (p.daRivincita) {
+			      inPartita = true; partitaId = p.id;
+			      return;
+			    }
 			    // In attesa: sono impegnato solo se ho creato la sfida o l'ho accettata
 			    const accettanti = p.rivincitaAccettataDa || [];
 			    if (partecipanti[0] === mioNome || accettanti.includes(mioNome)) {
@@ -1860,6 +1867,12 @@ function invitiPendenti() {
   const spingiPartita = (p) => {
     if (!p || !p.id || visti.has(p.id)) return;
     if (p.stato !== 'attesa') return;
+    /* Una lobby nata da una RIVINCITA non e' una sfida da accettare: si entra
+       e basta (l'accettazione si segna sulla partita di origine). Trattarla
+       come invito faceva scrivere il "si" sul documento sbagliato: chi
+       accettava dal popup entrava nella lobby nuova mentre gli altri restavano
+       in attesa per sempre sulla partita finita. */
+    if (p.daRivincita) return;
     const partecipanti = p.partecipanti || [];
     if (!partecipanti.includes(mioNome)) return;
     if (partecipanti[0] === mioNome) return;   // sono io il creatore
@@ -1876,6 +1889,7 @@ function invitiPendenti() {
   const spingiPic = (p) => {
     if (!p || !p.id || visti.has(p.id)) return;
     if (p.stato !== 'lobby') return;
+    if (p.daRivincita) return;   // idem: lobby di rivincita, non un invito
     if (!(p.players || []).includes(mioNome)) return;
     if (p.host === mioNome) return;
     visti.add(p.id);
@@ -1989,6 +2003,8 @@ function firmaListaPartite() {
         return giocoSelezionato + '|' + JSON.stringify(partiteInCache().map(p => ({
             id: p.id, gioco: p.gioco, stato: p.stato,
             n: (p.partecipanti || p.players || []).length,
+            /* pronti: la riga delle lobby di rivincita mostra "n/N pronti" */
+            pr: (p.pronti || []).length,
             acc: p.rivincitaAccettataDa || [], rif: p.rivincitaRifiutataDa || [],
             inv: p.invitoRifiutatoDa || []
         })));
@@ -2053,6 +2069,26 @@ function renderPartitaRuzzle(p, div) {
     const creatore = p.partecipanti[0];
     const altriGiocatori = p.partecipanti.filter(x => x !== creatore);
     const delBtn = `<button class="u-btn--del" title="Elimina" onclick="event.stopPropagation(); if(confirm('Eliminare?')) db.collection('partite').doc('${partitaId}').delete()">🗑️</button>`;
+
+    /* Lobby nata da una RIVINCITA: non e' una sfida da accettare/rifiutare, e'
+       la partita in cui si entra (l'accettazione sulla partita di origine la
+       scrive entraRivincita). Niente 🗑️: cancellare la lobby lascerebbe la
+       partita finita con prossimaPartita che punta a un documento fantasma. */
+    if (p.daRivincita && p.stato === 'attesa') {
+        const dentro = Array.isArray(p.pronti) ? p.pronti.length : 0;
+        const totale = (p.partecipanti || []).length;
+        const statoLobby = dentro < totale ? `in attesa (${dentro}/${totale} pronti)` : 'pronta a partire';
+        const origine = p.rivincitaDi ? `'${p.rivincitaDi}'` : 'null';
+        const origineCol = p.rivincitaCollezione ? `'${p.rivincitaCollezione}'` : 'null';
+        div.innerHTML += `
+            <div class="user-item u-row--wait">
+                <span>🔁 Rivincita di ${creatore} — ${nomeGioco} · ${statoLobby}</span>
+                <div>
+                    <button class="u-btn--enter" onclick="event.stopPropagation(); entraRivincita('${partitaId}', '${p.gioco}', ${origine}, ${origineCol})">ENTRA →</button>
+                </div>
+            </div>`;
+        return;
+    }
 
     // Rifiuti / annullata
     if (rifiutanti.length > 0) {
@@ -2154,6 +2190,23 @@ function renderPartitaPictionary(p, div) {
                      p.stato === 'drawing' ? 'Disegno' :
                      p.stato === 'interpreting' ? 'Ridisegno' :
                      p.stato === 'voting' ? 'Votazione' : 'In corso';
+
+    /* Room nata da una RIVINCITA: non e' una sfida da accettare, e' la stanza
+       in cui si entra (l'accettazione si segna sulla partita di origine).
+       Niente 🗑️: cancellarla lascerebbe la partita finita con prossimaPartita
+       che punta nel vuoto. */
+    if (p.daRivincita && p.stato === 'lobby') {
+        const origine = p.rivincitaDi ? `'${p.rivincitaDi}'` : 'null';
+        const origineCol = p.rivincitaCollezione ? `'${p.rivincitaCollezione}'` : 'null';
+        div.innerHTML += `
+            <div class="user-item u-row--wait">
+                <span>🔁 Rivincita di ${p.host || p.players[0]} — Pictionary · in attesa</span>
+                <div>
+                    <button class="u-btn--enter" onclick="event.stopPropagation(); entraRivincita('${roomId}', 'pictionary', ${origine}, ${origineCol})">ENTRA →</button>
+                </div>
+            </div>`;
+        return;
+    }
 
     div.innerHTML += `
         <div class="user-item u-row--live">
@@ -2627,6 +2680,27 @@ if (giocoSelezionato === 'pictionary') {
 			    stato: 'pendente'
 			  });
 			  alert("Richiesta inviata!");
+			}
+			/* Entrare in una lobby di rivincita VALE come accettazione: la si segna
+			   sulla partita di origine (quella dove gli altri giocatori stanno
+			   ancora aspettando il nostro "si") e poi si entra. Senza questa
+			   scrittura chi entrava dall'hub lasciava tutti gli altri bloccati
+			   sulla partita finita, in attesa di un'accettazione che non
+			   arrivava mai. */
+			async function entraRivincita(partitaId, gioco, origine, origineCollezione) {
+			  if (origine && db) {
+			    try {
+			      const col = origineCollezione === 'pictionary_rooms' ? 'pictionary_rooms' : 'partite';
+			      await db.collection(col).doc(origine).update({
+			        rivincitaAccettataDa: firebase.firestore.FieldValue.arrayUnion(mioNome)
+			      });
+			    } catch (e) {
+			      console.warn('Accettazione rivincita non registrata su ' + origine + ':', e && e.message);
+			    }
+			  }
+			  /* Il Pictionary si raggiunge con ?room=, gli altri giochi con ?matchId= */
+			  const chiave = gioco === 'pictionary' ? 'room' : 'matchId';
+			  fawVaiA(gameHref(gioco, chiave + '=' + partitaId));
 			}
 			/* Chi accetta entra SUBITO nella lobby: niente toast da aspettare. */
 			async function accettaSfida(partitaId, gioco) {
