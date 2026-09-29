@@ -19,6 +19,8 @@ html = html.replace(/\t*<script src="\.\.\/shared\/firebase-config\.js"><\/scrip
 html = html.replace(/\t*<script src="\.\.\/shared\/faw-layout\.js" defer><\/script>\n?/g, '');
 
 const podioJs = fs.readFileSync(path.join(ROOT, 'games/shared/podio.js'), 'utf8');
+const bannerJs = fs.readFileSync(path.join(ROOT, 'games/shared/faw-banner.js'), 'utf8');
+const modaleJs = fs.readFileSync(path.join(ROOT, 'games/shared/faw-modale.js'), 'utf8');
 /* Dizionario minimo: sulla griglia del test si formano solo CANE e MARE. */
 const dictSample = ['CANE', 'MARE', 'GATTO', 'LUNA'].join('\n');
 /* Le stesse parole scritte dai due giocatori: CANE è in comune (0 punti),
@@ -65,6 +67,9 @@ function pagina(nome, errori) {
     virtualConsole: vc,
     beforeParse(w) {
       w.eval(podioJs);
+      w.eval(bannerJs);   // banner/toast condivisi
+      w.eval(modaleJs);   // modali condivise (Esc, sfondo, aria)
+      w.eval(bannerJs);   // banner/toast condivisi
       w.localStorage.setItem('mioNome', nome);
       w.firebase = makeFirebaseGlobal(mock);
       w.FAW_FIREBASE_CONFIG = { apiKey: 'test-key', projectId: 'test' };
@@ -109,6 +114,16 @@ async function apriPersi(w, errori) {
   if (errori && errori.length) console.log('   [jsdomError]', errori[0]);
 }
 
+/* La modale "Cosa mi sono perso" è una vera finestra: ruolo di dialogo e
+   chiusura con Esc, come tutte le modali della piattaforma. */
+async function modaleAccessibile(w) {
+  const el = w.document.getElementById('missed-words-modal');
+  const aria = [el.getAttribute('role'), el.getAttribute('aria-modal')];
+  w.document.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+  await until(() => el.style.display === 'none', 'Esc chiude la modale');
+  return aria;
+}
+
 (async () => {
   mock.store.set('partite/P1', {
     gioco: 'ruzzle',
@@ -151,6 +166,14 @@ async function apriPersi(w, errori) {
   ok(/ALFA/.test(riepilogo(a)), 'il riepilogo dice di chi sono le parole: "' + riepilogo(a) + '"');
   ok(/1 parole|1 parola/.test(riepilogo(a)) || /ne restavano 1/.test(riepilogo(a)),
     'il riepilogo conta le parole trovate da ALFA (1), non quelle del vincitore (2)');
+
+  console.log('\n[2b] La modale è una finestra accessibile');
+  {
+    const aria = await modaleAccessibile(a);
+    eq(aria, ['dialog', 'true'], 'role="dialog" e aria-modal="true" sulla modale');
+    await until(() => a.document.getElementById('missed-words-modal').getAttribute('aria-hidden') === 'true',
+      'aria-hidden coerente quando è chiusa');
+  }
 
   console.log('\n[3] Cambiare la vista non cambia le parole mancanti');
   const sel = a.document.getElementById('sel-analisi');

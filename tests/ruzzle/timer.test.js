@@ -19,6 +19,7 @@ html = html.replace(/\t*<script src="\.\.\/shared\/firebase-config\.js"><\/scrip
 html = html.replace(/\t*<script src="\.\.\/shared\/faw-layout\.js" defer><\/script>\n?/g, '');
 
 const podioJs = fs.readFileSync(path.join(ROOT, 'games/shared/podio.js'), 'utf8');
+const bannerJs = fs.readFileSync(path.join(ROOT, 'games/shared/faw-banner.js'), 'utf8');
 const dictSample = ['CANE', 'GATTO', 'VOLPE', 'ROSA', 'MARE'].join('\n');
 
 let passed = 0, failed = 0;
@@ -46,6 +47,7 @@ function pagina(nome) {
     virtualConsole: vc,
     beforeParse(w) {
       w.eval(podioJs);
+      w.eval(bannerJs);   // banner/toast condivisi
       w.localStorage.setItem('mioNome', nome);
       w.firebase = makeFirebaseGlobal(createMockFirestore());
       w.FAW_FIREBASE_CONFIG = { apiKey: 'test-key', projectId: 'test' };

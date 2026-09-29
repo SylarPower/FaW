@@ -12,10 +12,14 @@
     <!-- Config Firebase condivisa (prima dello script che inizializza Firebase) -->
     <script src="../shared/firebase-config.js"></script>
     <script src="../shared/rivincita.js"></script>
+    <script src="../shared/faw-theme.js" data-tema-fisso="dark"></script>
     <link rel="stylesheet" href="../shared/faw-ui.css">
     <!-- Podio di fine partita (condiviso tra i giochi) -->
     <link rel="stylesheet" href="../shared/podio.css">
     <link rel="stylesheet" href="../shared/rivincita.css">
+    <script src="../shared/faw-modale.js"></script>
+    <script src="../shared/faw-banner.js"></script>
+    <script src="../shared/faw-layout.js" defer></script>
     <script src="../shared/podio.js"></script>
     <style>
         /* Font piattaforma caricati via <link> nel <head> */
@@ -56,7 +60,7 @@
             pointer-events: none; z-index: 10;
             text-align: right;
         }
-.timer-display { font-family: 'Nunito', system-ui, sans-serif; font-size: 1.6rem; color: #a78bfa; font-weight: 800; text-shadow: 0 0 22px rgba(167, 139, 250, 0.45); font-variant-numeric: tabular-nums; }
+.timer-display { font-family: 'Nunito', system-ui, sans-serif; font-size: 1.6rem; color: var(--g15-viola); font-weight: 800; text-shadow: 0 0 22px rgba(167, 139, 250, 0.45); font-variant-numeric: tabular-nums; }
         .moves-display {
             font-family: 'Nunito', system-ui, sans-serif;
             font-size: 0.95rem; color: #f59e0b;
@@ -65,6 +69,17 @@
         }
 
         /* ===== SCHERMATE ===== */
+        :root {
+            /* Palette del Gioco del 15, in un posto solo. */
+            --g15-ciano: var(--g15-ciano);
+            --g15-verde: var(--g15-verde);
+            --g15-oro: var(--g15-oro);
+            --g15-viola: var(--g15-viola);
+            --g15-testo-2: #aaa;
+            --g15-testo-3: #888;
+            --g15-bordo: #c5cdd8;
+        }
+
         .overlay-screen {
             position: absolute; top: 0; left: 0;
             width: 100%; height: 100%;
@@ -166,8 +181,8 @@
             overflow: hidden;
             position: relative;
         }
-        .image-option:hover { border-color: #00ccff; transform: scale(1.1); }
-        .image-option.selected { border-color: #ffd700; box-shadow: 0 0 15px rgba(255,215,0,0.5); }
+        .image-option:hover { border-color: var(--g15-ciano); transform: scale(1.1); }
+        .image-option.selected { border-color: var(--g15-oro); box-shadow: 0 0 15px rgba(255,215,0,0.5); }
         .image-option img, .image-option canvas { width: 100%; height: 100%; object-fit: cover; }
         .image-option .img-label {
             position: absolute; bottom: 0; left: 0; right: 0;
@@ -193,7 +208,7 @@
             overflow: hidden;
             transition: box-shadow 0.3s, border-color 0.3s;
         }
-        #puzzle-board.glow-win { box-shadow: 0 0 40px rgba(34,197,94,0.4); border-color: #22c55e; }
+        #puzzle-board.glow-win { box-shadow: 0 0 40px rgba(34,197,94,0.4); border-color: var(--g15-verde); }
 
         .puzzle-tile {
             position: absolute;
@@ -318,9 +333,9 @@
         .rarity-uncommon { border-bottom: 3px solid #32cd32; }
         .rarity-rare { border-bottom: 3px solid #6366f1; }
         .rarity-epic { border-bottom: 3px solid #d000ff; }
-        .rarity-legendary { border-bottom: 3px solid #ffd700; animation: glowBorder 2s infinite; }
+        .rarity-legendary { border-bottom: 3px solid var(--g15-oro); animation: glowBorder 2s infinite; }
         @keyframes glowBorder { 50% { box-shadow: 0 0 20px rgba(255,215,0,0.5); } }
-        .price-tag { color: #ffd700; font-size: 0.6rem; }
+        .price-tag { color: var(--g15-oro); font-size: 0.6rem; }
         .owned-tag { color: #888; font-size: 0.6rem; }
 
         /* ===== PULSANTE HOME: usa la classe condivisa .fixed-home-btn (faw-ui.css) ===== */
@@ -410,7 +425,7 @@
             margin: 10px 0;
             line-height: 2;
         }
-        .records-table span { color: #ffd700; }
+        .records-table span { color: var(--g15-oro); }
 
         /* ===== SCROLLBAR ===== */
         ::-webkit-scrollbar { width: 6px; }
@@ -427,6 +442,30 @@
             .btn { padding: 12px 20px; font-size: 0.65rem; }
             .image-option { width: 75px; height: 75px; }
         }
+            /* ---------- Utility: sostituiscono gli stili scritti a mano nel markup ----------
+           Palette e misure in un posto solo, in fondo al foglio (a pari
+           specificità vincono sulle regole generali). */
+        .g15-ciano { color: var(--g15-ciano); }
+        .g15-arancione { font-size: 0.7rem; color: #ff9900; }
+        .g15-testo-2 { font-size: 0.6rem; color: var(--g15-testo-2); margin-bottom: 10px; }
+        .g15-testo-3 { font-size: 0.5rem; color: var(--g15-testo-3); margin-bottom: 15px; }
+        .g15-nota { font-size: 0.6rem; color: var(--g15-testo-2); margin-top: 4px; }
+        .g15-aiuto { font-size: 0.7rem; color: var(--g15-testo-3); margin-bottom: 18px; }
+        .g15-elenco { font-size: 0.6rem; color: #ccc; max-width: 500px; line-height: 2.2; margin: 20px 0; }
+        .g15-sopra { margin-top: 10px; }
+        .g15-sopra-15 { margin-top: 15px; }
+        .g15-sopra-20 { margin-top: 20px; }
+        .g15-sopra-sotto { margin: 15px 0; }
+        .g15-sopra-sotto-10 { margin: 10px 0; }
+        .g15-sotto { margin-bottom: 15px; font-size: 0.6rem; }
+        .g15-titolo-emoji { font-size: 1.5rem; margin-top: 10px; }
+        .g15-riga-campo { max-width: 420px; width: 90%; margin-bottom: 20px; }
+        .g15-oro { color: var(--g15-oro); }
+        .g15-verde { color: var(--g15-verde); }
+        .g15-viola { color: var(--g15-viola); }
+        .g15-vittoria { color: var(--g15-verde); font-size: 2.5rem; }
+        .g15-oro-piccolo { color: var(--g15-oro); font-size: 0.8rem; margin-top: 10px; }
+        .g15-viola-titolo { color: var(--g15-viola); margin-bottom: 8px; }
     </style>
 </head>
 <body>
@@ -437,7 +476,7 @@
     <!-- HUD SINISTRO -->
     <div id="ui-layer" style="display:none;">
         <div class="hud-text">MOSSE: <span id="movesVal" class="score-big">0</span></div>
-        <div style="font-size:0.6rem; color:#aaa; margin-top:4px;">RECORD: <span id="hudRecord">-</span></div>
+        <div class="g15-nota">RECORD: <span id="hudRecord">-</span></div>
         <div class="coin-text">COINS: <span id="walletVal">0</span></div>
     </div>
 
@@ -462,13 +501,13 @@
 
         <div class="records-table" id="main-records"></div>
 
-        <div style="margin:10px 0;" id="streak-container"></div>
+        <div class="g15-sopra-sotto-10" id="streak-container"></div>
 
         <div id="solo-actions">
             <button class="btn btn-play" onclick="openModeSelect()">🎮 GIOCA</button>
             <button class="btn btn-shop" onclick="openShop()">🛒 NEGOZIO</button>
         </div>
-        <div style="margin-top:10px;">
+        <div class="g15-sopra">
             <button class="btn btn-small" onclick="openStats()">📊 STATISTICHE</button>
         </div>
     </div>
@@ -476,9 +515,9 @@
     <!-- ===== SELEZIONE MODALITÀ ===== -->
     <div id="mode-screen" class="overlay-screen" style="display:none;">
         <h2 style="color:#7c3aed; margin-bottom:5px;">SCEGLI MODALITÀ</h2>
-        <p style="font-size:0.5rem; color:#888; margin-bottom:15px;">Seleziona dimensione e tipo</p>
+        <p class="g15-testo-3">Seleziona dimensione e tipo</p>
 
-        <p style="font-size:0.6rem; color:#aaa; margin-bottom:10px;">📐 DIMENSIONE GRIGLIA</p>
+        <p class="g15-testo-2">📐 DIMENSIONE GRIGLIA</p>
         <div class="mode-grid" id="size-select">
             <div class="mode-card" data-size="3" onclick="selectSize(3, this)">
                 <div class="mode-icon">🟩</div>
@@ -502,7 +541,7 @@
             </div>
         </div>
 
-        <p style="font-size:0.6rem; color:#aaa; margin:15px 0 10px;">🎨 TIPO PUZZLE</p>
+        <p class="g15-testo-2">🎨 TIPO PUZZLE</p>
         <div class="mode-grid" id="type-select">
             <div class="mode-card selected" data-type="numbers" onclick="selectType('numbers', this)">
                 <div class="mode-icon">🔢</div>
@@ -518,9 +557,9 @@
 
         <!-- Selezione immagine (nascosta inizialmente) -->
         <div id="image-select-section" style="display:none; margin-top:15px;">
-            <p style="font-size:0.6rem; color:#aaa; margin-bottom:10px;">📷 LA TUA IMMAGINE</p>
+            <p class="g15-testo-2">📷 LA TUA IMMAGINE</p>
             <div class="image-grid" id="image-grid"></div>
-            <div style="margin-top:10px;">
+            <div class="g15-sopra">
                 <label class="btn btn-small" style="display:inline-block;">
                     📤 CARICA IMMAGINE
                     <input type="file" accept="image/*" id="custom-image-input" style="display:none;" onchange="loadCustomImage(event)">
@@ -531,7 +570,7 @@
             </div>
         </div>
 
-        <div style="margin-top:20px;">
+        <div class="g15-sopra-20">
             <button class="btn btn-play" onclick="startGame()">▶ INIZIA</button>
             <button class="btn" onclick="closeModeSelect()">⬅ INDIETRO</button>
         </div>
@@ -539,16 +578,16 @@
 
     <!-- ===== SHOP ===== -->
     <div id="shop-screen" class="overlay-screen" style="display:none;">
-        <h2 style="color:#ffd700;">🛒 NEGOZIO TEMI</h2>
-        <p style="margin-bottom:15px; font-size:0.6rem;">Coins: <span id="shopWallet" style="color:#ffd700">0</span></p>
+        <h2 class="g15-oro">🛒 NEGOZIO TEMI</h2>
+        <p class="g15-sotto">Coins: <span id="shopWallet" class="g15-oro">0</span></p>
         <div id="shop-content"></div>
-        <button class="btn" onclick="closeShop()" style="margin-top:15px;">⬅ INDIETRO</button>
+        <button class="btn g15-sopra-15" onclick="closeShop()">⬅ INDIETRO</button>
     </div>
 
     <!-- ===== STATISTICHE ===== -->
     <div id="stats-screen" class="overlay-screen" style="display:none;">
-        <h2 style="color:#00ccff;">📊 STATISTICHE</h2>
-        <div id="stats-content" style="font-size:0.6rem; color:#ccc; max-width:500px; line-height:2.2; margin:20px 0;"></div>
+        <h2 class="g15-ciano">📊 STATISTICHE</h2>
+        <div id="stats-content" class="g15-elenco"></div>
         <button class="btn" onclick="closeStats()">⬅ INDIETRO</button>
     </div>
 
@@ -559,22 +598,20 @@
         <button class="btn" onclick="resumeFromPause()">▶ RIPRENDI</button>
     </div>
 
-    <div id="rivincita-15" style="position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:80;width:min(520px,92vw);"></div>
-
     <!-- ===== VITTORIA ===== -->
     <div id="win-screen" class="overlay-screen" style="display:none;">
-        <h1 style="color:#22c55e; font-size:2.5rem;" id="win-title">🎉 RISOLTO!</h1>
-        <div style="margin:15px 0;">
+        <h1 class="g15-vittoria" id="win-title">🎉 RISOLTO!</h1>
+        <div class="g15-sopra-sotto">
             <p style="color:#fff; font-size:1rem;">Mosse: <span id="finalMoves" style="color:#ffcc00;">0</span></p>
-            <p style="color:#fff; font-size:1rem; margin-top:8px;">Tempo: <span id="finalTime" style="color:#00ccff;">00:00</span></p>
-            <p style="font-size:1.5rem; margin-top:10px;" id="finalStars">⭐⭐⭐</p>
-            <p style="color:#ffd700; font-size:0.8rem; margin-top:10px;">+<span id="earnedCoins">0</span> Coins</p>
+            <p style="color:#fff; font-size:1rem; margin-top:8px;">Tempo: <span id="finalTime" class="g15-ciano">00:00</span></p>
+            <p class="g15-titolo-emoji" id="finalStars">⭐⭐⭐</p>
+            <p class="g15-oro-piccolo">+<span id="earnedCoins">0</span> Coins</p>
         </div>
         <div id="win-record" style="display:none; margin:10px 0;">
             <div class="streak-badge">🏆 NUOVO RECORD!</div>
         </div>
         <div id="multiplayer-results" style="display:none; margin:15px 0;">
-            <h3 style="color:#00ccff;">PODIO FINALE</h3>
+            <h3 class="g15-ciano">PODIO FINALE</h3>
             <div id="podio" class="podio"></div>
         </div>
         <div>
@@ -587,9 +624,9 @@
 
     <!-- ===== LOBBY MULTIPLAYER ===== -->
     <div id="mp-lobby-screen" class="overlay-screen" style="display:none;">
-        <h2 style="color:#a78bfa; margin-bottom:8px;">🧩 SFIDA IN CORSO</h2>
-        <p style="font-size:0.7rem; color:#888; margin-bottom:18px;" id="mp-lobby-meta">In attesa dei giocatori</p>
-        <div id="mp-lobby-players" style="max-width:420px; width:90%; margin-bottom:20px;"></div>
+        <h2 class="g15-viola-titolo">🧩 SFIDA IN CORSO</h2>
+        <p class="g15-aiuto" id="mp-lobby-meta">In attesa dei giocatori</p>
+        <div id="mp-lobby-players" class="g15-riga-campo"></div>
         <div>
             <button class="btn btn-play" id="mp-ready-btn" onclick="toggleMpReady()">✅ SONO PRONTO</button>
             <button class="btn" onclick="tornaHome()">⬅ ESCI</button>
@@ -608,7 +645,7 @@
 
     <!-- TIMER MULTIPLAYER -->
     <div id="mp-timer">
-        <div style="font-size:0.7rem; color:#ff9900;">⏱️ <span id="mp-timer-text">03:00</span></div>
+        <div class="g15-arancione">⏱️ <span id="mp-timer-text">03:00</span></div>
         <div class="mp-timer-bar"><div class="mp-timer-fill" id="mp-timer-fill"></div></div>
     </div>
 
@@ -749,41 +786,59 @@ function esc15(s) {
 async function inviaRivincita15(giocoId, opzioni) {
     if (!window.FAW_RIVINCITA || !matchData || !matchData.partecipanti) return;
     if (matchData.prossimaPartita && !(matchData.rivincitaRifiutataDa || []).length) return;
-    const box = document.getElementById('rivincita-15');
-    if (box) box.innerHTML = '<div style="background:#1c2438;color:#fff;border-radius:12px;padding:12px 14px;font-weight:800;">Creazione rivincita…</div>';
+    avviso15('⏳', 'CREAZIONE RIVINCITA...', 'Attendi un momento', '#3498db', true);
     const r = await window.FAW_RIVINCITA.invita(giocoId, opzioni);
     if (r && !r.ok) alert(r.errore || 'Invito non riuscito');
 }
+/* I messaggi della rivincita passano dal banner condiviso (faw-banner.js):
+   stesso componente degli altri giochi, qui in versione flottante perché il
+   Gioco del 15 occupa tutto lo schermo. */
+function avviso15(icona, titolo, sottotitolo, colore, spinner, bottoni) {
+    if (!window.FAW_BANNER) return;
+    /* .faw-banner--flottante è specifico del Gioco del 15 (non ha una barra in alto):
+       viene passato come `flottante` così il componente lo applica. */
+    window.FAW_BANNER.banner({
+        id: 'game-banner',
+        flottante: true,
+        icon: icona,
+        title: titolo,
+        subtitle: sottotitolo,
+        color: colore || '#7c3aed',
+        spinner: !!spinner,
+        sticky: true,
+        buttons: bottoni || []
+    });
+}
 function mostraProposta15(data) {
-    const box = document.getElementById('rivincita-15');
-    if (!box || !window.FAW_RIVINCITA) return;
+    if (!window.FAW_RIVINCITA || !window.FAW_BANNER) return;
     const fase = window.FAW_RIVINCITA.fase(data, mioNome);
-    if (fase.fase === 'nessuna') { box.innerHTML = ''; return; }
+    if (fase.fase === 'nessuna') { window.FAW_BANNER.chiudi('game-banner'); return; }
     const nomi = (fase.rifiutanti || []).map(esc15).join(', ');
     const mancanti = (fase.mancanti || []).map(esc15).join(', ');
     const nome = esc15(fase.nome);
     if (fase.fase === 'vai') {
-        box.innerHTML = `<div style="background:#1c2438;color:#fff;border-radius:12px;padding:12px 14px;font-weight:800;">Si entra in ${nome}…</div>`;
+        avviso15('✅', 'SI ENTRA IN ' + fase.nome.toUpperCase(), 'Attendi il reindirizzamento…', '#1e8449', true);
         window.FAW_RIVINCITA.vai(data, 'gameof15');
         return;
     }
     if (fase.fase === 'rifiutata') {
-        box.innerHTML = `<div style="background:#1c2438;color:#fff;border-radius:12px;padding:12px 14px;">${nomi} ha rifiutato.
-            <button class="btn" onclick="apriSceltaRivincita15()">🔁 ALTRA</button></div>`;
+        avviso15('👋', 'RIVINCITA RIFIUTATA', nomi + ' ha rifiutato', '#c0392b', false,
+            [{ label: '🔁 ALTRA', fn: apriSceltaRivincita15 }]);
         return;
     }
     if (fase.fase === 'attesa') {
-        box.innerHTML = `<div style="background:#1c2438;color:#fff;border-radius:12px;padding:12px 14px;">In attesa di ${mancanti} per ${nome}.
-            <button class="btn" onclick="annullaRivincita15()">🚫 ANNULLA</button></div>`;
+        avviso15('⏳', 'IN ATTESA DI ' + mancanti.toUpperCase(), 'Si parte con ' + nome + ' quando tutti accettano', '#7c3aed', true,
+            [{ label: '🚫 ANNULLA', fn: annullaRivincita15 }]);
         return;
     }
     if (fase.fase === 'accettata') {
-        box.innerHTML = `<div style="background:#1c2438;color:#fff;border-radius:12px;padding:12px 14px;">Hai accettato. In attesa degli altri per ${nome}.</div>`;
+        avviso15('✅', 'HAI ACCETTATO', 'In attesa degli altri per ' + nome + '…', '#1e8449', true);
         return;
     }
-    box.innerHTML = `<div style="background:#1c2438;color:#fff;border-radius:12px;padding:12px 14px;font-weight:800;">${esc15(fase.creatore)} propone ${nome}</div>
-        <button class="btn btn-play" onclick="accettaRivincita15()">✅ ACCETTA</button>
-        <button class="btn" onclick="rifiutaRivincita15()">❌ RIFIUTA</button>`;
+    avviso15('🔁', nome.toUpperCase(), esc15(fase.creatore) + ' propone una rivincita', '#7c3aed', false, [
+        { label: '✅ ACCETTA', class: 'btn btn-play', fn: accettaRivincita15 },
+        { label: '❌ RIFIUTA', class: 'btn', fn: rifiutaRivincita15 }
+    ]);
 }
 async function accettaRivincita15() {
     await db.collection('partite').doc(matchId).update({
@@ -799,6 +854,17 @@ async function annullaRivincita15() {
     if (!window.FAW_RIVINCITA) return;
     await window.FAW_RIVINCITA.annulla(db, db.collection('partite').doc(matchId), matchData);
 }
+/* Modali accessibili (games/shared/faw-modale.js): ruolo di dialogo, Esc e
+   click sullo sfondo. La pausa è esclusa di proposito: si riprende con il
+   pulsante, non con un tasto premuto per sbaglio. */
+function attivaModali15() {
+    if (!window.FAW_MODALE) return;
+    window.FAW_MODALE.attiva('mode-screen', { chiudi: closeModeSelect, etichetta: 'Nuova partita' });
+    window.FAW_MODALE.attiva('shop-screen', { chiudi: closeShop, etichetta: 'Negozio' });
+    window.FAW_MODALE.attiva('stats-screen', { chiudi: closeStats, etichetta: 'Statistiche' });
+    window.FAW_MODALE.attiva('pause-screen', { etichetta: 'Pausa', sfondo: false });
+}
+attivaModali15();
 function tornaHome() {
     if (unsubscribePartita) unsubscribePartita();
     window.location.href = '../../index.html';
@@ -1790,7 +1856,7 @@ function openStats() {
     html += `<p>🔥 Serie giornaliera: <span>${saveData.streak}</span></p>`;
     html += `<p>🪙 Coins totali: <span>${saveData.wallet}</span></p>`;
     html += `<p>🎨 Temi sbloccati: <span>${saveData.inventory.length}/${THEMES.length}</span></p>`;
-    html += `<br><p style="color:#00ccff;">📐 RECORD PER MODALITÀ</p><br>`;
+    html += `<br><p class="g15-ciano">📐 RECORD PER MODALITÀ</p><br>`;
 
     const sizeNames = { 3: '3×3', 4: '4×4', 5: '5×5', 6: '6×6' };
     [3,4,5,6].forEach(s => {

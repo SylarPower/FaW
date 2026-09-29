@@ -22,6 +22,7 @@ const html = fs.readFileSync(path.join(ROOT, 'games/patata/index.html'), 'utf8')
 const gameJs = fs.readFileSync(path.join(ROOT, 'games/patata/js/game.js'), 'utf8');
 const cfgJs = fs.readFileSync(path.join(ROOT, 'games/shared/firebase-config.js'), 'utf8');
 const podioJs = fs.readFileSync(path.join(ROOT, 'games/shared/podio.js'), 'utf8');
+const bannerJs = fs.readFileSync(path.join(ROOT, 'games/shared/faw-banner.js'), 'utf8');
 const dictSample = fs.readFileSync(path.join(ROOT, 'dizionario.txt'), 'utf8')
   .split('\n').slice(0, 20000).join('\n');
 
@@ -65,6 +66,7 @@ function pagina(nome, matchId) {
   w.Element.prototype.animate = function () { return { onfinish: null, cancel: function () {} }; };
   w.eval(cfgJs);
   w.eval(podioJs);   // podio condiviso di fine partita
+  w.eval(bannerJs);   // banner/toast condivisi
   w.eval(gameJs);
   return w;
 }

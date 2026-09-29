@@ -1121,36 +1121,17 @@
     return AVATAR_COLORS[h % AVATAR_COLORS.length];
   }
 
+  /* Banner e toast sono componenti condivisi (games/shared/faw-banner.js):
+     qui restano solo i nomi usati dalla pagina. */
   function toast(msg, kind) {
-    el.toast.textContent = msg;
-    el.toast.className = 'toast' + (kind ? ' ' + kind : '');
-    clearTimeout(toast._t);
-    toast._t = setTimeout(() => { el.toast.className = 'toast hidden'; }, 2600);
+    if (window.FAW_BANNER) { window.FAW_BANNER.toast(msg, kind === 'err' ? 'err' : (kind || '')); return; }
   }
-  let bannerTimer = null;
   function banner(opts) {
-    el.banner.innerHTML =
-      '<span class="b-emoji">' + (opts.icon || '🥔') + '</span>' +
-      '<div class="b-text"><div class="b-title">' + esc(opts.title) + '</div>' +
-      (opts.subtitle ? '<div class="b-sub">' + esc(opts.subtitle) + '</div>' : '') + '</div>' +
-      '<div class="b-actions">' +
-      (opts.spinner ? '<span class="spinner"></span>' : '') +
-      (opts.buttons || []).map((b) =>
-        '<button class="btn ' + (b.kind || 'btn-ghost') + '" data-bid="' + b.id + '"' +
-        (b.disabled ? ' disabled' : '') + (b.title ? ' title="' + esc(b.title) + '"' : '') + '>' + esc(b.label) + '</button>'
-      ).join('') +
-      '</div>';
-    el.banner.classList.remove('hidden');
-    (opts.buttons || []).forEach((b) => {
-      const btn = el.banner.querySelector('[data-bid="' + b.id + '"]');
-      if (btn) btn.addEventListener('click', () => b.fn());
-    });
-    clearTimeout(bannerTimer);
-    if (opts.sticky !== true) bannerTimer = setTimeout(() => { el.banner.classList.add('hidden'); }, 6000);
+    if (!window.FAW_BANNER) return;
+    window.FAW_BANNER.banner(Object.assign({ id: 'banner', icon: '🥔' }, opts));
   }
   function hideBanner() {
-    clearTimeout(bannerTimer);
-    el.banner.classList.add('hidden');
+    if (window.FAW_BANNER) window.FAW_BANNER.chiudi('banner');
   }
 
   /* Nessun audio in FaW: il feedback di gioco è solo visivo/tattile. */
@@ -2640,9 +2621,22 @@
     }
   }
 
+  /* Finestre di gioco: ruolo di dialogo e stato aria, dal modulo condiviso
+     (games/shared/faw-modale.js). Qui non si chiudono con Esc o col click sullo
+     sfondo: un turno si conferma dal pulsante, non di sfuggita. */
+  function attivaOverlay() {
+    if (!window.FAW_MODALE) return;
+    [['overlay-recap', 'Recap del turno'], ['overlay-pausa', 'Pausa'],
+     ['overlay-target', 'Scegli a chi passare la patata'], ['overlay-fine', 'Risultati finali']
+    ].forEach(function (voce) {
+      window.FAW_MODALE.attiva(voce[0], { etichetta: voce[1], sfondo: false });
+    });
+  }
+
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', boot);
+    document.addEventListener('DOMContentLoaded', function () { boot(); attivaOverlay(); });
   } else {
     boot();
+    attivaOverlay();
   }
 })(typeof window !== 'undefined' ? window : globalThis);

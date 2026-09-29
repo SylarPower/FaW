@@ -12,10 +12,13 @@
 		<!-- Spazio per i banner di stato fissi in cima (evita che coprano il testo) -->
 		<script src="../shared/faw-layout.js" defer></script>
 		<!-- Podio di fine partita (condiviso tra i giochi) -->
+		<script src="../shared/faw-modale.js"></script>
+		<script src="../shared/faw-banner.js"></script>
 		<script src="../shared/podio.js"></script>
 		<link rel="preconnect" href="https://fonts.googleapis.com">
 		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 		<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <script src="../shared/faw-theme.js" data-tema-fisso="dark"></script>
 		<link rel="stylesheet" href="../shared/faw-ui.css">
 		<!-- Podio di fine partita (condiviso tra i giochi) -->
 		<link rel="stylesheet" href="../shared/podio.css">
@@ -72,20 +75,6 @@
 			-webkit-tap-highlight-color: transparent;
 			-webkit-touch-callout: none;
 			}
-			@keyframes bannerVictoryPulse {
-				 0%, 100% { transform: translateY(0); box-shadow: 0 4px 15px rgba(241, 196, 15, 0.3); }
-				 15% { transform: translateX(-3px) translateY(1px); }
-				 30% { transform: translateX(3px) translateY(-1px); }
-				 45% { transform: translateX(-2px) translateY(1px); }
-				 60% { transform: translateX(2px); }
-				 75% { transform: translateX(-1px); }
-				 85% { transform: translateX(1px); }
-			}
-
-			.banner-victory {
-				 animation: bannerVictoryPulse 0.6s ease-in-out infinite;
-				 border-bottom: 3px solid #fff;
-			}			
 			@keyframes earthquake {
 			0% {
 			transform: translate(1px, 1px) rotate(0deg);
@@ -425,12 +414,10 @@
 		border-color: #8b9bb8;
 		color-scheme: dark;
 		}
-		/* Modali e banner sono scuri in entrambi i temi: il controllo resta chiaro,
+		/* I modali sono scuri in entrambi i temi: il controllo resta chiaro,
 		   così le option non ereditano il testo chiaro del contenitore. */
 		.modal-content select,
-		.modal-content select option,
-		.game-banner select,
-		.game-banner select option {
+		.modal-content select option {
 		background-color: #ffffff !important;
 		color: #1c2438 !important;
 		border: 2px solid #5b6470;
@@ -1330,47 +1317,24 @@
 			@media (max-width: 480px) {
 			.header-bar h1 { font-size: 0.95rem; letter-spacing: 0.8px; }
 			}
-			@media (min-width: 601px) {
-			.game-banner { padding-left: var(--faw-home-safe-x); }
-			}
-			.game-banner {
-			position: fixed;
-			top: 0;
-			left: 0;
-			right: 0;
-			padding: 12px 20px;
-			display: flex;
-			justify-content: space-between;
-			align-items: center;
-			z-index: 9999;
-			box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
-			animation: slideDown 0.3s ease;
-			color: white;
-			flex-wrap: wrap;
-			}
-			.game-banner .banner-left {
-			display: flex;
-			align-items: center;
-			gap: 10px;
-			}
-			.game-banner .banner-right {
-			display: flex;
-			align-items: center;
-			gap: 10px;
-			flex-wrap: wrap;
-			}
-			@media (max-width: 600px) {
-			.game-banner {
-			flex-direction: column;
-			text-align: center;
-			gap: 15px;
-			}
-			.game-banner .banner-left,
-			.game-banner .banner-right {
-			justify-content: center;
-			}
-			}
-		</style>
+			/* Banner di stato: struttura e stile condivisi (games/shared/faw-banner.js
+			   + .faw-banner in faw-ui.css). Nessuna regola locale. */
+		/* ---------- Utility: sostituiscono gli stili scritti a mano nel markup ----------
+   Le classi stanno qui in fondo così vincono alla pari di specificità. */
+.ruzzle-ancora { position: relative; }
+.ruzzle-campo-largo { width: 100%; padding: 8px; font-size: 1rem; }
+.ruzzle-bottone-largo { width: auto; padding: 12px 25px; margin-top: 0; }
+.ruzzle-bottone-medio { width: auto; padding: 10px 20px; }
+.ruzzle-bottone-tondo { width: auto; align-self: center; padding: 11px 30px; }
+.ruzzle-bottone-tutto { width: 100%; margin: 0; font-size: 0.8rem; text-transform: uppercase; }
+.ruzzle-bottone-vicino { margin: 0 5px; }
+.ruzzle-bottone-chiaro {
+  width: auto; padding: 12px 25px;
+  background: white; color: #0e7490; border: none;
+}
+.ruzzle-etichetta { font-weight: bold; display: block; margin-bottom: 5px; }
+.ruzzle-etichetta-piccola { font-size: 0.7rem; font-weight: bold; display: block; margin-bottom: 5px; }
+</style>
 	</head>
 	<body class="dark-mode">
 		<div id="multiplayer-lobby">
@@ -1389,7 +1353,7 @@
 				<h2>🔍 Cosa mi sono perso</h2>
 				<p id="missed-summary" style="margin:4px 0 16px; font-size:0.88rem; opacity:0.85;"></p>
 				<ul id="missed-words-list" class="missed-words-list"></ul>
-				<button class="btn-action" style="width:auto; align-self:center; padding:11px 30px;" onclick="closeMissedWords()">CHIUDI</button>
+				<button class="btn-action ruzzle-bottone-tondo" onclick="closeMissedWords()">CHIUDI</button>
 			</div>
 		</div>
 		<div id="loading-msg">
@@ -1465,7 +1429,7 @@
 					<!-- Podio di fine partita: posizioni e punteggi finali (stessi per tutti) -->
 					<div id="podio" class="podio" style="display:none;"></div>
 					<div id="proposta-manuale-container" style="display:none; background:rgba(3,218,198,0.1); padding:10px; border-radius:8px; margin-bottom:10px; border:1px dashed #03dac6;">
-						<input type="text" id="input-nuova-parola" placeholder="Parola non letta? Scrivila..." autocomplete="off" autocorrect="off" spellcheck="false" style="width:100%; margin:0; font-size:0.8rem; text-transform:uppercase;">
+						<input type="text" id="input-nuova-parola" placeholder="Parola non letta? Scrivila..." autocomplete="off" autocorrect="off" spellcheck="false" class="ruzzle-bottone-tutto">
 						<button onclick="proponiParolaManuale()" class="btn-action" style="margin-top:5px; padding:8px; font-size:0.75rem;">PROPONI AGGIUNTA 📢</button>
 					</div>
 					<div style="display:flex; justify-content:space-between; font-weight:bold; margin-bottom:5px; flex-shrink:0;">
@@ -1494,8 +1458,8 @@
 				<span class="close-modal" onclick="closeNewGameModal()">&times;</span>
 				<h2>Nuova Partita</h2>
 				<div style="margin-bottom: 20px;">
-					<label for="modal-timer-select" style="font-weight:bold; display:block; margin-bottom:5px;">Durata:</label>
-					<select id="modal-timer-select" class="faw-select" style="width: 100%; padding: 8px; font-size: 1rem;">
+					<label for="modal-timer-select" class="ruzzle-etichetta">Durata:</label>
+					<select id="modal-timer-select" class="faw-select ruzzle-campo-largo">
 						<option value="30">30s (Fulmine)</option>
 						<option value="60">60s (Blitz)</option>
 						<option value="90">90s</option>
@@ -1504,8 +1468,8 @@
 					</select>
 				</div>
 				<div style="margin-bottom: 20px;">
-					<label for="modal-grid-select" style="font-weight:bold; display:block; margin-bottom:5px;">Dimensione Griglia:</label>
-					<select id="modal-grid-select" class="faw-select" style="width: 100%; padding: 8px; font-size: 1rem;">
+					<label for="modal-grid-select" class="ruzzle-etichetta">Dimensione Griglia:</label>
+					<select id="modal-grid-select" class="faw-select ruzzle-campo-largo">
 						<option value="3">3x3 (Mini)</option>
 						<option value="4">4x4 (Easy)</option>
 						<option value="5" selected>5x5 (Classica)</option>
@@ -1516,9 +1480,9 @@
 				</div>
 				<p style="margin-bottom:20px; color:inherit;">Scegli la modalità di gioco:</p>
 				<div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
-					<button class="btn-action" style="width:auto; padding:12px 25px; margin-top:0;" onclick="confirmNewGame(false, false)">CLASSICA</button>
-					<button class="btn-action" style="width:auto; padding:12px 25px; margin-top:0;" onclick="confirmNewGame(true, false)">BONUS ⭐</button>
-					<button class="btn-action" style="width:auto; padding:12px 25px; margin-top:0;" onclick="confirmNewGame(true, true)">CRAZY 🤪</button>
+					<button class="btn-action ruzzle-bottone-largo" onclick="confirmNewGame(false, false)">CLASSICA</button>
+					<button class="btn-action ruzzle-bottone-largo" onclick="confirmNewGame(true, false)">BONUS ⭐</button>
+					<button class="btn-action ruzzle-bottone-largo" onclick="confirmNewGame(true, true)">CRAZY 🤪</button>
 				</div>
 			</div>
 		</div>
@@ -1611,16 +1575,16 @@
 					<hr style="margin:10px 0; border:0; border-top:1px solid #ccc;">
 					<p style="font-weight:bold; margin-bottom:10px;">Bonus:</p>
 					<div class="bonus-legend-item">
-						<span class="bonus-badge b-2l" style="position:relative;">2L</span> +2 Punti al totale
+						<span class="bonus-badge b-2l ruzzle-ancora">2L</span> +2 Punti al totale
 					</div>
 					<div class="bonus-legend-item">
-						<span class="bonus-badge b-3l" style="position:relative;">3L</span> +3 Punti al totale
+						<span class="bonus-badge b-3l ruzzle-ancora">3L</span> +3 Punti al totale
 					</div>
 					<div class="bonus-legend-item">
-						<span class="bonus-badge b-2p" style="position:relative;">2P</span> Punteggio parola x2
+						<span class="bonus-badge b-2p ruzzle-ancora">2P</span> Punteggio parola x2
 					</div>
 					<div class="bonus-legend-item">
-						<span class="bonus-badge b-3p" style="position:relative;">3P</span> Punteggio parola x3
+						<span class="bonus-badge b-3p ruzzle-ancora">3P</span> Punteggio parola x3
 					</div>
 				</div>
 			</div>
@@ -1635,8 +1599,8 @@
 					<div id="end-score-val" style="font-size: 5rem; font-weight: 900; line-height: 1; text-shadow: 0 5px 0 rgba(0,0,0,0.2);">0</div>
 				</div>
 				<div style="display:flex; gap:15px; justify-content:center; margin-top:20px; flex-wrap:wrap;">
-		<button onclick="closeEndGameModal()" class="btn-action" style="width:auto; padding:12px 25px; background:white; color:#0e7490; border:none;">🔍 ESPLORA GRIGLIA</button>
-		<button onclick="tornaHome()" class="btn-action" style="width:auto; padding:12px 25px; background:white; color:#0e7490; border:none;">🏠 HOME</button>
+		<button onclick="closeEndGameModal()" class="btn-action ruzzle-bottone-chiaro">🔍 ESPLORA GRIGLIA</button>
+		<button onclick="tornaHome()" class="btn-action ruzzle-bottone-chiaro">🏠 HOME</button>
 				</div>
 			</div>
 		</div>
@@ -1958,92 +1922,47 @@
 			const modalGridSelect = document.getElementById('modal-grid-select');
 			const gameEndModal = document.getElementById('game-end-modal');
 			// --- BANNER SYSTEM ---
+			/* Banner di stato: componente condiviso (games/shared/faw-banner.js).
+			   Qui resta solo la priorità (un banner più importante non viene
+			   sovrascritto da uno secondario) e la pulizia del vecchio
+			   #wait-banner. */
 			function showGameBanner(options) {
 			    const priority = options.priority || 1;
 			    if (currentBannerPriority > priority) return; // Non sovrascrivere banner più importanti
 			    currentBannerPriority = priority;
-			
-			    let banner = document.getElementById('game-banner');
-			    const isNewBanner = !banner;
-			    
-			    if (isNewBanner) {
-			        // Crea nuovo banner solo se non esiste
-			        banner = document.createElement('div');
-			        banner.id = 'game-banner';
-			        banner.className = 'game-banner';
-			        document.body.appendChild(banner);
-			    }
-			    
-			    // ✅ Aggiorna stile senza ricreare
-			    const bannerFill = (window.FAW_fillPerTestoChiaro && options.color)
-		      ? window.FAW_fillPerTestoChiaro(options.color)
-		      : options.color;
-		    banner.style.background = `linear-gradient(135deg, ${bannerFill} 0%, ${adjustColor(bannerFill, -20)} 100%)`;
-		    banner.style.color = '#ffffff';
-				 // ✅ Gestisci vibrazione vittoria
-				 if (options.vibrate) {
-					  banner.classList.add('banner-victory');
-				 } else {
-					  banner.classList.remove('banner-victory');
-				 }			    
-			    // Genera HTML bottoni
-			    let buttonsHtml = '';
-			    if (options.buttons && options.buttons.length > 0) {
-			        buttonsHtml = options.buttons.map(btn => {
-			            const specialClass = btn.special ? 'btn-rivincita' : 'btn-action';
-			            const specialStyle = btn.special ? '' : 'style="width:auto; padding:8px 16px; margin:0; background:white; color:#333; border:none;"';
-			            return `<button onclick="${btn.onclick}" class="${specialClass}" ${specialStyle}>${btn.text}</button>`;
-			        }).join('');
-			    }
-			    
-			    let spinnerHtml = '';
-			    if (options.spinner) {
-			        spinnerHtml = `<div style="width:20px; height:20px; border:3px solid white; border-top-color:transparent; border-radius:50%; animation: spin 1s linear infinite;"></div>`;
-			    }
-			    
-			    const newContent = `
-			        <div class="banner-left">
-			            <span style="font-size:1.5rem;">${options.icon}</span>
-			            <div>
-			                <div style="font-weight:bold;">${options.title}</div>
-			                <div style="font-size:0.8rem; opacity:0.9;">${options.subtitle}</div>
-			            </div>
-			        </div>
-			        <div class="banner-right">
-			            ${buttonsHtml}
-			            ${spinnerHtml}
-			        </div>
-			    `;
-			    
-			    // ✅ Aggiorna solo se il contenuto è diverso
-			    banner.innerHTML = newContent;
-			    
-			    // Rimuovi vecchi banner se esistono
 			    const oldBanner = document.getElementById('wait-banner');
 			    if (oldBanner) oldBanner.remove();
+			    if (!window.FAW_BANNER) return;
+			    window.FAW_BANNER.banner({
+			        id: 'game-banner',
+			        icon: options.icon,
+			        title: options.title,
+			        subtitle: options.subtitle,
+			        color: options.color,
+			        timer: options.timer,
+			        spinner: options.spinner,
+			        vibrate: options.vibrate,
+			        /* I banner di Ruzzle restano finché il gioco non li toglie. */
+			        sticky: options.sticky !== undefined ? options.sticky : true,
+			        priority: priority,
+			        buttons: (options.buttons || []).map(btn => ({
+			            text: btn.text || btn.label,
+			            onclick: btn.onclick,
+			            /* I pulsanti "speciali" (rivincita) hanno lo stile del gioco;
+			               gli altri sono pillole chiare leggibili su ogni tinta. */
+			            kind: btn.special ? 'btn-rivincita' : 'btn-action',
+			            chiaro: !btn.special
+			        }))
+			    });
 			}
 			
 			function removeGameBanner() {
 			  currentBannerPriority = 0;
+			  if (window.FAW_BANNER) window.FAW_BANNER.chiudi('game-banner');
 			  const existing = document.getElementById('game-banner');
 			  if (existing) existing.remove();
 			  const oldBanner = document.getElementById('wait-banner');
 			  if (oldBanner) oldBanner.remove();
-			}
-			
-			function adjustColor(hex, amount) {
-			  let color = hex.replace('#', '');
-			  if (color.length === 3) {
-			    color = color[0] + color[0] + color[1] + color[1] + color[2] + color[2];
-			  }
-			  const num = parseInt(color, 16);
-			  let r = (num >> 16) + amount;
-			  let g = ((num >> 8) & 0x00FF) + amount;
-			  let b = (num & 0x0000FF) + amount;
-			  r = Math.max(0, Math.min(255, r));
-			  g = Math.max(0, Math.min(255, g));
-			  b = Math.max(0, Math.min(255, b));
-			  return '#' + (0x1000000 + r * 0x10000 + g * 0x100 + b).toString(16).slice(1);
 			}
 			
 			function mostraRisultatiPopup() {
@@ -2153,7 +2072,7 @@
 							<small style="opacity:0.8;">${error.message}</small>
 							<br>
 								<br>
-									<button onclick="location.reload()" class="btn-action" style="width:auto; padding:10px 20px;">
+									<button onclick="location.reload()" class="btn-action ruzzle-bottone-medio">
 			                  🔄 RIPROVA
 			              </button>
 								</div>
@@ -3468,17 +3387,19 @@
 		   La sorgente è sempre la SUA lista sul documento partita: l'analisi di
 		   fine partita può mostrare le parole di un altro giocatore (il vincitore
 		   è preselezionato) e `foundWords` viene riempito con quelle, quindi non
-		   è utilizzabile per "Cosa mi sono perso". Le parole escluse dal
-		   vocabolario sono tolte (non sono parole valide). In allenamento, dove
-		   non esiste un documento partita, valgono le parole di questa partita. */
+		   è utilizzabile per "Cosa mi sono perso". In allenamento, dove non
+		   esiste un documento partita, valgono le parole di questa partita.
+
+		   Le parole tolte dal vocabolario (`paroleEscluse`) NON vanno tolte da
+		   qui: sono parole che il giocatore ha trovato davvero. A non doverle
+		   più proporre è l'elenco delle mancanti (vedi `paroleEsclusePartita`
+		   in showMissedWords), che le salta anche se il dizionario locale non è
+		   ancora stato ricostruito. */
 		function mieParoleTrovate() {
 		  const set = new Set();
 		  if (matchId && currentGameData && mioNome && currentGameData.parole) {
-		    const escluse = currentGameData.paroleEscluse || [];
 		    const mie = currentGameData.parole[mioNome] || [];
-		    mie.forEach((p) => {
-		      if (p && p.w && !escluse.includes(p.w)) set.add(p.w);
-		    });
+		    mie.forEach((p) => { if (p && p.w) set.add(p.w); });
 		    return set;
 		  }
 		  foundWords.forEach((v, k) => { if (!v || v.active !== false) set.add(k); });
@@ -3502,6 +3423,9 @@
 		      const foundSet = new Set();
 		      /* Parole trovate dal giocatore loggato (mai quelle di un altro). */
 		      const trovate = mieParoleTrovate();
+		      /* Parole tolte dal vocabolario: non sono parole valide, non vanno
+		         proposte come mancanti (il trie può non essere ancora allineato). */
+		      const escluse = new Set((currentGameData && currentGameData.paroleEscluse) || []);
 		      const maxTime = 10000;
 		      const totalCells = gridSize * gridSize;
 			
@@ -3514,7 +3438,7 @@
 		          currentPath.pop();
 		          return;
 		        }
-		        if (currentWord.length >= MIN_WORD_LENGTH && dictionary.has(currentWord) && !trovate.has(currentWord) && !foundSet.has(currentWord)) {
+		        if (currentWord.length >= MIN_WORD_LENGTH && dictionary.has(currentWord) && !trovate.has(currentWord) && !escluse.has(currentWord) && !foundSet.has(currentWord)) {
 		          foundSet.add(currentWord);
 		          const pts = calculateScoreWithBonusesSolver(currentWord, [...currentPath], visualBonuses);
 		          possibleWords.push({
@@ -3572,8 +3496,11 @@
 		        listEl.innerHTML = '';
 		      } else {
 		        const totPts = possibleWords.reduce((acc, x) => acc + x.p, 0);
+		        /* Il conteggio mostra le parole VALIDE trovate: quelle tolte dal
+		           vocabolario non fanno numero. */
+		        const trovateValide = Array.from(trovate).filter(w => !escluse.has(w)).length;
 		        summaryEl.textContent = (mioNome ? `Parole mancanti di ${mioNome}: ` : 'Le tue parole mancanti: ') +
-		          `avevi trovato ${trovate.size} parole, ne restavano ${possibleWords.length} per ${totPts} punti.`;
+		          `avevi trovato ${trovateValide} parole, ne restavano ${possibleWords.length} per ${totPts} punti.`;
 		        listEl.innerHTML = possibleWords.map(x =>
 		          `<li><span class="mw-w">${x.w}</span><span class="mw-p">${x.p} pt</span></li>`
 		        ).join('');
@@ -3839,7 +3766,7 @@ function fermaFesteggiamenti() {
     stopFireworks();
     document.body.classList.remove('mega-win-effect');
     const banner = document.getElementById('game-banner');
-    if (banner) banner.classList.remove('banner-victory');
+    if (banner) banner.classList.remove('faw-banner--vittoria');
 }
 
 /* Podio di fine partita (modulo condiviso ../shared/podio.js): una posizione per
@@ -3973,7 +3900,7 @@ function aggiornaLiveScorePostGame(data) {
     let scoresHtml = "";
     altri.forEach(a => {
         const punteggio = punteggiAllineati(data)[a] || 0;
-        scoresHtml += `<span style="margin:0 5px;">🆚 ${a}: <strong>${punteggio}</strong></span>`;
+        scoresHtml += `<span class="ruzzle-bottone-vicino">🆚 ${a}: <strong>${punteggio}</strong></span>`;
     });
 
     const scoreEl = document.getElementById('live-opponent-score');
@@ -4067,15 +3994,17 @@ function aggiornaLiveScorePostGame(data) {
 			  }
 			}
 			
-			window.addEventListener('click', (e) => {
-			  if (e.target.classList.contains('modal-overlay')) {
-			    if (e.target.id === 'game-end-modal') {
-			      closeEndGameModal();
-			      return;
-			    }
-			    e.target.style.display = 'none';
-			  }
-			});
+			/* Click sullo sfondo ed Esc delle modali: comportamento condiviso in
+			   games/shared/faw-modale.js (registrazione qui sotto). */
+			function attivaModaliRuzzle() {
+			  if (!window.FAW_MODALE) return;
+			  window.FAW_MODALE.attiva('missed-words-modal', { chiudi: closeMissedWords, etichetta: 'Parole non trovate' });
+			  window.FAW_MODALE.attiva('new-game-modal', { chiudi: closeNewGameModal, etichetta: 'Nuova partita' });
+			  window.FAW_MODALE.attiva('stats-modal', { chiudi: closeStats, etichetta: 'Statistiche' });
+			  window.FAW_MODALE.attiva('legend-modal', { chiudi: closeLegend, etichetta: 'Legenda' });
+			  window.FAW_MODALE.attiva('game-end-modal', { chiudi: closeEndGameModal, etichetta: 'Risultato della partita' });
+			}
+			attivaModaliRuzzle();
 			const autoPauseOnFocusLoss = () => {
 			  if (!isGameActive || isPaused || isSandboxMode || matchId) return;
 			  togglePause();
@@ -4098,7 +4027,7 @@ function aggiornaLiveScorePostGame(data) {
 			  altri.forEach(a => {
 			    const punteggio = punteggiAllineati(data)[a] || 0;
 			    scoresHtml += `
-																<span style="margin:0 5px;">🆚 ${a}: 
+																<span class="ruzzle-bottone-vicino">🆚 ${a}: 
 																	<strong>${punteggio}</strong>
 																</span>`;
 			  });
@@ -4580,8 +4509,8 @@ if (data.stato === "in_corso") {
 			    const headerDiv = document.createElement('div');
 			    headerDiv.style = "background:#2c3e50; color:#eef1fa; padding:10px; border-radius:5px; margin-bottom:10px;";
 			    headerDiv.innerHTML = `
-																<label style="font-size:0.7rem; font-weight:bold; display:block; margin-bottom:5px;">MOSTRA PAROLE DI:</label>
-																<select id="sel-analisi" class="faw-select" style="width:100%; padding:8px; font-size:1rem;"></select>`;
+																<label class="ruzzle-etichetta-piccola">MOSTRA PAROLE DI:</label>
+																<select id="sel-analisi" class="faw-select ruzzle-campo-largo"></select>`;
 			    wordsListEl.parentNode.insertBefore(headerDiv, wordsListEl);
 			    const sel = document.getElementById('sel-analisi');
 			    data.partecipanti.forEach(p => {
@@ -4932,8 +4861,8 @@ async function attivaAnalisiMultiplayerSilent() {
         const headerDiv = document.createElement('div');
         headerDiv.style = "background:#2c3e50; color:#eef1fa; padding:10px; border-radius:5px; margin-bottom:10px;";
         headerDiv.innerHTML = `
-            <label style="font-size:0.7rem; font-weight:bold; display:block; margin-bottom:5px;">MOSTRA PAROLE DI:</label>
-            <select id="sel-analisi" class="faw-select" style="width:100%; padding:8px; font-size:1rem;"></select>`;
+            <label class="ruzzle-etichetta-piccola">MOSTRA PAROLE DI:</label>
+            <select id="sel-analisi" class="faw-select ruzzle-campo-largo"></select>`;
 
         wordsListEl.parentNode.insertBefore(headerDiv, wordsListEl);
 

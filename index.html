@@ -29,6 +29,7 @@
 		<!-- <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-app-check-compat.js"></script> -->
 		<!-- Config Firebase condivisa (deve stare prima dello script che inizializza Firebase) -->
 		<script src="games/shared/firebase-config.js"></script>
+		<script src="games/shared/faw-banner.js"></script>
 		<!-- Design system FaW -->
 		<link rel="stylesheet" href="games/shared/faw-ui.css">
 		<style>
@@ -2675,12 +2676,9 @@ if (giocoSelezionato === 'pictionary') {
 			  }
 			}
 
+			/* Toast: componente condiviso (games/shared/faw-banner.js). */
 			function mostraToast(messaggio, tipo) {
-			  const toast = document.createElement('div');
-			  toast.className = 'faw-toast' + (tipo === 'err' ? ' faw-toast--err' : tipo === 'ok' ? ' faw-toast--ok' : '');
-			  toast.textContent = messaggio;
-			  document.body.appendChild(toast);
-			  setTimeout(() => toast.remove(), 2400);
+			  if (window.FAW_BANNER) { window.FAW_BANNER.toast(messaggio, tipo === 'err' ? 'err' : (tipo || '')); return; }
 			}
 
 			function logout() {

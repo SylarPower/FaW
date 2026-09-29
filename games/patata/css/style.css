@@ -26,12 +26,50 @@
   --ok: #15803d;
   --ok-soft: #f0fdf4;
   --info: #0369a1;
+  --info-border: #bae6fd;
+  --power-soft: #f3e8ff;
+  --power-border: #e9d5ff;
   --radius: 16px;
   --radius-sm: 10px;
   --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.05);
   --shadow-pop: 0 2px 8px rgba(16, 24, 40, 0.06), 0 12px 32px rgba(16, 24, 40, 0.1);
   --font: 'Nunito', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --font-display: 'Nunito', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* =========================================================
+   TEMA SCURO — segue la scelta fatta sull'hub (faw-theme.js).
+   Gli stessi token del tema chiaro, con le superfici scure:
+   niente regole nuove, così il disegno resta identico.
+   ========================================================= */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg-0: #211F1B;
+  --bg-1: #2A2621;
+  --bg-2: #332E27;
+  --card: #2A2621;
+  --card-2: #383129;
+  --card-border: rgba(255, 248, 238, 0.16);
+  --row-bg: #302B25;
+  --text-0: #FFF8EE;
+  --text-1: #D7CEC2;
+  --text-2: #A99E91;
+  --fire-0: #FF8A4C;
+  --fire-1: #FFA872;
+  --fire-soft: rgba(255, 138, 76, 0.16);
+  --fire-border: rgba(255, 138, 76, 0.42);
+  --gold: #F7B849;
+  --gold-soft: rgba(247, 184, 73, 0.16);
+  --danger: #EB6A5E;
+  --danger-soft: rgba(235, 106, 94, 0.16);
+  --ok: #51BB84;
+  --ok-soft: rgba(81, 187, 132, 0.16);
+  --info: #5D91E1;
+  --info-border: rgba(93, 145, 225, 0.42);
+  --power-soft: rgba(139, 135, 240, 0.16);
+  --power-border: rgba(139, 135, 240, 0.42);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.34);
+  --shadow-pop: 0 2px 8px rgba(0, 0, 0, 0.4), 0 12px 32px rgba(0, 0, 0, 0.44);
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -911,57 +949,8 @@ button { font-family: var(--font); }
 
 .fine-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
 
-/* ---------- Banner (top) ---------- */
-.banner {
-  position: fixed;
-  top: 0; left: 0; right: 0;
-  z-index: 200;
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  row-gap: 8px;
-  gap: 12px;
-  padding: 13px 18px;
-  background: var(--card);
-  border-bottom: 1px solid var(--card-border);
-  box-shadow: var(--shadow-pop);
-  animation: slide-down 0.3s ease;
-}
-@keyframes slide-down { from { transform: translateY(-100%); } to { transform: translateY(0); } }
-.banner .b-emoji { font-size: 1.4rem; }
-@media (min-width: 601px) {
-  .banner { padding-left: var(--faw-home-safe-x); }
-}
-.banner .b-text { flex: 1; min-width: 160px; }
-.banner .b-title { overflow-wrap: anywhere; }
-.banner .b-sub { overflow-wrap: anywhere; }
-.banner .b-title { font-weight: 700; font-size: 0.9rem; }
-.banner .b-sub { font-size: 0.76rem; color: var(--text-1); margin-top: 2px; }
-.banner .b-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-.banner .b-actions .btn { padding: 9px 16px; font-size: 0.78rem; border-radius: 10px; }
-
-/* ---------- Toast ---------- */
-.toast {
-  position: fixed;
-  bottom: 26px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 300;
-  background: #111827;
-  color: #fff;
-  font-weight: 500;
-  font-size: 0.86rem;
-  padding: 12px 20px;
-  border-radius: 12px;
-  box-shadow: var(--shadow-pop);
-  animation: toast-in 0.25s ease;
-  max-width: 90vw;
-  text-align: center;
-}
-.toast.ok { background: #14532d; }
-.toast.err { background: #7f1d1d; }
-@keyframes toast-in {
-  from { opacity: 0; transform: translateX(-50%) translateY(10px); }
+/* Banner di stato e toast: componenti condivisi (games/shared/faw-ui.css +
+   games/shared/faw-banner.js). Qui non serve più nessuno stile dedicato. */
   to { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
 
@@ -1042,11 +1031,11 @@ button { font-family: var(--font); }
   padding: 10px 16px;
   font-size: 0.8rem;
   border-style: dashed;
-  border-color: #bae6fd;
+  border-color: var(--info-border, #bae6fd);
   color: var(--info);
-  background: #f0f9ff;
+  background: var(--info-soft, #f0f9ff);
 }
-.btn-proponi:hover { background: #e0f2fe; color: var(--info); }
+.btn-proponi:hover { background: var(--info-soft, #e0f2fe); color: var(--info); }
 
 /* ---------- Power-up 🚀: passa la patata ---------- */
 .btn-power {
@@ -1066,8 +1055,8 @@ button { font-family: var(--font); }
   line-height: 1;
   padding: 2px 6px;
   border-radius: 999px;
-  background: #f3e8ff;
-  border: 1px solid #e9d5ff;
+  background: var(--power-soft, #f3e8ff);
+  border: 1px solid var(--power-border, #e9d5ff);
   animation: power-pop 0.35s ease;
 }
 @keyframes power-pop {

@@ -22,6 +22,7 @@
   --acc-border: #c7d2fe;
   --gold: #b45309;
   --gold-soft: #fffbeb;
+  --gold-border: #fcd34d;
   --danger: #dc2626;
   --danger-soft: #fef2f2;
   --ok: #15803d;
@@ -35,6 +36,42 @@
   --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.05);
   --shadow-pop: 0 2px 8px rgba(16, 24, 40, 0.06), 0 12px 32px rgba(16, 24, 40, 0.1);
   --font: 'Nunito', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* =========================================================
+   TEMA SCURO — segue la scelta fatta sull'hub (faw-theme.js).
+   Gli stessi token del tema chiaro, con le superfici scure:
+   niente regole nuove, così il disegno resta identico.
+   ========================================================= */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg-0: #211F1B;
+  --bg-1: #2A2621;
+  --bg-2: #332E27;
+  --card: #2A2621;
+  --card-2: #383129;
+  --card-border: rgba(255, 248, 238, 0.16);
+  --row-bg: #302B25;
+  --text-0: #FFF8EE;
+  --text-1: #D7CEC2;
+  --text-2: #A99E91;
+  --acc-0: #8B87F0;
+  --acc-1: #A5A1F5;
+  --acc-soft: rgba(139, 135, 240, 0.18);
+  --acc-border: rgba(139, 135, 240, 0.42);
+  --gold: #F7B849;
+  --gold-soft: rgba(247, 184, 73, 0.16);
+  --gold-border: rgba(247, 184, 73, 0.45);
+  --danger: #EB6A5E;
+  --danger-soft: rgba(235, 106, 94, 0.16);
+  --ok: #51BB84;
+  --ok-soft: rgba(81, 187, 132, 0.16);
+  --info: #5D91E1;
+  --info-soft: rgba(93, 145, 225, 0.16);
+  --warn: #F7B849;
+  --warn-soft: rgba(247, 184, 73, 0.16);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.34);
+  --shadow-pop: 0 2px 8px rgba(0, 0, 0, 0.4), 0 12px 32px rgba(0, 0, 0, 0.44);
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -235,7 +272,7 @@ button { font-family: var(--font); }
 .campo input {
   border: 1px solid var(--card-border); border-radius: 8px;
   padding: 9px 10px; font-family: var(--font); font-size: 1rem; font-weight: 700;
-  background: #fff; color: var(--text-0); width: 100%;
+  background: var(--card); color: var(--text-0); width: 100%;
 }
 .campo input:focus { outline: 2px solid var(--acc-0); outline-offset: 1px; border-color: var(--acc-0); }
 .campo input:disabled { background: var(--card-2); color: var(--text-2); }
@@ -244,19 +281,19 @@ button { font-family: var(--font); }
 .stop-avviso {
   display: flex; align-items: center; gap: 10px; margin-top: 10px;
   padding: 9px 12px; border-radius: var(--radius-sm);
-  background: var(--gold-soft, #fef3c7); border: 1px solid #fcd34d;
-  color: #92400e; font-size: 0.82rem; font-weight: 700;
+  background: var(--gold-soft, #fef3c7); border: 1px solid var(--gold-border, #fcd34d);
+  color: var(--gold); font-size: 0.82rem; font-weight: 700;
 }
 .stop-avviso.hidden { display: none; }
 .stop-avviso .stop-crono {
   margin-left: auto; font-weight: 900; font-variant-numeric: tabular-nums;
-  background: #fff; border: 1px solid #fcd34d; border-radius: 999px;
-  padding: 2px 10px; color: #92400e;
+  background: var(--card); border: 1px solid var(--gold-soft-border, #fcd34d); border-radius: 999px;
+  padding: 2px 10px; color: var(--gold);
 }
 .stop-avviso .stop-crono.danger { background: var(--danger); border-color: var(--danger); color: #fff; }
 
 /* Righe del bonus STOP nel recap del round */
-.st-row.bonus-stop.ok { border-color: #fcd34d; background: #fffbeb; }
+.st-row.bonus-stop.ok { border-color: var(--gold-border, #fcd34d); background: var(--gold-soft, #fffbeb); }
 .st-row.bonus-stop.no { border-style: dashed; }
 .st-row.bonus-stop .st-lettera { color: var(--text-1); }
 
@@ -487,7 +524,7 @@ button { font-family: var(--font); }
   background: var(--card); border: 1px solid var(--card-border); margin-bottom: 5px;
 }
 .rc-row:last-child { margin-bottom: 0; }
-.rc-row.mine { border-color: var(--acc-border); background: #fff; box-shadow: inset 3px 0 0 var(--acc-0); }
+.rc-row.mine { border-color: var(--acc-border); background: var(--card); box-shadow: inset 3px 0 0 var(--acc-0); }
 .rc-pos { width: 24px; text-align: center; font-weight: 900; font-size: 0.9rem; }
 .rc-name { font-weight: 800; font-size: 0.86rem; }
 .rc-delta { font-size: 0.72rem; font-weight: 800; color: var(--ok); }
@@ -541,31 +578,8 @@ button { font-family: var(--font); }
 }
 @keyframes ncc-spin { to { transform: rotate(360deg); } }
 
-/* ---------- Banner di stato fisso in cima ---------- */
-.banner {
-  position: fixed; top: 0; left: 0; right: 0; z-index: 10000;
-  display: flex; align-items: center; gap: 12px;
-  padding: 12px 18px;
-  background: var(--bg-1);
-  border-bottom: 1px solid var(--card-border);
-  box-shadow: var(--shadow-card);
-}
-.b-emoji { font-size: 1.4rem; }
-.b-text { flex: 1; min-width: 0; }
-.b-title { font-weight: 800; font-size: 0.92rem; }
-.b-sub { font-size: 0.8rem; color: var(--text-1); }
-.b-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-
-/* ---------- Toast ---------- */
-.toast {
-  position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%);
-  z-index: 10005; max-width: min(560px, calc(100vw - 32px));
-  background: #111827; color: #fff; font-weight: 700; font-size: 0.88rem;
-  padding: 12px 18px; border-radius: 999px; box-shadow: var(--shadow-pop);
-  text-align: center;
-}
-.toast.ok { background: #166534; }
-.toast.err { background: #991b1b; }
+/* Banner di stato e toast: componenti condivisi (games/shared/faw-ui.css +
+   games/shared/faw-banner.js). Qui non serve più nessuno stile dedicato. */
 
 /* =========================================================
    FALLBACK RESPONSIVE
@@ -591,7 +605,6 @@ button { font-family: var(--font); }
   .screen-inner { padding: 12px; }
   .card { padding: 16px; }
   .topbar { padding-left: var(--faw-home-safe-x); }
-  .banner { padding-left: var(--faw-home-safe-x); }
 }
 
 @media (prefers-reduced-motion: reduce) {

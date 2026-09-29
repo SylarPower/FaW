@@ -15,6 +15,7 @@ const coreJs = fs.readFileSync(path.join(ROOT, 'games/nomi-cose-citta/js/core.js
 const backendJs = fs.readFileSync(path.join(ROOT, 'games/nomi-cose-citta/js/backend.js'), 'utf8');
 const uiJs = fs.readFileSync(path.join(ROOT, 'games/nomi-cose-citta/js/ui.js'), 'utf8');
 const podioJs = fs.readFileSync(path.join(ROOT, 'games/shared/podio.js'), 'utf8');
+const bannerJs = fs.readFileSync(path.join(ROOT, 'games/shared/faw-banner.js'), 'utf8');
 
 /* Campione del dizionario reale: una riga ogni dieci, cosi' il campione copre
    tutto l'alfabeto (il file e' ordinato: le prime righe sono solo parole con "a"). */
@@ -71,6 +72,7 @@ dictSample.split('\n').forEach((w) => {
   window.eval(coreJs);
   window.eval(backendJs);
   window.eval(podioJs);   // podio condiviso di fine partita
+  window.eval(bannerJs);   // banner/toast condivisi
   window.eval(uiJs);
 
   console.log('\n[1] Boot: dizionario → lobby di allenamento');

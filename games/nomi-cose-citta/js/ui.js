@@ -117,41 +117,17 @@
     return out;
   }
 
-  var toastTimer = null;
+  /* Banner e toast sono componenti condivisi (games/shared/faw-banner.js):
+     qui restano solo i nomi usati dalla pagina. */
   function toast(msg, kind) {
-    el.toast.textContent = msg;
-    el.toast.className = 'toast' + (kind ? ' ' + kind : '');
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () { el.toast.className = 'toast hidden'; }, 2800);
+    if (global.FAW_BANNER) global.FAW_BANNER.toast(msg, kind === 'err' ? 'err' : (kind || ''));
   }
-  var bannerTimer = null;
   function banner(opts) {
-    el.banner.innerHTML =
-      '<span class="b-emoji">' + (opts.icon || '📝') + '</span>' +
-      '<div class="b-text"><div class="b-title">' + esc(opts.title) + '</div>' +
-      (opts.subtitle ? '<div class="b-sub">' + esc(opts.subtitle) + '</div>' : '') + '</div>' +
-      '<div class="b-actions">' +
-      (opts.spinner ? '<span class="spinner"></span>' : '') +
-      (opts.buttons || []).map(function (b) {
-        return '<button class="btn btn-sm ' + (b.kind || 'btn-ghost') + '" data-bid="' + esc(b.id) + '"' +
-          (b.disabled ? ' disabled' : '') + (b.title ? ' title="' + esc(b.title) + '"' : '') + '>' + esc(b.label) + '</button>';
-      }).join('') +
-      '</div>';
-    el.banner.classList.remove('hidden');
-    (opts.buttons || []).forEach(function (b) {
-      var btn = el.banner.querySelector('[data-bid="' + b.id + '"]');
-      if (btn) btn.addEventListener('click', b.fn);
-    });
-    if (global.FAW_SYNC_BANNER_SPACE) global.FAW_SYNC_BANNER_SPACE();
-    clearTimeout(bannerTimer);
-    if (opts.sticky !== true) {
-      bannerTimer = setTimeout(function () { hideBanner(); }, 6000);
-    }
+    if (!global.FAW_BANNER) return;
+    global.FAW_BANNER.banner(Object.assign({ id: 'banner', icon: '📝' }, opts));
   }
   function hideBanner() {
-    clearTimeout(bannerTimer);
-    el.banner.classList.add('hidden');
-    if (global.FAW_SYNC_BANNER_SPACE) global.FAW_SYNC_BANNER_SPACE();
+    if (global.FAW_BANNER) global.FAW_BANNER.chiudi('banner');
   }
   function setLoadStatus(msg, isErr) {
     el['load-status'].textContent = msg;
@@ -1613,6 +1589,18 @@
     stop: premiStop
   };
 
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
-  else boot();
+  /* Finestre di gioco: ruolo di dialogo e stato aria dal modulo condiviso
+     (games/shared/faw-modale.js). Niente Esc o click sullo sfondo: revisione e
+     risultati si chiudono quando il gioco lo decide, non per sbaglio. */
+  function attivaOverlay() {
+    if (!window.FAW_MODALE) return;
+    [['overlay-revisione', 'Revisione delle risposte'], ['overlay-risultati', 'Risultati del round'],
+     ['overlay-fine', 'Risultati finali']
+    ].forEach(function (voce) {
+      window.FAW_MODALE.attiva(voce[0], { etichetta: voce[1], sfondo: false });
+    });
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { boot(); attivaOverlay(); });
+  else { boot(); attivaOverlay(); }
 })(typeof window !== 'undefined' ? window : globalThis);

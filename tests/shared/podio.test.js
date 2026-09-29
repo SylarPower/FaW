@@ -121,6 +121,25 @@ ok(box.querySelector('.pod-col') !== colPo1, 'punteggio cambiato: il podio viene
 ok(box.querySelectorAll('.pod-col').length === 2, 'nessun doppione dopo i ridisegni');
 ok(box.getAttribute('data-firma') !== null, 'la firma dei dati resta sul contenitore');
 
-console.log('\n=================');
-console.log('PASSATI: ' + passed + '  FALLITI: ' + failed);
-process.exit(failed ? 1 : 0);
+console.log('\n[8] Animazione di fine partita');
+ok(/\.podio--entra \.pod-col[\s\S]{0,200}podio-su/.test(podioCss), 'le colonne entrano con l\'animazione condivisa');
+ok(/nth-child\(1\)[\s\S]{0,120}nth-child\(2\)/.test(podioCss), 'ingresso a scaletta (ritardi per colonna)');
+ok(/podio-faro/.test(podioCss), 'il gradino del 1° si accende una volta');
+ok(/prefers-reduced-motion[\s\S]{0,200}\.podio--entra/.test(podioCss), 'con ridotta-movimento niente animazioni');
+P.render(box, [{ nome: 'ALFA', punti: 10 }, { nome: 'BETA', punti: 6 }], { io: 'ALFA' });
+ok(box.classList.contains('podio--entra'), 'dopo il disegno la classe di ingresso è attiva');
+ok(typeof P.contaNumeri === 'function' && typeof P.confetti === 'function',
+  'il modulo espone contaNumeri() e confetti()');
+
+/* I coriandoli sono veri elementi: si creano e si rimuovono da soli. */
+const quantiConfetti = () => w.document.querySelectorAll('.faw-confetti i').length;
+const prima = quantiConfetti();
+P.confetti(12);
+ok(quantiConfetti() === prima + 12, 'i coriandoli sono particelle DOM');
+const scatola = w.document.querySelector('.faw-confetti');
+setTimeout(() => {
+  ok(!w.document.body.contains(scatola), 'i coriandoli spariscono da soli');
+  console.log('\n=================');
+  console.log('PASSATI: ' + passed + '  FALLITI: ' + failed);
+  process.exit(failed ? 1 : 0);
+}, 3600);
