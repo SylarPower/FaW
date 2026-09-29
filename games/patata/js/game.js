@@ -271,6 +271,11 @@
   /**
    * Estrae DETERMINISTICAMENTE le lettere di un round (stesso seed + round
    * → stessa combinazione su tutti i client, senza scritture extra).
+   * ATTENZIONE: `index` deve essere costruito sul dizionario BASE condiviso
+   * (il file `dizionario.txt`), non sul dizionario completo del client: le
+   * parole approvate durante le partite e le esclusioni cambiano i conteggi,
+   * quindi un indice "locale" farebbe divergere l'estrazione tra giocatori
+   * (stesso seed → lettere diverse). Vedi `loadDictionary` nella pagina.
    * In modalità 'classic': estrae lettere distinte con countFor >= LETTER_THRESHOLD.
    * In modalità 'sequenza': estrae una sequenza consecutiva con countSequence >= LETTER_THRESHOLD.
    */
@@ -831,7 +836,13 @@
       prossimaPartita: d.prossimaPartita || null,
       prossimaPartitaCreataDa: d.prossimaPartitaCreataDa || null,
       rivincitaAccettataDa: d.rivincitaAccettataDa || [],
-      rivincitaRifiutataDa: d.rivincitaRifiutataDa || []
+      rivincitaRifiutataDa: d.rivincitaRifiutataDa || [],
+      /* Lobby nata da una rivincita: `rivincitaDi` è la partita di origine
+         (dove gli altri aspettano l'accettazione di questo giocatore) e
+         `rivincitaCollezione` dice dove vive quell'origine. */
+      daRivincita: !!d.daRivincita,
+      rivincitaDi: d.rivincitaDi || null,
+      rivincitaCollezione: d.rivincitaCollezione || null
     };
   }
 
@@ -1091,6 +1102,7 @@
     pickTarget: false,    // overlay di scelta bersaglio del power-up 🚀 aperto
     statsSaved: false,
     redirected: false,
+    accettazioneSegnata: false, // lobby di rivincita: accettazione già scritta sull'origine
     lastFeedbackTimer: null,
     rateLimited: false     // Firestore ha risposto 429: lo diciamo all'utente
   };
@@ -1261,6 +1273,15 @@
     el['load-count'].textContent = words.size.toLocaleString('it-IT') + ' parole nel dizionario';
     setLoadStatus('Carico le parole condivise…');
 
+    /* DIZIONARIO BASE: il file condiviso, prima degli override. È identico su
+       ogni client (stesso file, stesso ordine), quindi è l'unica base su cui si
+       possono estrarre le lettere di un turno: usando il dizionario COMPLETO
+       (base + parole approvate + esclusioni + cache locale) bastava una parola
+       in più su un client per far cambiare l'estrazione e mostrare lettere
+       diverse agli altri giocatori (bug storico). `G.dict` resta il dizionario
+       completo e serve alla VALIDAZIONE delle parole. */
+    const baseWords = Array.from(words);
+
     // Override Firebase (extra/excluded) con cache in localStorage
     const overrides = await getSharedDictionaryOverrides(G.db);
     (overrides.extra || []).forEach((w) => {
@@ -1270,7 +1291,7 @@
     (overrides.excluded || []).forEach((w) => words.delete(normalizeWord(w)));
 
     G.dict = words;
-    G.index = new LetterIndex(Array.from(words));
+    G.index = new LetterIndex(baseWords);
     setLoadStatus('Dizionario pronto: ' + G.dict.size.toLocaleString('it-IT') + ' parole');
   }
 
@@ -1311,15 +1332,25 @@
       }
     }
   }
-  /** Inserimento a caldo nel Set + ricostruzione dell'indice (conteggi). */
+  /**
+   * Inserimento a caldo nel Set delle parole valide.
+   * NON tocca `G.index`: l'indice (ed estrazione lettere/conteggi) è costruito
+   * sul dizionario BASE, identico su tutti i client. Ricostruirlo qui con le
+   * parole approvate durante la partita rimetterebbe in circolo il bug delle
+   * lettere diverse tra giocatori.
+   */
   function aggiungiParolaLocale(w) {
     if (!G.dict || G.dict.has(w)) return;
     G.dict.add(w);
-    try { G.index = new LetterIndex(Array.from(G.dict)); }
-    catch (e) { /* l'indice serve solo ai conteggi: la validazione usa G.dict */ }
   }
 
   /* ---------------- DERIVATI ---------------- */
+  /**
+   * Lettere del turno: estrazione deterministica (seed + numero di turno) su
+   * `G.index`, che è costruito sul dizionario BASE condiviso → la stessa
+   * identica combinazione su OGNI client della partita, indipendentemente
+   * dagli override del dizionario (parole approvate, esclusioni, cache).
+   */
   function lettersFor(state) {
     if (!state || !state.opzioni) return ['A', 'E'];
     const rule = ruleFor(state);
@@ -1329,6 +1360,7 @@
     }
     return G.letterCache.get(key);
   }
+  /** Parole valide per il turno: stesso conteggio su tutti i client (indice base). */
   function availFor(letters, rule = 'classic') {
     if (!G.index) return 0;
     if (rule === 'sequenza') {
@@ -2222,10 +2254,36 @@
     });
   }
 
+  /**
+   * Entrare in una lobby nata da una rivincita VALE come "ho accettato".
+   * I giocatori che accettano dal banner della partita finita restano lì ad
+   * aspettare l'accettazione di tutti; chi invece apre la nuova partita
+   * direttamente dall'hub (o da un link) non la segnerebbe mai, e gli altri
+   * resterebbero bloccati in attesa per sempre: da qui la scrittura cieca
+   * (arrayUnion, idempotente, zero letture) sul documento di origine.
+   */
+  function segnaAccettazioneOrigine(s) {
+    if (G.solo || G.accettazioneSegnata || !s || !s.rivincitaDi) return;
+    if ((s.partecipanti || []).indexOf(G.me) === -1) return;
+    const col = s.rivincitaCollezione === 'pictionary_rooms' ? 'pictionary_rooms' : 'partite';
+    if (window.FAW_RIVINCITA && window.FAW_RIVINCITA.segnaAccettazione) {
+      G.accettazioneSegnata = true;
+      window.FAW_RIVINCITA.segnaAccettazione(G.db, s.rivincitaDi, G.me, col);
+      return;
+    }
+    const FV = fieldValue();
+    if (!G.db || !FV) return;
+    G.accettazioneSegnata = true;
+    G.db.collection(col).doc(s.rivincitaDi)
+      .update({ rivincitaAccettataDa: FV.arrayUnion(G.me) })
+      .catch(() => { /* la partita di origine potrebbe essere già stata pulita */ });
+  }
+
   /* ---------------- RENDER PRINCIPALE ---------------- */
   function render(s) {
     G.state = s;
     if (!s) return;
+    segnaAccettazioneOrigine(s);
 
     // Schermate
     el.app.classList.remove('hidden');

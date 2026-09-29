@@ -139,6 +139,21 @@ Firestore con **429 Too Many Requests** e il gioco resta bloccato in lobby. Per 
   (non in `rivincitaRifiutataDa`, che resta il rifiuto della rivincita fatto dentro
   la partita) e chi rifiuta viene tolto da `partecipanti`, così la lobby parte con
   chi resta e il pulsante RIVINCITA non resta bloccato.
+- **La lobby di una rivincita non è un invito**: nasce in stato `attesa` come una
+  sfida, ma è marcata `daRivincita: true`, `rivincitaDi: <partita di origine>` e
+  `rivincitaCollezione` (la collezione dell'origine: `partite` per i giochi
+  "tipo Ruzzle", `pictionary_rooms` per il Pictionary — una rivincita può
+  cambiare gioco, quindi la collezione non si indovina dal gioco nuovo).
+  L'hub non le mostra il popup "ti sfida" né ACCETTA/RIFIUTA/🗑️ (l'accettazione
+  vive sulla partita finita: un "sì" scritto sul documento sbagliato lasciava gli
+  altri in attesa per sempre); mostra invece la riga **🔁 Rivincita di … · in
+  attesa (n/N pronti)** con **ENTRA →**, e chi entra segna l'accettazione sulla
+  partita di origine (`FAW_RIVINCITA.segnaAccettazione`, `arrayUnion` idempotente
+  senza letture). Anche la pagina di gioco la segna da sola quando la lobby ha
+  `rivincitaDi`: entrare vale come accettare, gli altri non restano bloccati.
+  Coperto da `tests/hub/inviti-realtime.test.js` [K]/[K2],
+  `tests/shared/rivincita.test.js` [9] e
+  `tests/patata/browser-multiplayer.test.js` [12].
 
 `tests/patata/quota.test.js` misura letture e scritture reali di una lobby a 3 client e
 blocca le regressioni. `tests/ncc/quota.test.js` fa lo stesso per Nomi, Cose, Città:
@@ -168,6 +183,16 @@ esclusa dal dizionario = 0 punti, ogni partecipante ha sempre una voce.
 `matchId` (mock Firestore) e verifica: una sola scrittura di chiusura, risultato
 corretto, stessi numeri sui tre schermi, ricalcolo dopo un'eliminazione e
 riconciliazione di un punteggio sbagliato senza loop di scritture.
+
+## Ruzzle: selezione a trascinamento (niente modalità click)
+
+La griglia si gioca **solo trascinando** il dito/mouse sulle lettere: la
+"Modalità Click" (toccare una lettera alla volta, con il pulsante *AZZERA
+SELEZIONE*) è stata **rimossa**. Era nata per il tocco su schermi piccoli, ma la
+piattaforma si usa da desktop e il doppio sistema di selezione confondeva (un
+click secco faceva partire una selezione di una lettera sola, che sembrava un
+blocco del gioco). Restano i listener `mousedown`/`touchstart` + `mousemove`/
+`touchmove` + `mouseup`/`touchend` di prima, con un'unica via di selezione.
 
 ## Ruzzle: durata della partita
 

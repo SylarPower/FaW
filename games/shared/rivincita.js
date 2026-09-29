@@ -2,12 +2,19 @@
  * Rivincita condivisa. La proposta vive sul documento della partita già in
  * corso (niente collection nuova, niente indice): prossimaPartita,
  * prossimaPartitaCreataDa, prossimaPartitaGioco, rivincitaAccettataDa,
- * rivincitaRifiutataDa. Il documento nuovo è una lobby normale del gioco
- * scelto, così l'hub la vede come le altre sfide in attesa.
+ * rivincitaRifiutataDa. Il documento nuovo è una lobby del gioco scelto,
+ * marcata come rivincita: l'hub la mostra come lobby da raggiungere, non come
+ * una seconda sfida da accettare (vedi sotto).
  *
  * Chi crea non deve ri-accettare. Si entra tutti insieme solo quando ogni
  * altro partecipante ha accettato. Un rifiuto blocca quella proposta; se ne
  * può aprire un'altra, e il documento orfano viene cancellato.
+ *
+ * La lobby nuova porta `daRivincita: true`, `rivincitaDi: <partita di origine>`
+ * e `rivincitaCollezione` (la collezione dell'origine: `partite` o
+ * `pictionary_rooms`): così l'hub la mostra come lobby da raggiungere (non
+ * come una seconda sfida da accettare) e chi ci entra segna l'accettazione
+ * sulla partita di origine (`segnaAccettazione`), liberando gli altri.
  *
  * La scelta del gioco e delle impostazioni passa da un'unica modale
  * (`apriScelta`): schede per i giochi (quello corrente in evidenza) e, per il
@@ -219,7 +226,24 @@
     out.seed = seed();
     return out;
   }
-  function documentoPartita(giocoId, partecipanti, opzioni) {
+  /**
+   * Collezione della partita di ORIGINE (dove vive l'accettazione): le partite
+   * dei giochi "tipo Ruzzle" stanno in `partite`, le room Pictionary in
+   * `pictionary_rooms`. Stessa mappa di `scarta()`.
+   */
+  function collezioneOrigine(giocoId) {
+    return giocoId === 'pictionary' ? 'pictionary_rooms' : 'partite';
+  }
+  /**
+   * Documento della lobby nuova. `origineId` è la partita da cui nasce la
+   * rivincita e `origineCollezione` la sua collezione: la lobby viene marcata
+   * (`daRivincita`, `rivincitaDi`, `rivincitaCollezione`) così l'hub sa che NON
+   * è una sfida da accettare ma una lobby già avviata in cui entrare, e chi
+   * entra può segnare l'accettazione sulla partita di origine (dove gli altri
+   * giocatori stanno ancora aspettando), anche quando l'origine è una room
+   * Pictionary e non una partita della collezione `partite`.
+   */
+  function documentoPartita(giocoId, partecipanti, opzioni, origineId, origineCollezione) {
     var punteggi = {};
     var parole = {};
     partecipanti.forEach(function (p) { punteggi[p] = 0; parole[p] = []; });
@@ -234,6 +258,9 @@
       stato: 'attesa',
       rivincitaAccettataDa: [],
       rivincitaRifiutataDa: [],
+      daRivincita: true,
+      rivincitaDi: origineId || null,
+      rivincitaCollezione: origineId ? (origineCollezione || 'partite') : null,
       dataOra: dataOra(),
       timestamp: Date.now(),
       opzioni: opzioni || opzioniDefault(giocoId)
@@ -245,7 +272,7 @@
     }
     return doc;
   }
-  function documentoRoom(partecipanti, me, opzioni) {
+  function documentoRoom(partecipanti, me, opzioni, origineId, origineCollezione) {
     var opts = opzioni || opzioniDefault('pictionary');
     var mode = opts.mode || 'classic';
     var code = Math.random().toString(36).substring(2, 7).toUpperCase();
@@ -264,6 +291,9 @@
         scores: {},
         completedRound: {},
         playerOrder: partecipanti,
+        daRivincita: true,
+        rivincitaDi: origineId || null,
+        rivincitaCollezione: origineId ? (origineCollezione || 'partite') : null,
         timestamp: Date.now(),
         dataOra: new Date().toLocaleString('it-IT'),
         sfidaDiretta: true
@@ -315,8 +345,7 @@
   }
   function scarta(db, id, giocoId) {
     if (!db || !id) return Promise.resolve();
-    var col = giocoId === 'pictionary' ? 'pictionary_rooms' : 'partite';
-    return db.collection(col).doc(id).delete().catch(function () {});
+    return db.collection(collezioneOrigine(giocoId)).doc(id).delete().catch(function () {});
   }
   function prepara(options) {
     ctx = options || null;
@@ -337,16 +366,21 @@
       return Promise.resolve({ ok: false, errore: 'c\'è già una proposta aperta' });
     }
     var opzioni = opzioniScelte(giocoId, scelte, ctx.correnti || proposta.opzioni);
+    var origineId = (ctx.ref && ctx.ref.id) || null;
+    /* La collezione dell'origine si ricava dal gioco della PAGINA che propone
+       (le room Pictionary vivono in pictionary_rooms, tutto il resto in
+       partite): serve a segnare l'accettazione sul documento giusto. */
+    var origineCollezione = collezioneOrigine(ctx.giocoCorrente || proposta.gioco);
     var creatoId = null;
     return scarta(ctx.db, proposta.prossimaPartita, proposta.prossimaPartitaGioco).then(function () {
       if (giocoId === 'pictionary') {
-        var room = documentoRoom(persone, ctx.me, opzioni);
+        var room = documentoRoom(persone, ctx.me, opzioni, origineId, origineCollezione);
         creatoId = room.id;
         return ctx.db.collection('pictionary_rooms').doc(room.id).set(room.data);
       }
       var ref = ctx.db.collection('partite').doc();
       creatoId = ref.id;
-      return ref.set(documentoPartita(giocoId, persone, opzioni));
+      return ref.set(documentoPartita(giocoId, persone, opzioni, origineId, origineCollezione));
     }).then(function () {
       return ctx.ref.update(campiCollegamento(creatoId, giocoId, ctx.me));
     }).then(function () {
@@ -371,6 +405,32 @@
         rivincitaRifiutataDa: FV.delete()
       });
     });
+  }
+  /* Accettazioni già segnate in QUESTA pagina: una scrittura per origine. */
+  var accettazioniSegnate = {};
+  /**
+   * Segna l'accettazione della rivincita sulla partita di ORIGINE.
+   * Serve a chi entra direttamente nella lobby nuova (dall'hub o da un link)
+   * senza passare dal banner ✅ ACCETTA della partita finita: senza questa
+   * scrittura gli altri giocatori restavano in attesa per sempre e la
+   * rivincita non partiva ("a volte la rivincita non funziona").
+   * `collezione` è quella dell'origine (`partite` per i giochi "tipo Ruzzle",
+   * `pictionary_rooms` per le room Pictionary: una rivincita può cambiare
+   * gioco, quindi la collezione dell'origine non si indovina dal gioco nuovo).
+   * Scrittura cieca con arrayUnion: idempotente, nessuna lettura, e se il
+   * documento di origine non c'è più fallisce in silenzio.
+   */
+  function segnaAccettazione(db, origineId, me, collezione) {
+    var FV = global.firebase && global.firebase.firestore && global.firebase.firestore.FieldValue;
+    if (!db || !origineId || !me || !FV) return Promise.resolve(false);
+    var col = collezione === 'pictionary_rooms' ? 'pictionary_rooms' : 'partite';
+    var chiave = col + '/' + origineId;
+    if (accettazioniSegnate[chiave]) return Promise.resolve(false);
+    accettazioniSegnate[chiave] = true;
+    return db.collection(col).doc(origineId)
+      .update({ rivincitaAccettataDa: FV.arrayUnion(me) })
+      .then(function () { return true; })
+      .catch(function () { return false; });
   }
   function vai(data, giocoFallback) {
     if (global.__fawRivincitaVia) return true;
@@ -648,9 +708,11 @@
     documentoPartita: documentoPartita,
     documentoRoom: documentoRoom,
     scarta: scarta,
+    collezioneOrigine: collezioneOrigine,
     prepara: prepara,
     invita: invita,
     annulla: annulla,
+    segnaAccettazione: segnaAccettazione,
     vai: vai,
     riepilogo: riepilogo,
     apriScelta: apriScelta,

@@ -23,6 +23,7 @@ const gameJs = fs.readFileSync(path.join(ROOT, 'games/patata/js/game.js'), 'utf8
 const cfgJs = fs.readFileSync(path.join(ROOT, 'games/shared/firebase-config.js'), 'utf8');
 const podioJs = fs.readFileSync(path.join(ROOT, 'games/shared/podio.js'), 'utf8');
 const bannerJs = fs.readFileSync(path.join(ROOT, 'games/shared/faw-banner.js'), 'utf8');
+const rivincitaJs = fs.readFileSync(path.join(ROOT, 'games/shared/rivincita.js'), 'utf8');
 const dictSample = fs.readFileSync(path.join(ROOT, 'dizionario.txt'), 'utf8')
   .split('\n').slice(0, 20000).join('\n');
 
@@ -49,7 +50,7 @@ async function until(fn, what, timeout = 25000) {
 
 const mock = createMockFirestore();
 
-function pagina(nome, matchId) {
+function pagina(nome, matchId, opts) {
   const dom = new JSDOM(html, {
     url: 'http://localhost/games/patata/index.html?matchId=' + (matchId || 'P1'),
     runScripts: 'dangerously',
@@ -65,11 +66,26 @@ function pagina(nome, matchId) {
   // jsdom non implementa la Web Animations API (usata dai coriandoli di fine partita)
   w.Element.prototype.animate = function () { return { onfinish: null, cancel: function () {} }; };
   w.eval(cfgJs);
+  /* Override del dizionario CONDIVISO diversi per client: nella realtà un
+     giocatore può avere appena approvato una parola (o una cache diversa).
+     Serve a verificare che le lettere del turno restino le stesse per tutti. */
+  if (opts && opts.extra) w.FAW_WRITE_DICTIONARY_OVERRIDES({ extra: opts.extra, excluded: [] });
+  w.eval(rivincitaJs); // rivincita condivisa (come nella pagina reale)
   w.eval(podioJs);   // podio condiviso di fine partita
   w.eval(bannerJs);   // banner/toast condivisi
   w.eval(gameJs);
   return w;
 }
+/* Il dizionario di prova: stesso file per tutte le pagine, come in produzione. */
+const BASE_WORDS = (() => {
+  const set = new Set();
+  dictSample.split('\n').forEach((l) => {
+    const w = C.normalizeWord(l);
+    if (w.length >= C.MIN_WORD_LENGTH) set.add(w);
+  });
+  return Array.from(set);
+})();
+const PAROLE_EXTRA = ['ZABAIONE', 'CIAONE', 'PATATINA', 'ZZZQ'];
 const input = (w) => w.document.getElementById('word-input');
 const btnInvia = (w) => w.document.getElementById('btn-invia');
 function scrivi(w, parola) {
@@ -422,6 +438,126 @@ function invia(w) {
   ok(f.document.defaultView.__PATATA.state.turno.giocatore === 'BETA' &&
     !f.document.getElementById('word-input').disabled,
     'BETA può a sua volta giocare normalmente dopo aver ricevuto la patata');
+
+  /* ============================================================
+     [11] LETTERE UGUALI PER TUTTI — anche con dizionari diversi
+     Le lettere di ogni turno si estraggono dal dizionario BASE condiviso:
+     prima venivano estratte dal dizionario locale (base + parole approvate +
+     esclusioni + cache) e bastava una parola in più su un client per mostrare
+     lettere diverse agli altri giocatori.
+     ============================================================ */
+  console.log('\n[11] Lettere identiche anche con dizionari locali diversi');
+  const SEED_LETTERE = 'SEED0';   // con le parole extra divergerebbe (vedi sotto)
+  mock.store.set('partite/P4', {
+    gioco: 'patata',
+    partecipanti: ['ALFA', 'BETA'],
+    punteggi: {}, parole: {}, pronti: [], stato: 'attesa',
+    rivincitaAccettataDa: [], rivincitaRifiutataDa: [],
+    opzioni: { tempo: '30', turni: '3', lettere: '2', mode: 'sequenza', seed: SEED_LETTERE },
+    dataOra: '2026-09-29 09:00:00',
+    timestamp: Date.now()
+  });
+  const g = pagina('ALFA', 'P4', { extra: PAROLE_EXTRA });   // dizionario «sporco»
+  const h = pagina('BETA', 'P4');                            // dizionario pulito
+  ok(await until(() => g.document.defaultView.__PATATA.state &&
+    g.document.defaultView.__PATATA.state.stato === 'in_corso', 'P4 avviata (A)'), 'P4 avviata');
+  ok(await until(() => h.document.defaultView.__PATATA.state &&
+    h.document.defaultView.__PATATA.state.stato === 'in_corso', 'P4 avviata (B)'), 'P4 visibile a BETA');
+  /* I due dizionari SONO diversi: il test ha senso solo così. */
+  ok(g.document.defaultView.__PATATA.dict.has('ZABAIONE') &&
+    !h.document.defaultView.__PATATA.dict.has('ZABAIONE'),
+    'i dizionari locali dei due client differiscono (ALFA ha le parole approvate)');
+  {
+    const wg = g.document.defaultView, wh = h.document.defaultView;
+    const stG = wg.__PATATA.state;
+    /* Il calcolo «vecchio» (indice del dizionario locale) divergerebbe davvero:
+       documenta la regressione, non solo la coincidenza. */
+    const idxBase = new C.LetterIndex(BASE_WORDS);
+    const idxLocale = new C.LetterIndex(BASE_WORDS.concat(PAROLE_EXTRA));
+    const vecchioA = C.pickLetters(SEED_LETTERE, 1, 2, idxLocale, 'sequenza').join('');
+    const vecchioB = C.pickLetters(SEED_LETTERE, 1, 2, idxBase, 'sequenza').join('');
+    ok(vecchioA !== vecchioB,
+      'con l\'indice locale le lettere sarebbero diverse (' + vecchioA + ' vs ' + vecchioB + ')');
+    /* ...e invece su tutte le pagine e per tutti i turni sono identiche. */
+    let uguali = true;
+    const viste = [];
+    for (let r = 1; r <= 6; r++) {
+      const stR = Object.assign({}, stG, { round: r });
+      const lA = wg.__PATATA.lettersFor(stR).join('');
+      const lB = wh.__PATATA.lettersFor(stR).join('');
+      viste.push('r' + r + ':' + lA);
+      if (lA !== lB) uguali = false;
+      if (lA !== C.pickLetters(SEED_LETTERE, r, 2, idxBase, 'sequenza').join('')) uguali = false;
+    }
+    ok(uguali, 'stesse lettere su ogni client e per ogni turno: ' + viste.join(' '));
+    eq(g.document.getElementById('letters-avail').textContent,
+      h.document.getElementById('letters-avail').textContent,
+      'stesso numero di parole valide mostrato ai due client');
+  }
+
+  /* ============================================================
+     [12] RIVINCITA — si entra nella partita nuova senza restare bloccati
+     ============================================================ */
+  console.log('\n[12] Rivincita: lobby nuova marcata e accettazione sulla partita di origine');
+  mock.store.set('partite/P5', {
+    gioco: 'patata', partecipanti: ['ALFA', 'BETA'],
+    punteggi: { ALFA: 12, BETA: 7 }, patate: { ALFA: 0, BETA: 1 },
+    pronti: ['ALFA', 'BETA'], stato: 'conclusa', round: 1, storia: [],
+    roundData: { fase: 'recap', parlate: { ALFA: [], BETA: [] }, patata: 'BETA', flags: {}, rimosse: [] },
+    rivincitaAccettataDa: [], rivincitaRifiutataDa: [],
+    opzioni: { tempo: '30', turni: '1', lettere: '2', mode: 'classic', seed: 'SEEDTEST' },
+    dataOra: '2026-09-29 10:00:00', timestamp: Date.now()
+  });
+  const i = pagina('ALFA', 'P5');
+  const j = pagina('BETA', 'P5');
+  ok(await until(() => i.__PATATA.state && i.__PATATA.state.stato === 'conclusa', 'partita finita per ALFA'),
+    'ALFA riceve la partita conclusa');
+  ok(await until(() => j.__PATATA.state && j.__PATATA.state.stato === 'conclusa', 'partita finita per BETA'),
+    'BETA riceve la partita conclusa');
+  ok(await until(() => !i.document.getElementById('btn-rivincita').disabled, 'RIVINCITA attiva per ALFA'),
+    'ALFA (partita finita) vede il pulsante RIVINCITA');
+  ok(await until(() => !j.document.getElementById('btn-rivincita').disabled, 'RIVINCITA attiva per BETA'),
+    'BETA vede il pulsante RIVINCITA');
+  i.document.getElementById('btn-rivincita').dispatchEvent(new i.Event('click', { bubbles: true }));
+  ok(await until(() => !!i.document.getElementById('faw-rv-conferma'), 'modale rivincita'), 'modale di rivincita aperta');
+  i.document.getElementById('faw-rv-conferma').dispatchEvent(new i.Event('click', { bubbles: true }));
+  ok(await until(() => !!mock.store.get('partite/P5').prossimaPartita, 'proposta creata'), 'lobby nuova creata');
+  const nuovaId = mock.store.get('partite/P5').prossimaPartita;
+  const nuova = mock.store.get('partite/' + nuovaId) || {};
+  ok(nuova.daRivincita === true && nuova.rivincitaDi === 'P5',
+    'la lobby nuova è marcata daRivincita + rivincitaDi=P5 (l\'hub non la tratta come invito)');
+  /* BETA accetta dal banner della partita finita: si parte tutti insieme. */
+  const btnAccetta = Array.from(j.document.querySelectorAll('button'))
+    .find((b) => /✅ ACCETTA/.test(b.textContent));
+  ok(!!btnAccetta, 'BETA vede il pulsante ✅ ACCETTA nella partita finita');
+  btnAccetta.dispatchEvent(new j.Event('click', { bubbles: true }));
+  ok(await until(() => (mock.store.get('partite/P5').rivincitaAccettataDa || []).includes('BETA'),
+    'accettazione di BETA'), 'accettazione registrata sulla partita di origine');
+  ok(await until(() => i.__fawRivincitaVia === true && j.__fawRivincitaVia === true, 'redirect di entrambi'),
+    'tutti accettano → entrambi vanno nella partita nuova');
+
+  /* Chi entra nella lobby nuova dall'hub (senza passare dal banner) vale come
+     accettazione: altrimenti gli altri restavano in attesa per sempre. */
+  mock.store.set('partite/P6', {
+    gioco: 'patata', partecipanti: ['ALFA', 'BETA'],
+    punteggi: {}, pronti: [], stato: 'attesa',
+    rivincitaAccettataDa: [], rivincitaRifiutataDa: [],
+    daRivincita: true, rivincitaDi: 'P7',
+    opzioni: { tempo: '30', turni: '1', lettere: '2', mode: 'classic', seed: 'SEEDTEST' },
+    dataOra: '2026-09-29 10:30:00', timestamp: Date.now()
+  });
+  mock.store.set('partite/P7', {
+    gioco: 'patata', partecipanti: ['ALFA', 'BETA'],
+    punteggi: {}, pronti: [], stato: 'attesa',
+    rivincitaAccettataDa: ['ALFA'], rivincitaRifiutataDa: [],
+    prossimaPartita: 'P6', prossimaPartitaCreataDa: 'ALFA', prossimaPartitaGioco: 'patata',
+    opzioni: { tempo: '30', turni: '1', lettere: '2', mode: 'classic', seed: 'SEEDTEST' },
+    dataOra: '2026-09-29 10:31:00', timestamp: Date.now()
+  });
+  const k = pagina('BETA', 'P6', { extra: PAROLE_EXTRA });
+  ok(await until(() => (mock.store.get('partite/P7').rivincitaAccettataDa || []).includes('BETA'),
+    'accettazione segnata sull\'origine', 6000),
+    'entrare nella lobby di rivincita segna l\'accettazione su P7 (chi entra non blocca più gli altri)');
 
   console.log('\n=================');
   console.log('PASSATI: ' + passed + '  FALLITI: ' + failed);
