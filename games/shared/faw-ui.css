@@ -605,6 +605,14 @@ select option {
 }
 
 /* ==========================================================================
+   FINESTRE DI GIOCO (.faw-dialog)
+   Aggiunta da games/shared/faw-modale.js a ogni modale registrata: qui solo
+   quello che serve alla tastiera, il disegno resta quello del gioco.
+   ========================================================================== */
+.faw-dialog:focus { outline: none; }
+.faw-dialog:focus-visible { outline: 3px solid var(--faw-acc); outline-offset: 4px; }
+
+/* ==========================================================================
    TOAST
    ========================================================================== */
 /* Il contenitore (usato da faw-banner.js) impila i toast dal basso; l'hub
