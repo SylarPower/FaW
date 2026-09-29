@@ -15,7 +15,7 @@
     <script src="../shared/faw-layout.js" defer></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="../shared/faw-theme.js" data-tema-fisso="dark"></script>
     <link rel="stylesheet" href="../shared/faw-ui.css">
     <!-- Podio di fine partita (condiviso tra i giochi) -->
@@ -30,13 +30,13 @@
             --bg: #0b0e1c; --panel: #121832; --primary: #ff4d7d; --accent: #1d2848;
             --text: #eef1fa; --border: rgba(148, 163, 255, 0.16); --danger: #ff5a6e; --success: #2fd6c8;
             --gold: #ffc93c; --silver: #b8c2d9; --bronze: #c98a4b;
-            --font-display: 'Nunito', system-ui, sans-serif;
+            --font-display: var(--faw-font-display, 'Nunito', system-ui, sans-serif);
         }
 
         * { box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; }
 
         body {
-            font-family: 'Nunito', system-ui, sans-serif; background: var(--bg); color: var(--text);
+            font-family: var(--faw-font-body, 'Plus Jakarta Sans', 'Nunito', system-ui, sans-serif); background: var(--bg); color: var(--text);
             margin: 0; padding: 0; min-height: 100vh; display: flex; flex-direction: column;
             position: relative;
         }
@@ -58,7 +58,7 @@
         @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
         @keyframes confetti { 0% { transform: translateY(0) rotate(0deg); opacity: 1; } 100% { transform: translateY(100vh) rotate(720deg); opacity: 0; } }
         @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
-        @keyframes glow { 0%, 100% { box-shadow: 0 0 20px var(--primary); } 50% { box-shadow: 0 0 40px var(--primary), 0 0 60px var(--primary); } }
+        @keyframes glow { 0%, 100% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 20%, transparent); } 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--primary) 12%, transparent); } }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         @keyframes timerPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.15); } }
 
@@ -95,7 +95,7 @@
             font-family: var(--font-display); font-weight: 800; color: var(--danger); 
             font-size: 2rem; min-width: 64px; text-align: center;
             font-variant-numeric: tabular-nums;
-            text-shadow: 0 0 24px rgba(255, 90, 110, 0.65);
+            text-shadow: none;
         }
         #timer.warning { animation: pulse 0.5s infinite; color: #ff3b52; }
 
@@ -230,11 +230,11 @@
         .btn {
             padding: 13px 26px; border-radius: 12px; border: none; font-family: inherit; 
             font-weight: 800; cursor: pointer; font-size: 0.88rem; transition: all 0.2s;
-            text-transform: uppercase; letter-spacing: 1.4px;
+            text-transform: none; letter-spacing: 0.01em;
         }
         .btn:active { transform: scale(0.95); }
         .btn-primary { 
-            background: linear-gradient(135deg, var(--primary) 0%, #ff87ab 100%); 
+            background: var(--primary); 
             color: #241500; box-shadow: 0 4px 20px rgba(255, 77, 125, 0.4); 
         }
         .btn-primary:hover { box-shadow: 0 6px 30px rgba(255, 77, 125, 0.6); transform: translateY(-1px); }
@@ -272,7 +272,7 @@
             border: 1px solid var(--border); animation: fadeIn 0.3s ease;
         }
 
-        h1 { font-family: var(--font-display); font-size: 2.1rem; font-weight: 800; margin: 0; color: var(--primary); letter-spacing: 0.5px; text-shadow: 0 0 30px rgba(255, 77, 125, 0.35); }
+        h1 { font-family: var(--font-display); font-size: 2.1rem; font-weight: 800; margin: 0; color: var(--primary); letter-spacing: 0.5px; text-shadow: none; }
         h2 { font-family: var(--font-display); font-size: 1.5rem; font-weight: 700; margin: 0; color: var(--text); }
         
         input, select, textarea {
@@ -322,7 +322,7 @@
         .player-card.ready { 
             border-color: var(--success); 
             background: rgba(47, 214, 200, 0.09);
-            box-shadow: 0 0 18px rgba(47, 214, 200, 0.15);
+            box-shadow: 0 0 0 3px rgba(47,214,200,0.25);
         }
         .player-card.host::after { 
             content: '👑'; display: block; font-size: 1.2rem; margin-top: 5px;
@@ -390,7 +390,7 @@
             cursor: pointer;
         }
         .chain-step:hover { border-color: var(--primary); transform: translateY(-5px); box-shadow: 0 10px 30px rgba(255, 77, 125, 0.25); }
-        .chain-step.voted { border-color: var(--gold); box-shadow: 0 0 20px rgba(255, 215, 0, 0.3); }
+        .chain-step.voted { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(255,215,0,0.25); }
 
         .step-canvas {
             width: 100%; aspect-ratio: 1/1; background: white;
@@ -472,7 +472,7 @@
             transition: border-color 0.2s ease;
         }
         .ranking-row:hover { border-color: rgba(148, 163, 255, 0.4); }
-        .ranking-row.me { border: 1px solid var(--primary); box-shadow: 0 0 18px rgba(255, 77, 125, 0.2); }
+        .ranking-row.me { border: 1px solid var(--primary); box-shadow: 0 0 0 3px rgba(255,77,125,0.25); }
 
         .ranking-position { 
             font-weight: 900; font-size: 1.1rem; min-width: 30px;
@@ -516,7 +516,7 @@
             border-radius: 50%;
             animation: spin 0.9s linear infinite;
             margin-bottom: 22px;
-            box-shadow: 0 0 30px rgba(255, 77, 125, 0.35);
+            box-shadow: 0 0 0 3px rgba(255,77,125,0.25);
         }
 
         #loading-screen p {
@@ -666,7 +666,7 @@
     border-radius: 50%;
     cursor: pointer;
     border: 2px solid #fff;
-    box-shadow: 0 0 12px rgba(255, 77, 125, 0.6);
+    box-shadow: 0 0 0 3px rgba(255,77,125,0.25);
 }
 
 .size-slider::-moz-range-thumb {
@@ -676,7 +676,7 @@
     border-radius: 50%;
     cursor: pointer;
     border: 2px solid #fff;
-    box-shadow: 0 0 12px rgba(255, 77, 125, 0.6);
+    box-shadow: 0 0 0 3px rgba(255,77,125,0.25);
 }
 
 .size-preview {
@@ -818,7 +818,7 @@
     background: white;
     border-radius: 18px;
     border: 3px solid var(--primary);
-    box-shadow: 0 18px 60px rgba(0,0,0,0.55), 0 0 30px rgba(255, 77, 125, 0.18);
+    box-shadow: 0 18px 60px rgba(0,0,0,0.55), 0 0 0 3px rgba(255,77,125,0.25);
     cursor: crosshair;
     touch-action: none;
 }
@@ -855,7 +855,7 @@
     background: white;
     border: 3px solid var(--success);
     border-radius: 16px;
-    box-shadow: 0 8px 30px rgba(0,0,0,0.45), 0 0 20px rgba(47, 214, 200, 0.2);
+    box-shadow: 0 8px 30px rgba(0,0,0,0.45), 0 0 0 3px rgba(47,214,200,0.25);
     z-index: 50;
     cursor: pointer;
     transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -929,13 +929,13 @@
     font-weight: 800;
     color: var(--success);
     font-variant-numeric: tabular-nums;
-    text-shadow: 0 0 26px rgba(47, 214, 200, 0.6);
+    text-shadow: none;
     line-height: 1;
 }
 
 .timer-display.warning {
     color: var(--danger) !important;
-    text-shadow: 0 0 20px var(--danger) !important;
+    text-shadow: none;
     animation: pulse 0.5s infinite;
 }
 
@@ -1318,7 +1318,7 @@
                     width: 100% !important; height: 100% !important;
                     background: white; border-radius: 18px;
                     border: 3px solid var(--primary);
-                    box-shadow: 0 18px 60px rgba(0,0,0,0.55), 0 0 30px rgba(255, 77, 125, 0.18);
+                    box-shadow: 0 18px 60px rgba(0,0,0,0.55), 0 0 0 3px rgba(255,77,125,0.25);
                     touch-action: none;
                 "></canvas>
             </div>
@@ -2050,6 +2050,9 @@ if (data.stato !== 'lobby' && data.players.length > 0 && !data.players.includes(
 function renderLobby(data) {
     showScreen('lobby-screen');
     showHomeButton();
+    if (data.rivincitaDi && window.FAW_RIVINCITA && window.FAW_RIVINCITA.segnaAccettazione) {
+        window.FAW_RIVINCITA.segnaAccettazione(db, data.rivincitaDi, state.playerName, data.rivincitaCollezione);
+    }
 
     // Aggiorna lista giocatori
     const playersDisplay = document.getElementById('lobby-players-display');
@@ -2410,9 +2413,10 @@ function startTimerWithBanner() {
     removeBanner();
     
     const timerEl = document.getElementById('timer');
+    const deadline = Date.now() + timer * 1000;
     
     timerInterval = setInterval(() => {
-        timer--;
+        timer = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
         
         if (timerEl) {
             timerEl.textContent = timer;
@@ -2423,7 +2427,7 @@ function startTimerWithBanner() {
             clearInterval(timerInterval);
             finishCurrentPhase();
         }
-    }, 1000);
+    }, 250);
 }
 
 // ✅ FINISH PHASE - CORRETTO
@@ -3762,6 +3766,7 @@ function removeGuessItCanvasListeners() {
     c.ontouchmove = null;
     c.ontouchend = null;
     c.ontouchcancel = null;
+    window.onmouseup = null;
 }
     
 function setupGuessItGuesser(gi) {
@@ -4049,7 +4054,7 @@ function attachGuessItCanvasListeners() {
     
     c.onmousedown = start;
     c.onmousemove = draw;
-    window.addEventListener('mouseup', stop);
+    window.onmouseup = stop;
     c.ontouchstart = start;
     c.ontouchmove = draw;
     c.ontouchend = stop;
@@ -4253,6 +4258,7 @@ function startGuessItTimer(seconds) {
     if (guessIt.timerInterval) clearInterval(guessIt.timerInterval);
     
     let remaining = seconds;
+    const deadline = Date.now() + seconds * 1000;
     const timerEl = document.getElementById('guessit-timer');
     
     if (timerEl) {
@@ -4261,7 +4267,7 @@ function startGuessItTimer(seconds) {
     }
     
     guessIt.timerInterval = setInterval(() => {
-        remaining--;
+        remaining = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
         
         if (timerEl) {
             timerEl.textContent = remaining;
@@ -4288,7 +4294,7 @@ function startGuessItTimer(seconds) {
                 }
             }
         }
-    }, 1000);
+    }, 250);
 }
 
 // ========================================

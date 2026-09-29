@@ -19,7 +19,7 @@
 		<script src="../shared/podio.js"></script>
 		<link rel="preconnect" href="https://fonts.googleapis.com">
 		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-		<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+		<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="../shared/faw-theme.js" data-tema-fisso="dark"></script>
 		<link rel="stylesheet" href="../shared/faw-ui.css">
 		<!-- Podio di fine partita (condiviso tra i giochi) -->
@@ -48,7 +48,8 @@
 			--line-color: rgba(28, 36, 56, 0.75);
 			--overlay-bg: rgba(16, 22, 42, 0.92);
 			--grid-cols: 5;
-			--font-display: 'Nunito', system-ui, sans-serif;
+			--font-display: var(--faw-font-display, 'Nunito', system-ui, sans-serif);
+			--font-body: var(--faw-font-body, 'Plus Jakarta Sans', 'Nunito', system-ui, sans-serif);
 			--font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
 			}
 			body.dark-mode {
@@ -181,7 +182,7 @@
 			}
 			50% {
 			transform: scale(1.05);
-			box-shadow: 0 0 25px rgba(231, 76, 60, 0.8);
+			box-shadow: 0 0 0 3px rgba(231,76,60,0.25);
 			}
 			}
 			@keyframes popIn {
@@ -242,7 +243,7 @@
 			}
 			}
 			body.mega-win-effect {
-			animation: earthquake 0.5s 3, disco-flash 0.5s 3;
+			animation: none;
 			}
 			/* ✅ DISABILITA ANIMAZIONI DURANTE PROCESSING */
 			body.processing * {
@@ -250,7 +251,7 @@
 			transition: none !important;
 			}
 			body {
-			font-family: 'Nunito', system-ui, sans-serif;
+			font-family: var(--font-body, 'Plus Jakarta Sans', 'Nunito', system-ui, sans-serif);
 			background-color: var(--bg);
 			color: var(--text-main);
 			display: flex;
@@ -320,7 +321,7 @@
 			color: var(--text-main);
 			}
 			body.dark-mode h1 {
-			text-shadow: 0 0 24px rgba(34, 211, 238, 0.35);
+			text-shadow: none;
 			}
 			.theme-btn {
 			background: var(--item-bg);
@@ -472,7 +473,7 @@
 			}
 			body.dark-mode #current-word {
 			color: #7ff3ff;
-			text-shadow: 0 0 18px rgba(34, 211, 238, 0.5);
+			text-shadow: none;
 			}
 			.grid-container {
 			position: relative;
@@ -877,7 +878,6 @@
 			cursor: pointer;
 			font-weight: 800;
 			box-shadow: 0 6px 20px rgba(255, 90, 110, 0.4);
-			animation: fremito 0.15s infinite;
 			}
 			.btn-rivincita:hover {
 			filter: brightness(1.1);
@@ -1083,7 +1083,7 @@
 			font-weight: 800;
 			letter-spacing: 1px;
 			cursor: pointer;
-			box-shadow: 0 0 34px rgba(34, 211, 238, 0.55), inset 0 2px 0 rgba(255, 255, 255, 0.5);
+			box-shadow: 0 0 0 3px rgba(34,211,238,0.25), inset 0 2px 0 rgba(255, 255, 255, 0.5);
 			animation: pulseBtn 1.5s infinite;
 			margin-top: 15px;
 			}
@@ -1164,7 +1164,7 @@
 			font-weight: 800;
 			letter-spacing: 2px;
 			margin: 0 0 12px;
-			text-shadow: 0 0 40px rgba(34, 211, 238, 0.5);
+			text-shadow: none;
 			}
 			#lobby-info { opacity: 0.75; margin: 0; }
 			#lobby-status {
@@ -1176,11 +1176,11 @@
 			min-height: 1.6em;
 		}
 			#game-end-modal .modal-content {
-			background: linear-gradient(135deg, #2c3e50 0%, #2980b9 50%, #8e44ad 100%);
-			color: white;
-			border: 6px solid white;
-			box-shadow: 0 0 60px rgba(52, 152, 219, 0.6), 0 0 0 15px rgba(255, 255, 255, 0.1);
-			border-radius: 25px;
+			background: linear-gradient(160deg, #1e293b 0%, #0f172a 100%);
+			color: #f1f5f9;
+			border: 1px solid rgba(148, 163, 184, 0.28);
+			box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
+			border-radius: 24px;
 			max-width: 450px;
 			width: 90%;
 			padding: 40px 20px;
@@ -1241,7 +1241,7 @@
 			}
 			body.dark-mode #start-screen h2 {
 			color: #7ff3ff;
-			text-shadow: 0 0 30px rgba(34, 211, 238, 0.55);
+			text-shadow: none;
 			}
 			#calculation-overlay {
 			position: fixed;
@@ -4049,6 +4049,9 @@ if (data.stato === "attesa") {
      // ✅ Auto-ready: il giocatore ha già accettato l'invito entrando nella partita
     if (!pronti.includes(mioNome)) {
         setProntoOnline();
+    }
+    if (data.rivincitaDi && window.FAW_RIVINCITA && window.FAW_RIVINCITA.segnaAccettazione) {
+        window.FAW_RIVINCITA.segnaAccettazione(db, data.rivincitaDi, mioNome, data.rivincitaCollezione);
     }
 
     // Mostra sempre il banner di attesa

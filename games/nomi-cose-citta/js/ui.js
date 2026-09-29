@@ -1265,6 +1265,9 @@
     if (showLobby) {
       if (G.prevFase !== 'attesa') hideBanner();
       G.prevFase = 'attesa';
+      if (!G.solo && s.rivincitaDi && global.FAW_RIVINCITA && global.FAW_RIVINCITA.segnaAccettazione && G.backend && G.backend.db) {
+        global.FAW_RIVINCITA.segnaAccettazione(G.backend.db, s.rivincitaDi, G.me, s.rivincitaCollezione);
+      }
       renderLobby(s);
       nascondiOverlay();
       return;

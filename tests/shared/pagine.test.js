@@ -59,9 +59,11 @@ PAGINE.forEach((f) => {
   ok(/<meta name="viewport"/.test(html), f + ': viewport dichiarata');
   ok(/<title>[^<]{3,}<\/title>/.test(html), f + ': titolo di pagina');
   ok(/name="description"/.test(html), f + ': descrizione per i motori di ricerca');
-  ok(/fonts\.googleapis\.com\/css2\?family=Nunito/.test(html), f + ': carica il font di piattaforma (Nunito)');
+  ok(/fonts\.googleapis\.com\/css2\?family=Nunito/.test(html), f + ': carica il font display di piattaforma (Nunito)');
   ok(/Nunito:wght@400;500;600;700;800;900/.test(html),
-    f + ': carica tutti i pesi usati (500 compreso: altrimenti il browser ne inventa uno)');
+    f + ': carica tutti i pesi di Nunito usati (500 compreso: altrimenti il browser ne inventa uno)');
+  ok(/Plus\+Jakarta\+Sans:wght@400;500;600;700;800/.test(html),
+    f + ': carica il font UI/testo desktop (Plus Jakarta Sans)');
   ok(/rel="preconnect"/.test(html), f + ': preconnect ai font (niente lampo di testo)');
   ok(/rel="icon"/.test(html), f + ': favicon');
 });

@@ -16,10 +16,10 @@
 				} catch (e) { /* noop */ }
 			})();
 		</script>
-		<!-- Tipografia piattaforma (font unico: Nunito) -->
+		<!-- Tipografia piattaforma (Soluzione A: Plus Jakarta Sans UI/testo + Nunito display/tessere) -->
 		<link rel="preconnect" href="https://fonts.googleapis.com">
 		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-		<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+		<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 		<!-- ✅ PRECONNECT per velocità -->
 		<link rel="preconnect" href="https://www.gstatic.com">
 		<link rel="preconnect" href="https://firestore.googleapis.com">
@@ -44,9 +44,9 @@
 				--hub-max: 1200px;
 			}
 			:root[data-theme='dark'] {
-				--faw-acc: #FF796A;
-				--faw-acc-2: #FF9B8F;
-				--faw-acc-soft: rgba(255, 121, 106, 0.16);
+				--faw-acc: #F43F5E;
+				--faw-acc-2: #FB7185;
+				--faw-acc-soft: rgba(244, 63, 94, 0.14);
 			}
 			html, body { min-height: 100%; }
 			body { overflow-x: hidden; }
@@ -64,7 +64,7 @@
 			.login-card {
 				width: min(400px, 100%);
 				background: var(--faw-panel-solid);
-				border: 2px solid var(--faw-border);
+				border: 1px solid var(--faw-border);
 				border-radius: 20px;
 				padding: 36px 32px 28px;
 				box-shadow: var(--faw-shadow-3);
@@ -101,7 +101,7 @@
 				padding: 12px 14px;
 				margin-bottom: 10px;
 				border-radius: var(--faw-r-md);
-				border: 2px solid var(--faw-border-2);
+				border: 1px solid var(--faw-border-2);
 				background: var(--faw-panel-solid);
 				color: var(--faw-text);
 				font-family: var(--faw-font-body);
@@ -184,7 +184,7 @@
 				gap: 9px;
 				padding: 4px 13px 4px 4px;
 				border-radius: 999px;
-				border: 2px solid var(--faw-border);
+				border: 1px solid var(--faw-border);
 				background: var(--faw-panel-2);
 			}
 			#user-display { font-weight: 600; font-size: 0.88rem; white-space: nowrap; }
@@ -238,7 +238,7 @@
 				position: relative;
 				padding: 16px 14px 14px;
 				border-radius: 16px;
-				border: 2px solid var(--faw-border);
+				border: 1px solid var(--faw-border);
 				/* Superficie bianca. Il colore del gioco sta nel bordo, non in una tinta lavata. */
 				background: var(--faw-panel-solid);
 				border-color: color-mix(in srgb, var(--g1) 62%, #667085);
@@ -256,11 +256,11 @@
 				justify-content: center;
 				font-size: 1.35rem;
 				background: #F3F5F8;
-				border: 2px solid color-mix(in srgb, var(--g1) 72%, #1C2430);
+				border: 1px solid color-mix(in srgb, var(--g1) 72%, #1C2430);
 				transition: transform var(--faw-fast) var(--faw-ease);
 			}
 			:root[data-theme='dark'] .game-card {
-				background: #332D26;
+				background: #1A2230;
 				background: color-mix(in srgb, var(--g1) 14%, var(--faw-panel-solid));
 			}
 			:root[data-theme='dark'] .game-card .g-tile {
@@ -285,7 +285,7 @@
 				font-weight: 700;
 				letter-spacing: 0.6px;
 				background: var(--faw-panel-2);
-				border: 2px solid var(--faw-border);
+				border: 1px solid var(--faw-border);
 				color: var(--faw-text-2);
 			}
 			.game-card .game-badge.online { background: var(--faw-ok-soft); border-color: var(--faw-ok); color: var(--faw-ok); }
@@ -327,7 +327,7 @@
 				padding: 12px 14px;
 				margin-bottom: 8px;
 				border-radius: 12px;
-				border: 2px solid var(--faw-border);
+				border: 1px solid var(--faw-border);
 				background: var(--faw-panel);
 				transition: border-color var(--faw-fast) var(--faw-ease), background var(--faw-fast) var(--faw-ease);
 				animation: faw-rise 300ms var(--faw-ease) both;
@@ -338,7 +338,7 @@
 			.user-item button {
 				padding: 7px 13px;
 				border-radius: 8px;
-				border: 2px solid transparent;
+				border: 1px solid transparent;
 				background: var(--faw-panel-2);
 				color: var(--faw-text);
 				font-family: var(--faw-font-body);
@@ -366,7 +366,7 @@
 				border-color: var(--faw-acc-2);
 				cursor: pointer;
 			}
-			:root[data-theme='dark'] .user-item.u-row--solo { border-color: rgba(255, 121, 106, 0.45); }
+			:root[data-theme='dark'] .user-item.u-row--solo { border-color: rgba(244, 63, 94, 0.45); }
 			.user-item.u-row--solo:hover { border-color: var(--faw-acc); }
 			.user-item.u-row--live:hover { border-color: var(--faw-border-2); }
 			.user-item.u-row--wait { background: var(--faw-info-soft); border-color: var(--faw-info); }
@@ -394,7 +394,7 @@
 			#lista-amici .user-item .btn-del {
 				padding: 5px 9px;
 				border-radius: 8px;
-				border: 2px solid var(--faw-border);
+				border: 1px solid var(--faw-border);
 				background: transparent;
 				color: var(--faw-text-3);
 				font-weight: 700;
@@ -420,7 +420,7 @@
 				width: 100%;
 				margin-bottom: 14px;
 				padding: 12px 18px;
-				border: 2px solid transparent;
+				border: 1px solid transparent;
 				border-radius: var(--faw-r-md);
 				background: #111827;
 				color: #fff;
@@ -447,7 +447,7 @@
 				padding: 10px 14px;
 				margin-bottom: 8px;
 				border-radius: 12px;
-				border: 2px solid var(--faw-border);
+				border: 1px solid var(--faw-border);
 				background: var(--faw-panel);
 				font-size: 0.85rem;
 				color: var(--faw-text-2);
@@ -463,7 +463,7 @@
 				margin-bottom: 18px;
 				border-radius: 12px;
 				background: var(--faw-panel-2);
-				border: 2px solid var(--faw-border);
+				border: 1px solid var(--faw-border);
 			}
 			.stats-tab {
 				padding: 7px 18px;
@@ -488,7 +488,7 @@
 			.stat-box {
 				padding: 16px 12px;
 				border-radius: 14px;
-				border: 2px solid var(--faw-border);
+				border: 1px solid var(--faw-border);
 				background: var(--faw-panel);
 				text-align: center;
 				transition: border-color var(--faw-fast) var(--faw-ease);
@@ -514,9 +514,9 @@
 				background: var(--faw-acc-soft);
 				border-color: var(--faw-acc-2);
 			}
-			:root[data-theme='dark'] .stat-box.highlight { border-color: rgba(255, 121, 106, 0.45); }
+			:root[data-theme='dark'] .stat-box.highlight { border-color: rgba(244, 63, 94, 0.45); }
 			.stat-box.highlight .stat-number { color: var(--faw-acc); }
-			:root[data-theme='dark'] .stat-box.highlight .stat-number { color: #FFB8AF; }
+			:root[data-theme='dark'] .stat-box.highlight .stat-number { color: #FDA4AF; }
 			/* Grafico settimanale */
 			.weekly-bars { display: flex; gap: 10px; align-items: flex-end; height: 150px; padding-top: 8px; }
 			.day-bar {
@@ -535,7 +535,7 @@
 				min-height: 5px;
 				border-radius: 7px;
 				background: var(--faw-panel-2);
-				border: 2px solid var(--faw-border);
+				border: 1px solid var(--faw-border);
 				transition: height 400ms var(--faw-ease);
 			}
 			.day-bar .bar.today {
@@ -546,7 +546,7 @@
 			.btn-danger {
 				padding: 8px 16px;
 				border-radius: 10px;
-				border: 2px solid var(--faw-danger);
+				border: 1px solid var(--faw-danger);
 				background: var(--faw-danger-soft);
 				color: var(--faw-danger);
 				font-weight: 600;
@@ -571,7 +571,7 @@
 				gap: 14px;
 				padding: 10px 16px;
 				border-radius: 0 0 16px 16px;
-				border: 2px solid var(--faw-border);
+				border: 1px solid var(--faw-border);
 				border-top: none;
 				background: var(--faw-panel-solid);
 				color: var(--faw-text);
@@ -629,7 +629,7 @@
 		.banner-right select option {
 			padding: 6px 8px;
 			border-radius: 8px;
-			border: 2px solid var(--faw-border-2);
+			border: 1px solid var(--faw-border-2);
 			background-color: var(--faw-panel-solid);
 			color: var(--faw-text);
 			color-scheme: light;
@@ -642,12 +642,12 @@
 		:root[data-theme='dark'] .banner-right select,
 		:root[data-theme='dark'] .banner-right select option {
 			color-scheme: dark;
-			background-color: #2a2621;
-			color: #fff8ee;
+			background-color: #151C28;
+			color: #F1F5F9;
 		}
 			.btn-banner {
 				padding: 7px 11px;
-				border: 2px solid var(--faw-border);
+				border: 1px solid var(--faw-border);
 				border-radius: 8px;
 				font-family: var(--faw-font-body);
 				font-weight: 700;
@@ -693,7 +693,7 @@
 				width: min(560px, 94vw);
 				padding: 20px 22px 18px;
 				border-radius: 0 0 22px 22px;
-				border: 2px solid #f59e0b;
+				border: 1px solid #f59e0b;
 				border-top: none;
 				background: var(--faw-panel-solid);
 				box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
@@ -738,7 +738,7 @@
 			.invite-btn:active { transform: scale(0.97); }
 			.invite-btn--acc { background: #16a34a; color: #fff; }
 			.invite-btn--acc:hover { background: #15803d; filter: none; }
-			.invite-btn--rif { background: var(--faw-panel-2); color: var(--faw-danger); border: 2px solid var(--faw-danger); }
+			.invite-btn--rif { background: var(--faw-panel-2); color: var(--faw-danger); border: 1px solid var(--faw-danger); }
 			.invite-close {
 				position: absolute;
 				top: 8px;
@@ -746,7 +746,7 @@
 				width: 30px;
 				height: 30px;
 				border-radius: 50%;
-				border: 2px solid var(--faw-border);
+				border: 1px solid var(--faw-border);
 				background: var(--faw-panel-2);
 				color: var(--faw-text-2);
 				font-size: 0.8rem;
@@ -800,8 +800,8 @@
 				<div class="login-logo"><span>F</span></div>
 				<h1>Focus at Work</h1>
 				<p class="login-sub">Entra nella piattaforma e sfida i tuoi colleghi.</p>
-				<input type="text" id="username" placeholder="IL TUO NOME" autocomplete="username" spellcheck="false">
-				<input type="password" id="password" placeholder="PASSWORD" autocomplete="current-password">
+				<input type="text" id="username" placeholder="IL TUO NOME" autocomplete="username" spellcheck="false" onkeydown="if(event.key==='Enter'){event.preventDefault();var p=document.getElementById('password');if(p&&!p.value)p.focus();else entra();}">
+				<input type="password" id="password" placeholder="PASSWORD" autocomplete="current-password" onkeydown="if(event.key==='Enter'){event.preventDefault();entra();}">
 				<button onclick="entra()" class="faw-btn faw-btn--primary faw-btn--lg faw-breathe login-cta">ENTRA <span class="arr">→</span></button>
 				<p class="login-foot">Accesso riservato ai membri del team FaW</p>
 			</div>

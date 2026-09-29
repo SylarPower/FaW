@@ -44,7 +44,7 @@
   align-items: flex-start;
   gap: 2px;
   padding: 12px 12px 10px;
-  border: 2px solid var(--faw-border);
+  border: 1px solid var(--faw-border);
   border-radius: var(--faw-r-md);
   background: var(--faw-panel-2);
   color: var(--faw-text);
@@ -89,7 +89,7 @@
   left: 10px;
   padding: 2px 7px;
   border-radius: 999px;
-  border: 2px solid var(--rv-acc);
+  border: 1px solid var(--rv-acc);
   background: var(--faw-panel-solid);
   color: var(--rv-acc);
   font-size: var(--faw-fs-2xs);
@@ -113,7 +113,7 @@
 
 /* ---------------- Impostazioni ---------------- */
 .faw-rv-panel {
-  border: 2px solid var(--faw-border);
+  border: 1px solid var(--faw-border);
   border-radius: var(--faw-r-lg);
   background: var(--faw-panel-2);
   padding: 12px 14px 14px;
@@ -175,7 +175,7 @@
 .faw-rv-seg__btn {
   flex: 1 1 auto;
   padding: 9px 12px;
-  border: 2px solid var(--faw-border);
+  border: 1px solid var(--faw-border);
   border-radius: var(--faw-r-sm);
   background: var(--faw-panel-solid);
   color: var(--faw-text-2);

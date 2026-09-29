@@ -354,8 +354,11 @@
       risultati: Array.isArray(doc.risultati) ? doc.risultati : [],
       prossimaPartita: doc.prossimaPartita || null,
       prossimaPartitaCreataDa: doc.prossimaPartitaCreataDa || null,
+      prossimaPartitaGioco: doc.prossimaPartitaGioco || null,
       rivincitaAccettataDa: Array.isArray(doc.rivincitaAccettataDa) ? doc.rivincitaAccettataDa : [],
-      rivincitaRifiutataDa: Array.isArray(doc.rivincitaRifiutataDa) ? doc.rivincitaRifiutataDa : []
+      rivincitaRifiutataDa: Array.isArray(doc.rivincitaRifiutataDa) ? doc.rivincitaRifiutataDa : [],
+      rivincitaDi: doc.rivincitaDi || null,
+      rivincitaCollezione: doc.rivincitaCollezione || null
     };
   }
 
