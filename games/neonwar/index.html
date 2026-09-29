@@ -8,11 +8,11 @@
 		  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E👾%3C/text%3E%3C/svg%3E">
 		<link rel="preconnect" href="https://fonts.googleapis.com">
 		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-		<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+		<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 		<script src="../shared/faw-theme.js" data-tema-fisso="dark"></script>
 		<link rel="stylesheet" href="../shared/faw-ui.css">
 		<style>
-			/* Font unico piattaforma: Nunito */
+			/* Font piattaforma: Plus Jakarta Sans (UI/body) + Nunito (display) */
 			body {
 			margin: 0; overflow: hidden;
 			background:
@@ -20,7 +20,7 @@
 				 radial-gradient(1000px 600px at 10% 110%, rgba(255, 0, 85, 0.07), transparent 60%),
 				 #0b0c14;
 			color: #fff;
-			font-family: 'Nunito', system-ui, sans-serif;
+			font-family: var(--faw-font-body, 'Plus Jakarta Sans', 'Nunito', system-ui, sans-serif);
 			user-select: none;
 			cursor: default;
 			}

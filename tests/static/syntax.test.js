@@ -363,6 +363,57 @@ console.log('\n[9] Podio di fine partita in tutti i giochi multiplayer');
   ok(/esc\(/.test(podio), 'podio.js: i nomi vengono escapati');
 }
 
+console.log('\n[10] Ottimizzazioni Desktop, Tipografia (Soluzione A) e Integrità CSS/JS');
+{
+  const fawUi = leggi('games/shared/faw-ui.css');
+  ok(/--faw-font-sans:\s*'Plus Jakarta Sans'/.test(fawUi), 'faw-ui.css: --faw-font-sans usa Plus Jakarta Sans');
+  ok(/--faw-font-display:\s*'Nunito'/.test(fawUi), 'faw-ui.css: --faw-font-display mantiene Nunito');
+  ok(/-webkit-font-smoothing:\s*auto/.test(fawUi) && /:root\[data-theme="dark"\]\s*body[\s\S]*?-webkit-font-smoothing:\s*antialiased/.test(fawUi),
+    'faw-ui.css: subpixel rendering nativo su tema chiaro e antialiased su tema scuro');
+
+  const hub = leggi('index.html');
+  ok(/id="username"[^>]*onkeydown="[^"]*Enter/.test(hub) && /id="password"[^>]*onkeydown="[^"]*Enter/.test(hub),
+    'index.html: invio con tasto Enter su #username e #password');
+
+  const g15 = leggi('games/gameof15/index.html');
+  ok(!/--([a-zA-Z0-9_-]+)\s*:\s*var\(\s*--\1\s*\)/.test(g15),
+    'games/gameof15/index.html: nessuna variabile CSS autoreferenziale');
+  ok(/async function winGame\(\s*fromRemote\s*=\s*false\s*\)/.test(g15),
+    'games/gameof15/index.html: winGame(fromRemote = false) dichiara il parametro fromRemote');
+
+  const patataCss = leggi('games/patata/css/style.css').replace(/\/\*[\s\S]*?\*\//g, '');
+  const openBraces = (patataCss.match(/\{/g) || []).length;
+  const closeBraces = (patataCss.match(/\}/g) || []).length;
+  ok(openBraces === closeBraces, 'games/patata/css/style.css: parentesi graffe bilanciate (' + openBraces + '/' + closeBraces + ')');
+
+  const nccCore = leggi('games/nomi-cose-citta/js/core.js');
+  ok(/prossimaPartitaGioco:\s*doc\.prossimaPartitaGioco/.test(nccCore) &&
+     /rivincitaDi:\s*doc\.rivincitaDi/.test(nccCore) &&
+     /rivincitaCollezione:\s*doc\.rivincitaCollezione/.test(nccCore),
+    'games/nomi-cose-citta/js/core.js: normState preserva prossimaPartitaGioco, rivincitaDi e rivincitaCollezione');
+
+  [
+    'games/ruzzle/index.html',
+    'games/patata/js/game.js',
+    'games/nomi-cose-citta/js/ui.js',
+    'games/pictionary/index.html',
+    'games/gameof15/index.html'
+  ].forEach((f) => {
+    ok(/segnaAccettazione/.test(leggi(f)), f + ': segna accettazione entrando in lobby di rivincita');
+  });
+
+  /* [11] Look moderno: niente ombre "a blocco", niente glow neon */
+  const fawCss = leggi('games/shared/faw-ui.css');
+  ok(!/box-shadow:[^;]*\d+px \d+px 0 rgba/.test(fawCss) && !/--faw-shadow-\d:\s*\d+px \d+px 0/.test(fawCss),
+    'faw-ui.css: ombre morbide a più livelli (nessuna ombra rigida a blocco)');
+  ok(!/border:\s*2px solid/.test(fawCss), 'faw-ui.css: bordi sottili da 1px');
+  ['games/ruzzle/index.html', 'games/pictionary/index.html', 'games/gameof15/index.html'].forEach((f) => {
+    const src = leggi(f);
+    ok(!/text-shadow:\s*0 0 \d+px (?!rgba\(0,\s*0,\s*0)/.test(src), f + ': nessun alone neon sul testo');
+  });
+  ok(!/disco-flash 0\.5s/.test(leggi('games/ruzzle/index.html')), 'ruzzle: nessun lampeggio "discoteca" a schermo intero');
+}
+
 console.log('\n=================');
 console.log('PASSATI: ' + passed + '  FALLITI: ' + failed);
 process.exit(failed ? 1 : 0);

@@ -33,8 +33,8 @@
   --radius-sm: 10px;
   --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.05);
   --shadow-pop: 0 2px 8px rgba(16, 24, 40, 0.06), 0 12px 32px rgba(16, 24, 40, 0.1);
-  --font: 'Nunito', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  --font-display: 'Nunito', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font: var(--faw-font-body, 'Plus Jakarta Sans', 'Nunito', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif);
+  --font-display: var(--faw-font-display, 'Nunito', 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif);
 }
 
 /* =========================================================
@@ -44,16 +44,16 @@
    ========================================================= */
 :root[data-theme='dark'] {
   color-scheme: dark;
-  --bg-0: #211F1B;
-  --bg-1: #2A2621;
-  --bg-2: #332E27;
-  --card: #2A2621;
-  --card-2: #383129;
-  --card-border: rgba(255, 248, 238, 0.16);
-  --row-bg: #302B25;
-  --text-0: #FFF8EE;
-  --text-1: #D7CEC2;
-  --text-2: #A99E91;
+  --bg-0: #0D1117;
+  --bg-1: #151C28;
+  --bg-2: #1A2230;
+  --card: #151C28;
+  --card-2: #1E2738;
+  --card-border: rgba(148, 163, 184, 0.16);
+  --row-bg: #1A2230;
+  --text-0: #F1F5F9;
+  --text-1: #CBD5E1;
+  --text-2: #94A3B8;
   --fire-0: #FF8A4C;
   --fire-1: #FFA872;
   --fire-soft: rgba(255, 138, 76, 0.16);
@@ -399,6 +399,7 @@ button { font-family: var(--font); }
   display: flex;
   align-items: center;
   justify-content: center;
+  font-family: var(--font-display);
   font-size: 2.1rem;
   font-weight: 800;
   color: #fff;
@@ -478,6 +479,7 @@ button { font-family: var(--font); }
   justify-content: center;
 }
 .timer-sec {
+  font-family: var(--font-display);
   font-size: 3rem;
   font-weight: 800;
   line-height: 1;
@@ -951,8 +953,6 @@ button { font-family: var(--font); }
 
 /* Banner di stato e toast: componenti condivisi (games/shared/faw-ui.css +
    games/shared/faw-banner.js). Qui non serve più nessuno stile dedicato. */
-  to { opacity: 1; transform: translateX(-50%) translateY(0); }
-}
 
 /* ---------- Confetti ---------- */
 .confetti-p {

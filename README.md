@@ -54,7 +54,7 @@ Dalla pagina del gioco, il ritorno alla home è `../../index.html`.
 
 ## Design system (faw-ui.css)
 
-`games/shared/faw-ui.css` è il layer visivo condiviso: token (colori, font Nunito,
+`games/shared/faw-ui.css` è il layer visivo condiviso: token (colori, font `Plus Jakarta Sans` per UI/testo + `Nunito` per display/tessere,
 shadow, radius) e componenti (`.faw-*`, `.fixed-home-btn`).
 
 - L'**hub** (`index.html`) e i giochi **ruzzle, patata, nomi-cose-citta, pictionary, gameof15, neonwar** la

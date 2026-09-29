@@ -113,7 +113,7 @@
   font-size: var(--faw-fs-sm);
   font-weight: 800;
   color: #111827;
-  border: 2px solid rgba(255, 255, 255, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.35);
 }
 .pod-col.p1 .pod-avatar { box-shadow: 0 0 0 2px var(--podio-gold); border-color: transparent; }
 

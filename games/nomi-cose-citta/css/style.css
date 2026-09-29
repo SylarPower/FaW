@@ -35,7 +35,8 @@
   --radius-sm: 10px;
   --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.05);
   --shadow-pop: 0 2px 8px rgba(16, 24, 40, 0.06), 0 12px 32px rgba(16, 24, 40, 0.1);
-  --font: 'Nunito', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font: var(--faw-font-body, 'Plus Jakarta Sans', 'Nunito', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif);
+  --font-display: var(--faw-font-display, 'Nunito', 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif);
 }
 
 /* =========================================================
@@ -45,16 +46,16 @@
    ========================================================= */
 :root[data-theme='dark'] {
   color-scheme: dark;
-  --bg-0: #211F1B;
-  --bg-1: #2A2621;
-  --bg-2: #332E27;
-  --card: #2A2621;
-  --card-2: #383129;
-  --card-border: rgba(255, 248, 238, 0.16);
-  --row-bg: #302B25;
-  --text-0: #FFF8EE;
-  --text-1: #D7CEC2;
-  --text-2: #A99E91;
+  --bg-0: #0D1117;
+  --bg-1: #151C28;
+  --bg-2: #1A2230;
+  --card: #151C28;
+  --card-2: #1E2738;
+  --card-border: rgba(148, 163, 184, 0.16);
+  --row-bg: #1A2230;
+  --text-0: #F1F5F9;
+  --text-1: #CBD5E1;
+  --text-2: #94A3B8;
   --acc-0: #8B87F0;
   --acc-1: #A5A1F5;
   --acc-soft: rgba(139, 135, 240, 0.18);
@@ -226,12 +227,13 @@ button { font-family: var(--font); }
 .lettera-tile {
   width: 96px; height: 96px; flex: 0 0 96px;
   display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-display);
   font-size: 3.2rem; font-weight: 900; color: #fff;
   background: linear-gradient(140deg, var(--acc-0), #7c3aed);
   border-radius: 20px; box-shadow: var(--shadow-pop);
 }
 .timer-block { flex: 1; }
-.timer-num { font-size: 2.2rem; font-weight: 900; line-height: 1; }
+.timer-num { font-family: var(--font-display); font-size: 2.2rem; font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums; }
 .timer-num.danger { color: var(--danger); }
 .timer-label { font-size: 0.6875rem; font-weight: 800; letter-spacing: 0.1em; color: var(--text-2); }
 .timer-bar {
