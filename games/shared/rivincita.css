@@ -15,7 +15,7 @@
 .faw-rv-title {
   margin: 0;
   font-family: var(--faw-font-display);
-  font-size: 1.35rem;
+  font-size: var(--faw-fs-xl);
   font-weight: 800;
   letter-spacing: 0.5px;
   color: var(--faw-text);
@@ -23,7 +23,7 @@
 
 .faw-rv-sub {
   margin: 0 0 14px;
-  font-size: 0.88rem;
+  font-size: var(--faw-fs-sm);
   font-weight: 600;
   color: var(--faw-text-3);
 }
@@ -70,16 +70,16 @@
   cursor: not-allowed;
 }
 .faw-rv-card__ico {
-  font-size: 1.5rem;
+  font-size: var(--faw-fs-xl);
   line-height: 1.1;
 }
 .faw-rv-card__name {
   font-weight: 800;
-  font-size: 0.92rem;
+  font-size: var(--faw-fs-base);
   line-height: 1.15;
 }
 .faw-rv-card__meta {
-  font-size: 0.72rem;
+  font-size: var(--faw-fs-2xs);
   font-weight: 600;
   color: var(--faw-text-3);
 }
@@ -92,7 +92,7 @@
   border: 2px solid var(--rv-acc);
   background: var(--faw-panel-solid);
   color: var(--rv-acc);
-  font-size: 0.6rem;
+  font-size: var(--faw-fs-2xs);
   font-weight: 800;
   letter-spacing: 0.6px;
   white-space: nowrap;
@@ -128,13 +128,13 @@
   margin-bottom: 10px;
 }
 .faw-rv-panel__lab {
-  font-size: 0.7rem;
+  font-size: var(--faw-fs-2xs);
   font-weight: 800;
   letter-spacing: 1px;
   color: var(--faw-text-3);
 }
 .faw-rv-panel__sum {
-  font-size: 0.76rem;
+  font-size: var(--faw-fs-xs);
   font-weight: 800;
   color: var(--faw-acc-text);
   text-align: right;
@@ -156,14 +156,14 @@
   grid-column: 1 / -1;
 }
 .faw-rv-field__label {
-  font-size: 0.72rem;
+  font-size: var(--faw-fs-2xs);
   font-weight: 800;
   letter-spacing: 0.4px;
   color: var(--faw-text-2);
 }
 .faw-rv-field .faw-select {
   padding: 9px 12px;
-  font-size: 0.86rem;
+  font-size: var(--faw-fs-sm);
   font-weight: 700;
 }
 
@@ -180,7 +180,7 @@
   background: var(--faw-panel-solid);
   color: var(--faw-text-2);
   font-family: var(--faw-font-body);
-  font-size: 0.8rem;
+  font-size: var(--faw-fs-sm);
   font-weight: 800;
   letter-spacing: 0.4px;
   cursor: pointer;
@@ -199,7 +199,7 @@
 .faw-rv-note {
   grid-column: 1 / -1;
   margin: 0;
-  font-size: 0.78rem;
+  font-size: var(--faw-fs-xs);
   font-weight: 700;
   color: var(--faw-warn);
 }

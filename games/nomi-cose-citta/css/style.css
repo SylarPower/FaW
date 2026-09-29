@@ -105,7 +105,7 @@ button { font-family: var(--font); }
 }
 .topbar-right { display: flex; align-items: center; gap: 8px; }
 .badge-round, .badge-dict {
-  font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em;
+  font-size: 0.75rem; font-weight: 700; letter-spacing: 0.04em;
   padding: 5px 12px; border-radius: 999px; white-space: nowrap;
 }
 .badge-round { color: var(--gold); background: var(--gold-soft); border: 1px solid #fde68a; }
@@ -131,7 +131,7 @@ button { font-family: var(--font); }
   padding: 20px 22px;
 }
 .card-label {
-  font-size: 0.7rem; font-weight: 800; letter-spacing: 0.1em;
+  font-size: 0.75rem; font-weight: 800; letter-spacing: 0.1em;
   color: var(--text-2); text-transform: uppercase; margin-bottom: 10px;
 }
 
@@ -153,7 +153,7 @@ button { font-family: var(--font); }
 .lobby-head h2 { font-size: 1.5rem; margin: 6px 0; }
 .lobby-sub { color: var(--text-1); max-width: 640px; margin: 0 auto; font-size: 0.95rem; }
 .lobby-label {
-  font-size: 0.7rem; font-weight: 800; letter-spacing: 0.1em;
+  font-size: 0.75rem; font-weight: 800; letter-spacing: 0.1em;
   color: var(--text-2); text-transform: uppercase; margin: 18px 0 8px;
 }
 .lobby-hint { color: var(--text-2); font-size: 0.82rem; text-align: center; margin: 16px 0 0; }
@@ -172,7 +172,7 @@ button { font-family: var(--font); }
   background: var(--card-2); border: 1px solid var(--card-border);
   border-radius: var(--radius-sm); padding: 10px 12px;
 }
-.config-label { font-size: 0.64rem; font-weight: 800; letter-spacing: 0.08em; color: var(--text-2); }
+.config-label { font-size: 0.6875rem; font-weight: 800; letter-spacing: 0.08em; color: var(--text-2); }
 .config-value { font-size: 1.05rem; font-weight: 800; }
 
 .cats { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -210,10 +210,10 @@ button { font-family: var(--font); }
 .avatar {
   width: 26px; height: 26px; border-radius: 50%;
   display: inline-flex; align-items: center; justify-content: center;
-  font-size: 0.66rem; font-weight: 800; color: #1f2937;
+  font-size: 0.6875rem; font-weight: 800; color: #1f2937;
 }
 .ready-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); display: inline-block; }
-.pchip .mini { font-size: 0.72rem; color: var(--text-2); font-weight: 600; }
+.pchip .mini { font-size: 0.75rem; color: var(--text-2); font-weight: 600; }
 
 /* ---------- Griglia di gioco ---------- */
 .gioco-grid {
@@ -233,7 +233,7 @@ button { font-family: var(--font); }
 .timer-block { flex: 1; }
 .timer-num { font-size: 2.2rem; font-weight: 900; line-height: 1; }
 .timer-num.danger { color: var(--danger); }
-.timer-label { font-size: 0.68rem; font-weight: 800; letter-spacing: 0.1em; color: var(--text-2); }
+.timer-label { font-size: 0.6875rem; font-weight: 800; letter-spacing: 0.1em; color: var(--text-2); }
 .timer-bar {
   height: 8px; border-radius: 99px; background: var(--card-2);
   border: 1px solid var(--card-border); overflow: hidden; margin-top: 10px;
@@ -246,7 +246,7 @@ button { font-family: var(--font); }
 .timer-bar > i.danger { background: linear-gradient(90deg, #f59e0b, var(--danger)); }
 .fase-chip {
   display: inline-block; margin-top: 14px;
-  font-size: 0.72rem; font-weight: 800; letter-spacing: 0.08em;
+  font-size: 0.75rem; font-weight: 800; letter-spacing: 0.08em;
   padding: 6px 12px; border-radius: 999px;
   background: var(--acc-soft); color: var(--acc-1); border: 1px solid var(--acc-border);
 }
@@ -263,10 +263,10 @@ button { font-family: var(--font); }
 }
 .campo.filled { border-color: var(--acc-border); background: var(--acc-soft); }
 .campo-label {
-  font-size: 0.72rem; font-weight: 800; letter-spacing: 0.06em;
+  font-size: 0.75rem; font-weight: 800; letter-spacing: 0.06em;
   color: var(--text-1); display: flex; justify-content: space-between; gap: 8px;
 }
-.campo-stato { font-size: 0.7rem; font-weight: 700; color: var(--text-2); }
+.campo-stato { font-size: 0.75rem; font-weight: 700; color: var(--text-2); }
 .campo-stato.ok { color: var(--ok); }
 .campo-stato.ko { color: var(--danger); }
 .campo input {
@@ -322,7 +322,7 @@ button { font-family: var(--font); }
 }
 .btn-fire:hover { filter: brightness(1.05); background: linear-gradient(140deg, var(--acc-0), #7c3aed); }
 .btn-ghost { background: transparent; box-shadow: none; text-decoration: none; display: inline-flex; align-items: center; }
-.btn-sm { padding: 6px 10px; font-size: 0.78rem; border-radius: 8px; }
+.btn-sm { padding: 6px 10px; font-size: 0.8125rem; border-radius: 8px; }
 
 /* ---------- Scoreboard / storico ---------- */
 .scoreboard { display: flex; flex-direction: column; gap: 6px; }
@@ -335,7 +335,7 @@ button { font-family: var(--font); }
 .rank { font-size: 0.9rem; width: 22px; text-align: center; }
 .sname { flex: 1; font-weight: 700; font-size: 0.88rem; }
 .spts { font-weight: 900; font-size: 1rem; }
-.sdelta { font-size: 0.72rem; color: var(--text-2); font-weight: 700; }
+.sdelta { font-size: 0.75rem; color: var(--text-2); font-weight: 700; }
 
 .storico { display: flex; flex-direction: column; gap: 6px; }
 .st-row {
@@ -414,7 +414,7 @@ button { font-family: var(--font); }
   padding: 8px 10px; text-align: left; vertical-align: top;
 }
 .rev-table thead th {
-  font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase;
+  font-size: 0.75rem; letter-spacing: 0.06em; text-transform: uppercase;
   color: var(--text-2); position: sticky; top: 0; background: var(--card); z-index: 2;
 }
 .rev-table tbody th {
@@ -427,7 +427,7 @@ button { font-family: var(--font); }
 .cell-word.annullata { text-decoration: line-through; color: var(--text-2); }
 .cell-meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 4px; }
 .tag {
-  font-size: 0.66rem; font-weight: 800; letter-spacing: 0.04em;
+  font-size: 0.6875rem; font-weight: 800; letter-spacing: 0.04em;
   padding: 2px 7px; border-radius: 999px; border: 1px solid transparent;
 }
 .tag.ok { background: var(--ok-soft); color: var(--ok); border-color: #bbf7d0; }
@@ -438,7 +438,7 @@ button { font-family: var(--font); }
 .tag.pts.zero { background: var(--card-2); color: var(--text-2); }
 .vote-btn {
   border: 1px solid var(--card-border); background: var(--card);
-  border-radius: 999px; padding: 2px 9px; font-size: 0.72rem; font-weight: 800;
+  border-radius: 999px; padding: 2px 9px; font-size: 0.75rem; font-weight: 800;
   cursor: pointer; color: var(--text-1);
 }
 .vote-btn:hover { border-color: var(--danger); color: var(--danger); }
@@ -478,24 +478,24 @@ button { font-family: var(--font); }
 }
 .rev-voti.hidden { display: none; }
 .rv-title { font-weight: 900; font-size: 0.86rem; color: #92400e; }
-.rv-sub { font-weight: 600; font-size: 0.74rem; color: var(--text-1); }
+.rv-sub { font-weight: 600; font-size: 0.75rem; color: var(--text-1); }
 .rv-empty { font-size: 0.82rem; color: var(--text-2); }
 .rv-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 .rv-item {
   display: inline-flex; align-items: center; gap: 7px; flex-wrap: wrap;
   padding: 6px 10px; border-radius: 999px;
   border: 1px solid var(--card-border); background: var(--card);
-  font-size: 0.78rem;
+  font-size: 0.8125rem;
 }
 .rv-item.invalida { border-color: #fecaca; }
 .rv-item.valida { border-color: #bbf7d0; }
 .rv-item.risolto { background: var(--card-2); }
 .rv-item b { font-size: 0.86rem; letter-spacing: 0.03em; }
-.rv-who { color: var(--text-2); font-size: 0.72rem; font-weight: 700; }
+.rv-who { color: var(--text-2); font-size: 0.75rem; font-weight: 700; }
 .rv-voti { font-weight: 900; }
-.rv-mancano { color: var(--text-1); font-size: 0.72rem; font-weight: 700; }
+.rv-mancano { color: var(--text-1); font-size: 0.75rem; font-weight: 700; }
 .rv-esito {
-  font-weight: 900; font-size: 0.7rem; letter-spacing: 0.06em;
+  font-weight: 900; font-size: 0.75rem; letter-spacing: 0.06em;
   padding: 1px 7px; border-radius: 999px;
   background: var(--card-2); border: 1px solid var(--card-border);
 }
@@ -517,7 +517,7 @@ button { font-family: var(--font); }
   background: var(--acc-soft);
 }
 .rc-head { font-weight: 900; font-size: 0.9rem; color: var(--acc-1); margin-bottom: 8px; }
-.rc-sub { font-weight: 600; font-size: 0.74rem; color: var(--text-1); margin-left: 8px; }
+.rc-sub { font-weight: 600; font-size: 0.75rem; color: var(--text-1); margin-left: 8px; }
 .rc-row {
   display: flex; align-items: center; gap: 8px;
   padding: 5px 8px; border-radius: var(--radius-sm);
@@ -527,7 +527,7 @@ button { font-family: var(--font); }
 .rc-row.mine { border-color: var(--acc-border); background: var(--card); box-shadow: inset 3px 0 0 var(--acc-0); }
 .rc-pos { width: 24px; text-align: center; font-weight: 900; font-size: 0.9rem; }
 .rc-name { font-weight: 800; font-size: 0.86rem; }
-.rc-delta { font-size: 0.72rem; font-weight: 800; color: var(--ok); }
+.rc-delta { font-size: 0.75rem; font-weight: 800; color: var(--ok); }
 .rc-bar { flex: 1; height: 8px; border-radius: 99px; background: var(--card-2); overflow: hidden; min-width: 40px; }
 .rc-bar > i { display: block; height: 100%; background: linear-gradient(90deg, var(--acc-0), #7c3aed); }
 .rc-pts { font-weight: 900; font-size: 0.95rem; min-width: 34px; text-align: right; }
@@ -561,7 +561,7 @@ button { font-family: var(--font); }
   margin: 16px 0; text-align: center;
 }
 .fs-val { font-size: 1.2rem; font-weight: 900; }
-.fs-lab { font-size: 0.66rem; letter-spacing: 0.08em; color: var(--text-2); font-weight: 800; }
+.fs-lab { font-size: 0.6875rem; letter-spacing: 0.08em; color: var(--text-2); font-weight: 800; }
 .fine-actions { display: flex; gap: 10px; justify-content: center; margin-top: 10px; }
 .fine-actions.hidden { display: none; }
 /* Rivincita in alto nella schermata finale: visibile senza scorrere */

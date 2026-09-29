@@ -114,7 +114,7 @@ button { font-family: var(--font); }
 }
 .topbar-right { display: flex; align-items: center; gap: 8px; }
 .badge-round {
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.06em;
   color: var(--gold);
@@ -164,7 +164,7 @@ button { font-family: var(--font); }
   box-shadow: var(--shadow-card);
 }
 .card-label {
-  font-size: 0.68rem;
+  font-size: 0.6875rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   color: var(--text-2);
@@ -254,12 +254,12 @@ button { font-family: var(--font); }
   flex-direction: column;
   gap: 4px;
 }
-.config-label { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.08em; color: var(--text-2); }
+.config-label { font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.08em; color: var(--text-2); }
 .config-value { font-size: 1.1rem; font-weight: 800; color: var(--text-0); font-variant-numeric: tabular-nums; }
 .config-value.negative { color: var(--danger); }
 
 .lobby-label {
-  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.08em;
+  font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.08em;
   color: var(--text-2);
   margin: 4px 0 10px;
 }
@@ -291,13 +291,13 @@ button { font-family: var(--font); }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   font-weight: 800;
   color: #1f2937;
   flex-shrink: 0;
 }
 .pchip .ppts {
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   font-weight: 800;
   color: var(--gold);
   font-variant-numeric: tabular-nums;
@@ -314,7 +314,7 @@ button { font-family: var(--font); }
 }
 .pchip.mine { font-weight: 700; }
 .pchip .potato { font-size: 1.05rem; }
-.pchip .scottato { font-size: 0.72rem; color: var(--danger); font-weight: 700; }
+.pchip .scottato { font-size: 0.75rem; color: var(--danger); font-weight: 700; }
 
 .lobby-status {
   display: flex;
@@ -337,7 +337,7 @@ button { font-family: var(--font); }
 
 .lobby-hint {
   margin: 18px 0 0;
-  font-size: 0.76rem;
+  font-size: 0.8125rem;
   color: var(--text-2);
 }
 .lobby-hint b { color: var(--text-1); }
@@ -433,7 +433,7 @@ button { font-family: var(--font); }
   border: 1px solid #fde68a;
 }
 .letters-avail {
-  font-size: 0.78rem;
+  font-size: 0.8125rem;
   color: var(--text-2);
   font-variant-numeric: tabular-nums;
 }
@@ -487,7 +487,7 @@ button { font-family: var(--font); }
 }
 .timer-sec.danger { color: var(--danger); }
 .timer-label {
-  font-size: 0.62rem;
+  font-size: 0.6875rem;
   font-weight: 700;
   letter-spacing: 0.14em;
   color: var(--text-2);
@@ -543,7 +543,7 @@ button { font-family: var(--font); }
   border-radius: 10px;
   border: 1px dashed var(--card-border);
   background: var(--card-2);
-  font-size: 0.78rem;
+  font-size: 0.8125rem;
   line-height: 1.35;
   color: var(--text-1);
 }
@@ -561,7 +561,7 @@ button { font-family: var(--font); }
   align-items: center;
   gap: 6px;
   margin-top: 10px;
-  font-size: 0.78rem;
+  font-size: 0.8125rem;
   color: var(--text-2);
   min-height: 26px;
 }
@@ -604,7 +604,7 @@ button { font-family: var(--font); }
   color: var(--ok);
 }
 .hint-mode-tag {
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   color: var(--text-2);
   font-weight: 600;
   margin-left: 4px;
@@ -656,7 +656,7 @@ button { font-family: var(--font); }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   font-weight: 800;
   color: #1f2937;
   flex-shrink: 0;
@@ -706,13 +706,13 @@ button { font-family: var(--font); }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.6rem;
+  font-size: 0.6875rem;
   font-weight: 800;
   color: #1f2937;
   flex-shrink: 0;
 }
 .feed-item .fname {
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   font-weight: 600;
   color: var(--text-2);
   width: 64px;
@@ -731,7 +731,7 @@ button { font-family: var(--font); }
   color: var(--fire-0);
 }
 .feed-item .fpts {
-  font-size: 0.74rem;
+  font-size: 0.75rem;
   font-weight: 800;
   color: var(--ok);
   background: var(--ok-soft);
@@ -830,12 +830,12 @@ button { font-family: var(--font); }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   font-weight: 800;
   color: #1f2937;
 }
 .rp-head .rp-name { font-weight: 700; font-size: 0.92rem; flex: 1; }
-.rp-head .rp-patata { font-size: 0.78rem; color: var(--danger); font-weight: 700; }
+.rp-head .rp-patata { font-size: 0.8125rem; color: var(--danger); font-weight: 700; }
 .rp-head .rp-total { font-weight: 800; color: var(--gold); font-variant-numeric: tabular-nums; }
 .rp-words { display: flex; flex-wrap: wrap; gap: 6px; }
 .rp-word {
@@ -851,7 +851,7 @@ button { font-family: var(--font); }
   letter-spacing: 0.04em;
 }
 .rp-word mark { background: none; color: var(--fire-0); }
-.rp-word .rw-pts { font-size: 0.7rem; color: var(--ok); font-weight: 800; }
+.rp-word .rw-pts { font-size: 0.75rem; color: var(--ok); font-weight: 800; }
 .rp-word .flag-btn {
   border: none;
   background: none;
@@ -864,7 +864,7 @@ button { font-family: var(--font); }
 }
 .rp-word .flag-btn:hover { opacity: 1; transform: scale(1.15); }
 .rp-word .flag-btn:disabled { cursor: default; opacity: 0.3; }
-.rp-word .flag-count { font-size: 0.66rem; color: var(--danger); font-weight: 800; }
+.rp-word .flag-count { font-size: 0.6875rem; color: var(--danger); font-weight: 800; }
 .rp-word.removed {
   text-decoration: line-through;
   opacity: 0.5;
@@ -945,7 +945,7 @@ button { font-family: var(--font); }
   padding: 10px 6px;
 }
 .fs-item .fs-val { font-weight: 800; font-size: 0.92rem; color: var(--text-0); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.fs-item .fs-lab { font-size: 0.6rem; letter-spacing: 0.08em; color: var(--text-2); font-weight: 700; margin-top: 3px; }
+.fs-item .fs-lab { font-size: 0.6875rem; letter-spacing: 0.08em; color: var(--text-2); font-weight: 700; margin-top: 3px; }
 
 .fine-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
 
@@ -965,7 +965,7 @@ button { font-family: var(--font); }
 /* ---------- Pausa (topbar) ---------- */
 .btn-pausa {
   padding: 8px 14px;
-  font-size: 0.78rem;
+  font-size: 0.8125rem;
   border-radius: 999px;
   white-space: nowrap;
 }
@@ -983,7 +983,7 @@ button { font-family: var(--font); }
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   font-weight: 800;
   letter-spacing: 0.1em;
   color: var(--gold);
@@ -1016,7 +1016,7 @@ button { font-family: var(--font); }
   transition: width 0.3s linear;
 }
 .bonus-caption {
-  font-size: 0.68rem;
+  font-size: 0.6875rem;
   font-weight: 700;
   letter-spacing: 0.05em;
   color: var(--text-2);
@@ -1051,7 +1051,7 @@ button { font-family: var(--font); }
   font-size: 0.82rem;
 }
 .power-badge {
-  font-size: 0.78rem;
+  font-size: 0.8125rem;
   line-height: 1;
   padding: 2px 6px;
   border-radius: 999px;
@@ -1075,7 +1075,7 @@ button { font-family: var(--font); }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.62rem;
+  font-size: 0.6875rem;
   font-weight: 800;
   color: #1f2937;
 }
@@ -1122,14 +1122,14 @@ button { font-family: var(--font); }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.62rem;
+  font-size: 0.6875rem;
   font-weight: 800;
   color: #1f2937;
   flex-shrink: 0;
 }
 .pausa-voter .pv-name { flex: 1; font-size: 0.85rem; font-weight: 700; }
 .pausa-voter .pv-prop {
-  font-size: 0.62rem;
+  font-size: 0.6875rem;
   font-weight: 800;
   letter-spacing: 0.06em;
   color: var(--info);

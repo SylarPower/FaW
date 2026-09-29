@@ -4,6 +4,8 @@
 		<meta charset="UTF-8">
 		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 		<title>Ruzzle dei 🐷</title>
+		<meta name="description" content="Ruzzle dei 🐷: trova più parole dei tuoi colleghi sulla stessa griglia. Bonus, bombe e classifica finale.">
+		  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🔤%3C/text%3E%3C/svg%3E">
 		<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-app-compat.js"></script>
 		<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore-compat.js"></script>
 		<!-- Config Firebase condivisa (prima dello script che inizializza Firebase) -->
@@ -17,7 +19,7 @@
 		<script src="../shared/podio.js"></script>
 		<link rel="preconnect" href="https://fonts.googleapis.com">
 		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-		<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+		<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <script src="../shared/faw-theme.js" data-tema-fisso="dark"></script>
 		<link rel="stylesheet" href="../shared/faw-ui.css">
 		<!-- Podio di fine partita (condiviso tra i giochi) -->
@@ -47,7 +49,7 @@
 			--overlay-bg: rgba(16, 22, 42, 0.92);
 			--grid-cols: 5;
 			--font-display: 'Nunito', system-ui, sans-serif;
-			--font-mono: 'Nunito', ui-monospace, monospace;
+			--font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
 			}
 			body.dark-mode {
 			--primary: #22d3ee;
@@ -540,7 +542,7 @@
 			    box-shadow: 0 4px 0 var(--tile-shadow);
 			}
 			.tile.large-font .bonus-badge {
-			    font-size: 0.7rem;
+			    font-size: 0.8125rem;
 			    padding: 2px 5px;
 			}
 			.tile.five-font {
@@ -550,15 +552,15 @@
 			font-size: 1.55rem;
 			}
 			.tile.six-font .bonus-badge {
-			font-size: 0.58rem;
+			font-size: 0.75rem;
 			padding: 1px 3px;
 			}
 			.tile.compact-font {
 			font-size: 1.35rem;
 			}
 			.tile.compact-font .bonus-badge {
-			font-size: 0.55rem;
-			padding: 1px 3px;
+			font-size: 0.6875rem;
+			padding: 1px 2px;
 			}
 			.tile.blurred {
 			    color: transparent;
@@ -584,17 +586,20 @@
 			position: absolute;
 			top: 2px;
 			right: 2px;
-			font-size: 0.6rem;
+			/* Minimo leggibile: 11px. Il badge sta nell'angolo della cella, sempre. */
+			font-size: var(--faw-fs-2xs);
 			font-weight: 900;
 			padding: 2px 4px;
 			border-radius: 3px;
 			color: white;
 			line-height: 1;
 			pointer-events: none;
+			max-width: calc(100% - 2px);
+			overflow: hidden;
 			}
 			.tile.small-font .bonus-badge {
-			font-size: 0.5rem;
-			padding: 1px 2px;
+			font-size: var(--faw-fs-2xs);
+			padding: 0 2px;
 			top: 1px;
 			right: 1px;
 			}
@@ -1326,14 +1331,14 @@
 .ruzzle-bottone-largo { width: auto; padding: 12px 25px; margin-top: 0; }
 .ruzzle-bottone-medio { width: auto; padding: 10px 20px; }
 .ruzzle-bottone-tondo { width: auto; align-self: center; padding: 11px 30px; }
-.ruzzle-bottone-tutto { width: 100%; margin: 0; font-size: 0.8rem; text-transform: uppercase; }
+.ruzzle-bottone-tutto { width: 100%; margin: 0; font-size: var(--faw-fs-sm); text-transform: uppercase; letter-spacing: 0.06em; }
 .ruzzle-bottone-vicino { margin: 0 5px; }
 .ruzzle-bottone-chiaro {
   width: auto; padding: 12px 25px;
   background: white; color: #0e7490; border: none;
 }
 .ruzzle-etichetta { font-weight: bold; display: block; margin-bottom: 5px; }
-.ruzzle-etichetta-piccola { font-size: 0.7rem; font-weight: bold; display: block; margin-bottom: 5px; }
+.ruzzle-etichetta-piccola { font-size: 0.8125rem; font-weight: bold; display: block; margin-bottom: 5px; }
 </style>
 	</head>
 	<body class="dark-mode">
@@ -1374,7 +1379,7 @@
 						</div>
 						<div class="config-row">
 							<div class="switch-container">Modalità Click <label class="switch">
-								<input type="checkbox" id="input-mode-toggle">
+								<input type="checkbox" id="input-mode-toggle" aria-label="Modalità Click (tocca le lettere invece di trascinare)">
 								<span class="slider"></span>
 								</label>
 							</div>
@@ -4933,7 +4938,7 @@ function renderizzaAnalisiPlayerSilent(nomePlayer, data, conteggioParoleGlobali)
             const propData = pendingEliminazioni.get(item.w);
             const totale = data.partecipanti.length;
             const accettati = propData.accettati ? propData.accettati.length : 0;
-            pendingBadge = `<span style="font-size:0.7rem; background:#f39c12; color:#241500; padding:2px 6px; border-radius:3px; margin-left:5px;">⏳ ${accettati}/${totale}</span>`;
+            pendingBadge = `<span style="font-size: 0.8125rem; background:#f39c12; color:#241500; padding:2px 6px; border-radius:3px; margin-left:5px;">⏳ ${accettati}/${totale}</span>`;
         }
 
         li.innerHTML = `

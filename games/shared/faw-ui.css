@@ -10,7 +10,7 @@
   --faw-font-sans: 'Nunito', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --faw-font-display: 'Nunito', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --faw-font-body: 'Nunito', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  --faw-font-mono: 'Nunito', ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, Consolas, monospace;
+  --faw-font-mono: ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, Consolas, monospace;
 
   /* --- Accento (override per pagina) --- */
   --faw-acc: #C2253A;
@@ -41,6 +41,20 @@
   --faw-danger-soft: #F3F5F8;
   --faw-info: #2B5DAA;
   --faw-info-soft: #F3F5F8;
+
+  /* --- Scala tipografica (l'unica da usare nelle pagine della piattaforma) ---
+     Regola di leggibilità: niente sotto gli 11px (0.6875rem), e quei 11px solo
+     per micro-etichette in MAIUSCOLO con letter-spacing. Il testo di lettura
+     sta fra 13px e 15px, i numeri grandi su font-variant-numeric. */
+  --faw-fs-2xs: 0.6875rem;  /* 11px — micro-etichette, badge */
+  --faw-fs-xs: 0.75rem;     /* 12px — note e sottotitoli */
+  --faw-fs-sm: 0.8125rem;   /* 13px — testo secondario */
+  --faw-fs-base: 0.9375rem; /* 15px — testo corrente */
+  --faw-fs-lg: 1.0625rem;   /* 17px — titoli di blocco */
+  --faw-fs-xl: 1.375rem;    /* 22px — titoli di pagina */
+  --faw-fs-2xl: 1.75rem;    /* 28px — numeri e titoli grandi */
+  --faw-lh-tight: 1.2;
+  --faw-lh-base: 1.55;
 
   /* --- Forma --- */
   --faw-r-sm: 6px;
@@ -118,10 +132,20 @@ h1, h2, h3, h4 {
 }
 a { color: var(--faw-acc-text); text-decoration: none; }
 a:hover { text-decoration: underline; }
-::selection { background: var(--faw-acc-soft); }
-:focus-visible { outline: 2px solid var(--faw-acc); outline-offset: 2px; border-radius: 6px; }
+/* ==========================================================================
+   DETTAGLI DI PRODOTTO (hub e giochi, che caricano questo foglio)
+   Sono i particolari che fanno sembrare una piattaforma "curata": si nota
+   subito se mancano, non si nota se ci sono.
+   ========================================================================== */
 
-/* Scrollbar sobria */
+/* Selezione del testo nel colore della piattaforma. */
+::selection { background: var(--faw-acc); color: #fff; }
+
+/* Focus da tastiera: anello visibile e coerente. Il mouse non lo vede mai
+   (`:focus-visible` non scatta al click), chi naviga con Tab sì. */
+:focus-visible { outline: 3px solid var(--faw-acc); outline-offset: 2px; border-radius: 6px; }
+
+/* Barre di scorrimento sottili e discrete (Firefox + WebKit). */
 * { scrollbar-width: thin; scrollbar-color: var(--faw-border-2) transparent; }
 *::-webkit-scrollbar { width: 10px; height: 10px; }
 *::-webkit-scrollbar-thumb {
@@ -130,7 +154,15 @@ a:hover { text-decoration: underline; }
   border: 3px solid transparent;
   background-clip: content-box;
 }
+*::-webkit-scrollbar-thumb:hover { background: var(--faw-text-3); background-clip: content-box; }
 *::-webkit-scrollbar-track { background: transparent; }
+
+/* I controlli non cambiano font rispetto al resto della pagina. */
+button, input, select, textarea { font-family: inherit; }
+
+/* Titoli e paragrafi con interruzioni di riga sensate (dove supportato). */
+h1, h2, h3 { text-wrap: balance; }
+p, li { text-wrap: pretty; }
 
 /* ==========================================================================
    SFONDO PAGINA (tinta unita pulita; nessun glow animato)
@@ -164,7 +196,7 @@ a:hover { text-decoration: underline; }
   color: var(--btn-fg);
   font-family: var(--faw-font-body);
   font-weight: 600;
-  font-size: 0.9rem;
+  font-size: var(--faw-fs-sm);
   letter-spacing: 0;
   padding: 10px 18px;
   border-radius: var(--faw-r-md);
@@ -223,8 +255,8 @@ a:hover { text-decoration: underline; }
 .faw-btn--ghost { background: transparent; box-shadow: none; }
 .faw-btn--ghost:hover { background: var(--faw-panel-2); }
 
-.faw-btn--lg { padding: 13px 24px; font-size: 0.95rem; border-radius: var(--faw-r-md); }
-.faw-btn--sm { padding: 6px 12px; font-size: 0.8rem; border-radius: var(--faw-r-sm); }
+.faw-btn--lg { padding: 13px 24px; font-size: var(--faw-fs-base); border-radius: var(--faw-r-md); }
+.faw-btn--sm { padding: 6px 12px; font-size: var(--faw-fs-sm); border-radius: var(--faw-r-sm); }
 .faw-btn--icon {
   padding: 9px 11px;
   font-size: 1rem;
@@ -250,7 +282,7 @@ a:hover { text-decoration: underline; }
   color: var(--faw-text);
   font-family: var(--faw-font-body);
   font-weight: 800;
-  font-size: 0.84rem;
+  font-size: var(--faw-fs-sm);
   letter-spacing: 0.02em;
   text-decoration: none;
   cursor: pointer;
@@ -288,7 +320,7 @@ body.faw-has-banner::before {
     top: 10px;
     left: 10px;
     padding: 8px 12px;
-    font-size: 0.78rem;
+    font-size: var(--faw-fs-xs);
   }
 }
 
@@ -313,11 +345,11 @@ body.faw-has-banner::before {
 }
 .faw-card__head h2,
 .faw-card__head h3 {
-  font-size: 1.02rem;
+  font-size: var(--faw-fs-base);
   font-weight: 700;
   letter-spacing: -0.01em;
 }
-.faw-card__hint { font-size: 0.82rem; color: var(--faw-text-3); font-weight: 500; }
+.faw-card__hint { font-size: var(--faw-fs-sm); color: var(--faw-text-3); font-weight: 500; }
 
 /* ==========================================================================
    PILL / BADGE / DOT
@@ -330,7 +362,7 @@ body.faw-has-banner::before {
   border-radius: 999px;
   border: 2px solid var(--faw-border);
   background: var(--faw-panel-2);
-  font-size: 0.76rem;
+  font-size: var(--faw-fs-xs);
   font-weight: 600;
   letter-spacing: 0;
   color: var(--faw-text-2);
@@ -356,7 +388,7 @@ body.faw-has-banner::before {
   gap: 5px;
   padding: 3px 9px;
   border-radius: 7px;
-  font-size: 0.66rem;
+  font-size: var(--faw-fs-2xs);
   font-weight: 700;
   letter-spacing: 0.6px;
   text-transform: uppercase;
@@ -432,7 +464,7 @@ select option {
   background: hsl(var(--h) 55% 28%);
   color: #ffffff;
   font-family: var(--faw-font-display);
-  font-size: 0.8rem;
+  font-size: var(--faw-fs-sm);
   font-weight: 700;
   letter-spacing: 0.3px;
   text-transform: uppercase;
@@ -443,7 +475,7 @@ select option {
   color: hsl(var(--h) 70% 82%);
   border-color: hsl(var(--h) 40% 34%);
 }
-.faw-avatar--sm { width: 26px; height: 26px; font-size: 0.64rem; }
+.faw-avatar--sm { width: 26px; height: 26px; font-size: var(--faw-fs-2xs); }
 
 /* ==========================================================================
    MODAL
@@ -483,7 +515,7 @@ select option {
   border: 2px solid var(--faw-border);
   background: var(--faw-panel-2);
   color: var(--faw-text-2);
-  font-size: 0.95rem;
+  font-size: var(--faw-fs-base);
   cursor: pointer;
   transition: all var(--faw-fast) var(--faw-ease);
 }
@@ -508,7 +540,7 @@ select option {
   padding: 12px 18px;
   padding-top: calc(12px + env(safe-area-inset-top, 0px));
   font-family: var(--faw-font-body);
-  font-size: 0.86rem;
+  font-size: var(--faw-fs-sm);
   animation: faw-slide-down 0.3s var(--faw-ease);
 }
 .faw-banner--pannello {
@@ -532,12 +564,12 @@ select option {
 .faw-banner__text { flex: 1 1 200px; min-width: 0; }
 .faw-banner__title {
   font-weight: 800;
-  font-size: 0.92rem;
+  font-size: var(--faw-fs-base);
   letter-spacing: 0.02em;
   overflow-wrap: anywhere;
 }
 .faw-banner__sub {
-  font-size: 0.78rem;
+  font-size: var(--faw-fs-xs);
   font-weight: 600;
   opacity: 0.85;
   margin-top: 2px;
@@ -550,7 +582,7 @@ select option {
   gap: 8px;
   flex-wrap: wrap;
 }
-.faw-banner__btn { font-size: 0.78rem; border-radius: var(--faw-r-md); }
+.faw-banner__btn { font-size: var(--faw-fs-xs); border-radius: var(--faw-r-md); }
 /* Pulsante "pillola chiara" per i banner colorati (Ruzzle): contrasto garantito
    su qualunque tinta, senza stili inline nel gioco. */
 .faw-banner__btn--chiaro {
@@ -580,7 +612,7 @@ select option {
 .faw-banner__timer {
   font-family: var(--faw-font-display);
   font-weight: 800;
-  font-size: 0.95rem;
+  font-size: var(--faw-fs-base);
   padding: 6px 12px;
   border-radius: var(--faw-r-md);
   background: rgba(255, 255, 255, 0.22);
@@ -647,7 +679,7 @@ select option {
   color: #fff;
   font-family: var(--faw-font-body);
   font-weight: 500;
-  font-size: 0.88rem;
+  font-size: var(--faw-fs-sm);
   box-shadow: var(--faw-shadow-3);
   animation: faw-toast-in 220ms var(--faw-ease);
   max-width: 92vw;

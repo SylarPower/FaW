@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>PICTIONARY 🎨</title>
+    <meta name="description" content="Pictionary FaW: disegna la parola, gli altri indovinano. Punti per chi indovina e per chi disegna.">
+      <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🎨%3C/text%3E%3C/svg%3E">
     <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore-compat.js"></script>
     <!-- Config Firebase condivisa (prima dello script che inizializza Firebase) -->
@@ -13,7 +15,7 @@
     <script src="../shared/faw-layout.js" defer></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <script src="../shared/faw-theme.js" data-tema-fisso="dark"></script>
     <link rel="stylesheet" href="../shared/faw-ui.css">
     <!-- Podio di fine partita (condiviso tra i giochi) -->
@@ -80,8 +82,8 @@
 
         .header-left { display: flex; align-items: center; gap: 15px; }
         .room-tag {
-            font-family: 'Nunito', ui-monospace, monospace;
-            font-size: 0.68rem; color: var(--primary); font-weight: 700;
+            font-family: inherit; font-variant-numeric: tabular-nums;
+            font-size: 0.75rem; color: var(--primary); font-weight: 700;
             letter-spacing: 3px; text-transform: uppercase;
             background: rgba(255, 77, 125, 0.14);
             border: 1px solid rgba(255, 77, 125, 0.3);
@@ -132,7 +134,7 @@
 }
 
 #guessit-word-badge > div:first-child {
-    font-size: 0.7rem;
+    font-size: 0.8125rem;
     opacity: 0.85;
     margin-bottom: 4px;
     letter-spacing: 1px;
@@ -177,7 +179,7 @@
             right: 0;
             background: var(--success);
             color: #06282a;
-            font-size: 0.5rem;
+            font-size: 0.8125rem;
             font-weight: bold;
             text-align: center;
             padding: 2px;
@@ -275,7 +277,7 @@
         
         input, select, textarea {
             width: 100%; padding: 14px; border-radius: 12px; border: 1px solid var(--border);
-            background: rgba(11, 14, 28, 0.7); font-family: 'Nunito', ui-monospace, monospace; font-size: 1rem;
+            background: rgba(11, 14, 28, 0.7); font-family: inherit; font-variant-numeric: tabular-nums; font-size: 1rem;
             outline: none; color: var(--text);
             transition: border-color 0.15s ease, box-shadow 0.15s ease;
         }
@@ -326,7 +328,7 @@
             content: '👑'; display: block; font-size: 1.2rem; margin-top: 5px;
         }
         .player-card .name { font-weight: 700; font-size: 0.9rem; }
-        .player-card .status { font-size: 0.7rem; opacity: 0.7; margin-top: 5px; }
+        .player-card .status { font-size: 0.8125rem; opacity: 0.7; margin-top: 5px; }
 
         /* === BANNER: struttura e stile sono condivisi (.faw-banner in
            faw-ui.css + games/shared/faw-banner.js). Qui resta solo il timer,
@@ -430,7 +432,7 @@
     right: 5px;
     background: var(--primary);
     color: #241500;
-    font-size: 0.6rem;
+    font-size: 0.8125rem;
     font-weight: bold;
     padding: 3px 8px;
     border-radius: 10px;
@@ -598,7 +600,7 @@
 }
 
 .tool-label {
-    font-size: 0.62rem;
+    font-size: 0.75rem;
     font-weight: 700;
     opacity: 0.65;
     text-transform: uppercase;
@@ -651,9 +653,9 @@
     appearance: none;
     background: var(--accent);
     border-radius: 4px;
-    outline: none;
     cursor: pointer;
 }
+.size-slider:focus-visible { outline: 3px solid #ffffff; outline-offset: 3px; }
 
 .size-slider::-webkit-slider-thumb {
     -webkit-appearance: none;
@@ -699,7 +701,7 @@
 .size-preview-text {
     position: absolute;
     bottom: 2px;
-    font-size: 0.6rem;
+    font-size: 0.8125rem;
     font-weight: bold;
     color: var(--text);
     opacity: 0.7;
@@ -879,7 +881,7 @@
     right: 0;
     background: var(--success);
     color: #06282a;
-    font-size: 0.5rem;
+    font-size: 0.8125rem;
     font-weight: bold;
     text-align: center;
     padding: 3px;
@@ -915,7 +917,7 @@
 }
 
 .timer-label {
-    font-size: 0.7rem;
+    font-size: 0.8125rem;
     opacity: 0.7;
     margin-bottom: 8px;
     text-transform: uppercase;
@@ -938,8 +940,8 @@
 }
 
 .round-info {
-    font-family: 'Nunito', ui-monospace, monospace;
-    font-size: 0.68rem;
+    font-family: inherit; font-variant-numeric: tabular-nums;
+    font-size: 0.75rem;
     font-weight: 700;
     letter-spacing: 2px;
     color: var(--primary);
@@ -1071,7 +1073,7 @@
 <body>
 
 <!-- LOADING -->
-<div id="loading-screen" class="overlay">
+<div id="loading-screen" class="overlay" role="status" aria-live="polite">
     <div class="spinner-big"></div>
     <p>Caricamento partita...</p>
 </div>
@@ -1134,7 +1136,7 @@
         <div class="tool-section">
             <div class="tool-label">Colore</div>
             <div class="color-picker-container">
-                <input type="color" id="color-picker" class="color-wheel" value="#000000" 
+                <input type="color" id="color-picker" class="color-wheel" value="#000000" aria-label="Colore del pennello" 
                        oninput="setColorFromPicker(this.value)">
                 <div class="quick-colors" id="quick-colors"></div>
             </div>
@@ -1272,7 +1274,7 @@
             <div class="tool-section">
                 <div class="tool-label">Colore</div>
                 <div class="color-picker-container">
-                    <input type="color" id="gi-color-picker" class="color-wheel" value="#000000" 
+                    <input type="color" id="gi-color-picker" class="color-wheel" value="#000000" aria-label="Colore del pennello (Guess It)" 
                            oninput="setGuessItColor(this.value)">
                     <div class="quick-colors" id="gi-quick-colors"></div>
                 </div>
@@ -1332,12 +1334,12 @@
             <div class="round-info" id="guessit-round-info">ROUND 1/5</div>
             
             <div style="text-align: center; padding: 10px 5px; background: var(--bg); border-radius: 8px; width: 100%;">
-                <div style="font-size: 0.65rem; opacity: 0.7;">TU</div>
+                <div style="font-size: 0.75rem; opacity: 0.7;">TU</div>
                 <div id="guessit-my-score" class="pict-punteggio">0</div>
             </div>
             
             <div style="text-align: center; padding: 8px 5px; background: rgba(233, 69, 96, 0.15); border-radius: 8px; width: 100%;">
-                <div style="font-size: 0.6rem; opacity: 0.7;">🎨 DRAWER</div>
+                <div style="font-size: 0.8125rem; opacity: 0.7;">🎨 DRAWER</div>
                 <div id="guessit-drawer-score" style="font-size: 1.2rem; font-weight: 900; color: var(--primary);">0</div>
             </div>
         </div>
@@ -1370,7 +1372,7 @@
             
             <!-- Input risposta (solo indovinatori) -->
             <div id="guessit-input-area" style="padding: 12px; border-top: 2px solid var(--border); display: none;">
-                <input type="text" id="guessit-input" placeholder="Cosa pensi sia?" 
+                <input type="text" id="guessit-input" placeholder="Cosa pensi sia?" aria-label="La tua risposta" 
                        autocomplete="off" autocorrect="off" spellcheck="false"
                        style="margin-bottom: 8px; font-size: 0.95rem; text-align: center; padding: 10px;">
                 <button class="btn btn-primary" onclick="submitGuessItAnswer()" style="width: 100%; padding: 12px;">
@@ -2095,7 +2097,7 @@ function renderLobby(data) {
         if (state.isHost && !data.sfidaDiretta) {
             const currentTime = data.settings?.timePerRound || 60;
             timeSelector = `
-                <select onchange="updateSettings()" id="banner-time-select" class="faw-select" style="padding:8px 12px;border-radius:8px;font-weight:bold;cursor:pointer;">
+                <select onchange="updateSettings()" id="banner-time-select" aria-label="Durata del round" class="faw-select" style="padding:8px 12px;border-radius:8px;font-weight:bold;cursor:pointer;">
                     <option value="30" ${currentTime==30?'selected':''}>30s</option>
                     <option value="45" ${currentTime==45?'selected':''}>45s</option>
                     <option value="60" ${currentTime==60?'selected':''}>60s</option>
@@ -2379,7 +2381,7 @@ function launchCanvas(data) {
 if (themeBadge) {
     const category = state.roomData?.chains?.[state.myChainId]?.originalCategory || '🎨 Tema';
     themeBadge.innerHTML = `
-        <div style="font-size: 0.65rem; opacity: 0.8; margin-bottom: 2px;">
+        <div style="font-size: 0.75rem; opacity: 0.8; margin-bottom: 2px;">
             ${category}
         </div>
         <div>
@@ -2676,7 +2678,7 @@ const themeDisplay = `<span>Tema: "${chain.originalTheme}"</span>`;
                 <div class="step-canvas"><canvas id="step-canvas-${chainId}-${stepIdx}"></canvas></div>
                 <div class="step-info">
                     ${playerDisplay}
-                    <div class="step-type" style="font-size: 0.65rem; opacity: 0.6;">
+                    <div class="step-type" style="font-size: 0.75rem; opacity: 0.6;">
                         ${stepIdx === 0 ? '🎯 Primo disegno' : `🔄 Copia #${stepIdx}`}
                     </div>
                 </div>
@@ -3709,7 +3711,7 @@ function setupGuessItDrawer(gi) {
     // Parola da disegnare
 const badge = document.getElementById('guessit-word-badge');
 badge.innerHTML = `
-    <div style="font-size: 0.7rem; opacity: 0.8; margin-bottom: 3px;">
+    <div style="font-size: 0.8125rem; opacity: 0.8; margin-bottom: 3px;">
         ${gi.currentCategory || '🎨 Disegna'}
     </div>
     <div style="font-size: 1.1rem;">
@@ -4514,7 +4516,7 @@ function startPracticeMode(playerName) {
     setSize(8);
     const badge = document.getElementById('canvas-theme-badge');
     if (badge) {
-        badge.innerHTML = `<div style="font-size:0.65rem;opacity:0.8;">${theme.category} • ALLENAMENTO</div><div>${theme.word}</div>`;
+        badge.innerHTML = `<div style="font-size: 0.75rem;opacity:0.8;">${theme.category} • ALLENAMENTO</div><div>${theme.word}</div>`;
     }
     document.getElementById('ui-round-info').textContent = 'PRATICA';
     document.getElementById('ui-player').textContent = playerName;
