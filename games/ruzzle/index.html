@@ -19,6 +19,7 @@
 		<link rel="stylesheet" href="../shared/faw-ui.css">
 		<!-- Podio di fine partita (condiviso tra i giochi) -->
 		<link rel="stylesheet" href="../shared/podio.css">
+		<link rel="stylesheet" href="../shared/rivincita.css">
 		<style>
 			/* Font piattaforma caricati via <link> nel <head> */
 			:root {
@@ -2178,41 +2179,25 @@
 			  initGame(null);
 			  copySeedNewGame();
 			}
+		/**
+		 * Nuova partita dal menu (in multiplayer = proposta di rivincita):
+		 * passa dalla creazione condivisa, così le opzioni restano validate
+		 * e la lobby nasce come tutte le altre.
+		 */
 		async function creaRivincitaPersonalizzata(bonus, crazy) {
 		  const v = currentGameData;
-		  if (!v || !Array.isArray(v.partecipanti)) throw new Error('Stato partita non ancora disponibile');
-		  let mode = crazy ? 'crazy' : (bonus ? 'bonus' : 'classic');
-		  let pts = {};
-		  let words = {};
-		  v.partecipanti.forEach(p => {
-		    pts[p] = 0;
-		    words[p] = [];
+		  if (!v || !Array.isArray(v.partecipanti)) return;
+		  if (!window.FAW_RIVINCITA) return;
+		  preparaContestoRivincita();
+		  const mode = crazy ? 'crazy' : (bonus ? 'bonus' : 'classic');
+		  const r = await window.FAW_RIVINCITA.invita('ruzzle', {
+		    tempo: document.getElementById('modal-timer-select').value,
+		    griglia: document.getElementById('modal-grid-select').value,
+		    mode: mode
 		  });
-		  if (window.FAW_RIVINCITA) {
-		    await window.FAW_RIVINCITA.scarta(db, v.prossimaPartita, v.prossimaPartitaGioco);
+		  if (r && !r.ok) {
+		    showGameBanner({ icon: '❌', title: 'ERRORE', subtitle: r.errore || 'Creazione non riuscita', color: '#e74c3c', buttons: [] });
 		  }
-		  const doc = await db.collection("partite").add({
-		    gioco: 'ruzzle',
-		    partecipanti: v.partecipanti,
-		    opzioni: {
-		      tempo: document.getElementById('modal-timer-select').value,
-		      griglia: document.getElementById('modal-grid-select').value,
-		      mode: mode,
-		      seed: Math.random().toString(36).substring(7).toUpperCase()
-		    },
-		    punteggi: pts,
-		    parole: words,
-		    pronti: [],
-		    finito: [],
-		    confermaVerifica: [],
-		    stato: "attesa",
-		    timestamp: Date.now(),
-		    dataOra: new Date().toLocaleString('it-IT')
-		  });
-		  const collegamento = window.FAW_RIVINCITA
-		    ? window.FAW_RIVINCITA.campiCollegamento(doc.id, 'ruzzle', mioNome)
-		    : { prossimaPartita: doc.id, prossimaPartitaCreataDa: mioNome };
-		  await db.collection("partite").doc(matchId).update(collegamento);
 		}
 			
 			function closeNewGameModal() {
@@ -3479,6 +3464,27 @@
 		  const modal = document.getElementById('missed-words-modal');
 		  if (modal) modal.style.display = 'none';
 		}
+		/* Le parole che il GIOCATORE LOGGATO ha davvero trovato.
+		   La sorgente è sempre la SUA lista sul documento partita: l'analisi di
+		   fine partita può mostrare le parole di un altro giocatore (il vincitore
+		   è preselezionato) e `foundWords` viene riempito con quelle, quindi non
+		   è utilizzabile per "Cosa mi sono perso". Le parole escluse dal
+		   vocabolario sono tolte (non sono parole valide). In allenamento, dove
+		   non esiste un documento partita, valgono le parole di questa partita. */
+		function mieParoleTrovate() {
+		  const set = new Set();
+		  if (matchId && currentGameData && mioNome && currentGameData.parole) {
+		    const escluse = currentGameData.paroleEscluse || [];
+		    const mie = currentGameData.parole[mioNome] || [];
+		    mie.forEach((p) => {
+		      if (p && p.w && !escluse.includes(p.w)) set.add(p.w);
+		    });
+		    return set;
+		  }
+		  foundWords.forEach((v, k) => { if (!v || v.active !== false) set.add(k); });
+		  return set;
+		}
+
 		function showMissedWords() {
 		  const container = document.querySelector('.game-container');
 		  const overlay = document.getElementById('calculation-overlay');
@@ -3494,6 +3500,8 @@
 		      const possibleWords = [];
 		      const start = performance.now();
 		      const foundSet = new Set();
+		      /* Parole trovate dal giocatore loggato (mai quelle di un altro). */
+		      const trovate = mieParoleTrovate();
 		      const maxTime = 10000;
 		      const totalCells = gridSize * gridSize;
 			
@@ -3506,7 +3514,7 @@
 		          currentPath.pop();
 		          return;
 		        }
-		        if (currentWord.length >= MIN_WORD_LENGTH && dictionary.has(currentWord) && !foundWords.has(currentWord) && !foundSet.has(currentWord)) {
+		        if (currentWord.length >= MIN_WORD_LENGTH && dictionary.has(currentWord) && !trovate.has(currentWord) && !foundSet.has(currentWord)) {
 		          foundSet.add(currentWord);
 		          const pts = calculateScoreWithBonusesSolver(currentWord, [...currentPath], visualBonuses);
 		          possibleWords.push({
@@ -3559,11 +3567,13 @@
 		      const listEl = document.getElementById('missed-words-list');
 		      const summaryEl = document.getElementById('missed-summary');
 		      if (possibleWords.length === 0) {
-		        summaryEl.textContent = "🎉 Hai trovato tutto (o limite di tempo di calcolo raggiunto)!";
+		        summaryEl.textContent = "🎉 Non ti sei perso niente: hai trovato tutto" +
+		          (mioNome ? ', ' + mioNome : '') + " (o limite di tempo di calcolo raggiunto)!";
 		        listEl.innerHTML = '';
 		      } else {
 		        const totPts = possibleWords.reduce((acc, x) => acc + x.p, 0);
-		        summaryEl.textContent = `Avevi trovato ${foundWords.size} parole: ne restavano ${possibleWords.length} per ${totPts} punti.`;
+		        summaryEl.textContent = (mioNome ? `Parole mancanti di ${mioNome}: ` : 'Le tue parole mancanti: ') +
+		          `avevi trovato ${trovate.size} parole, ne restavano ${possibleWords.length} per ${totPts} punti.`;
 		        listEl.innerHTML = possibleWords.map(x =>
 		          `<li><span class="mw-w">${x.w}</span><span class="mw-p">${x.p} pt</span></li>`
 		        ).join('');
@@ -4772,6 +4782,9 @@ async function applicaModificaDizionario(parola, tipo) {
 		    partecipanti: currentGameData.partecipanti || [],
 		    giocoCorrente: 'ruzzle',
 		    proposta: currentGameData,
+		    /* Impostazioni della partita appena finita: la modale le propone
+		       come punto di partenza per la rivincita. */
+		    correnti: currentGameData.opzioni || {},
 		    onFatto: function () { removeGameBanner(); },
 		    onErrore: function (msg) {
 		      showGameBanner({ icon: '❌', title: 'INVITO NON RIUSCITO', subtitle: msg || 'Riprova', color: '#c0392b', buttons: [{ text: '🔄 RIPROVA', onclick: 'apriRivincitaBanner()' }] });
@@ -4835,125 +4848,54 @@ async function applicaModificaDizionario(parola, tipo) {
 			  });
 			}
 			
+		/**
+		 * Rivincita: modale condivisa (gioco + impostazioni). La creazione della
+		 * lobby passa da `FAW_RIVINCITA.invita`, la stessa per tutti i giochi.
+		 */
 		function apriRivincitaBanner() {
 		  if (!matchId) {
 		    startNewGame();
 		    return;
 		  }
 		  preparaContestoRivincita();
-		  // ✅ Prendi i valori dalla partita appena giocata
-		  const tempoCorrente = currentGameData?.opzioni?.tempo || '180';
-		  const grigliaCorrente = currentGameData?.opzioni?.griglia || '5';
-		  const altriGiochi = window.FAW_RIVINCITA
-		    ? window.FAW_RIVINCITA.htmlAltri('ruzzle', (currentGameData?.partecipanti || []).length)
-		    : '';
+		  if (!window.FAW_RIVINCITA) {
+		    showGameBanner({ icon: '❌', title: 'ERRORE', subtitle: 'Rivincita non disponibile', color: '#c0392b', buttons: [] });
+		    return;
+		  }
 		  removeGameBanner();
-			  const banner = document.createElement('div');
-			  banner.id = 'game-banner';
-			  banner.className = 'game-banner';
-			  banner.style.background = 'linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%)';
-			  banner.style.flexWrap = 'wrap';
-			  banner.style.gap = '10px';
-			  banner.style.padding = '15px 20px';
-			  banner.innerHTML = `
-			  
-																<div class="banner-left">
-																	<span style="font-size:1.5rem;">🎮</span>
-																	<div>
-																		<div style="font-weight:bold;">RIVINCITA</div>
-																		<div style="font-size:0.8rem; opacity:0.9;">Configura e scegli modalità</div>
-																	</div>
-																</div>
-																<div class="banner-right" style="flex-wrap:wrap; gap:8px;">
-																	<select id="rivincita-tempo" class="faw-select" style="padding:8px 10px; border-radius:8px; font-size:0.85rem;">
-																		<option value="30" ${tempoCorrente === '30' ? 'selected' : ''}>30s</option>
-																		<option value="60" ${tempoCorrente === '60' ? 'selected' : ''}>60s</option>
-																		<option value="90" ${tempoCorrente === '90' ? 'selected' : ''}>90s</option>
-																		<option value="180" ${tempoCorrente === '180' ? 'selected' : ''}>180s</option>
-																		<option value="300" ${tempoCorrente === '300' ? 'selected' : ''}>300s</option>
-																	</select>
-																	<select id="rivincita-griglia" class="faw-select" style="padding:8px 10px; border-radius:8px; font-size:0.85rem;">
-																		<option value="3" ${grigliaCorrente === '3' ? 'selected' : ''}>3x3</option>
-																		<option value="4" ${grigliaCorrente === '4' ? 'selected' : ''}>4x4</option>
-																		<option value="5" ${grigliaCorrente === '5' ? 'selected' : ''}>5x5</option>
-																		<option value="6" ${grigliaCorrente === '6' ? 'selected' : ''}>6x6</option>
-																		<option value="7" ${grigliaCorrente === '7' ? 'selected' : ''}>7x7</option>
-																		<option value="10" ${grigliaCorrente === '10' ? 'selected' : ''}>10x10</option>
-																	</select>
-																	<button onclick="creaRivincitaConSelettori(false, false)" style="padding:6px 12px; border:none; border-radius:4px; background:white; color:#333; cursor:pointer; font-weight:bold;">CLASSICA</button>
-																	<button onclick="creaRivincitaConSelettori(true, false)" style="padding:6px 12px; border:none; border-radius:4px; background:#f1c40f; color:#333; cursor:pointer; font-weight:bold;">BONUS ⭐</button>
-									<button onclick="creaRivincitaConSelettori(true, true)" style="padding:6px 12px; border:none; border-radius:4px; background:#c0392b; color:#ffffff; cursor:pointer; font-weight:bold;">CRAZY 🤪</button>
-									<div style="flex-basis:100%; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-										<span style="font-size:0.78rem; font-weight:800;">Oppure un altro gioco</span>
-										${altriGiochi}
-									</div>
-									</div>
-		`;
-			  document.body.appendChild(banner);
-			}
-			async function creaRivincitaConSelettori(bonus, crazy) {
-			const tempo = document.getElementById('rivincita-tempo').value;
-			const griglia = document.getElementById('rivincita-griglia').value;
-			
-			showGameBanner({
-			  icon: '⏳',
-			  title: 'CREAZIONE RIVINCITA...',
-			  subtitle: 'Attendi un momento',
-			  color: '#3498db',
-			  buttons: [],
-			  spinner: true
-			});
-			
-			try {
-			  const v = currentGameData;
-			  if (!v || !Array.isArray(v.partecipanti)) throw new Error('Stato partita non ancora disponibile');
-			  let mode = crazy ? 'crazy' : (bonus ? 'bonus' : 'classic');
-			  
-			  let pts = {}; 
-			  let words = {}; 
-			  v.partecipanti.forEach(p => { pts[p]=0; words[p]=[]; });
-			  
-		  if (window.FAW_RIVINCITA) await window.FAW_RIVINCITA.scarta(db, v.prossimaPartita, v.prossimaPartitaGioco);
-		  const doc = await db.collection("partite").add({
-		      gioco: 'ruzzle',
-		      partecipanti: v.partecipanti,
-		      opzioni: {
-		          tempo: tempo,
-		          griglia: griglia,
-		          mode: mode,
-		          seed: Math.random().toString(36).substring(7).toUpperCase()
-		      },
-		      punteggi: pts, 
-		      parole: words, 
-		      pronti: [], 
-		      finito: [], 
-		      confermaVerifica: [], 
-		      stato: "attesa", 
-		      timestamp: Date.now(), 
-		      dataOra: new Date().toLocaleString('it-IT')
+		  window.FAW_RIVINCITA.apriScelta({
+		    giocoCorrente: 'ruzzle',
+		    n: (currentGameData?.partecipanti || []).length,
+		    correnti: currentGameData?.opzioni || {},
+		    sottotitolo: 'Rigioca la stessa sfida con le impostazioni che preferisci, oppure invita tutti a un altro gioco. Si parte quando tutti accettano.',
+		    onConferma: inviaRivincitaConOpzioni
 		  });
-		  
-		  const collegamento = window.FAW_RIVINCITA
-		    ? window.FAW_RIVINCITA.campiCollegamento(doc.id, 'ruzzle', mioNome)
-		    : { prossimaPartita: doc.id, prossimaPartitaCreataDa: mioNome, rivincitaAccettataDa: [], rivincitaRifiutataDa: [] };
-		  await db.collection("partite").doc(matchId).update(collegamento);
-			  
-			  // ✅ Il listener Firebase mostrerà "In attesa che gli altri accettino"
-			  // Il redirect avverrà quando qualcuno accetta
-			  
-			} catch(e) {
-			  console.error("Errore creazione rivincita:", e);
-			  showGameBanner({
-			      icon: '❌',
-			      title: 'ERRORE',
-			      subtitle: 'Impossibile creare rivincita',
-			      color: '#e74c3c',
-			      buttons: [
-			          { text: '🔄 RIPROVA', onclick: 'apriRivincitaBanner()' }
-			      ]
-			  });
-			}
-			}
+		}
+		async function inviaRivincitaConOpzioni(giocoId, opzioni) {
+		  try {
+		    showGameBanner({
+		      icon: '⏳',
+		      title: 'CREAZIONE RIVINCITA...',
+		      subtitle: 'Attendi un momento',
+		      color: '#3498db',
+		      buttons: [],
+		      spinner: true
+		    });
+		    const r = await window.FAW_RIVINCITA.invita(giocoId, opzioni);
+		    if (r && !r.ok) throw new Error(r.errore || 'Creazione non riuscita');
+		    /* Il listener Firebase mostrerà "In attesa che gli altri accettino";
+		       il redirect avviene quando tutti accettano. */
+		  } catch (e) {
+		    console.error('Errore creazione rivincita:', e);
+		    showGameBanner({
+		      icon: '❌',
+		      title: 'ERRORE',
+		      subtitle: 'Impossibile creare rivincita',
+		      color: '#e74c3c',
+		      buttons: [{ text: '🔄 RIPROVA', onclick: 'apriRivincitaBanner()' }]
+		    });
+		  }
+		}
 async function attivaAnalisiMultiplayerSilent() {
     /* Il documento partita è già in ascolto: evitare una lettura extra quando
        il listener porta l'utente nella schermata di analisi. */

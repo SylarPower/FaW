@@ -1,0 +1,231 @@
+/* ==========================================================================
+   Rivincita condivisa — modale "scegli il gioco + impostazioni".
+   Usa i token e i componenti di faw-ui.css (.faw-modal__overlay, .faw-modal,
+   .faw-btn, .faw-select): qui ci sono solo le parti specifiche della scelta.
+   ========================================================================== */
+
+.faw-rv-overlay {
+  padding: max(18px, env(safe-area-inset-top)) 18px max(18px, env(safe-area-inset-bottom));
+}
+
+.faw-rv-modal {
+  width: min(680px, 100%);
+}
+
+.faw-rv-title {
+  margin: 0;
+  font-family: var(--faw-font-display);
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  color: var(--faw-text);
+}
+
+.faw-rv-sub {
+  margin: 0 0 14px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--faw-text-3);
+}
+
+/* ---------------- Schede dei giochi ---------------- */
+.faw-rv-giochi {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(126px, 1fr));
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.faw-rv-card {
+  --rv-acc: var(--faw-acc);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 12px 12px 10px;
+  border: 2px solid var(--faw-border);
+  border-radius: var(--faw-r-md);
+  background: var(--faw-panel-2);
+  color: var(--faw-text);
+  font-family: var(--faw-font-body);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--faw-fast) var(--faw-ease),
+    background var(--faw-fast) var(--faw-ease),
+    transform var(--faw-fast) var(--faw-ease);
+}
+.faw-rv-card:hover:not([disabled]) {
+  border-color: var(--rv-acc);
+  background: var(--faw-panel-solid);
+  transform: translateY(-1px);
+}
+.faw-rv-card.is-on {
+  border-color: var(--rv-acc);
+  background: var(--faw-panel-solid);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--rv-acc) 22%, transparent);
+}
+.faw-rv-card[disabled] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.faw-rv-card__ico {
+  font-size: 1.5rem;
+  line-height: 1.1;
+}
+.faw-rv-card__name {
+  font-weight: 800;
+  font-size: 0.92rem;
+  line-height: 1.15;
+}
+.faw-rv-card__meta {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--faw-text-3);
+}
+.faw-rv-card__tag {
+  position: absolute;
+  top: -9px;
+  left: 10px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 2px solid var(--rv-acc);
+  background: var(--faw-panel-solid);
+  color: var(--rv-acc);
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  white-space: nowrap;
+}
+.faw-rv-card__tag--off {
+  border-color: var(--faw-border-2);
+  color: var(--faw-text-3);
+  max-width: calc(100% - 20px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.faw-rv-card[data-gioco='ruzzle'] { --rv-acc: #2563eb; }
+.faw-rv-card[data-gioco='patata'] { --rv-acc: #e2600a; }
+.faw-rv-card[data-gioco='nomi-cose-citta'] { --rv-acc: #d92d20; }
+.faw-rv-card[data-gioco='pictionary'] { --rv-acc: #b0319c; }
+.faw-rv-card[data-gioco='gameof15'] { --rv-acc: #0e7490; }
+
+/* ---------------- Impostazioni ---------------- */
+.faw-rv-panel {
+  border: 2px solid var(--faw-border);
+  border-radius: var(--faw-r-lg);
+  background: var(--faw-panel-2);
+  padding: 12px 14px 14px;
+}
+
+.faw-rv-panel__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.faw-rv-panel__lab {
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: var(--faw-text-3);
+}
+.faw-rv-panel__sum {
+  font-size: 0.76rem;
+  font-weight: 800;
+  color: var(--faw-acc-text);
+  text-align: right;
+}
+
+.faw-rv-settings {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.faw-rv-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.faw-rv-field--wide {
+  grid-column: 1 / -1;
+}
+.faw-rv-field__label {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  color: var(--faw-text-2);
+}
+.faw-rv-field .faw-select {
+  padding: 9px 12px;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.faw-rv-seg {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.faw-rv-seg__btn {
+  flex: 1 1 auto;
+  padding: 9px 12px;
+  border: 2px solid var(--faw-border);
+  border-radius: var(--faw-r-sm);
+  background: var(--faw-panel-solid);
+  color: var(--faw-text-2);
+  font-family: var(--faw-font-body);
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  cursor: pointer;
+  transition: all var(--faw-fast) var(--faw-ease);
+}
+.faw-rv-seg__btn:hover {
+  border-color: var(--faw-border-2);
+  color: var(--faw-text);
+}
+.faw-rv-seg__btn.is-on {
+  border-color: var(--faw-acc);
+  background: var(--faw-acc);
+  color: #fff;
+}
+
+.faw-rv-note {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--faw-warn);
+}
+
+.faw-rv-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+.faw-rv-actions .faw-btn {
+  flex: 0 1 auto;
+}
+
+@media (max-width: 420px) {
+  .faw-rv-giochi { grid-template-columns: repeat(2, 1fr); }
+  .faw-rv-actions { flex-direction: column-reverse; }
+  .faw-rv-actions .faw-btn { width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .faw-rv-card,
+  .faw-rv-card:hover:not([disabled]),
+  .faw-rv-seg__btn {
+    transform: none;
+    transition: none;
+  }
+}

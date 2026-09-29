@@ -523,17 +523,42 @@ console.log('\n[6d] Power-up 🚀 passa la patata (estrazione + mutatore)');
   eq(inPausa && inPausa.__error && inPausa.__error.code, 'PAUSED', ' durante la pausa il passaggio non si usa');
   C.applyPartial(st, { pausa: false, pausaDa: { __op: 'delete' }, pausaTs: { __op: 'delete' }, 'turno.pausaIniziata': { __op: 'delete' } });
 
-  /* passaggio riuscito */
-  const deadlinePrima = st.turno.deadline;
+  /* passaggio riuscito: il cronometro guadagna il bonus del turno, come per
+     una parola valida (stesso +5s del primo minuto, stesso tetto) */
+  C.applyPartial(st, { 'turno.deadline': t0 + 20_000, 'turno.riferimento': t0 });
   const pass = C.mutPassaPatata(st, ctxP(pu, { target: altro }));
   ok(pass && !pass.__error, 'passaggio concesso al detentore al proprio turno');
   C.applyPartial(st, pass);
   eq(st.turno.giocatore, altro, 'la patata è arrivata al bersaglio');
   eq(st.roundData.powerPass, { da: pu, target: altro, ts: t0 + 1000 }, 'power-up segnato come usato');
   eq(st.turno.ultimo.pass, true, 'ultimo.pass = true (feedback dedicato, non una parola)');
-  eq(st.turno.deadline, deadlinePrima, 'il clock non cambia: né secondi aggiunti né tolti');
+  eq(st.turno.ultimo.bonus, 5, 'bonus comunicato a tutti: +5s (primo minuto di turno)');
+  eq(st.turno.deadline, t0 + 25_000, 'il cronometro guadagna il bonus come una parola valida (+5s)');
+  eq(st.turno.riferimento, t0 + 1000, 'riferimento aggiornato: il tempo aggiunto si vede sul ring');
   eq(st.storia, [], 'nessuna parola in storia (0 punti, feed parole invariato)');
   eq(st.punteggi, { ALFA: 0, BETA: 0, GAMMA: 0 }, 'nessun punto assegnato');
+
+  /* il bonus del passaggio scala con i minuti di turno, come le parole */
+  {
+    const stScala = mk();
+    const puS = C.powerPassFor(stScala);
+    C.applyPartial(stScala, { 'turno.giocatore': puS, 'turno.deadline': t0 + 200_000 });
+    const targetS = stScala.partecipanti.find((p) => p !== puS);
+    const dopo5min = C.mutPassaPatata(stScala, ctxP(puS, { target: targetS, now: t0 + 5 * 60_000 + 1000 }));
+    eq(dopo5min && dopo5min['turno.ultimo'].bonus, 1,
+      'dopo 5 minuti di turno il passaggio vale +1s (come una parola valida)');
+  }
+
+  /* il tetto del cronometro vale anche per il power-up */
+  {
+    const stTetto = mk();
+    const puT = C.powerPassFor(stTetto);
+    C.applyPartial(stTetto, { 'turno.giocatore': puT, 'turno.deadline': t0 + 30_500 });
+    const targetT = stTetto.partecipanti.find((p) => p !== puT);
+    const cap = C.mutPassaPatata(stTetto, ctxP(puT, { target: targetT }));
+    eq(cap && cap['turno.deadline'], t0 + 1000 + 30_000,
+      'mai oltre il tempo configurato: il tetto taglia il bonus del passaggio');
+  }
 
   /* la rotazione riparte dalla posizione del ricevente */
   const attesoDopo = C.nextPlayer(st, altro);

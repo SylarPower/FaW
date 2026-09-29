@@ -17,6 +17,7 @@
     <link rel="stylesheet" href="../shared/faw-ui.css">
     <!-- Podio di fine partita (condiviso tra i giochi) -->
     <link rel="stylesheet" href="../shared/podio.css">
+    <link rel="stylesheet" href="../shared/rivincita.css">
     <script src="../shared/podio.js"></script>
     <style>
         /* Font piattaforma caricati via <link> nel <head> */
@@ -2933,27 +2934,47 @@ function preparaContestoRivincita() {
         partecipanti: state.roomData.players || [],
         giocoCorrente: 'pictionary',
         proposta: state.roomData,
+        /* Impostazioni della room: la modale le ripropone per il rilancio. */
+        correnti: {
+            mode: state.roomData.settings?.mode || 'classic',
+            timePerRound: String(state.roomData.settings?.timePerRound || 60)
+        },
         onErrore: (msg) => alert(msg || 'Invito non riuscito')
     });
 }
+/**
+ * Rivincita: modale condivisa (gioco + impostazioni). Per il Pictionary la
+ * "stessa partita" è il rilancio di QUESTA room (solo l'host), mentre gli
+ * altri giochi creano una lobby nuova a cui tutti devono accettare.
+ */
 function apriSceltaRivincita() {
+    if (!window.FAW_RIVINCITA) return;
     preparaContestoRivincita();
-    const n = (state.roomData?.players || []).length;
-    const altri = window.FAW_RIVINCITA ? window.FAW_RIVINCITA.htmlAltri('pictionary', n) : '';
-    const stessa = state.isHost
-        ? `<button class="btn btn-primary" onclick="playAgain()" style="padding:10px 16px;">🎨 STESSA PARTITA</button>`
-        : `<button class="btn btn-secondary" disabled title="Solo l'host può rifare questa room" style="padding:10px 16px;">🎨 STESSA PARTITA</button>`;
-    showBanner({
-        icon: '🔁',
-        title: 'RIVINCITA',
-        subtitle: 'Stessa partita, oppure invita tutti a un altro gioco',
-        color: '#1c2438',
-        buttons: []
+    const isHost = !!state.isHost;
+    window.FAW_RIVINCITA.apriScelta({
+        giocoCorrente: 'pictionary',
+        n: (state.roomData?.players || []).length,
+        correnti: {
+            mode: state.roomData?.settings?.mode || 'classic',
+            timePerRound: String(state.roomData?.settings?.timePerRound || 60)
+        },
+        disabilitati: isHost ? {} : { pictionary: 'Solo l\'host può rigiocare questa room' },
+        sottotitolo: 'Rilancia questa room (solo l\'host) con le impostazioni che preferisci, oppure invita tutti a un altro gioco. Si parte quando tutti accettano.',
+        onConferma: (giocoId, opzioni) => {
+            if (giocoId === 'pictionary') {
+                if (!isHost) return;
+                playAgain(opzioni);
+                return;
+            }
+            inviaRivincitaPictionary(giocoId, opzioni);
+        }
     });
-    const right = document.querySelector('#game-banner .banner-right');
-    if (right) {
-        right.innerHTML = stessa + `<div style="flex-basis:100%;display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><span style="font-size:0.78rem;font-weight:800;">Oppure un altro gioco</span>${altri}</div>`;
-    }
+}
+/** Crea la lobby di un altro gioco scelto in modale (con le sue impostazioni). */
+async function inviaRivincitaPictionary(giocoId, opzioni) {
+    if (!window.FAW_RIVINCITA) return;
+    const r = await window.FAW_RIVINCITA.invita(giocoId, opzioni);
+    if (r && !r.ok) alert(r.errore || 'Invito non riuscito');
 }
 function gestisciPropostaPictionary(data) {
     if (!data || !data.prossimaPartita || !window.FAW_RIVINCITA) return;
@@ -3010,13 +3031,13 @@ async function annullaRivincitaPictionary() {
     if (!window.FAW_RIVINCITA) return;
     await window.FAW_RIVINCITA.annulla(db, db.collection('pictionary_rooms').doc(state.roomId), state.roomData);
 }
-async function playAgain() {
+async function playAgain(opzioni) {
     if (!state.isHost) {
         return alert("Solo l'host può avviare una nuova partita!");
     }
     
     const FV = firebase.firestore.FieldValue;
-    await db.collection("pictionary_rooms").doc(state.roomId).update({
+    const patch = {
         stato: 'lobby',
         currentRound: 0,
         totalRounds: 0,
@@ -3031,7 +3052,15 @@ async function playAgain() {
         prossimaPartitaGioco: FV.delete(),
         rivincitaAccettataDa: FV.delete(),
         rivincitaRifiutataDa: FV.delete()
-    });
+    };
+    /* Il rilancio riparte con le impostazioni scelte in modale. */
+    if (opzioni) {
+        const mode = opzioni.mode || state.roomData?.settings?.mode || 'classic';
+        patch.settings = { mode: mode, timePerRound: parseInt(opzioni.timePerRound, 10) || 60 };
+        patch.totalRounds = mode === 'guessit' ? (state.roomData?.players || []).length * 2
+                                               : (state.roomData?.players || []).length;
+    }
+    await db.collection("pictionary_rooms").doc(state.roomId).update(patch);
     
     state.myVotes = {};
     state.isAdvancing = false;

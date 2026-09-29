@@ -379,6 +379,7 @@ function invia(w) {
   ok(targetBtns.some((b) => /PASSA A BETA/.test(b.textContent)), 'bersaglio BETA presente');
   ok(targetBtns.some((b) => b.getAttribute('data-target') === ''), 'ANNULLA presente');
   const btnPassaBeta = targetBtns.find((b) => b.getAttribute('data-target') === 'BETA');
+  const deadlinePrimaPassaggio = mock.store.get('partite/P3').turno.deadline;
   btnPassaBeta.dispatchEvent(new e.Event('click', { bubbles: true }));
 
   ok(await until(() => {
@@ -391,6 +392,21 @@ function invia(w) {
   eq(docP3.roundData.powerPass.da, 'ALFA', 'usato da ALFA');
   eq(docP3.storia || [], [], 'nessuna parola: il passaggio non entra nel feed parole');
   eq(docP3.punteggi, { ALFA: 0, BETA: 0 }, 'nessun punto assegnato (0 punti come da regola)');
+  /* Il passaggio vale come una parola valida sul cronometro: tempo mai tolto
+     e mai oltre il tetto configurato (30s). */
+  eq(docP3.turno.ultimo && docP3.turno.ultimo.bonus, 5,
+    'il bonus del passaggio (+5s) è comunicato a tutti i client');
+  ok(docP3.turno.deadline >= deadlinePrimaPassaggio,
+    'il cronometro non perde tempo con il passaggio (prima: ' + deadlinePrimaPassaggio +
+    ', dopo: ' + docP3.turno.deadline + ')');
+  ok(docP3.turno.deadline <= Date.now() + 30_000,
+    'il cronometro resta entro il tetto configurato: ' +
+    Math.round((docP3.turno.deadline - Date.now()) / 1000) + 's residui');
+  eq(docP3.turno.riferimento, docP3.turno.ultimo.ts,
+    'riferimento del ring allineato al passaggio (il bonus si vede subito)');
+  ok(/\+5s/.test(e.document.getElementById('feedback').textContent),
+    'feedback con il bonus guadagnato: "' +
+    e.document.getElementById('feedback').textContent.trim() + '"');
   ok(await until(() => e.document.getElementById('overlay-target').classList.contains('hidden'),
     'picker chiuso dopo la scelta'), 'overlay chiuso dopo il passaggio');
   ok(await until(() => e.document.getElementById('btn-power').classList.contains('hidden'),

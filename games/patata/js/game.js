@@ -32,8 +32,9 @@
    - POWER-UP 🚀 "PASSA LA PATATA" → a ogni turno (round) UN giocatore
      estratto in modo deterministico dal seed (come le lettere, zero scritture
      extra) riceve il power-up: al proprio turno, invece di scrivere, può
-     mandare la patata al giocatore che vuoi — 0 punti, 1 solo utilizzo per
-     round, mostrato da un badge 🚀 sul chip.
+     mandare la patata al giocatore che vuoi — 0 punti per chi passa, ma il
+     cronometro guadagna lo stesso bonus del turno (come una parola valida,
+     tetto compreso), 1 solo utilizzo per round, badge 🚀 sul chip.
    - A fine partita  → classifica finale.
 
    Backend (Zero runTransaction):
@@ -714,9 +715,12 @@
 
   /**
    * POWER-UP 🚀 "Passa la patata": al proprio turno, il detentore del
-   * power-up del round può passare la patata a chiunque (0 punti, nessun
-   * secondo aggiunto, 1 solo utilizzo per round). La rotazione successiva
-   * riparte dalla posizione del ricevente (nextPlayer è già basato su indici).
+   * power-up del round può passare la patata a chiunque. Il passaggio vale
+   * come una parola valida sul cronometro — il bonus del turno (a scalare)
+   * viene aggiunto con lo stesso TETTO del tempo configurato — ma non assegna
+   * punti e non entra nel feed parole: 1 solo utilizzo per round. La
+   * rotazione successiva riparte dalla posizione del ricevente (nextPlayer è
+   * già basato su indici).
    */
   function mutPassaPatata(state, ctx) {
     if (state.stato !== 'in_corso' || !state.roundData || !state.turno) return { __error: { code: 'NOT_PLAYING' } };
@@ -729,10 +733,17 @@
     if (!target || target === ctx.me || state.partecipanti.indexOf(target) === -1) {
       return { __error: { code: 'BAD_TARGET' } };
     }
+    /* Stesso bonus (e stesso tetto) di una parola valida: chi passa non
+       perde il turno, quindi il cronometro deve guadagnarci come se avesse
+       scritto. `bonus` finisce in turno.ultimo per il feedback di tutti. */
+    const bonusMs = bonusPerParola(state, ctx.now) * 1000;
+    const tetto = ctx.now + state.opzioni.tempo * 1000;
+    const deadline = Math.min(Math.max(state.turno.deadline, ctx.now) + bonusMs, tetto);
     return {
-      // Nessuna modifica al clock: il passaggio non aggiunge (né toglie) tempo.
+      'turno.deadline': deadline,
+      'turno.riferimento': ctx.now,
       'turno.giocatore': target,
-      'turno.ultimo': { nome: ctx.me, pass: true, target, ok: true, ts: ctx.now },
+      'turno.ultimo': { nome: ctx.me, pass: true, target, ok: true, bonus: bonusMs / 1000, ts: ctx.now },
       'roundData.powerPass': { da: ctx.me, target, ts: ctx.now }
     };
   }
@@ -1915,7 +1926,8 @@
     el['overlay-target'].classList.add('hidden');
     const r = await G.backend.applyAtomic(mutPassaPatata, { target });
     if (r && r.ok) {
-      toast('🚀 Patata passata a ' + target.toUpperCase() + ' — 0 punti, nessun secondo');
+      const b = bonusPerParola(G.state || s, Date.now());
+      toast('🚀 Patata passata a ' + target.toUpperCase() + ' — +' + b + 's sul cronometro');
     } else if (r && r.error) {
       const msg = {
         NO_POWER: 'Non hai il power-up di questo round',
@@ -2085,45 +2097,16 @@
   }
 
   /* ---------------- RIVINCITA (Zero runTransaction) ---------------- */
-  async function creaRivincita() {
-    const s = G.state;
-    if (!s || s.stato !== 'conclusa') return;
-    if (G.solo || !G.db) { toast('Rivincita disponibile solo in sfida'); return; }
-    if (s.prossimaPartita && !(s.rivincitaRifiutataDa || []).length) { toast('Rivincita già creata, in attesa…'); return; }
-    try {
-      if (window.FAW_RIVINCITA) await window.FAW_RIVINCITA.scarta(G.db, s.prossimaPartita, s.prossimaPartitaGioco);
-      const newRef = G.db.collection('partite').doc();
-      const punteggi = {};
-      const parole = {};
-      s.partecipanti.forEach((p) => { punteggi[p] = 0; parole[p] = []; });
-      await newRef.set({
-        gioco: 'patata',
-        partecipanti: s.partecipanti,
-        punteggi,
-        parole,
-        pronti: [],
-        stato: 'attesa',
-        rivincitaAccettataDa: [],
-        rivincitaRifiutataDa: [],
-        dataOra: new Date().toLocaleString('it-IT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }),
-        timestamp: Date.now(),
-        opzioni: {
-          tempo: String(s.opzioni.tempo),
-          turni: String(s.opzioni.turni),
-          lettere: String(s.opzioni.lettere),
-          mode: s.opzioni.mode,
-          seed: Math.random().toString(36).substring(7).toUpperCase()
-        }
-      });
-      const collegamento = window.FAW_RIVINCITA
-        ? window.FAW_RIVINCITA.campiCollegamento(newRef.id, 'patata', G.me)
-        : { prossimaPartita: newRef.id, prossimaPartitaCreataDa: G.me, rivincitaAccettataDa: [], rivincitaRifiutataDa: [] };
-      await G.backend.ref.update(collegamento);
-      hideBanner();
-    } catch (e) {
-      console.error('[Patata] rivincita:', e);
-      toast('Errore nella creazione della rivincita', 'err');
-    }
+  /**
+   * Crea la lobby della rivincita con il gioco e le impostazioni scelte nella
+   * modale condivisa (`FAW_RIVINCITA.invita`): un'unica via di creazione per
+   * tutti i giochi, niente documenti costruiti a mano in ogni pagina.
+   */
+  async function inviaRivincita(giocoId, opzioni) {
+    hideBanner();
+    if (!window.FAW_RIVINCITA) { toast('Rivincita non disponibile', 'err'); return; }
+    const r = await window.FAW_RIVINCITA.invita(giocoId, opzioni);
+    if (r && !r.ok) toast(r.errore || 'Invito non riuscito', 'err');
   }
   function fieldValue() {
     return (G.fs && G.fs.FieldValue) ||
@@ -2162,10 +2145,14 @@
       partecipanti: (G.state && G.state.partecipanti) || [],
       giocoCorrente: 'patata',
       proposta: G.state,
+      /* Impostazioni della partita appena finita: la modale le usa come
+         punto di partenza per la rivincita. */
+      correnti: (G.state && G.state.opzioni) || {},
       onFatto: hideBanner,
       onErrore: (msg) => toast(msg || 'Invito non riuscito', 'err')
     });
   }
+  /** Rivincita: modale condivisa per scegliere gioco e impostazioni. */
   function apriSceltaRivincita() {
     const s = G.state;
     if (!s || s.stato !== 'conclusa' || G.solo) return;
@@ -2174,20 +2161,13 @@
       return;
     }
     preparaContestoRivincita();
-    const altri = window.FAW_RIVINCITA
-      ? window.FAW_RIVINCITA.azioniAltri('patata', s.partecipanti.length, (id) => {
-          window.FAW_invitaAltroGioco(id);
-        })
-      : [];
-    banner({
-      icon: '🔁',
-      title: 'RIVINCITA',
-      subtitle: 'Stessa partita, oppure invita tutti a un altro gioco',
-      sticky: true,
-      buttons: [
-        { id: 'stessa', label: '🥔 STESSA PARTITA', kind: 'btn-fire', fn: creaRivincita },
-        { id: 'chiudi', label: '✖️', kind: 'btn-ghost', fn: hideBanner }
-      ].concat(altri)
+    if (!window.FAW_RIVINCITA) { toast('Rivincita non disponibile', 'err'); return; }
+    window.FAW_RIVINCITA.apriScelta({
+      giocoCorrente: 'patata',
+      n: s.partecipanti.length,
+      correnti: s.opzioni,
+      sottotitolo: 'Rigioca la stessa sfida con le impostazioni che preferisci, oppure invita tutti a un altro gioco. Si parte quando tutti accettano.',
+      onConferma: inviaRivincita
     });
   }
   function annullaRivincita() {
@@ -2338,9 +2318,11 @@
 
   function onUltimo(ultimo, s) {
     if (ultimo.pass) {
-      // Power-up 🚀 usato: comunicazione ben diversa da una parola valida.
+      // Power-up 🚀 usato: comunicazione ben diversa da una parola valida,
+      // ma il cronometro guadagna lo stesso il bonus del turno.
       showFeedback('ok', '🚀 ' + ultimo.nome.toUpperCase() + ' passa la patata a ' +
-        String(ultimo.target || '').toUpperCase() + ' (power-up!)');
+        String(ultimo.target || '').toUpperCase() + ' (power-up!)' +
+        (ultimo.bonus ? ' · +' + ultimo.bonus + 's sul cronometro' : ''));
       if (ultimo.nome === G.me) { el['word-input'].value = ''; updateInputHint(); }
     } else if (ultimo.ok) {
       showFeedback('ok', '✅ ' + ultimo.w + '  +' + ultimo.p + ' pt — passa a ' + nextPlayer(s, ultimo.nome).toUpperCase());

@@ -15,6 +15,7 @@
     <link rel="stylesheet" href="../shared/faw-ui.css">
     <!-- Podio di fine partita (condiviso tra i giochi) -->
     <link rel="stylesheet" href="../shared/podio.css">
+    <link rel="stylesheet" href="../shared/rivincita.css">
     <script src="../shared/podio.js"></script>
     <style>
         /* Font piattaforma caricati via <link> nel <head> */
@@ -722,38 +723,36 @@ function preparaContestoRivincita15() {
         partecipanti: matchData.partecipanti || [],
         giocoCorrente: 'gameof15',
         proposta: matchData,
+        /* Impostazioni della partita appena finita: la modale le ripropone. */
+        correnti: matchData.opzioni || {},
         onErrore: (msg) => alert(msg || 'Invito non riuscito')
     });
 }
+/** Rivincita: modale condivisa per scegliere gioco e impostazioni. */
 function apriSceltaRivincita15() {
     preparaContestoRivincita15();
-    const box = document.getElementById('rivincita-15');
-    if (!box || !window.FAW_RIVINCITA) return;
-    const n = (matchData && matchData.partecipanti || []).length;
-    box.innerHTML = `<div style="background:#1c2438;color:#fff;border-radius:12px;padding:12px 14px;text-align:left;">
-        <div style="font-weight:800;margin-bottom:8px;">RIVINCITA</div>
-        <div style="font-size:0.85rem;margin-bottom:10px;">Stessa partita, oppure invita tutti a un altro gioco.</div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;">
-            <button class="btn btn-play" onclick="creaRivincita15()">🧩 STESSA PARTITA</button>
-            ${window.FAW_RIVINCITA.htmlAltri('gameof15', n)}
-        </div>
-    </div>`;
+    if (!window.FAW_RIVINCITA) return;
+    window.FAW_RIVINCITA.apriScelta({
+        giocoCorrente: 'gameof15',
+        n: ((matchData && matchData.partecipanti) || []).length,
+        correnti: (matchData && matchData.opzioni) || {},
+        sottotitolo: 'Rigioca la stessa sfida con le impostazioni che preferisci, oppure invita tutti a un altro gioco. Si parte quando tutti accettano.',
+        onConferma: inviaRivincita15
+    });
 }
 function esc15(s) {
     return String(s || '').replace(/[&<>"']/g, function (c) {
         return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c];
     });
 }
-async function creaRivincita15() {
+/** Crea la lobby della rivincita (gioco e impostazioni scelti in modale). */
+async function inviaRivincita15(giocoId, opzioni) {
     if (!window.FAW_RIVINCITA || !matchData || !matchData.partecipanti) return;
     if (matchData.prossimaPartita && !(matchData.rivincitaRifiutataDa || []).length) return;
-    const persone = matchData.partecipanti;
-    if (window.FAW_RIVINCITA) await window.FAW_RIVINCITA.scarta(db, matchData.prossimaPartita, matchData.prossimaPartitaGioco);
-    const opzioni = Object.assign({}, matchData.opzioni || window.FAW_RIVINCITA.opzioniDefault('gameof15'), {
-        seed: Math.random().toString(36).substring(7).toUpperCase()
-    });
-    const doc = await db.collection('partite').add(window.FAW_RIVINCITA.documentoPartita('gameof15', persone, opzioni));
-    await db.collection('partite').doc(matchId).update(window.FAW_RIVINCITA.campiCollegamento(doc.id, 'gameof15', mioNome));
+    const box = document.getElementById('rivincita-15');
+    if (box) box.innerHTML = '<div style="background:#1c2438;color:#fff;border-radius:12px;padding:12px 14px;font-weight:800;">Creazione rivincita…</div>';
+    const r = await window.FAW_RIVINCITA.invita(giocoId, opzioni);
+    if (r && !r.ok) alert(r.errore || 'Invito non riuscito');
 }
 function mostraProposta15(data) {
     const box = document.getElementById('rivincita-15');
