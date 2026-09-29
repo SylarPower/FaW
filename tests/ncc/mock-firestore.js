@@ -39,7 +39,9 @@ function createMockFirestore() {
     writes: 0,
     /* registro delle scritture: serve a contare CHI scrive cosa (es. una sola
        scrittura dei punteggi finali di Ruzzle invece di una per client) */
-    log: []
+    log: [],
+    /* id generati per `collection(x).doc()` senza argomento, come fa Firestore */
+    autoId: 0
   };
 
   function clone(d) { return d === undefined ? undefined : JSON.parse(JSON.stringify(d)); }
@@ -114,6 +116,7 @@ function createMockFirestore() {
   function collection(prefix) {
     return {
       doc(id) {
+        if (id === undefined || id === null) id = 'auto' + (++m.autoId);
         const p = prefix + '/' + id;
         return {
           id,

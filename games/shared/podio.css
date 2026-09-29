@@ -90,7 +90,7 @@
   border-radius: 999px;
   background: var(--podio-medal-bg);
   color: var(--podio-text);
-  font-size: 0.92rem;
+  font-size: var(--faw-fs-base);
   font-weight: 900;
   letter-spacing: 0.02em;
   font-variant-numeric: tabular-nums;
@@ -110,7 +110,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.9rem;
+  font-size: var(--faw-fs-sm);
   font-weight: 800;
   color: #111827;
   border: 2px solid rgba(255, 255, 255, 0.35);
@@ -122,7 +122,7 @@
   justify-self: center;
   max-width: 100%;
   font-weight: 800;
-  font-size: 0.82rem;
+  font-size: var(--faw-fs-sm);
   line-height: 1.15;
   color: var(--podio-text);
   text-align: center;
@@ -143,7 +143,7 @@
   padding: 1px 5px;
   border-radius: 999px;
   background: var(--podio-tu-bg);
-  font-size: 0.68rem;
+  font-size: var(--faw-fs-2xs);
   font-weight: 900;
   letter-spacing: 0.02em;
   vertical-align: 1px;
@@ -164,7 +164,7 @@
   background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0) 65%);
   border: 1px solid var(--podio-border);
   border-bottom: none;
-  font-size: 1.25rem;
+  font-size: var(--faw-fs-lg);
   font-weight: 900;
   line-height: 1;
   color: var(--podio-text);
@@ -179,7 +179,7 @@
   align-self: start;
   justify-self: center;
   max-width: 100%;
-  font-size: 0.68rem;
+  font-size: var(--faw-fs-2xs);
   line-height: 1.2;
   color: var(--podio-sub);
   font-weight: 600;
@@ -200,11 +200,11 @@
     --podio-sub-h: 16px;
     --podio-radius: 12px;
   }
-  .pod-name { font-size: 0.76rem; }
-  .pod-tu { font-size: 0.6rem; }
-  .pod-bar { font-size: 1.05rem; }
-  .pod-sub { font-size: 0.62rem; }
-  .pod-medal { font-size: 0.82rem; padding: 0 7px; }
+  .pod-name { font-size: var(--faw-fs-xs); }
+  .pod-tu { font-size: var(--faw-fs-2xs); }
+  .pod-bar { font-size: var(--faw-fs-lg); }
+  .pod-sub { font-size: var(--faw-fs-2xs); }
+  .pod-medal { font-size: var(--faw-fs-sm); padding: 0 7px; }
 }
 
 /* Con tanti giocatori (5-6) il podio scorre: colonne un po' più strette, ma
@@ -216,7 +216,7 @@
     --podio-pad: 9px;
     --podio-avatar: 38px;
   }
-  .podio[data-molti="1"] .pod-name { font-size: 0.78rem; }
+  .podio[data-molti="1"] .pod-name { font-size: var(--faw-fs-xs); }
 }
 
 /* Podio che scorre: sfumatura sul bordo destro come invito allo scorrimento */
@@ -225,6 +225,35 @@
   mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 26px), transparent 100%);
 }
 
+/* ============================================================
+   INGRESSO DEL PODIO (fine partita)
+   `podio.js` aggiunge .podio--entra a ogni ridisegno: le colonne salgono in
+   sequenza, dalla prima all'ultima. Le colonne partono comunque visibili, poi
+   l'animazione le porta al loro posto (nome, avatar e gradino insieme).
+   ============================================================ */
+@keyframes podio-su {
+  from { opacity: 0; transform: translateY(26px); }
+  to   { opacity: 1; transform: none; }
+}
+.podio--entra .pod-col {
+  animation: podio-su 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.podio--entra .pod-col:nth-child(1) { animation-delay: 0.00s; }
+.podio--entra .pod-col:nth-child(2) { animation-delay: 0.07s; }
+.podio--entra .pod-col:nth-child(3) { animation-delay: 0.14s; }
+.podio--entra .pod-col:nth-child(4) { animation-delay: 0.21s; }
+.podio--entra .pod-col:nth-child(5) { animation-delay: 0.28s; }
+.podio--entra .pod-col:nth-child(n+6) { animation-delay: 0.35s; }
+/* Il podio del vincitore ha un alone dorato che si accende dopo le colonne. */
+.podio--entra .pod-col.p1 .pod-bar { animation: podio-faro 0.9s ease-out 0.32s both; }
+@keyframes podio-faro {
+  0%   { box-shadow: 0 0 0 0 rgba(252, 211, 77, 0.0); }
+  45%  { box-shadow: 0 0 26px 8px rgba(252, 211, 77, 0.55); }
+  100% { box-shadow: 0 0 0 0 rgba(252, 211, 77, 0.0); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .pod-bar { transition: none; }
+  .podio--entra .pod-col,
+  .podio--entra .pod-col.p1 .pod-bar { animation: none; }
 }

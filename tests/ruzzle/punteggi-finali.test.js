@@ -18,6 +18,7 @@ html = html.replace(/\t*<script src="\.\.\/shared\/firebase-config\.js"><\/scrip
 html = html.replace(/\t*<script src="\.\.\/shared\/faw-layout\.js" defer><\/script>\n?/g, '');
 
 const podioJs = fs.readFileSync(path.join(ROOT, 'games/shared/podio.js'), 'utf8');
+const bannerJs = fs.readFileSync(path.join(ROOT, 'games/shared/faw-banner.js'), 'utf8');
 const dictSample = ['CANE', 'GATTO', 'VOLPE', 'ROSA', 'MARE', 'CASA', 'LUNA', 'STELLA'].join('\n');
 
 let passed = 0, failed = 0;
@@ -69,6 +70,7 @@ function pagina(nome, errori) {
     virtualConsole: vc,
     beforeParse(w) {
       w.eval(podioJs);   // podio condiviso di fine partita
+      w.eval(bannerJs);   // banner/toast condivisi
       w.localStorage.setItem('mioNome', nome);
       w.firebase = makeFirebaseGlobal(mock);
       w.FAW_FIREBASE_CONFIG = { apiKey: 'test-key', projectId: 'test' };
@@ -190,6 +192,8 @@ const scrittureChiusura = () => mock.log.filter((w) => w.p === 'partite/P1' && (
   const nomePodio = (col) => col.querySelector('.pod-name').textContent.replace(' (TU)', '');
   eq(podio(a).map(nomePodio), ['BETA', 'GAMMA', 'ALFA'],
     'ordine per punteggio decrescente (BETA 6, GAMMA 5, ALFA 0 dopo l\'eliminazione)');
+  await until(() => JSON.stringify(podio(a).map((col) => col.querySelector('.pod-bar').textContent))
+    === JSON.stringify(['6', '5', '0']), 'punteggi finali del podio');
   eq(podio(a).map((col) => col.querySelector('.pod-bar').textContent), ['6', '5', '0'],
     'punteggi finali corretti nei gradini');
   eq(podio(a).map((col) => parseInt(col.querySelector('.pod-bar').style.height, 10)), [104, 88, 72],

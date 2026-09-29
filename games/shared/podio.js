@@ -18,6 +18,13 @@
      classifica si legge a colpo d'occhio anche con 5-6 giocatori;
    - il disegno è idempotente: se i dati non cambiano il podio non viene
      ridisegnato (niente sfarfallio quando il documento si aggiorna).
+
+   "Juice" di fine partita (opzioni del render, tutte attive di default):
+   - `conta`: i punteggi salgono da 0 al valore finale (rispetto del
+     `prefers-reduced-motion`, che li lascia subito al valore giusto);
+   - `festa`: coriandoli condivisi (`.faw-confetti` di faw-ui.css) per chi ha
+     vinto davvero — se il primo ha 0 punti non si festeggia niente;
+   - `entra`: colonne che salgono in sequenza.
    ============================================================ */
 (function () {
   'use strict';
@@ -89,6 +96,65 @@
     return testo;
   }
 
+  /* ---------------- ANIMAZIONI (juice) ---------------- */
+
+  function ridottaMovimento() {
+    try {
+      return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    } catch (e) { return false; }
+  }
+
+  /**
+   * Fa salire i punteggi da 0 al valore finale. Il valore giusto resta
+   * nell'aria-label (scritto da `html`), quindi i lettori di schermo non
+   * sentono numeri intermedi.
+   */
+  function contaNumeri(container, durata) {
+    if (!container || ridottaMovimento()) return;
+    var raf = window.requestAnimationFrame;
+    if (typeof raf !== 'function') return;
+    var span = container.querySelectorAll('.pod-bar > span');
+    var finali = [];
+    for (var i = 0; i < span.length; i++) finali.push(Number(span[i].textContent) || 0);
+    var t0 = null;
+    var ms = Number(durata) || 750;
+    function passo(t) {
+      if (t0 === null) t0 = t;
+      var k = Math.min(1, (t - t0) / ms);
+      var ease = 1 - Math.pow(1 - k, 3);       // uscita morbida
+      for (var j = 0; j < span.length; j++) {
+        if (!span[j].isConnected) continue;
+        span[j].textContent = String(Math.round(finali[j] * ease));
+      }
+      if (k < 1) raf(passo);
+      else for (var h = 0; h < span.length; h++) if (span[h].isConnected) span[h].textContent = String(finali[h]);
+    }
+    // lo span parte da 0: il primo frame lo riporta al valore corrente
+    for (var z = 0; z < span.length; z++) span[z].textContent = '0';
+    raf(passo);
+  }
+
+  /** Coriandoli per il vincitore (particelle .faw-confetti di faw-ui.css). */
+  function confetti(n) {
+    if (!document.body || ridottaMovimento()) return null;
+    var box = document.createElement('div');
+    box.className = 'faw-confetti';
+    var colori = ['#6366f1', '#a855f7', '#38bdf8', '#2fd67b', '#ffd166', '#ff5a6e'];
+    var quanti = Number(n) || 30;
+    for (var i = 0; i < quanti; i++) {
+      var p = document.createElement('i');
+      p.style.left = (4 + Math.random() * 92) + 'vw';
+      p.style.background = colori[i % colori.length];
+      p.style.animationDuration = (1.4 + Math.random() * 1.2) + 's';
+      p.style.animationDelay = (Math.random() * 0.35) + 's';
+      p.style.transform = 'rotate(' + (Math.random() * 360).toFixed(0) + 'deg)';
+      box.appendChild(p);
+    }
+    document.body.appendChild(box);
+    setTimeout(function () { if (box.parentNode) box.parentNode.removeChild(box); }, 3200);
+    return box;
+  }
+
   /** Markup del podio (stessa struttura in ogni gioco). */
   function html(righe, opts) {
     var o = opts || {};
@@ -107,7 +173,7 @@
         '<span class="pod-name">' + esc(r.nome) +
           (r.tu ? '<span class="pod-tu"> (TU)</span>' : '') + '</span>' +
         '<div class="pod-bar" style="height:' + h + 'px" aria-label="' + esc(r.punti + ' ' + unita) + '">' +
-          '<span>' + r.punti + '</span></div>' +
+          '<span class="faw-num">' + r.punti + '</span></div>' +
         (r.sottotitolo ? '<span class="pod-sub">' + esc(r.sottotitolo) + '</span>' : '') +
         '</div>';
     }).join('');
@@ -120,6 +186,22 @@
       var n = riga(r, o, i);
       return [n.nome, n.punti, n.sottotitolo, n.tu];
     })]);
+  }
+
+  /** Ingresso a scaletta, punteggi che salgono e coriandoli per il vincitore. */
+  function anima(container, classificate, opts) {
+    var o = opts || {};
+    if (o.entra !== false) {
+      /* L'animazione d'ingresso riparte solo quando il podio viene ridisegnato:
+         la firma qui sopra impedisce i ridisegni inutili. */
+      container.classList.remove('podio--entra');
+      /* reflow: senza questo il browser non riavvia la transizione */
+      void container.offsetWidth;
+      container.classList.add('podio--entra');
+    }
+    if (o.conta !== false) contaNumeri(container, o.durataConta);
+    var primo = classificate && classificate[0];
+    if (o.festa !== false && primo && punti(primo) > 0) confetti(o.quantiConfetti);
   }
 
   /** Disegna il podio dentro `container` e restituisce le righe ordinate. */
@@ -146,6 +228,7 @@
        senza doverlo spiegare. Il confronto va fatto dopo aver disegnato. */
     if (container.scrollWidth > container.clientWidth + 1) container.setAttribute('data-scroll', '1');
     else container.removeAttribute('data-scroll');
+    anima(container, classificate, opts);
     return classificate;
   }
 
@@ -156,6 +239,8 @@
     UNITA: UNITA_DEFAULT,
     altezza: altezza,
     avatarColor: avatarColor,
+    contaNumeri: contaNumeri,
+    confetti: confetti,
     esc: esc,
     ordina: ordina,
     html: html,

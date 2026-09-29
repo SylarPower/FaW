@@ -19,7 +19,7 @@
 		<!-- Tipografia piattaforma (font unico: Nunito) -->
 		<link rel="preconnect" href="https://fonts.googleapis.com">
 		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-		<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+		<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 		<!-- ✅ PRECONNECT per velocità -->
 		<link rel="preconnect" href="https://www.gstatic.com">
 		<link rel="preconnect" href="https://firestore.googleapis.com">
@@ -29,6 +29,7 @@
 		<!-- <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-app-check-compat.js"></script> -->
 		<!-- Config Firebase condivisa (deve stare prima dello script che inizializza Firebase) -->
 		<script src="games/shared/firebase-config.js"></script>
+		<script src="games/shared/faw-banner.js"></script>
 		<!-- Design system FaW -->
 		<link rel="stylesheet" href="games/shared/faw-ui.css">
 		<style>
@@ -114,6 +115,11 @@
 				border-color: var(--faw-acc);
 				box-shadow: 0 0 0 3px var(--faw-acc-glow);
 			}
+			/* Da tastiera l'indicatore è pieno, non un alone tenue. */
+			#username:focus-visible, #password:focus-visible {
+				outline: 3px solid var(--faw-acc);
+				outline-offset: 2px;
+			}
 			.login-cta {
 				width: 100%;
 				min-height: 50px;
@@ -166,7 +172,7 @@
 			}
 			.brand small {
 				display: block;
-				font-size: 0.68rem;
+				font-size: 0.75rem;
 				font-weight: 500;
 				letter-spacing: 0.04em;
 				color: var(--faw-text-3);
@@ -275,7 +281,7 @@
 				right: 10px;
 				padding: 3px 8px;
 				border-radius: 7px;
-				font-size: 0.62rem;
+				font-size: 0.75rem;
 				font-weight: 700;
 				letter-spacing: 0.6px;
 				background: var(--faw-panel-2);
@@ -307,7 +313,7 @@
 				justify-content: center;
 				background: var(--g1);
 				color: #fff;
-				font-size: 0.68rem;
+				font-size: 0.75rem;
 				font-weight: 800;
 				animation: faw-pop 200ms var(--faw-ease);
 			}
@@ -498,7 +504,7 @@
 			}
 			.stat-box .stat-desc {
 				margin-top: 5px;
-				font-size: 0.68rem;
+				font-size: 0.75rem;
 				font-weight: 600;
 				letter-spacing: 0.04em;
 				text-transform: uppercase;
@@ -536,7 +542,7 @@
 				background: var(--faw-acc);
 				border-color: var(--faw-acc);
 			}
-			.day-bar .label { font-size: 0.68rem; font-weight: 600; color: var(--faw-text-3); text-transform: uppercase; }
+			.day-bar .label { font-size: var(--faw-fs-xs); font-weight: 600; color: var(--faw-text-3); text-transform: uppercase; letter-spacing: 0.06em; }
 			.btn-danger {
 				padding: 8px 16px;
 				border-radius: 10px;
@@ -612,7 +618,7 @@
 			}
 			.banner-opt { display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; }
 			.banner-opt > span {
-				font-size: 0.65rem;
+				font-size: 0.75rem;
 				font-weight: 700;
 				letter-spacing: 0.05em;
 				text-transform: uppercase;
@@ -2675,12 +2681,9 @@ if (giocoSelezionato === 'pictionary') {
 			  }
 			}
 
+			/* Toast: componente condiviso (games/shared/faw-banner.js). */
 			function mostraToast(messaggio, tipo) {
-			  const toast = document.createElement('div');
-			  toast.className = 'faw-toast' + (tipo === 'err' ? ' faw-toast--err' : tipo === 'ok' ? ' faw-toast--ok' : '');
-			  toast.textContent = messaggio;
-			  document.body.appendChild(toast);
-			  setTimeout(() => toast.remove(), 2400);
+			  if (window.FAW_BANNER) { window.FAW_BANNER.toast(messaggio, tipo === 'err' ? 'err' : (tipo || '')); return; }
 			}
 
 			function logout() {

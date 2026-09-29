@@ -71,9 +71,10 @@ lettere, zero scritture extra) e assegnato a **un giocatore casuale**:
 - sul chip del detentore compare il badge **🚀**;
 - al proprio turno, il detentore vede il pulsante **🚀 PASSA LA PATATA A…**
   e sceglie il bersaglio fra gli altri giocatori;
-- la patata arriva subito al bersaglio con **0 punti** per chi passa, il
-  clock **non cambia** e la rotazione successiva prosegue dalla posizione del
-  ricevente;
+- la patata arriva subito al bersaglio con **0 punti** per chi passa, ma il
+  cronometro guadagna lo stesso il **bonus del turno** (lo stesso `+Ns` di
+  una parola valida, tetto del tempo configurato compreso) e la rotazione
+  successiva prosegue dalla posizione del ricevente;
 - **una sola volta per round**: usato il power-up, badge e pulsante spariscono
   e ricompaiono col prossimo round (con un eventuale nuovo detentore);
 - durante una pausa o una votazione non è utilizzabile.
@@ -143,11 +144,15 @@ Stesse convenzioni degli altri giochi FaW:
   ogni nuovo turno. Il passaggio di scalino è evidente a tutti: il chip
   `+Ns` **lampeggia**, un toast annuncia il nuovo valore e una **barra
   secondo timer** sotto il cronometro si svuota indicando quando scatta il
-  prossimo calo (es. «prossimo scalino (+3s) tra 42s»).
+  prossimo calo (es. «prossimo scalino (+3s) tra 42s»). **Anche il power-up
+  🚀 "Passa la patata" vale come una parola valida sul cronometro**: chi passa
+  guadagna lo stesso `+Ns` (a scalare) e il `turno.ultimo.bonus` lo comunica a
+  tutti (`🚀 … (power-up!) · +5s sul cronometro`).
 - **Tetto del cronometro**: il tempo mostrato non supera mai quello
   configurato (30/60/120 s). Se il cronometro è a 58 s e la parola vale `+5s`,
-  si va a 60 s — mai 63. La partita può comunque durare di più, perché il
-  tetto vale sull'istante del turno, non sulla partita.
+  si va a 60 s — mai 63. Vale identicamente per il bonus del power-up 🚀. La
+  partita può comunque durare di più, perché il tetto vale sull'istante del
+  turno, non sulla partita.
 - La rivincita riusa i campi `prossimaPartita` / `rivincitaAccettataDa` /
   `rivincitaRifiutataDa` già usati da Ruzzle e dall'hub.
 

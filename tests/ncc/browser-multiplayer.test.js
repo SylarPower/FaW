@@ -17,6 +17,7 @@ const backendJs = fs.readFileSync(path.join(ROOT, 'games/nomi-cose-citta/js/back
 const uiJs = fs.readFileSync(path.join(ROOT, 'games/nomi-cose-citta/js/ui.js'), 'utf8');
 const cfgJs = fs.readFileSync(path.join(ROOT, 'games/shared/firebase-config.js'), 'utf8');
 const podioJs = fs.readFileSync(path.join(ROOT, 'games/shared/podio.js'), 'utf8');
+const bannerJs = fs.readFileSync(path.join(ROOT, 'games/shared/faw-banner.js'), 'utf8');
 const dictSample = fs.readFileSync(path.join(ROOT, 'dizionario.txt'), 'utf8')
   .split('\n').filter((_, i) => i % 10 === 0).join('\n');
 
@@ -69,6 +70,7 @@ function pagina(nome) {
   w.eval(coreJs);
   w.eval(backendJs);
   w.eval(podioJs);   // podio condiviso di fine partita
+  w.eval(bannerJs);   // banner/toast condivisi
   w.eval(uiJs);
   return w;
 }
@@ -364,6 +366,9 @@ const visibile = (w, id) => !w.document.getElementById(id).classList.contains('h
   const podio = a.document.querySelectorAll('#podio .pod-col');
   eq(podio.length, 2, 'podio con entrambi i giocatori');
   ok(podio[0].textContent.indexOf('ALFA') !== -1, 'ALFA primo');
+  /* I punteggi del podio salgono da 0 al valore finale: si aspetta la fine
+     dell'animazione (podio.js) prima di leggerli. */
+  await until(() => podio[0].querySelector('.pod-bar').textContent === '40', 'punteggio finale del podio');
   ok(podio[0].textContent.indexOf('40') !== -1, 'punteggio finale mostrato');
   ok(podio[1].textContent.indexOf('BETA') !== -1, 'BETA secondo');
   const gradino1 = parseInt(podio[0].querySelector('.pod-bar').style.height, 10);

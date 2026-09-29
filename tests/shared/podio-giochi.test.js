@@ -67,6 +67,17 @@ const nomi = (w) => colonne(w).map((c) => c.querySelector('.pod-name').textConte
 const punti = (w) => colonne(w).map((c) => c.querySelector('.pod-bar').textContent);
 const altezze = (w) => colonne(w).map((c) => parseInt(c.querySelector('.pod-bar').style.height, 10));
 
+/* I punteggi del podio salgono da 0 al valore finale (podio.js): si aspetta la
+   fine dell'animazione prima di confrontarli. */
+async function until(fn, what, timeout = 5000) {
+  const t0 = Date.now();
+  for (;;) {
+    try { if (fn()) return true; } catch (e) { /* continua */ }
+    if (Date.now() - t0 > timeout) throw new Error('timeout in attesa di: ' + what);
+    await new Promise((r) => setTimeout(r, 30));
+  }
+}
+
 (async () => {
   const errori = [];
 
@@ -79,6 +90,7 @@ const altezze = (w) => colonne(w).map((c) => parseInt(c.querySelector('.pod-bar'
     finito: ['ALFA', 'BETA', 'GAMMA', 'DELTA']
   });
   eq(nomi(g), ['BETA', 'DELTA', 'ALFA', 'GAMMA'], 'ordine per punteggio decrescente (tutti e 4)');
+  await until(() => JSON.stringify(punti(g)) === JSON.stringify(['480', '300', '120', '0']), 'punteggi del podio del 15');
   eq(punti(g), ['480', '300', '120', '0'], 'punteggi corretti nei gradini');
   eq(altezze(g), [104, 88, 72, 56], 'gradini decrescenti');
   ok(g.document.getElementById('multiplayer-results').style.display === 'block', 'riquadro risultati visibile');
@@ -92,6 +104,7 @@ const altezze = (w) => colonne(w).map((c) => parseInt(c.querySelector('.pod-bar'
   // 'state' e' un const di script (non una proprieta' di window): si passa da eval
   p.eval("state.playerName = 'ALFA'; handleResultsPhase({ scores: { ALFA: 5, BETA: 12, GAMMA: 7 }, chains: { c1: { originalTheme: 'CASA', steps: [{ player: 'BETA' }] } } });");
   eq(nomi(p), ['BETA', 'GAMMA', 'ALFA'], 'ordine per voti decrescente');
+  await until(() => JSON.stringify(punti(p)) === JSON.stringify(['12', '7', '5']), 'voti del podio del Pictionary');
   eq(punti(p), ['12', '7', '5'], 'voti corretti nei gradini');
   eq(altezze(p), [104, 88, 72], 'gradino del 1° più alto');
   ok(colonne(p)[0].querySelector('.pod-medal').textContent === '🥇', 'medaglia d\'oro al primo');

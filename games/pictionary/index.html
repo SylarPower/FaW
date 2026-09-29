@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>PICTIONARY 🎨</title>
+    <meta name="description" content="Pictionary FaW: disegna la parola, gli altri indovinano. Punti per chi indovina e per chi disegna.">
+      <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🎨%3C/text%3E%3C/svg%3E">
     <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore-compat.js"></script>
     <!-- Config Firebase condivisa (prima dello script che inizializza Firebase) -->
@@ -13,10 +15,13 @@
     <script src="../shared/faw-layout.js" defer></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <script src="../shared/faw-theme.js" data-tema-fisso="dark"></script>
     <link rel="stylesheet" href="../shared/faw-ui.css">
     <!-- Podio di fine partita (condiviso tra i giochi) -->
     <link rel="stylesheet" href="../shared/podio.css">
+    <link rel="stylesheet" href="../shared/rivincita.css">
+    <script src="../shared/faw-banner.js"></script>
     <script src="../shared/podio.js"></script>
     <style>
         /* Font piattaforma caricati via <link> nel <head> */
@@ -48,7 +53,6 @@
         .app-container, #game-ui, #loading-screen, .overlay { position: relative; z-index: 1; }
 
         /* === ANIMAZIONI === */
-        @keyframes slideDown { from { transform: translateY(-100%); } to { transform: translateY(0); } }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes pulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.1); opacity: 0.8; } }
         @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
@@ -78,8 +82,8 @@
 
         .header-left { display: flex; align-items: center; gap: 15px; }
         .room-tag {
-            font-family: 'Nunito', ui-monospace, monospace;
-            font-size: 0.68rem; color: var(--primary); font-weight: 700;
+            font-family: inherit; font-variant-numeric: tabular-nums;
+            font-size: 0.75rem; color: var(--primary); font-weight: 700;
             letter-spacing: 3px; text-transform: uppercase;
             background: rgba(255, 77, 125, 0.14);
             border: 1px solid rgba(255, 77, 125, 0.3);
@@ -130,7 +134,7 @@
 }
 
 #guessit-word-badge > div:first-child {
-    font-size: 0.7rem;
+    font-size: 0.8125rem;
     opacity: 0.85;
     margin-bottom: 4px;
     letter-spacing: 1px;
@@ -175,7 +179,7 @@
             right: 0;
             background: var(--success);
             color: #06282a;
-            font-size: 0.5rem;
+            font-size: 0.8125rem;
             font-weight: bold;
             text-align: center;
             padding: 2px;
@@ -273,7 +277,7 @@
         
         input, select, textarea {
             width: 100%; padding: 14px; border-radius: 12px; border: 1px solid var(--border);
-            background: rgba(11, 14, 28, 0.7); font-family: 'Nunito', ui-monospace, monospace; font-size: 1rem;
+            background: rgba(11, 14, 28, 0.7); font-family: inherit; font-variant-numeric: tabular-nums; font-size: 1rem;
             outline: none; color: var(--text);
             transition: border-color 0.15s ease, box-shadow 0.15s ease;
         }
@@ -282,7 +286,7 @@
             background-color: #121832;
             color: #eef1fa;
         }
-        .game-banner select, .game-banner select option {
+        .faw-banner select, .faw-banner select option {
             color-scheme: light;
             background-color: #ffffff;
             color: #1c2438;
@@ -324,20 +328,12 @@
             content: '👑'; display: block; font-size: 1.2rem; margin-top: 5px;
         }
         .player-card .name { font-weight: 700; font-size: 0.9rem; }
-        .player-card .status { font-size: 0.7rem; opacity: 0.7; margin-top: 5px; }
+        .player-card .status { font-size: 0.8125rem; opacity: 0.7; margin-top: 5px; }
 
-        /* === BANNER STILE RUZZLE === */
-        .game-banner {
-            position: fixed; top: 0; left: 0; right: 0;
-            padding: 15px 20px; display: flex; justify-content: space-between;
-            align-items: center; z-index: 9999; animation: slideDown 0.3s ease;
-            flex-wrap: wrap; gap: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-        }
-        .banner-left { display: flex; align-items: center; gap: 12px; }
-        .banner-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-        .banner-icon { font-size: 1.8rem; }
-        .banner-title { font-family: var(--font-display); font-weight: 800; font-size: 1.1rem; color: white; letter-spacing: 0.6px; }
-        .banner-subtitle { font-size: 0.8rem; opacity: 0.9; color: white; }
+        /* === BANNER: struttura e stile sono condivisi (.faw-banner in
+           faw-ui.css + games/shared/faw-banner.js). Qui resta solo il timer,
+           che è specifico di Pictionary. === */
+        .faw-banner__actions > .btn { padding: 10px 20px; }
 
         /* ✅ TIMER NEL BANNER - SEMPRE VISIBILE */
         .banner-timer {
@@ -436,7 +432,7 @@
     right: 5px;
     background: var(--primary);
     color: #241500;
-    font-size: 0.6rem;
+    font-size: 0.8125rem;
     font-weight: bold;
     padding: 3px 8px;
     border-radius: 10px;
@@ -532,10 +528,8 @@
             opacity: 0.85;
         }
 
-        /* === PULSANTE HOME: classe condivisa .fixed-home-btn (faw-ui.css), sempre visibile === */
-        @media (min-width: 601px) {
-            .game-banner { padding-left: var(--faw-home-safe-x); }
-        }
+        /* === PULSANTE HOME: classe condivisa .fixed-home-btn (faw-ui.css),
+           come l'area di sicurezza riservata al banner. === */
 
         /* === RESPONSIVE === */
         @media (max-width: 600px) {
@@ -546,8 +540,7 @@
             .color-dot { width: 28px; height: 28px; }
             .tool-btn { width: 38px; height: 38px; font-size: 1.1rem; }
             .btn { padding: 10px 18px; font-size: 0.8rem; }
-            .game-banner { flex-direction: column; text-align: center; }
-            .banner-left, .banner-right { justify-content: center; width: 100%; }
+            /* La disposizione mobile del banner è già in faw-ui.css. */
             .banner-timer { font-size: 1.5rem; padding: 6px 12px; }
             .reference-thumbnail:hover {
                 transform: scale(2.5) translate(-20%, 10%);
@@ -607,7 +600,7 @@
 }
 
 .tool-label {
-    font-size: 0.62rem;
+    font-size: 0.75rem;
     font-weight: 700;
     opacity: 0.65;
     text-transform: uppercase;
@@ -660,9 +653,9 @@
     appearance: none;
     background: var(--accent);
     border-radius: 4px;
-    outline: none;
     cursor: pointer;
 }
+.size-slider:focus-visible { outline: 3px solid #ffffff; outline-offset: 3px; }
 
 .size-slider::-webkit-slider-thumb {
     -webkit-appearance: none;
@@ -708,7 +701,7 @@
 .size-preview-text {
     position: absolute;
     bottom: 2px;
-    font-size: 0.6rem;
+    font-size: 0.8125rem;
     font-weight: bold;
     color: var(--text);
     opacity: 0.7;
@@ -888,7 +881,7 @@
     right: 0;
     background: var(--success);
     color: #06282a;
-    font-size: 0.5rem;
+    font-size: 0.8125rem;
     font-weight: bold;
     text-align: center;
     padding: 3px;
@@ -924,7 +917,7 @@
 }
 
 .timer-label {
-    font-size: 0.7rem;
+    font-size: 0.8125rem;
     opacity: 0.7;
     margin-bottom: 8px;
     text-transform: uppercase;
@@ -947,8 +940,8 @@
 }
 
 .round-info {
-    font-family: 'Nunito', ui-monospace, monospace;
-    font-size: 0.68rem;
+    font-family: inherit; font-variant-numeric: tabular-nums;
+    font-size: 0.75rem;
     font-weight: 700;
     letter-spacing: 2px;
     color: var(--primary);
@@ -1060,19 +1053,34 @@
         max-height: calc(100vw - 130px);
     }
 }
+            /* ---------- Utility: sostituiscono gli stili scritti a mano nel markup ----------
+           In fondo al foglio così, a pari specificità, vincono sulle regole generali. */
+        .pict-vuoto { text-align: center; padding: 40px; }
+        .pict-cresce { flex: 1; }
+        .pict-riga { display: flex; align-items: center; gap: 16px; }
+        .pict-punto { width: 16px; height: 16px; }
+        .pict-bottone-grande { padding: 14px 28px; font-weight: 900; font-size: 1.1rem; }
+        .pict-bottone-medio { padding: 10px 20px; }
+        .pict-punteggio { font-size: 1.5rem; font-weight: 900; color: var(--success); }
+        .pict-dim-90 { font-size: 0.75rem; opacity: 0.9; }
+        .pict-dim-80 { font-size: 0.85rem; opacity: 0.8; }
+        .pict-dim-70 { font-size: 0.8rem; opacity: 0.7; }
+        .pict-rosa { color: #ff8fa3; }
+        .pict-ottone { color: #f39c12; }
+        .pict-rosso { color: #e94560; }
     </style>
 </head>
 <body>
 
 <!-- LOADING -->
-<div id="loading-screen" class="overlay">
+<div id="loading-screen" class="overlay" role="status" aria-live="polite">
     <div class="spinner-big"></div>
     <p>Caricamento partita...</p>
 </div>
 
 <!-- LOBBY (gestita solo da banner, background neutro) -->
 <div id="lobby-screen" class="overlay hidden" style="justify-content: center; align-items: center;">
-    <div style="text-align: center; padding: 40px;">
+    <div class="pict-vuoto">
         <div style="font-size: 5rem; margin-bottom: 20px;">🎨</div>
         <h1 style="margin-bottom: 10px;">PICTIONARY</h1>
         <p style="opacity: 0.7; margin-bottom: 30px;">In attesa nella lobby...</p>
@@ -1082,7 +1090,7 @@
         <div style="background: var(--panel); padding: 20px; border-radius: 15px; max-width: 300px; margin: 0 auto;">
             <div style="text-align: center; padding: 10px; background: rgba(78, 205, 196, 0.1); border-radius: 8px; margin-bottom: 15px;">
                 <div style="font-size: 0.75rem; opacity: 0.7;">ROUND AUTOMATICI</div>
-                <div style="font-size: 1.5rem; font-weight: 900; color: var(--success);">
+                <div class="pict-punteggio">
                     <span id="auto-rounds-display">2</span> round
                 </div>
             </div>
@@ -1120,7 +1128,7 @@
         <span class="size-dot" style="width: 10px; height: 10px;"></span>
     </button>
     <button class="tool-btn size-btn" id="size-large" onclick="setSize(16)" title="Grande">
-        <span class="size-dot" style="width: 16px; height: 16px;"></span>
+        <span class="size-dot pict-punto"></span>
     </button>
 </div>
         
@@ -1128,7 +1136,7 @@
         <div class="tool-section">
             <div class="tool-label">Colore</div>
             <div class="color-picker-container">
-                <input type="color" id="color-picker" class="color-wheel" value="#000000" 
+                <input type="color" id="color-picker" class="color-wheel" value="#000000" aria-label="Colore del pennello" 
                        oninput="setColorFromPicker(this.value)">
                 <div class="quick-colors" id="quick-colors"></div>
             </div>
@@ -1190,7 +1198,7 @@
             <span style="font-size: 1.5rem;">🖼️</span>
             <span style="font-weight: 900;">GALLERIA</span>
         </div>
-        <div id="vote-status" style="font-size: 0.85rem; opacity: 0.8;"></div>
+        <div id="vote-status" class="pict-dim-80"></div>
     </header>
     
     <div class="gallery-container" id="gallery-container"></div>
@@ -1217,10 +1225,10 @@
         <div class="full-ranking" id="full-ranking"></div>
         
         <div style="display: flex; gap: 15px; margin-top: 30px;">
-            <button class="btn btn-primary" style="flex: 1;" onclick="apriSceltaRivincita()">
+            <button class="btn btn-primary pict-cresce" onclick="apriSceltaRivincita()">
                 🔄 RIVINCITA
             </button>
-            <button class="btn btn-secondary" style="flex: 1;" onclick="goHome()">
+            <button class="btn btn-secondary pict-cresce" onclick="goHome()">
                 🏠 HOME
             </button>
         </div>
@@ -1255,7 +1263,7 @@
                     <span class="size-dot" style="width: 8px; height: 8px;"></span>
                 </button>
                 <button class="tool-btn size-btn active" id="gi-size-medium" onclick="setGuessItSize(12)" title="Medio">
-                    <span class="size-dot" style="width: 16px; height: 16px;"></span>
+                    <span class="size-dot pict-punto"></span>
                 </button>
                 <button class="tool-btn size-btn" id="gi-size-large" onclick="setGuessItSize(28)" title="Grande">
                     <span class="size-dot" style="width: 28px; height: 28px;"></span>
@@ -1266,7 +1274,7 @@
             <div class="tool-section">
                 <div class="tool-label">Colore</div>
                 <div class="color-picker-container">
-                    <input type="color" id="gi-color-picker" class="color-wheel" value="#000000" 
+                    <input type="color" id="gi-color-picker" class="color-wheel" value="#000000" aria-label="Colore del pennello (Guess It)" 
                            oninput="setGuessItColor(this.value)">
                     <div class="quick-colors" id="gi-quick-colors"></div>
                 </div>
@@ -1326,12 +1334,12 @@
             <div class="round-info" id="guessit-round-info">ROUND 1/5</div>
             
             <div style="text-align: center; padding: 10px 5px; background: var(--bg); border-radius: 8px; width: 100%;">
-                <div style="font-size: 0.65rem; opacity: 0.7;">TU</div>
-                <div id="guessit-my-score" style="font-size: 1.5rem; font-weight: 900; color: var(--success);">0</div>
+                <div style="font-size: 0.75rem; opacity: 0.7;">TU</div>
+                <div id="guessit-my-score" class="pict-punteggio">0</div>
             </div>
             
             <div style="text-align: center; padding: 8px 5px; background: rgba(233, 69, 96, 0.15); border-radius: 8px; width: 100%;">
-                <div style="font-size: 0.6rem; opacity: 0.7;">🎨 DRAWER</div>
+                <div style="font-size: 0.8125rem; opacity: 0.7;">🎨 DRAWER</div>
                 <div id="guessit-drawer-score" style="font-size: 1.2rem; font-weight: 900; color: var(--primary);">0</div>
             </div>
         </div>
@@ -1356,7 +1364,7 @@
             <div id="guessit-drawer-notice" style="
                 padding: 15px; text-align: center; display: none;
                 background: rgba(233, 69, 96, 0.1); border-top: 2px solid var(--border);">
-                <div style="font-size: 0.85rem; opacity: 0.8;">
+                <div class="pict-dim-80">
                     Sei il disegnatore!<br>
                     <span style="font-size: 0.75rem;">Clicca ✅ ACCETTA per approvare risposte simili</span>
                 </div>
@@ -1364,7 +1372,7 @@
             
             <!-- Input risposta (solo indovinatori) -->
             <div id="guessit-input-area" style="padding: 12px; border-top: 2px solid var(--border); display: none;">
-                <input type="text" id="guessit-input" placeholder="Cosa pensi sia?" 
+                <input type="text" id="guessit-input" placeholder="Cosa pensi sia?" aria-label="La tua risposta" 
                        autocomplete="off" autocorrect="off" spellcheck="false"
                        style="margin-bottom: 8px; font-size: 0.95rem; text-align: center; padding: 10px;">
                 <button class="btn btn-primary" onclick="submitGuessItAnswer()" style="width: 100%; padding: 12px;">
@@ -1859,65 +1867,37 @@ function showScreen(id) {
     }
 }
 
+/* Banner di stato: componente condiviso (games/shared/faw-banner.js). */
 function showBanner(options) {
     removeBanner();
-    const banner = document.createElement('div');
-    banner.id = 'game-banner';
-    banner.className = 'game-banner';
-    const bannerFill = (window.FAW_fillPerTestoChiaro && options.color)
-        ? window.FAW_fillPerTestoChiaro(options.color)
-        : options.color;
-    banner.style.background = `linear-gradient(135deg, ${bannerFill} 0%, ${adjustColor(bannerFill, -30)} 100%)`;
-    banner.style.color = '#ffffff';
-    
-    let buttonsHtml = (options.buttons || []).map(btn => 
-        `<button class="btn ${btn.class || 'btn-secondary'}" onclick="${btn.onclick}" 
-                 style="padding: 10px 20px;">${btn.text}</button>`
-    ).join('');
-    
-    let spinnerHtml = options.spinner ? '<div class="spinner"></div>' : '';
-    let timerHtml = options.timer ? `<div class="banner-timer" id="banner-timer">${options.timer}s</div>` : '';
-    
-    banner.innerHTML = `
-        <div class="banner-left">
-            <span class="banner-icon">${options.icon}</span>
-            <div>
-                <div class="banner-title">${options.title}</div>
-                <div class="banner-subtitle">${options.subtitle}</div>
-            </div>
-        </div>
-        <div class="banner-right">${timerHtml}${buttonsHtml}${spinnerHtml}</div>
-    `;
-    
-    document.body.appendChild(banner);
+    if (!window.FAW_BANNER) return;
+    window.FAW_BANNER.banner({
+        id: 'game-banner',
+        icon: options.icon,
+        title: options.title,
+        subtitle: options.subtitle,
+        color: options.color,
+        timer: options.timer,
+        spinner: options.spinner,
+        /* I banner di Pictionary restano finché il gioco non li toglie. */
+        sticky: options.sticky !== undefined ? options.sticky : true,
+        buttons: (options.buttons || []).map(btn => ({
+            text: btn.text || btn.label,
+            onclick: btn.onclick,
+            fn: btn.fn,
+            kind: btn.class,
+            chiaro: !btn.class
+        }))
+    });
 }
 
 function removeBanner() {
+    if (window.FAW_BANNER) window.FAW_BANNER.chiudi('game-banner');
     document.getElementById('game-banner')?.remove();
 }
 function updateBannerText(title, subtitle) {
-    const bannerTitle = document.querySelector('#game-banner .banner-title');
-    const bannerSubtitle = document.querySelector('#game-banner .banner-subtitle');
-    
-    if (bannerTitle) bannerTitle.textContent = title;
-    if (bannerSubtitle) bannerSubtitle.textContent = subtitle;
+    if (window.FAW_BANNER) window.FAW_BANNER.aggiorna('game-banner', { title: title, subtitle: subtitle });
 }
-function adjustColor(hex, amount) {
-    if (!hex || hex === 'transparent') return '#000000';
-    
-    let c = hex.replace('#', '');
-    if (c.length === 3) c = c[0]+c[0]+c[1]+c[1]+c[2]+c[2];
-    
-    const num = parseInt(c, 16);
-    if (isNaN(num)) return hex; // ✅ Protezione
-    
-    let r = Math.min(255, Math.max(0, (num >> 16) + amount));
-    let g = Math.min(255, Math.max(0, ((num >> 8) & 0xFF) + amount));
-    let b = Math.min(255, Math.max(0, (num & 0xFF) + amount));
-    
-    return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
-}
-
 function cyrb128(str) {
     let h = 1779033703;
     for (let i = 0; i < str.length; i++) h = Math.imul(h ^ str.charCodeAt(i), 597399067);
@@ -1995,8 +1975,8 @@ function handleRoomUpdate(doc) {
         }
         showScreen('loading-screen');
         document.getElementById('loading-screen').innerHTML = `
-            <div style="text-align: center; padding: 40px;">
-                <h2 style="color: #f39c12;">⚠️ Room Eliminata</h2>
+            <div class="pict-vuoto">
+                <h2 class="pict-ottone">⚠️ Room Eliminata</h2>
                 <button onclick="window.location.href='../../index.html'" 
                         style="padding: 15px 30px; background: #c2253a; color: #ffffff; 
                                border: none; border-radius: 10px; cursor: pointer; margin-top: 20px;">
@@ -2096,7 +2076,7 @@ function renderLobby(data) {
 
     if (banner && banner.dataset.type === 'lobby') {
         // Aggiorna solo il contenuto
-        const subtitleEl = banner.querySelector('.banner-subtitle');
+        const subtitleEl = banner.querySelector('.faw-banner__sub');
         if (subtitleEl) subtitleEl.textContent = subtitleText;
 
         const readyBtn = banner.querySelector('.ready-toggle-btn');
@@ -2109,7 +2089,7 @@ function renderLobby(data) {
         removeBanner();
         banner = document.createElement('div');
         banner.id = 'game-banner';
-        banner.className = 'game-banner';
+        banner.className = 'faw-banner faw-banner--tinta';
         banner.dataset.type = 'lobby';
         banner.style.background = 'linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%)';
 
@@ -2117,7 +2097,7 @@ function renderLobby(data) {
         if (state.isHost && !data.sfidaDiretta) {
             const currentTime = data.settings?.timePerRound || 60;
             timeSelector = `
-                <select onchange="updateSettings()" id="banner-time-select" class="faw-select" style="padding:8px 12px;border-radius:8px;font-weight:bold;cursor:pointer;">
+                <select onchange="updateSettings()" id="banner-time-select" aria-label="Durata del round" class="faw-select" style="padding:8px 12px;border-radius:8px;font-weight:bold;cursor:pointer;">
                     <option value="30" ${currentTime==30?'selected':''}>30s</option>
                     <option value="45" ${currentTime==45?'selected':''}>45s</option>
                     <option value="60" ${currentTime==60?'selected':''}>60s</option>
@@ -2127,20 +2107,20 @@ function renderLobby(data) {
         }
 
         banner.innerHTML = `
-            <div class="banner-left">
-                <span class="banner-icon">🎨</span>
+            <div class="faw-banner__left">
+                <span class="faw-banner__ico">🎨</span>
                 <div>
-                    <div class="banner-title">PICTIONARY - LOBBY</div>
-                    <div class="banner-subtitle">${subtitleText}</div>
+                    <div class="faw-banner__title">PICTIONARY - LOBBY</div>
+                    <div class="faw-banner__sub">${subtitleText}</div>
                 </div>
             </div>
-            <div class="banner-right">
+            <div class="faw-banner__actions">
                 ${timeSelector}
-                <button class="btn ${isReady ? 'btn-secondary' : 'btn-primary'} ready-toggle-btn" 
-                        onclick="toggleReady()" style="padding:10px 20px;">
+                <button class="btn ${isReady ? 'btn-secondary' : 'btn-primary'} ready-toggle-btn pict-bottone-medio" 
+            onclick="toggleReady()">
                     ${isReady ? '⏸️ ANNULLA' : '🚀 SONO PRONTO!'}
                 </button>
-                <button class="btn btn-danger" onclick="leaveRoom()" style="padding:10px 20px;">
+                <button class="btn btn-danger pict-bottone-medio" onclick="leaveRoom()">
                     🚪 ESCI
                 </button>
             </div>
@@ -2401,7 +2381,7 @@ function launchCanvas(data) {
 if (themeBadge) {
     const category = state.roomData?.chains?.[state.myChainId]?.originalCategory || '🎨 Tema';
     themeBadge.innerHTML = `
-        <div style="font-size: 0.65rem; opacity: 0.8; margin-bottom: 2px;">
+        <div style="font-size: 0.75rem; opacity: 0.8; margin-bottom: 2px;">
             ${category}
         </div>
         <div>
@@ -2637,8 +2617,8 @@ function renderGallery(data) {
         
         // ✅ Durante la votazione NON mostrare chi ha creato il tema originale
         const headerInfo = isVotingPhase 
-            ? `<div style="font-size: 0.8rem; opacity: 0.7;">🎯 Tema originale nascosto</div>`
-            : `<div style="font-size: 0.8rem; opacity: 0.7;">di ${chain.steps[0]?.player || '?'}</div>`;
+            ? `<div class="pict-dim-70">🎯 Tema originale nascosto</div>`
+            : `<div class="pict-dim-70">di ${chain.steps[0]?.player || '?'}</div>`;
         
 // ✅ Tema sempre visibile
 const themeDisplay = `<span>Tema: "${chain.originalTheme}"</span>`;
@@ -2698,7 +2678,7 @@ const themeDisplay = `<span>Tema: "${chain.originalTheme}"</span>`;
                 <div class="step-canvas"><canvas id="step-canvas-${chainId}-${stepIdx}"></canvas></div>
                 <div class="step-info">
                     ${playerDisplay}
-                    <div class="step-type" style="font-size: 0.65rem; opacity: 0.6;">
+                    <div class="step-type" style="font-size: 0.75rem; opacity: 0.6;">
                         ${stepIdx === 0 ? '🎯 Primo disegno' : `🔄 Copia #${stepIdx}`}
                     </div>
                 </div>
@@ -2933,27 +2913,47 @@ function preparaContestoRivincita() {
         partecipanti: state.roomData.players || [],
         giocoCorrente: 'pictionary',
         proposta: state.roomData,
+        /* Impostazioni della room: la modale le ripropone per il rilancio. */
+        correnti: {
+            mode: state.roomData.settings?.mode || 'classic',
+            timePerRound: String(state.roomData.settings?.timePerRound || 60)
+        },
         onErrore: (msg) => alert(msg || 'Invito non riuscito')
     });
 }
+/**
+ * Rivincita: modale condivisa (gioco + impostazioni). Per il Pictionary la
+ * "stessa partita" è il rilancio di QUESTA room (solo l'host), mentre gli
+ * altri giochi creano una lobby nuova a cui tutti devono accettare.
+ */
 function apriSceltaRivincita() {
+    if (!window.FAW_RIVINCITA) return;
     preparaContestoRivincita();
-    const n = (state.roomData?.players || []).length;
-    const altri = window.FAW_RIVINCITA ? window.FAW_RIVINCITA.htmlAltri('pictionary', n) : '';
-    const stessa = state.isHost
-        ? `<button class="btn btn-primary" onclick="playAgain()" style="padding:10px 16px;">🎨 STESSA PARTITA</button>`
-        : `<button class="btn btn-secondary" disabled title="Solo l'host può rifare questa room" style="padding:10px 16px;">🎨 STESSA PARTITA</button>`;
-    showBanner({
-        icon: '🔁',
-        title: 'RIVINCITA',
-        subtitle: 'Stessa partita, oppure invita tutti a un altro gioco',
-        color: '#1c2438',
-        buttons: []
+    const isHost = !!state.isHost;
+    window.FAW_RIVINCITA.apriScelta({
+        giocoCorrente: 'pictionary',
+        n: (state.roomData?.players || []).length,
+        correnti: {
+            mode: state.roomData?.settings?.mode || 'classic',
+            timePerRound: String(state.roomData?.settings?.timePerRound || 60)
+        },
+        disabilitati: isHost ? {} : { pictionary: 'Solo l\'host può rigiocare questa room' },
+        sottotitolo: 'Rilancia questa room (solo l\'host) con le impostazioni che preferisci, oppure invita tutti a un altro gioco. Si parte quando tutti accettano.',
+        onConferma: (giocoId, opzioni) => {
+            if (giocoId === 'pictionary') {
+                if (!isHost) return;
+                playAgain(opzioni);
+                return;
+            }
+            inviaRivincitaPictionary(giocoId, opzioni);
+        }
     });
-    const right = document.querySelector('#game-banner .banner-right');
-    if (right) {
-        right.innerHTML = stessa + `<div style="flex-basis:100%;display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><span style="font-size:0.78rem;font-weight:800;">Oppure un altro gioco</span>${altri}</div>`;
-    }
+}
+/** Crea la lobby di un altro gioco scelto in modale (con le sue impostazioni). */
+async function inviaRivincitaPictionary(giocoId, opzioni) {
+    if (!window.FAW_RIVINCITA) return;
+    const r = await window.FAW_RIVINCITA.invita(giocoId, opzioni);
+    if (r && !r.ok) alert(r.errore || 'Invito non riuscito');
 }
 function gestisciPropostaPictionary(data) {
     if (!data || !data.prossimaPartita || !window.FAW_RIVINCITA) return;
@@ -3010,13 +3010,13 @@ async function annullaRivincitaPictionary() {
     if (!window.FAW_RIVINCITA) return;
     await window.FAW_RIVINCITA.annulla(db, db.collection('pictionary_rooms').doc(state.roomId), state.roomData);
 }
-async function playAgain() {
+async function playAgain(opzioni) {
     if (!state.isHost) {
         return alert("Solo l'host può avviare una nuova partita!");
     }
     
     const FV = firebase.firestore.FieldValue;
-    await db.collection("pictionary_rooms").doc(state.roomId).update({
+    const patch = {
         stato: 'lobby',
         currentRound: 0,
         totalRounds: 0,
@@ -3031,7 +3031,15 @@ async function playAgain() {
         prossimaPartitaGioco: FV.delete(),
         rivincitaAccettataDa: FV.delete(),
         rivincitaRifiutataDa: FV.delete()
-    });
+    };
+    /* Il rilancio riparte con le impostazioni scelte in modale. */
+    if (opzioni) {
+        const mode = opzioni.mode || state.roomData?.settings?.mode || 'classic';
+        patch.settings = { mode: mode, timePerRound: parseInt(opzioni.timePerRound, 10) || 60 };
+        patch.totalRounds = mode === 'guessit' ? (state.roomData?.players || []).length * 2
+                                               : (state.roomData?.players || []).length;
+    }
+    await db.collection("pictionary_rooms").doc(state.roomId).update(patch);
     
     state.myVotes = {};
     state.isAdvancing = false;
@@ -3425,8 +3433,8 @@ window.onload = async () => {
     // ✅ VALIDAZIONE SENZA REDIRECT AUTOMATICO
     if (!mioNome) {
         document.getElementById('loading-screen').innerHTML = `
-            <div style="text-align: center; padding: 40px;">
-                <h2 style="color: #e94560;">❌ Login richiesto</h2>
+            <div class="pict-vuoto">
+                <h2 class="pict-rosso">❌ Login richiesto</h2>
                 <button onclick="window.location.href='../../index.html'" 
                         style="padding: 15px 30px; background: #c2253a; color: #ffffff; 
                                border: none; border-radius: 10px; cursor: pointer; margin-top: 20px;">
@@ -3454,8 +3462,8 @@ window.onload = async () => {
     let roomAssenteTimer = null;
     const mostraErrore = (msg) => {
         document.getElementById('loading-screen').innerHTML = `
-            <div style="text-align: center; padding: 40px;">
-                <h2 style="color: #ff8fa3;">❌ Errore</h2>
+            <div class="pict-vuoto">
+                <h2 class="pict-rosa">❌ Errore</h2>
                 <p>${msg || 'Ingresso non riuscito'}</p>
                 <button onclick="window.location.href='../../index.html'"
                         style="padding: 15px 30px; background: #c2253a; color: #ffffff;
@@ -3467,8 +3475,8 @@ window.onload = async () => {
     };
     const mostraAssente = () => {
         document.getElementById('loading-screen').innerHTML = `
-            <div style="text-align: center; padding: 40px;">
-                <h2 style="color: #ff8fa3;">❌ Room Non Trovata</h2>
+            <div class="pict-vuoto">
+                <h2 class="pict-rosa">❌ Room Non Trovata</h2>
                 <p>La room "${roomCode}" non esiste</p>
                 <button onclick="window.location.href='../../index.html'"
                         style="padding: 15px 30px; background: #c2253a; color: #ffffff;
@@ -3510,8 +3518,8 @@ window.onload = async () => {
                         return;
                     } else {
                         document.getElementById('loading-screen').innerHTML = `
-                            <div style="text-align: center; padding: 40px;">
-                                <h2 style="color: #f39c12;">⚠️ Partita già iniziata</h2>
+                            <div class="pict-vuoto">
+                                <h2 class="pict-ottone">⚠️ Partita già iniziata</h2>
                                 <button onclick="window.location.href='../../index.html'"
                                         style="padding: 15px 30px; background: #c2253a; color: #ffffff;
                                                border: none; border-radius: 10px; cursor: pointer; margin-top: 20px;">
@@ -3535,8 +3543,8 @@ window.onload = async () => {
     } catch (e) {
         console.error("Errore:", e);
         document.getElementById('loading-screen').innerHTML = `
-            <div style="text-align: center; padding: 40px;">
-                <h2 style="color: #e94560;">❌ Errore</h2>
+            <div class="pict-vuoto">
+                <h2 class="pict-rosso">❌ Errore</h2>
                 <p>${e.message}</p>
                 <button onclick="window.location.href='../../index.html'" 
                         style="padding: 15px 30px; background: #c2253a; color: #ffffff; 
@@ -3703,7 +3711,7 @@ function setupGuessItDrawer(gi) {
     // Parola da disegnare
 const badge = document.getElementById('guessit-word-badge');
 badge.innerHTML = `
-    <div style="font-size: 0.7rem; opacity: 0.8; margin-bottom: 3px;">
+    <div style="font-size: 0.8125rem; opacity: 0.8; margin-bottom: 3px;">
         ${gi.currentCategory || '🎨 Disegna'}
     </div>
     <div style="font-size: 1.1rem;">
@@ -3824,30 +3832,29 @@ function showRoundWinnerBanner(winner, word, drawer, data) {
 
     const banner = document.createElement('div');
     banner.id = 'game-banner';
-    banner.className = 'game-banner';
+    banner.className = 'faw-banner faw-banner--tinta';
     banner.style.background = 'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)';
 
     // ✅ Mostra il pulsante "PROSSIMO ROUND" solo al disegnatore corrente
     const showAdvanceButton = iAmDrawer || state.isHost;
 
     const advanceButton = showAdvanceButton 
-        ? `<button class="btn btn-primary" onclick="confirmAdvanceRound()" 
-                   style="padding: 14px 28px; font-weight: 900; font-size: 1.1rem;">
+        ? `<button class="btn btn-primary pict-bottone-grande" onclick="confirmAdvanceRound()">
                ▶️ PROSSIMO ROUND
            </button>`
         : `<div class="spinner"></div><span style="color:rgba(255,255,255,0.9)">Attendi il disegnatore...</span>`;
 
     banner.innerHTML = `
-        <div class="banner-left">
-            <span class="banner-icon">🎉</span>
+        <div class="faw-banner__left">
+            <span class="faw-banner__ico">🎉</span>
             <div>
-                <div class="banner-title">${winner} HA INDOVINATO!</div>
-                <div class="banner-subtitle">"${word}" • ${pointsMsg}</div>
+                <div class="faw-banner__title">${winner} HA INDOVINATO!</div>
+                <div class="faw-banner__sub">"${word}" • ${pointsMsg}</div>
             </div>
         </div>
-        <div class="banner-right" style="display:flex; align-items:center; gap:16px;">
+        <div class="faw-banner__actions pict-riga">
             <div style="background:rgba(255,215,0,0.25); border:2px solid #ffd700; border-radius:12px; padding:8px 16px; text-align:center; min-width:120px;">
-                <div style="font-size:0.75rem; opacity:0.9;">⚡ ${elapsedSeconds}s</div>
+                <div class="pict-dim-90">⚡ ${elapsedSeconds}s</div>
                 <div style="font-size:1.15rem; font-weight:900; color:#ffd700;">${pointsBadge}</div>
             </div>
             ${advanceButton}
@@ -3871,12 +3878,11 @@ function showTimeUpBanner(word, drawer, data) {
 
     const banner = document.createElement('div');
     banner.id = 'game-banner';
-    banner.className = 'game-banner';
+    banner.className = 'faw-banner faw-banner--tinta';
     banner.style.background = 'linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)';
 
     const advanceButton = showAdvanceButton 
-        ? `<button class="btn btn-primary" onclick="confirmAdvanceRound()" 
-                   style="padding: 14px 28px; font-weight: 900; font-size: 1.1rem;">
+        ? `<button class="btn btn-primary pict-bottone-grande" onclick="confirmAdvanceRound()">
                ▶️ PROSSIMO ROUND
            </button>`
         : `<div class="spinner"></div>
@@ -3885,17 +3891,17 @@ function showTimeUpBanner(word, drawer, data) {
            </span>`;
 
     banner.innerHTML = `
-        <div class="banner-left">
-            <span class="banner-icon">⏰</span>
+        <div class="faw-banner__left">
+            <span class="faw-banner__ico">⏰</span>
             <div>
-                <div class="banner-title">TEMPO SCADUTO!</div>
-                <div class="banner-subtitle">
+                <div class="faw-banner__title">TEMPO SCADUTO!</div>
+                <div class="faw-banner__sub">
                     La parola era: <strong>"${word}"</strong><br>
                     <span style="opacity:0.9;">Nessun punto assegnato questo round</span>
                 </div>
             </div>
         </div>
-        <div class="banner-right" style="display:flex; align-items:center; gap:16px;">
+        <div class="faw-banner__actions pict-riga">
             <div style="
                 background:rgba(255,255,255,0.15); 
                 border:2px solid rgba(255,255,255,0.4); 
@@ -3904,7 +3910,7 @@ function showTimeUpBanner(word, drawer, data) {
                 text-align:center;
                 min-width:110px;
             ">
-                <div style="font-size:0.75rem; opacity:0.9;">Durata round</div>
+                <div class="pict-dim-90">Durata round</div>
                 <div style="font-size:1.2rem; font-weight:900; color:white;">
                     ${totalTime}s
                 </div>
@@ -4510,7 +4516,7 @@ function startPracticeMode(playerName) {
     setSize(8);
     const badge = document.getElementById('canvas-theme-badge');
     if (badge) {
-        badge.innerHTML = `<div style="font-size:0.65rem;opacity:0.8;">${theme.category} • ALLENAMENTO</div><div>${theme.word}</div>`;
+        badge.innerHTML = `<div style="font-size: 0.75rem;opacity:0.8;">${theme.category} • ALLENAMENTO</div><div>${theme.word}</div>`;
     }
     document.getElementById('ui-round-info').textContent = 'PRATICA';
     document.getElementById('ui-player').textContent = playerName;
