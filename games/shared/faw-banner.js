@@ -18,7 +18,7 @@
 
    API:
      FAW_BANNER.banner({ id, icon, title, subtitle, color, buttons, spinner,
-                         timer, sticky, vibrate, priority })
+                         timer, sticky, vibrate, compact, priority })
      FAW_BANNER.aggiorna(id, { title, subtitle })
      FAW_BANNER.chiudi(id)
      FAW_BANNER.toast(msg, 'ok' | 'err')
@@ -105,6 +105,7 @@
     }
     el.className = 'faw-banner' + (o.color ? ' faw-banner--tinta' : ' faw-banner--pannello') +
       (o.flottante ? ' faw-banner--flottante' : '') +
+      (o.compact ? ' faw-banner--compatto' : '') +
       (o.vibrate ? ' faw-banner--vittoria' : '');
     el.setAttribute('role', 'status');
     el.setAttribute('aria-live', 'polite');

@@ -132,7 +132,39 @@ const mouseEvent = (w, tipo) => new w.MouseEvent(tipo, { bubbles: true, cancelab
   ok(typeof w.eval('typeof clearSelection') === 'string' && w.eval('typeof clearSelection') === 'function',
     'clearSelection resta disponibile come funzione interna');
 
-  console.log('\n[5] Nessun errore di pagina durante l\'interazione');
+  console.log('\n[5] La griglia multiplayer segue tutte le opzioni della rivincita');
+  w.eval("currentGameData = { stato: 'attesa' };" +
+    "syncMultiplayerGrid({ opzioni: { seed: 'RIVINCITA1', griglia: '3', mode: 'classic' } });");
+  eq(tiles(w).length, 9, 'con opzioni 3×3 la nuova partita renderizza 9 celle');
+  const firstBoardTile = tiles(w)[0];
+  w.eval("syncMultiplayerGrid({ opzioni: { seed: 'RIVINCITA1', griglia: '5', mode: 'classic' } });");
+  eq(tiles(w).length, 25, 'cambio griglia a seed invariato ricostruisce 25 celle (non resta il vecchio DOM)');
+  eq(Number(w.eval('gridSize')), 5, 'la dimensione interna coincide con la griglia renderizzata');
+  const currentBoardTile = tiles(w)[0];
+  w.eval("syncMultiplayerGrid({ opzioni: { seed: 'RIVINCITA1', griglia: '5', mode: 'classic' } });");
+  ok(tiles(w)[0] === currentBoardTile && currentBoardTile !== firstBoardTile,
+    'snapshot identica non ridisegna la griglia, una configurazione diversa sì');
+
+  console.log('\n[6] Drag interrotto o indice obsoleto: nessun errore getBoundingClientRect');
+  w.eval('inputState.isDragging = true; selectedCells = [];');
+  w.document.dispatchEvent(mouseEvent(w, 'mousemove'));
+  await sleep(40);
+  eq(Boolean(w.eval('inputState.isDragging')), false, 'un move senza celle selezionate chiude il drag');
+  w.eval('inputState.isDragging = true; selectedCells = [999, 0];');
+  w.document.dispatchEvent(mouseEvent(w, 'mousemove'));
+  await sleep(40);
+  eq(Boolean(w.eval('inputState.isDragging')), false, 'un indice fuori griglia annulla il drag in sicurezza');
+  eq(selezionati(w), 0, 'la selezione non lascia celle fantasma');
+  w.eval("gridSize = 5; while (gridEl.children.length > 9) gridEl.lastElementChild.remove();" +
+    'inputState.isDragging = true; selectedCells = [8];');
+  w.document.dispatchEvent(mouseEvent(w, 'mousemove'));
+  await sleep(40);
+  eq(Boolean(w.eval('inputState.isDragging')), false, 'un DOM di 3×3 non viene usato come se fosse 5×5');
+  w.eval('inputState.isDragging = true; selectedCells = [0];');
+  w.document.dispatchEvent(new w.Event('touchcancel', { bubbles: true }));
+  eq(Boolean(w.eval('inputState.isDragging')), false, 'touchcancel ripulisce lo stato di trascinamento');
+
+  console.log('\n[7] Nessun errore di pagina durante l\'interazione');
   eq(errori, [], 'nessun errore uncaught: ' + errori.join(' | '));
 
   console.log('\n=================');

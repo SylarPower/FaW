@@ -1725,6 +1725,7 @@
 			let rotationCount = 0;
 			let errorCount = 0;
 			let fireworksInterval = null;
+			let vittoriaCelebrata = false;
 			/* Conto alla rovescia ancorato all'orologio: timeRemaining e' sempre
 			   "quanti secondi mancano ADESSO", quindi la durata scelta dall'utente e'
 			   quella giocata davvero. Le sottrazioni a ogni tick dell'intervallo
@@ -1888,6 +1889,7 @@
 			        timer: options.timer,
 			        spinner: options.spinner,
 			        vibrate: options.vibrate,
+			        compact: options.compact,
 			        /* I banner di Ruzzle restano finché il gioco non li toglie. */
 			        sticky: options.sticky !== undefined ? options.sticky : true,
 			        priority: priority,
@@ -1913,10 +1915,15 @@
 			
 			function mostraRisultatiPopup() {
 			  if (!currentGameData) return;
-			  let msg = "RISULTATI PARZIALI:\n\n";
-			  Object.entries(currentGameData.punteggi || {}).forEach(([p, s]) => {
+			  const conclusa = currentGameData.stato === 'conclusa';
+			  const finali = punteggiAllineati(currentGameData);
+			  const nomi = (currentGameData.partecipanti || Object.keys(finali)).slice().sort((a, b) =>
+			    (finali[b] - finali[a]) || a.localeCompare(b)
+			  );
+			  let msg = conclusa ? "RISULTATI FINALI NETTI:\n\n" : "RISULTATI PARZIALI:\n\n";
+			  nomi.forEach(p => {
 			    const finito = (currentGameData.finito || []).includes(p);
-			    msg += `${finito ? '✅' : '⏳'} ${p}: ${s} PT\n`;
+			    msg += `${conclusa ? '🏁' : (finito ? '✅' : '⏳')} ${p}: ${finali[p]} PT\n`;
 			  });
 			  alert(msg);
 			}
@@ -2084,6 +2091,7 @@
 			  isSandboxMode = false;
 			  document.body.classList.remove('mega-win-effect');
 			  stopFireworks();
+			  vittoriaCelebrata = false;
 			  score = 0;
 			  foundWords.clear();
 			  selectedCells = [];
@@ -2319,7 +2327,39 @@
 			  gridEl.dataset.letters = JSON.stringify(displayLetters);
 			  gridEl.dataset.bonuses = JSON.stringify(displayBonuses);
 			}
-			
+
+			/* Sincronizza la griglia con l'intera configurazione della lobby.
+			   Controllare solo il seed lasciava in piedi le vecchie celle se una
+			   snapshot arrivava con lo stesso seed ma dimensione/modalità diversa:
+			   gridSize e DOM finivano fuori sincrono e il trascinamento poteva
+			   puntare a una cella inesistente. */
+			function syncMultiplayerGrid(data) {
+			  const opzioni = (data && data.opzioni) || {};
+			  const size = parseInt(opzioni.griglia, 10);
+			  gridSize = Number.isInteger(size) && size > 0 && size <= 10 ? size : 5;
+			  currentSeed = String(opzioni.seed || 'DEFAULT');
+			  const mode = opzioni.mode == null ? 'bonus' : String(opzioni.mode);
+			  isCrazyMode = mode === 'crazy';
+			  useBonuses = mode !== 'classic';
+
+			  const boardKey = JSON.stringify([currentSeed, gridSize, mode]);
+			  const expectedCells = gridSize * gridSize;
+			  if (gridEl.dataset.boardConfig === boardKey && gridEl.children.length === expectedCells) {
+			    return false;
+			  }
+
+			  // Non lasciare che un trascinamento inizi sulla griglia appena sostituita.
+			  inputState.isDragging = false;
+			  clearSelectionImmediate();
+			  rotationIndex = 0;
+			  generateGridData(currentSeed.split('-')[0]);
+			  renderGrid();
+			  gridEl.dataset.seed = currentSeed;
+			  gridEl.dataset.boardConfig = boardKey;
+			  console.log("✅ Griglia multiplayer:", gridSize, "x", gridSize, "- Celle:", gridEl.children.length);
+			  return true;
+			}
+
 			function rotateArray(arr) {
 			  const newArr = new Array(gridSize * gridSize);
 			  for (let r = 0; r < gridSize; r++) {
@@ -2571,6 +2611,7 @@
 			}
 			// --- INPUT SYSTEM ---
 			function getCenter(el) {
+			  if (!el || typeof el.getBoundingClientRect !== 'function') return null;
 			  const r = el.getBoundingClientRect();
 			  return {
 			    x: r.left + r.width / 2,
@@ -2584,18 +2625,32 @@
 			
 			const moveListener = (x, y) => {
 			  if (!inputState.isDragging || !isGameActive) return;
+			  // touchcancel, un ridisegno della griglia o un cambio fase possono
+			  // svuotare la selezione mentre il browser invia ancora move events.
+			  if (!selectedCells.length) {
+			    inputState.isDragging = false;
+			    return;
+			  }
+			  const cellCount = gridEl.children.length;
+			  const last = selectedCells[selectedCells.length - 1];
+			  const selectionInvalid = selectedCells.some(idx =>
+			    !Number.isInteger(idx) || idx < 0 || idx >= cellCount
+			  );
+			  if (selectionInvalid || !Number.isInteger(last) || cellCount !== gridSize * gridSize) {
+			    inputState.isDragging = false;
+			    clearSelectionImmediate();
+			    return;
+			  }
 			  let closest = -1,
 			    minD = 9999;
-			  const last = selectedCells[selectedCells.length - 1];
 			  const candidates = getNeighbors(last);
 			  candidates.push(last);
 			  if (selectedCells.length > 1) candidates.push(selectedCells[selectedCells.length - 2]);
 			  candidates.forEach(idx => {
-			    const tile = gridEl.children[idx];
-			    const d = dist({
-			      x,
-			      y
-			    }, getCenter(tile));
+			    const tile = Number.isInteger(idx) ? gridEl.children[idx] : null;
+			    const center = getCenter(tile);
+			    if (!tile || !center) return;
+			    const d = dist({ x, y }, center);
 			    if (d < tile.offsetWidth * 0.45 && d < minD) {
 			      minD = d;
 			      closest = idx;
@@ -2604,19 +2659,28 @@
 			  if (closest !== -1) attemptSelection(closest);
 			};
 			// ✅ MANAGED LISTENERS
+			const cancelDrag = () => {
+			  if (!inputState.isDragging) return;
+			  inputState.isDragging = false;
+			  clearSelectionImmediate();
+			};
 			addManagedListener(document, 'mousemove', (e) => {
 			  if (inputState.isDragging) moveListener(e.clientX, e.clientY);
 			});
 			addManagedListener(document, 'touchmove', (e) => {
 			  if (inputState.isDragging) {
+			    const touch = e.touches && e.touches[0];
+			    if (!touch) return;
 			    e.preventDefault();
-			    moveListener(e.touches[0].clientX, e.touches[0].clientY);
+			    moveListener(touch.clientX, touch.clientY);
 			  }
 			}, {
 			  passive: false
 			});
 			addManagedListener(document, 'mouseup', () => endDrag());
 			addManagedListener(document, 'touchend', () => endDrag());
+			addManagedListener(document, 'touchcancel', cancelDrag);
+			addManagedListener(window, 'blur', cancelDrag);
 			
 			function selectTile(i) {
 			  selectedCells = [i];
@@ -2638,6 +2702,7 @@
 			}
 			
 			function getNeighbors(idx) {
+			  if (!Number.isInteger(idx) || idx < 0 || idx >= gridSize * gridSize) return [];
 			  const n = [],
 			    r = Math.floor(idx / gridSize),
 			    c = idx % gridSize;
@@ -2984,7 +3049,12 @@
 			classifica, banner e live score mostrano cosi' gli stessi numeri su ogni
 			client, anche se il documento non e' ancora allineato. */
 			function punteggiAllineati(data) {
-			  const src = (data && data.punteggi) || {};
+			  /* Alla chiusura la mappa salvata può essere ancora quella live mentre
+			     l'arbitro riconcilia Firestore. La UI usa subito la stessa regola
+			     netta della classifica, senza aspettare la scrittura asincrona. */
+			  const src = data && data.stato === 'conclusa'
+			    ? calcolaPunteggiFinali(data)
+			    : ((data && data.punteggi) || {});
 			  const out = {};
 			  ((data && data.partecipanti) || []).forEach(p => { out[p] = Number(src[p]) || 0; });
 			  return out;
@@ -3636,22 +3706,27 @@
 			  }
 			}
 function celebraVittoria() {
-    // Coriandoli dorati esplosivi
-    fireConfettiVittoria();
+    if (vittoriaCelebrata) return;
+    vittoriaCelebrata = true;
 
-    // Fuochi d'artificio brevi (3 secondi)
+    const ridotto = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (ridotto) return;
+
+    // Pioggia dorata e pochi fuochi: festa visibile, senza riavviarla a ogni snapshot.
+    fireConfettiVittoria();
     stopFireworks();
     let count = 0;
+    const raffiche = 3;
     fireworksInterval = setInterval(() => {
         launchFirework();
         count++;
-        if (count > 15) stopFireworks();
-    }, 200);
+        if (count >= raffiche) stopFireworks();
+    }, 650);
 }
 
 function fireConfettiVittoria() {
     const colors = ['#f1c40f', '#f39c12', '#e67e22', '#fff9c4', '#ffe082', '#ffd54f', '#ffffff', '#ffeb3b'];
-    const count = 200;
+    const count = 96;
 
     for (let i = 0; i < count; i++) {
         const p = document.createElement('div');
@@ -3712,10 +3787,10 @@ function fermaFesteggiamenti() {
 			  box.style.display = 'flex';
 			}
 			function aggiornaFesteggiamentoVincitore(data) {
-    if (!data || !data.punteggi) return;
+    if (!data || !Array.isArray(data.partecipanti) || !data.partecipanti.length) return;
 
-    const partecipanti = data.partecipanti || [];
-    const paroleEscluse = data.paroleEscluse || [];   // ← Parole cancellate/escluse
+    const partecipanti = data.partecipanti;
+    const paroleEscluse = paroleEsclusePartita(data);
 
     let playerStats = [];
 
@@ -3755,6 +3830,7 @@ function fermaFesteggiamenti() {
 
     const bestTotal = playerStats[0].totalScore;
     const bestMaxWordScore = playerStats[0].maxWordScore;
+    const punteggiFinaliTesto = playerStats.map(p => `${p.name}: ${p.totalScore} pt`).join(' | ');
 
     // Tutti i giocatori che pareggiano sia sul totale che sulla parola più preziosa valida
     const vincitori = playerStats.filter(p => 
@@ -3769,7 +3845,6 @@ function fermaFesteggiamenti() {
     if (!data.prossimaPartita) {
         let titolo = '';
         let sottotitolo = '';
-        let colore = '';
         let icona = '';
 
         if (isPareggio) {
@@ -3778,23 +3853,17 @@ function fermaFesteggiamenti() {
             if (bestMaxWordScore > 0) {
                 sottotitolo += ` (parola più preziosa valida: ${bestMaxWordScore} pt)`;
             }
-            colore = '#f39c12';
+            sottotitolo += ` · Punteggi netti: ${punteggiFinaliTesto}`;
             icona = '🤝';
-        } 
-        else {
+        } else {
             const vincitoreSingolo = vincitori[0];
             const statsVincitore = playerStats.find(p => p.name === vincitoreSingolo);
-            
+
             titolo = haVinto ? 'VITTORIA!' : 'SCONFITTA!';
-            sottotitolo = Object.entries(finali)
-                            .map(([p, s]) => `${p}: ${s} pt`)
-                            .join(' | ');
-            
+            sottotitolo = `Punteggi netti: ${punteggiFinaliTesto}`;
             if (statsVincitore && statsVincitore.maxWordScore > 0) {
                 sottotitolo += ` • Max parola valida: ${statsVincitore.maxWord} (${statsVincitore.maxWordScore} pt)`;
             }
-            
-            colore = haVinto ? '#f1c40f' : '#7f8c8d';
             icona = haVinto ? '👑' : '🐷';
         }
 
@@ -3802,10 +3871,11 @@ function fermaFesteggiamenti() {
             icon: icona,
             title: titolo,
             subtitle: sottotitolo,
-            color: colore,
+            compact: true,
             vibrate: haVinto && !isPareggio,
             buttons: [{ text: '🔄 RIVINCITA', onclick: 'apriRivincitaBanner()', special: true }]
         });
+        if (haVinto && !isPareggio) celebraVittoria();
     }
 
     /* Il punteggio mostrato e' sempre quello condiviso: se il documento non ha
@@ -3819,10 +3889,11 @@ function fermaFesteggiamenti() {
 function aggiornaLiveScorePostGame(data) {
     if (!data || !data.partecipanti) return;
 
+    const finali = punteggiAllineati(data);
     const altri = data.partecipanti.filter(n => n !== mioNome);
     let scoresHtml = "";
     altri.forEach(a => {
-        const punteggio = punteggiAllineati(data)[a] || 0;
+        const punteggio = finali[a] || 0;
         scoresHtml += `<span class="ruzzle-bottone-vicino">🆚 ${a}: <strong>${punteggio}</strong></span>`;
     });
 
@@ -3945,10 +4016,11 @@ function aggiornaLiveScorePostGame(data) {
 			}
 			// ✅ DEBOUNCE PER FIREBASE
 			const aggiornaInterfacciaMultiplayer = debounce((data) => {
+			  const finali = punteggiAllineati(data);
 			  const altri = data.partecipanti.filter(n => n !== mioNome);
 			  let scoresHtml = "";
 			  altri.forEach(a => {
-			    const punteggio = punteggiAllineati(data)[a] || 0;
+			    const punteggio = finali[a] || 0;
 			    scoresHtml += `
 																<span class="ruzzle-bottone-vicino">🆚 ${a}: 
 																	<strong>${punteggio}</strong>
@@ -3978,6 +4050,7 @@ function aggiornaLiveScorePostGame(data) {
 			      return;
 			    }
 			    currentGameData = data;
+			    syncMultiplayerGrid(data);
 			    /* Podio: si aggiorna a ogni snapshot, così resta allineato anche se i
 			       punteggi cambiano dopo la chiusura (parola eliminata, riconciliazione). */
 			    renderizzaPodioFinale(data);
@@ -4019,21 +4092,9 @@ function aggiornaLiveScorePostGame(data) {
 // ========================================
 if (data.stato === "attesa") {
     
-    // Configura parametri griglia
-    gridSize = parseInt(data.opzioni?.griglia) || 5;
+    // Configura il timer; syncMultiplayerGrid ha già allineato griglia e opzioni.
     timeRemaining = parseInt(data.opzioni?.tempo) || 180;
     initialTime = timeRemaining;
-    currentSeed = data.opzioni?.seed || 'DEFAULT';
-    isCrazyMode = (data.opzioni?.mode === 'crazy');
-    useBonuses = (data.opzioni?.mode !== 'classic');
-    
-    // ✅ GENERA E RENDERIZZA GRIGLIA (solo se non già fatto)
-    if (!gridEl.children.length || gridEl.dataset.seed !== currentSeed) {
-        generateGridData(currentSeed.split('-')[0]);
-        renderGrid();
-        gridEl.dataset.seed = currentSeed;
-        console.log("✅ Griglia generata:", gridSize, "x", gridSize, "- Celle:", gridEl.children.length);
-    }
     
     // ✅ Nascondi start screen e overlay VIA
     document.getElementById('start-screen').style.display = 'none';
@@ -4058,8 +4119,8 @@ if (data.stato === "attesa") {
     showGameBanner({
         icon: '⏳',
         title: `ATTESA GIOCATORI (${pronti.length}/${data.partecipanti.length})`,
-        subtitle: 'Preparazione in corso... Aspettiamo tutti!',
-        color: '#2c3e50',
+        subtitle: 'La sfida parte appena tutti sono pronti.',
+        compact: true,
         buttons: [
             { text: '🚫 ANNULLA', onclick: 'annullaPartita()' }
         ],
@@ -4090,21 +4151,9 @@ if (data.stato === "in_corso") {
         
         // Se non sto già giocando, mostra overlay VIA
         if (!isGameActive && !isAnalysisPhase && !isPaused) {
-            // Configura parametri
-            gridSize = parseInt(data.opzioni?.griglia) || 5;
+            // Il listener ha già sincronizzato il tabellone dalla configurazione condivisa.
             timeRemaining = parseInt(data.opzioni?.tempo) || 180;
             initialTime = timeRemaining;
-            currentSeed = data.opzioni?.seed || 'DEFAULT';
-                    isCrazyMode = (data.opzioni?.mode === 'crazy');
-            useBonuses = (data.opzioni?.mode !== 'classic');
-            
-            // ✅ Genera griglia se non già fatto
-            if (!gridEl.children.length || gridEl.dataset.seed !== currentSeed) {
-                generateGridData(currentSeed.split('-')[0]);
-                renderGrid();
-                gridEl.dataset.seed = currentSeed;
-                console.log("✅ Griglia in_corso:", gridSize, "x", gridSize);
-            }
             
             // ✅ Mostra griglia blurrata CON overlay VIA
             document.getElementById('start-screen').style.display = 'none';
@@ -4139,12 +4188,12 @@ if (data.stato === "in_corso") {
             // Attendo altri giocatori
             showGameBanner({
                 icon: '⏳',
-                title: `ATTESA COLLEGHI (${finito.length}/${data.partecipanti.length})`,
-                subtitle: 'Esplora la griglia nel frattempo!',
-                color: '#2c3e50',
+                title: `IN ATTESA DEGLI ALTRI (${finito.length}/${data.partecipanti.length})`,
+                subtitle: 'Esplora la griglia o controlla i risultati parziali.',
+                compact: true,
                 buttons: [
-                    { text: '👀 RISULTATI PARZIALI', onclick: 'mostraRisultatiPopup()' },
-                    { text: '🔍 COSA MI SONO PERSO', onclick: 'showMissedWords()' }
+                    { text: '📊 RISULTATI PARZIALI', onclick: 'mostraRisultatiPopup()' },
+                    { text: '🔍 PAROLE MANCANTI', onclick: 'showMissedWords()' }
                 ],
                 spinner: true
             });
@@ -4152,9 +4201,9 @@ if (data.stato === "in_corso") {
             // Tutti hanno finito → la verifica parte DA SOLA, senza pulsanti
             showGameBanner({
                 icon: '✅',
-                title: 'TUTTI HANNO FINITO!',
-                subtitle: 'Verifica parole in corso…',
-                color: '#27ae60',
+                title: 'TUTTI HANNO FINITO',
+                subtitle: 'Verifica delle parole e calcolo dei risultati finali…',
+                compact: true,
                 buttons: [],
                 spinner: true
             });
@@ -4185,14 +4234,14 @@ if (data.stato === "in_corso") {
 			      }
 			      if (!conferma.includes(mioNome)) {
 			        // Nessuna conferma manuale: il client si allinea da solo
-			        showGameBanner({
-			          icon: '🏁',
-			          title: 'VERIFICA PAROLE',
-			          subtitle: 'Calcolo dei risultati in corso…',
-			          color: '#27ae60',
-			          buttons: [],
-			          spinner: true
-			        });
+				        showGameBanner({
+				          icon: '🏁',
+				          title: 'VERIFICA PAROLE',
+				          subtitle: 'Calcolo dei risultati in corso…',
+				          compact: true,
+				          buttons: [],
+				          spinner: true
+				        });
 			        if (!verificaAutoInviata) {
 			          verificaAutoInviata = true;
 			          avviaVerificaUnificata().catch(e => {
@@ -4202,14 +4251,14 @@ if (data.stato === "in_corso") {
 			        }
 			      } else {
 			        // Ho già confermato, attendo altri
-			        showGameBanner({
-			          icon: '⏳',
-			          title: `ATTESA VERIFICA (${conferma.length}/${data.partecipanti.length})`,
-			          subtitle: 'Verifica automatica: attendi gli altri giocatori...',
-			          color: '#8e44ad',
-			          buttons: [],
-			          spinner: true
-			        });
+				        showGameBanner({
+				          icon: '⏳',
+				          title: `ATTESA VERIFICA (${conferma.length}/${data.partecipanti.length})`,
+				          subtitle: 'Verifica automatica: attendi gli altri giocatori…',
+				          compact: true,
+				          buttons: [],
+				          spinner: true
+				        });
 			      }
 			      // Tutti hanno confermato? Chiude UN solo client (l'arbitro), che rilegge il
 			      // documento prima di scrivere: niente scritture concorrenti che possono
@@ -4340,8 +4389,6 @@ if (data.stato === "in_corso") {
 							  renderizzaAnalisiPlayerSilent(selAnalisi.value, data, conteggioParoleGlobali);
 						 }
 
-						 // ✅ Aggiorna festeggiamenti, banner, live-score e punteggio locale
-						 aggiornaFesteggiamentoVincitore(data);
 					}
 			    }
 			  });
