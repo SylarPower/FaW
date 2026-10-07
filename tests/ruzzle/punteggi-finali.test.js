@@ -56,7 +56,7 @@ const BANNER = (w) => {
   return el ? el.textContent.replace(/\s+/g, ' ').trim() : '';
 };
 
-function pagina(nome, errori) {
+function pagina(nome, errori, firestore = mock, partitaId = 'P1') {
   const vc = new VirtualConsole();
   vc.on('jsdomError', (e) => {
     const msg = String(e && e.message ? e.message : e);
@@ -64,7 +64,7 @@ function pagina(nome, errori) {
     errori.push(nome + ': ' + msg);
   });
   const dom = new JSDOM(html, {
-    url: 'http://localhost/games/ruzzle/index.html?matchId=P1',
+    url: 'http://localhost/games/ruzzle/index.html?matchId=' + partitaId,
     runScripts: 'dangerously',
     pretendToBeVisual: true,
     virtualConsole: vc,
@@ -72,14 +72,14 @@ function pagina(nome, errori) {
       w.eval(podioJs);   // podio condiviso di fine partita
       w.eval(bannerJs);   // banner/toast condivisi
       w.localStorage.setItem('mioNome', nome);
-      w.firebase = makeFirebaseGlobal(mock);
+      w.firebase = makeFirebaseGlobal(firestore);
       w.FAW_FIREBASE_CONFIG = { apiKey: 'test-key', projectId: 'test' };
       w.FAW_REQUIRE_FIREBASE_CONFIG = () => w.FAW_FIREBASE_CONFIG;
       w.fetch = async (url) => {
         if (String(url).indexOf('dizionario') !== -1) return { ok: true, status: 200, text: async () => dictSample };
         throw new Error('no network: ' + url);
       };
-      w.alert = () => {};
+      w.alert = (messaggio) => { w.__ultimoAlert = String(messaggio); };
       w.confirm = () => true;
       w.Element.prototype.animate = function () { return { onfinish: null, cancel() {} }; };
       // jsdom non ha il canvas: i festeggiamenti non devono far fallire il test
@@ -132,6 +132,12 @@ const scrittureChiusura = () => mock.log.filter((w) => w.p === 'partite/P1' && (
     'JSON.stringify(punteggiAllineati({ partecipanti: ["A","B"], punteggi: { A: 3 } }))'
   ));
   eq(mappaUI, { A: 3, B: 0 }, 'mappa UI completa: chi manca vale 0');
+  const mappaFinaleStale = JSON.parse(a.eval('JSON.stringify(punteggiAllineati(' + JSON.stringify({
+    stato: 'conclusa', partecipanti: ['ALFA', 'BETA', 'GAMMA'], parole: PAROLE,
+    punteggi: { ALFA: 30, BETA: 14, GAMMA: 17 }
+  }) + '))'));
+  eq(mappaFinaleStale, ATTESI,
+    'a partita conclusa la UI calcola i punti netti senza aspettare la riconciliazione');
 
   console.log('\n[3] Chiusura della verifica: una scrittura sola, risultato giusto');
   ok(await until(() => doc().stato === 'conclusa', 'partita conclusa'), 'partita conclusa');
@@ -158,6 +164,46 @@ const scrittureChiusura = () => mock.log.filter((w) => w.p === 'partite/P1' && (
   const liveB = (b.document.getElementById('live-opponent-score') || {}).textContent || '';
   ok(/ALFA/.test(liveB) && /10/.test(liveB) && /GAMMA/.test(liveB) && /5/.test(liveB),
     'live score di BETA con i punteggi degli altri: ' + liveB.replace(/\s+/g, ' ').trim());
+  const bannerA = a.document.getElementById('game-banner');
+  ok(bannerA.classList.contains('faw-banner--compatto'), 'banner di fine partita compatto');
+  ok(bannerA.classList.contains('faw-banner--pannello') && !bannerA.classList.contains('faw-banner--tinta'),
+    'banner finale leggero, con colori del tema e senza tinta pesante');
+  ok(bannerA.classList.contains('faw-banner--vittoria') && b.document.getElementById('game-banner').classList.contains('faw-banner--compatto'),
+    'il vincitore è evidenziato e il banner resta compatto anche sugli altri client');
+  ok(a.document.querySelectorAll('.confetti').length >= 96,
+    'la vittoria aggiunge una celebrazione dorata più visibile');
+  ok(b.document.querySelectorAll('.confetti').length === 0 && c.document.querySelectorAll('.confetti').length === 0,
+    'la celebrazione extra è riservata al vincitore');
+
+  console.log('\n[4b] UI finale indipendente dalla mappa live ancora salvata');
+  a.eval('currentGameData.punteggi = { ALFA: 30, BETA: 14, GAMMA: 17 }; aggiornaFesteggiamentoVincitore(currentGameData); renderizzaPodioFinale(currentGameData); mostraRisultatiPopup();');
+  ok(SCORE(a) === '10' && rigaPunteggi(a) === 'ALFA: 10 pt | BETA: 6 pt | GAMMA: 5 pt',
+    'score, banner e live-score mostrano subito i netti, anche con mappa live obsoleta');
+  eq((a.__ultimoAlert.match(/(?:ALFA|BETA|GAMMA): \d+ PT/g) || []),
+    ['ALFA: 10 PT', 'BETA: 6 PT', 'GAMMA: 5 PT'], 'il popup finale usa la stessa classifica netta');
+  ok(/RISULTATI FINALI NETTI/.test(a.__ultimoAlert) && !/ALFA: 30 PT/.test(a.__ultimoAlert),
+    'il popup distingue i risultati finali e non mostra più il totale live');
+  const confettiPrimaDiAggiornare = a.document.querySelectorAll('.confetti').length;
+  a.eval('aggiornaFesteggiamentoVincitore(currentGameData)');
+  ok(a.document.querySelectorAll('.confetti').length === confettiPrimaDiAggiornare,
+    'gli snapshot successivi non riavviano la celebrazione');
+
+  console.log('\n[4c] Banner compatto mentre si aspetta che gli altri finiscano');
+  const waitingMock = createMockFirestore();
+  waitingMock.store.set('partite/WAIT1', {
+    gioco: 'ruzzle', partecipanti: ['ALFA', 'BETA'], parole: { ALFA: [], BETA: [] },
+    punteggi: { ALFA: 12, BETA: 6 }, finito: ['ALFA'], pronti: ['ALFA', 'BETA'],
+    stato: 'in_corso', opzioni: { griglia: 5, seed: 'WAIT-1', mode: 'classic', tempo: 180 }
+  });
+  const waitingPage = pagina('ALFA', errori, waitingMock, 'WAIT1');
+  ok(await until(() => {
+    const banner = waitingPage.document.getElementById('game-banner');
+    return banner && /IN ATTESA DEGLI ALTRI \(1\/2\)/.test(banner.textContent) &&
+      banner.classList.contains('faw-banner--compatto') && banner.classList.contains('faw-banner--pannello');
+  }, 'banner compatto in attesa degli altri'), 'attesa multiplayer con pannello leggero e compatto');
+  ok(!waitingPage.document.getElementById('game-banner').classList.contains('faw-banner--tinta'),
+    'il banner di attesa non usa una fascia scura pesante');
+  waitingPage.close();
 
   console.log('\n[5] Parola eliminata dopo la chiusura: punteggi ricalcolati per tutti');
   await mock.db.collection('partite').doc('P1').update({

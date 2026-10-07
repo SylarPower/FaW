@@ -566,6 +566,28 @@ select option {
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
 }
 .faw-banner--vittoria { animation: faw-slide-down 0.3s var(--faw-ease), faw-banner-win 1.1s var(--faw-ease); }
+.faw-banner--pannello.faw-banner--vittoria {
+  border-bottom-color: rgba(252, 211, 77, 0.72);
+  box-shadow: var(--faw-shadow-2), inset 0 -1px 0 rgba(252, 211, 77, 0.22);
+}
+/* Barra di stato compatta: resta fissa in alto, ma occupa meno spazio visivo.
+   faw-layout.js ne misura comunque l'altezza e tiene libero il contenuto sotto. */
+.faw-banner--compatto {
+  gap: 10px;
+  row-gap: 6px;
+  padding: 8px 18px;
+  padding-top: calc(8px + env(safe-area-inset-top, 0px));
+  border-radius: 0 0 var(--faw-r-lg) var(--faw-r-lg);
+  box-shadow: var(--faw-shadow-2);
+}
+.faw-banner--compatto .faw-banner__ico { font-size: 1.25rem; }
+.faw-banner--compatto .faw-banner__text { flex: 1 1 220px; }
+.faw-banner--compatto .faw-banner__title { font-size: var(--faw-fs-sm); line-height: 1.25; }
+.faw-banner--compatto .faw-banner__sub { margin-top: 1px; }
+.faw-banner--compatto .faw-banner__actions { gap: 6px; }
+.faw-banner--compatto .faw-banner__actions:empty { display: none; }
+.faw-banner--compatto .faw-banner__btn--chiaro { padding: 6px 11px; }
+.faw-banner--compatto .faw-banner__spin { width: 14px; height: 14px; border-width: 2px; }
 @keyframes faw-slide-down { from { transform: translateY(-100%); } to { transform: none; } }
 @keyframes faw-banner-win {
   0%, 100% { box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3); }
@@ -645,6 +667,23 @@ select option {
 @media (max-width: 600px) {
   .faw-banner { flex-direction: column; text-align: center; gap: 10px; }
   .faw-banner__actions { justify-content: center; }
+  /* Riserva esplicitamente il lato sinistro al pulsante HOME: il testo e le
+     azioni del banner compatto iniziano sempre dopo il controllo fisso. */
+  .faw-banner--compatto {
+    flex-direction: row;
+    align-items: center;
+    text-align: left;
+    gap: 8px;
+    padding-left: var(--faw-home-safe-x);
+    padding-right: 12px;
+  }
+  .faw-banner--compatto .faw-banner__text { flex: 1 1 0; }
+  .faw-banner--compatto .faw-banner__actions {
+    flex: 0 1 calc(100% - 28px);
+    max-width: calc(100% - 28px);
+    margin-left: 28px;
+    justify-content: flex-start;
+  }
 }
 
 /* ==========================================================================
