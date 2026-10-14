@@ -42,6 +42,7 @@ function normalizeData(data) {
   if (!data || typeof data !== "object" || !Array.isArray(data.days))
     throw new Error("Formato dei dati non valido. Nessun dato sovrascritto.");
   data.hist = Array.isArray(data.hist) ? data.hist : [];
+  data.sessionFeedback = Array.isArray(data.sessionFeedback) ? data.sessionFeedback : [];
   data.st = { ...dSt(), ...data.st };
   data.days.forEach((day) => {
     day.exs = Array.isArray(day.exs) ? day.exs : [];
@@ -294,7 +295,7 @@ window.addEventListener("storage", (event) => {
 function dayCounts(day) {
   return {
     sets: day.exs.reduce((a, e) => a + e.sd.length, 0),
-    done: day.exs.reduce((a, e) => a + e.sd.filter((s) => s.done).length, 0),
+    done: day.exs.reduce((a, e) => a + e.sd.filter((s) => s.done && !s.skipped).length, 0),
   };
 }
 function showGymTab(tab) {
@@ -342,18 +343,29 @@ goDay = function (id) {
 };
 function renderHomePremium() {
   if (!D) return;
+  const installCard = document.getElementById("personalProgramCard");
+  if (installCard)
+    installCard.hidden = D.st?.personalProgramVersion === PERSONAL_PROGRAM_VERSION;
   document.getElementById("todayDate").textContent = new Intl.DateTimeFormat(
     "it",
     { weekday: "long", day: "numeric", month: "long" },
   ).format(new Date());
-  const partial = D.days.find((d) => dayCounts(d).done > 0);
+  const activeDay = D.days.find((d) => d.id === D.activeSession?.dayId);
+  const partial = activeDay || D.days.find((d) => dayCounts(d).done > 0);
+  const personalDays = typeof getPersonalDayList === "function" ? getPersonalDayList() : [];
+  const cursor = Number(D.st?.nextPersonalDayIndex) || 0;
+  const scheduled = personalDays.length ? personalDays[cursor % personalDays.length] : null;
+  const restStatus = typeof getPersonalRestStatus === "function" ? getPersonalRestStatus() : null;
   const next =
     partial ||
+    scheduled ||
     D.days.find((d) => d.exs.length && !isDoneThisWeek(d.id)) ||
     D.days.find((d) => d.exs.length) ||
     D.days[0];
   const hero = document.getElementById("todayHero");
-  if (next) {
+  if (restStatus && !partial) {
+    hero.innerHTML = `<article class="hero-card rest-day-card"><span class="hero-label">RECUPERO PROGRAMMATO</span><h3>Giorno di riposo.</h3><p>${escapeHTML(restStatus.message)}</p><p class="muted">Il ciclo personale riprenderà con Gambe Final. La sequenza resta invariata.</p></article>`;
+  } else if (next) {
     const count = dayCounts(next);
     hero.innerHTML = `<article class="hero-card"><div class="hero-top"><span class="hero-label">${partial ? "Da dove eri rimasto" : "Il prossimo passo"}</span><span class="hero-tag">${partial ? "In corso" : "La tua scheda"}</span></div><h3>${escapeHTML(next.name)}</h3><p>${partial ? `${count.done} di ${count.sets} serie completate. Riparti da qui.` : "Tutto pronto. Prenditi questo tempo per te."}</p><div class="hero-meta"><div><strong>${next.exs.length}</strong><span>Esercizi</span></div><div><strong>${count.sets}</strong><span>Serie previste</span></div><div><strong>${count.sets ? Math.round((count.done / count.sets) * 100) : 0}%</strong><span>Completato</span></div></div><button class="bp" id="heroStart">${partial ? "Riprendi allenamento" : "Apri la scheda"} <span aria-hidden="true">→</span></button></article>`;
     document.getElementById("heroStart").onclick = () => {
@@ -362,7 +374,7 @@ function renderHomePremium() {
     };
   } else {
     hero.innerHTML =
-      '<article class="hero-card"><span class="hero-label">Il tuo primo passo</span><h3>Si comincia da una scheda.</h3><p>Crea la tua giornata o importa il programma che già segui.</p><button class="bp full-width" onclick="showGymTab(\'plan\');document.getElementById(\'iDay\').focus()">Crea la prima scheda <span>+</span></button><button class="text-button" onclick="openImport()">Ho già una scheda da importare →</button></article>';
+      '<article class="hero-card"><span class="hero-label">Il tuo primo passo</span><h3>Si comincia da una scheda.</h3><p>Crea la tua giornata, importa una scheda o aggiungi il programma personale.</p><button class="bp full-width" onclick="showGymTab(\'plan\')">Apri le schede <span>→</span></button><button class="text-button" onclick="openImport()">Ho già una scheda da importare →</button></article>';
   }
   const quick = document.getElementById("quickDays");
   quick.replaceChildren();
@@ -392,7 +404,7 @@ function renderHomePremium() {
         .slice(0, 20)
         .map(
           (session) =>
-            `<article class="history-item"><strong>${escapeHTML(D.days.find((d) => d.id === session.dayId)?.name || "Allenamento")}</strong><p>${new Intl.DateTimeFormat("it", { day: "numeric", month: "short", year: "numeric" }).format(new Date(session.dt))} · ${session.exercises} esercizi · ${session.sets} serie${session.volumeKnown ? " · " + formatGymNumber(session.volumeKg, 2) + " kg di volume" : ""}${session.duration ? " · " + Math.max(1, Math.round(session.duration / 60)) + " min" : ""}</p></article>`,
+            `<article class="history-item"><strong>${escapeHTML(D.days.find((d) => d.id === session.dayId)?.name || "Allenamento")}</strong><p>${new Intl.DateTimeFormat("it", { day: "numeric", month: "short", year: "numeric" }).format(new Date(session.dt))} · ${session.exercises} esercizi · ${session.sets} serie${session.volumeKnown ? " · " + formatGymNumber(session.volumeKg, 2) + " kg di volume" : ""}${session.duration ? " · " + Math.max(1, Math.round(session.duration / 60)) + " min" : ""}${session.rpe ? ` · RPE ${session.rpe}/10 · gomito ${{ none: "no", mild: "lieve", yes: "sì" }[session.elbow] || "—"} · ginocchio ${{ none: "no", mild: "lieve", yes: "sì" }[session.knee] || "—"}` : ""}${session.note ? ` · ${escapeHTML(session.note)}` : ""}</p></article>`,
         )
         .join("")
     : '<div class="card"><h3>La tua storia inizia qui.</h3><p class="muted">Completa un allenamento per ritrovare qui il tuo lavoro.</p></div>';
@@ -423,7 +435,11 @@ function sessionHistory() {
       entry.volumeKg += h.volumeKg;
     else entry.volumeKnown = false;
   });
-  return [...groups.values()].sort((a, b) => new Date(b.dt) - new Date(a.dt));
+  const feedbackById = new Map((D.sessionFeedback || []).map((entry) => [entry.sessionId, entry]));
+  return [...groups.entries()].map(([key, entry]) => {
+    const feedback = feedbackById.get(key);
+    return feedback ? { ...entry, rpe: feedback.rpe, elbow: feedback.elbow, knee: feedback.knee, note: feedback.note } : entry;
+  }).sort((a, b) => new Date(b.dt) - new Date(a.dt));
 }
 const legacyRenDay = renDay;
 renDay = function () {
@@ -457,10 +473,32 @@ function renderDayPremium() {
           const reps = [...new Set(ex.sd.map((s) => s.r).filter(Boolean))].join(
             " / ",
           );
-          return `<article class="outline-ex"><span class="outline-number">${done === ex.sd.length && done ? "✓" : String(i + 1).padStart(2, "0")}</span><div><h4>${escapeHTML(ex.name)}</h4><p>${ex.sd.length} serie${reps ? " × " + escapeHTML(reps) + " rip." : ""}${ex.rest ? " · Recupero " + escapeHTML(ex.rest) + "s" : ""}</p><p>${escapeHTML(def?.eq || "")}${done ? " · " + done + "/" + ex.sd.length + " fatte" : ""}</p>${ex.ssG ? "<small>Superserie · esercizi alternati</small>" : ""}${ex.note ? '<small class="note">' + escapeHTML(ex.note) + "</small>" : ""}</div></article>`;
+          const range = ex.progression ? formatRepTarget(ex) : "";
+          const loads = [...new Set(ex.sd.map((set) => Number(set.w) || 0))];
+          const loadLabel = loads.map((load) => load > 0 ? `${formatGymNumber(load, 2)} kg` : "corpo libero").join(" / ");
+          const step = Number(ex.progression?.stepKg) || 0;
+          const progressStatus = ex.progression ? getProgressionStatus(ex, day.id) : null;
+          const ramp = ex.rampUp?.length
+            ? getRampUpForLoad(ex, ex.sd?.[0]?.w).map((set) => `${formatGymNumber(set.w, 2)} kg × ${set.r} (${set.rest}s)`).join(" → ")
+            : "";
+          const plateau = day.personalProgramVersion ? getPlateauStatus(ex, day.id) : null;
+          const painStreak = ex.safetyJoint ? getJointDiscomfortStreak(ex.safetyJoint) : 0;
+          const safetyTrigger = painStreak >= 3
+            ? `<small class="safety-warning">3 sessioni consecutive con fastidio: sospendi e valuta ${escapeHTML(ex.progression?.alternative || (ex.safetyJoint === "elbow" ? "una variante a presa neutra" : "una variante senza dolore"))}.</small>`
+            : "";
+          const dropSetControl = "";
+          return `<article class="outline-ex"><span class="outline-number">${done === ex.sd.length && done ? "✓" : String(i + 1).padStart(2, "0")}</span><div><h4>${escapeHTML(ex.name)}</h4><p>${ex.sd.length} serie${reps ? " × " + escapeHTML(reps) + (ex.unit === "sec" ? " s" : " rip.") : ""} · ${escapeHTML(loadLabel)}${range ? ` · range ${escapeHTML(range)}${step > 0 ? ` · step +${formatGymNumber(step, 2)} kg` : ` · solo ${ex.progression.progressionType === "time" ? "tempo" : "ripetizioni"}`}` : ""}${ex.rest ? " · Recupero " + escapeHTML(ex.rest) + "s" : ""}</p><p>${escapeHTML(def?.eq || "")}${done ? " · " + done + "/" + ex.sd.length + " fatte" : ""}</p>${progressStatus ? `<small class="progression-status ${progressStatus.ready ? "ready" : ""}">${escapeHTML(progressStatus.text)}</small>` : ""}${ramp ? `<small>Ramp-up: ${escapeHTML(ramp)}</small>` : ""}${ex.ssG ? "<small>Superserie · esercizi alternati</small>" : ""}${ex.dropSet ? `<small>Drop set finale −${Math.round(ex.dropSet.reduction * 100)}% · ${ex.dropSet.reps[0]}–${ex.dropSet.reps[1]} rep</small>` : ""}${plateau ? `<small class="safety-warning">${escapeHTML(plateau)}</small>` : ""}${safetyTrigger}${dropSetControl}${ex.note ? '<small class="note">' + escapeHTML(ex.note) + "</small>" : ""}</div></article>`;
         })
         .join("")
     : '<div class="card"><h3>La tua scheda è pronta da costruire.</h3><p class="muted">Aggiungi il primo esercizio, poi imposta serie e recupero.</p><button class="bp full-width" onclick="dayEditing=true;renderDayPremium();openSel()">+ Aggiungi esercizio</button></div>';
+  if (day.personalProgramVersion) {
+    const messages = getProgramPolicyMessages(day);
+    const policy = document.createElement("section");
+    policy.className = "card program-policy";
+    policy.setAttribute("aria-label", "Regole del programma personale");
+    policy.innerHTML = `<h3>Progressione e recupero</h3>${messages.map((message) => `<p>${escapeHTML(message)}</p>`).join("")}`;
+    document.getElementById("dayOutline").prepend(policy);
+  }
 }
 function validateSessionInputs() {
   const rules = [
@@ -544,7 +582,60 @@ sesRender = function () {
   legacySesRender();
   const day = gD();
   if (!day) return;
-  renderWeightControls(day.exs[sesExIdx]);
+  const ex = day.exs[sesExIdx];
+  renderWeightControls(ex);
+  const repsLabel = document.getElementById("sesRepsLabel");
+  if (repsLabel) repsLabel.textContent = ex.unit === "sec" ? "Durata · secondi" : "Ripetizioni";
+  const repsOnly = ex.unit === "sec" || ["reps", "time"].includes(ex.progression?.progressionType);
+  const kgGroup = document.getElementById("sesKg")?.closest(".ses-input-group");
+  if (kgGroup) kgGroup.hidden = repsOnly;
+  const stepHint = document.getElementById("sesWeightStep");
+  if (stepHint) stepHint.hidden = repsOnly;
+  const rampInfo = document.getElementById("sesRampUpInfo");
+  if (rampInfo) {
+    const rampSets = ex.rampUp?.length ? getRampUpForLoad(ex, ex.sd?.[0]?.w) : [];
+    rampInfo.hidden = rampSets.length === 0;
+    if (rampSets.length) {
+      const adjusted = D.activeSession?.isDeload ? " · carichi ricalcolati sul deload" : D.activeSession?.inactivityAdjusted ? " · rientro −10%" : "";
+      rampInfo.innerHTML = `<strong>Ramp-up${adjusted}</strong><br>${rampSets.map((set, i) => `${i + 1}. ${formatGymNumber(set.w, 2)} kg × ${set.r} · recupero ${set.rest} s`).join("<br>")}`;
+    }
+  }
+  const safety = document.getElementById("sesSafetyNotice");
+  const stopButton = document.getElementById("sesPainStop");
+  const checkButton = document.getElementById("sesCheckBtn");
+  const jointStreak = ex.safetyJoint ? getJointDiscomfortStreak(ex.safetyJoint) : 0;
+  const repeatedPain = jointStreak >= 3;
+  if (safety) {
+    safety.hidden = !ex.safetyJoint && !repeatedPain;
+    safety.textContent = repeatedPain
+      ? `Tre sessioni consecutive con fastidio ${ex.safetyJoint === "elbow" ? "al gomito" : "al ginocchio"}: esercizio sospeso. Salta le serie e valuta una variante sicura.`
+      : ex.safetyJoint === "elbow"
+        ? "⚠️ Gomito: presa neutra/semiprona dove possibile. Interrompi subito se compare anche un lieve fastidio. Aumenta il carico solo dopo 2 sessioni consecutive senza fastidio."
+        : ex.safetyJoint === "knee"
+          ? "⚠️ Ginocchio: interrompi subito se compare dolore. Aumenta il carico solo dopo 2 sessioni consecutive senza fastidio."
+          : "";
+  }
+  if (stopButton) {
+    stopButton.hidden = !ex.safetyJoint && !repeatedPain;
+    stopButton.textContent = repeatedPain ? "Sospendi e salta questo esercizio" : "Segnala fastidio e interrompi questo esercizio";
+    stopButton.onclick = repeatedPain ? skipExerciseForSafety : stopExerciseForJointPain;
+  }
+  if (checkButton) {
+    checkButton.disabled = repeatedPain || Date.now() < sesConfirmUntil;
+    if (repeatedPain) checkButton.setAttribute("aria-label", "Esercizio sospeso dopo tre sessioni con fastidio");
+    else checkButton.removeAttribute("aria-label");
+  }
+  const currentSet = ex.sd?.[sesGetCurrentSetIdx(ex)];
+  const dropInfo = document.getElementById("sesDropSetInfo");
+  if (dropInfo) {
+    dropInfo.hidden = !currentSet?.isDropSet;
+    if (currentSet?.isDropSet) {
+      dropInfo.innerHTML = `<strong>Drop set finale</strong><br>−${Math.round((ex.dropSet?.reduction || 0.3) * 100)}% rispetto all’ultimo set · obiettivo ${ex.dropSet?.reps?.[0] || 8}–${ex.dropSet?.reps?.[1] || 10} ripetizioni · senza pausa.`;
+    }
+  }
+  if (currentSet?.isDropSet) {
+    document.getElementById("sesSetLabel").textContent = `DROP SET · ${sesGetCurrentSetIdx(ex) + 1}/${ex.sd.length}`;
+  }
   document
     .getElementById("sesTimerToggle")
     .setAttribute("aria-pressed", sesTimerEnabled);

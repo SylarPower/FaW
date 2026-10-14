@@ -31,7 +31,7 @@ const JS = [
   'games/palestra/app.js',
   'games/palestra/premium.js',
   'games/palestra/workout-metrics.js',
-  'games/palestra/cargo-art.js',
+  'games/palestra/training-program.js',
   'games/shared/firebase-config.js',
   'games/shared/rivincita.js'
 ];

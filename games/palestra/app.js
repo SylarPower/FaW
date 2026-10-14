@@ -78,6 +78,7 @@ let progTargetUid = null;
 let sesActive = false;
 let sesExIdx = 0;
 let sesStartTime = null;
+let sesConfirmUntil = 0;
 let openExercises = new Set(); // Tiene traccia di quali esercizi sono aperti
 let myExChart = null;
 
@@ -442,10 +443,16 @@ function renderWeeklyOverview() {
 // 📅 PHASE / WEEK SYSTEM
 // ============================================================
 function getProgramWeek() {
-  const start = D.st.programStart;
+  const start = D.st.personalProgramVersion
+    ? D.st.personalProgramStart
+    : D.st.programStart;
   if (!start) return null;
-  const startDate = new Date(start);
+  const parts = String(start).split("-").map(Number);
+  const startDate = parts.length === 3 && parts.every(Number.isFinite)
+    ? new Date(parts[0], parts[1] - 1, parts[2])
+    : new Date(start);
   const now = new Date();
+  now.setHours(0, 0, 0, 0);
   const diffDays = Math.floor((now - startDate) / 86400000);
   if (diffDays < 0) return null;
   return Math.floor(diffDays / 7) + 1;
@@ -461,9 +468,7 @@ function isDeloadWeek(week) {
   return week % 4 === 0;
 }
 function getDeloadPercent(week) {
-  const phase = getProgramPhase(week);
-  // Fasi 3 e 5: -20%, altre: -15%
-  return phase === 3 || phase === 5 ? 0.2 : 0.15;
+  return week && isDeloadWeek(week) ? 0.4 : 0;
 }
 
 function getPhaseInfo(phase) {
@@ -493,7 +498,8 @@ function getPhaseInfo(phase) {
 }
 function setProgramDate(val) {
   if (!val) return;
-  D.st.programStart = val;
+  if (D.st.personalProgramVersion) D.st.personalProgramStart = val;
+  else D.st.programStart = val;
   save().then(() => {
     renderPhaseIndicator();
     toast("📅 Programma dal " + val, "ok");
@@ -501,9 +507,10 @@ function setProgramDate(val) {
 }
 
 function clearProgramDate() {
-  if (!D.st.programStart) return;
+  const key = D.st.personalProgramVersion ? "personalProgramStart" : "programStart";
+  if (!D.st[key]) return;
   if (!confirm("Rimuovere la data di inizio programma?")) return;
-  delete D.st.programStart;
+  delete D.st[key];
   const input = document.getElementById("programDateInput");
   if (input) input.value = "";
   save().then(() => {
@@ -516,66 +523,20 @@ function renderPhaseIndicator() {
   const el = document.getElementById("phaseIndicator");
   if (!el) return;
   const dateInput = document.getElementById("programDateInput");
-  if (dateInput) dateInput.value = D.st.programStart || "";
+  const start = D.st.personalProgramVersion ? D.st.personalProgramStart : D.st.programStart;
+  if (dateInput) dateInput.value = start || "";
   const week = getProgramWeek();
   if (!week) {
-    el.innerHTML = `<div style="text-align:center;color:var(--tx3);font-size:.8rem;padding:8px;">
-            Imposta la data di inizio programma per vedere la fase attuale
-        </div>`;
+    el.innerHTML = `<div class="phase-card"><p>Imposta la data di inizio per attivare il mesociclo di 4 settimane e il deload obbligatorio.</p></div>`;
     return;
   }
-  const phase = getProgramPhase(week);
+  const weekInCycle = ((week - 1) % 4) + 1;
   const deload = isDeloadWeek(week);
-  const weekInPhase = ((week - 1) % 4) + 1;
-  const totalPhases = 5;
-  const info = getPhaseInfo(phase);
-  const dlPct = Math.round(getDeloadPercent(week) * 100);
-
-  el.innerHTML = `
-        <div class="phase-card">
-            <div class="phase-week ${deload ? "phase-deload" : "phase-normal"}">
-                <span class="pw-num">${week}</span>
-                <span class="pw-label">Sett.</span>
-            </div>
-            <div class="phase-info">
-                <h4 style="color:${deload ? "var(--yel)" : "var(--acc)"}">
-                    ${
-                      deload
-                        ? "📉 Deload — Fase " + phase + " (" + info.name + ")"
-                        : "Fase " +
-                          phase +
-                          ": " +
-                          info.name +
-                          " — Sett. " +
-                          weekInPhase +
-                          "/4"
-                    }
-                </h4>
-                <small>${
-                  deload
-                    ? "Carico -" +
-                      dlPct +
-                      "%. Valuta una serie in meno sui compound."
-                    : info.desc
-                }</small>
-            </div>
-        </div>
-        <div style="display:flex;gap:3px;margin-top:8px;">
-            ${[1, 2, 3, 4, 5]
-              .map((p) => {
-                const active = phase === p;
-                const done = phase > p;
-                return `<div style="flex:1;text-align:center;">
-                    <div style="height:6px;border-radius:3px;margin-bottom:3px;
-                        background:${done ? "var(--grn)" : active ? "var(--acc)" : "var(--c3)"};
-                        transition:all .3s;"></div>
-                    <span style="font-size:.5rem;color:${active ? "var(--acc)" : done ? "var(--grn)" : "var(--tx3)"};">
-                        F${p}</span>
-                </div>`;
-              })
-              .join("")}
-        </div>
-    `;
+  el.innerHTML = `<div class="phase-card">
+    <div class="phase-week ${deload ? "phase-deload" : "phase-normal"}"><span class="pw-num">${week}</span><span class="pw-label">Sett.</span></div>
+    <div class="phase-info"><h4>${deload ? "Deload obbligatorio" : `Mesociclo ${Math.ceil(week / 4)} · settimana ${weekInCycle}/4`}</h4>
+    <small>${deload ? "−40% del carico dell’ultima sessione normale · −1 serie per esercizio (minimo 1) · ripetizioni e recuperi invariati · drop set esclusi." : "Doppia progressione per esercizio. La settimana 4 è sempre di scarico."}</small></div>
+  </div><div class="phase-cycle" aria-label="Settimana ${weekInCycle} di 4">${[1, 2, 3, 4].map((n) => `<span class="${n < weekInCycle ? "done" : n === weekInCycle ? "active" : ""}"${n === weekInCycle ? ' aria-current="step"' : ""}>${n === 4 ? "Deload" : `Sett. ${n}`}</span>`).join("")}</div>`;
 }
 
 function renderAll() {
@@ -1536,8 +1497,20 @@ function openProgManager(exUid) {
   if (!ex || !ex.sd || ex.sd.length === 0) return;
 
   progTargetUid = exUid;
-  document.getElementById("pmWeightDescription").textContent =
-    `Aumenta il carico di ${formatGymNumber(getWeightStep(ex))} kg e riduci una ripetizione per serie.`;
+  const personal = Boolean(ex.progression && gD()?.personalProgramVersion);
+  const choices = document.getElementById("pmStrategyChoices");
+  const statusBox = document.getElementById("pmPersonalStatus");
+  if (choices) choices.hidden = personal;
+  if (statusBox) {
+    statusBox.hidden = !personal;
+    if (personal) {
+      const status = getProgressionStatus(ex, curDay);
+      statusBox.textContent = status?.text || `Target ${formatRepTarget(ex)}. La progressione si applica solo quando tutte le serie raggiungono il limite superiore.`;
+    }
+  }
+  document.getElementById("pmWeightDescription").textContent = personal
+    ? `Incremento specifico: ${formatGymNumber(getWeightStep(ex))} kg.`
+    : `Aumenta il carico di ${formatGymNumber(getWeightStep(ex))} kg e riduci una ripetizione per serie.`;
   document.getElementById("pmTitle").textContent = "⚡ " + ex.name;
   document.getElementById("mProgManager").style.display = "flex";
 }
@@ -1545,6 +1518,10 @@ function openProgManager(exUid) {
 function applyProgType(type) {
   const ex = fEx(progTargetUid);
   if (!ex || !ex.sd) return;
+  if (ex.progression && gD()?.personalProgramVersion) {
+    toast("La doppia progressione personale è automatica e rispetta range e gate articolari.", "info", 3000);
+    return;
+  }
 
   ex.sd.forEach((s) => {
     let w = parseFloat(s.w) || 0;
@@ -1795,9 +1772,14 @@ function startSession() {
 
   const totalSets = day.exs.reduce((a, e) => a + (e.sd ? e.sd.length : 0), 0);
   const doneSets = day.exs.reduce(
-    (a, e) => a + (e.sd ? e.sd.filter((s) => s.done).length : 0),
+    (a, e) => a + (e.sd ? e.sd.filter((s) => s.done && !s.skipped).length : 0),
     0,
   );
+
+  if (D.activeSession?.dayId === curDay && D.activeSession.pendingCompletion) {
+    launchSession();
+    return;
+  }
 
   if (totalSets === 0) {
     toast("⚠️ Aggiungi almeno una serie agli esercizi!", "warn");
@@ -1812,9 +1794,11 @@ function startSession() {
       )
     )
       return;
+    if (typeof restorePersonalSessionPlan === "function")
+      restorePersonalSessionPlan(day, D.activeSession);
     delete D.activeSession;
     day.exs.forEach((e) => {
-      if (e.sd) e.sd.forEach((s) => (s.done = false));
+      if (e.sd) e.sd.forEach((s) => { s.done = false; delete s.skipped; delete s.isDropSet; });
     });
     save();
     launchSession();
@@ -1838,11 +1822,13 @@ function sesChoiceContinue() {
 
 function sesChoiceReset() {
   if (!confirm("Azzerare le serie completate e ricominciare?")) return;
+  const day = gD();
+  if (typeof restorePersonalSessionPlan === "function")
+    restorePersonalSessionPlan(day, D.activeSession);
   delete D.activeSession;
   document.getElementById("mSesChoice").style.display = "none";
-  const day = gD();
   day.exs.forEach((e) => {
-    if (e.sd) e.sd.forEach((s) => (s.done = false));
+    if (e.sd) e.sd.forEach((s) => { s.done = false; delete s.skipped; delete s.isDropSet; });
   });
   save();
   launchSession();
@@ -1854,14 +1840,37 @@ function sesChoiceCancel() {
 
 function launchSession() {
   const day = gD();
-
+  if (!day) return;
+  const previous = D.activeSession?.dayId === curDay ? D.activeSession : null;
+  if (!previous && day.personalProgramVersion) {
+    const personalDays = typeof getPersonalDayList === "function" ? getPersonalDayList() : [];
+    const expectedIndex = Number(D.st?.nextPersonalDayIndex) || 0;
+    const expectedDay = personalDays[expectedIndex % Math.max(personalDays.length, 1)];
+    const rest = typeof getPersonalRestStatus === "function" ? getPersonalRestStatus() : null;
+    if (rest) {
+      toast(rest.message, "warn", 5000);
+      return;
+    }
+    if (expectedDay && expectedDay.id !== day.id) {
+      toast(`Segui la sequenza: la prossima giornata è ${expectedDay.name}.`, "warn", 4000);
+      return;
+    }
+  }
   sesActive = true;
   sesExIdx = 0;
   sesLastExIdx = -1;
-  sesStartTime =
-    D.activeSession?.dayId === curDay ? D.activeSession.startedAt : Date.now();
-  D.activeSession = { dayId: curDay, startedAt: sesStartTime };
+  sesStartTime = previous?.startedAt || Date.now();
+  if (previous) {
+    D.activeSession = previous;
+    if (!D.activeSession.startedAt) D.activeSession.startedAt = sesStartTime;
+  } else {
+    const personalState = typeof preparePersonalSession === "function"
+      ? preparePersonalSession(day, sesStartTime)
+      : null;
+    D.activeSession = personalState || { dayId: curDay, startedAt: sesStartTime };
+  }
   sessionFinalized = false;
+  sesConfirmUntil = 0;
   document.getElementById("sesTimerToggle").disabled = false;
   selectedSetIdx = null;
   save();
@@ -1871,16 +1880,19 @@ function launchSession() {
   );
   if (firstUndone >= 0) sesExIdx = firstUndone;
 
-  // ← FIX CRITICO: Reset UI sessione precedente
+  // Reset the previous summary and restore the active workout surface.
   document.getElementById("sesSummary").style.display = "none";
   document.getElementById("sesExCard").style.display = "";
   document.querySelector(".ses-nav").style.display = "";
-
   document.body.classList.add("in-session");
   document.getElementById("vDay").style.display = "none";
   document.getElementById("vSession").style.display = "flex";
-
   updateTimerToggleUI();
+
+  if (D.activeSession.pendingCompletion) {
+    sesShowSummary();
+    return;
+  }
   sesRender();
   if (navigator.vibrate) navigator.vibrate(30);
 }
@@ -1894,8 +1906,9 @@ function exitSession() {
       )
     : 0;
 
-  // Sessione parziale: chiedi se terminare (con riepilogo) o mettere in pausa.
+  // Sessione parziale: sospendi il cronometro mentre l’utente sceglie cosa fare.
   if (sesActive && !sessionFinalized && doneSets > 0) {
+    if (swRunning) stopStopwatch();
     const totalSets = day.exs.reduce((a, e) => a + (e.sd ? e.sd.length : 0), 0);
     document.getElementById("sesExitDone").textContent = doneSets;
     document.getElementById("sesExitTotal").textContent = totalSets;
@@ -1930,6 +1943,13 @@ function sesExitCancel() {
 function doExitSession() {
   skipRestTimer();
   resetStopwatch();
+  const day = gD();
+  const completedSets = day?.exs?.some((ex) => ex.sd?.some((set) => set.done && !set.skipped));
+  if (!completedSets && !D.activeSession?.pendingCompletion) {
+    if (typeof restorePersonalSessionPlan === "function")
+      restorePersonalSessionPlan(day, D.activeSession);
+    delete D.activeSession;
+  }
   save();
   // Ferma timer se attivo
   clearInterval(restTimerId);
@@ -1948,6 +1968,12 @@ function doExitSession() {
 }
 
 function sesClose() {
+  if (!sessionFinalized) {
+    toast("Prima di chiudere, registra fastidi e RPE finale.", "warn");
+    document.getElementById("sessionFeedbackForm")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    document.getElementById("feedbackElbow")?.focus({ preventScroll: true });
+    return;
+  }
   skipRestTimer();
   resetStopwatch();
   clearInterval(restTimerId);
@@ -2106,10 +2132,11 @@ function sesRender() {
 // ============================================================
 // PREVIOUS SESSION REFERENCE
 // ============================================================
-function getLastSessionData(dayId, exerciseId) {
+function getLastSessionData(dayId, exerciseId, exerciseUid = null) {
   if (!D.hist || !D.hist.length) return null;
   const entries = D.hist.filter(
-    (h) => h.dayId === dayId && h.eid === exerciseId,
+    (h) => h.dayId === dayId && h.eid === exerciseId &&
+      (exerciseUid ? h.exerciseUid === exerciseUid || !h.exerciseUid : true),
   );
   if (!entries.length) return null;
   entries.sort((a, b) => new Date(b.dt) - new Date(a.dt));
@@ -2117,7 +2144,7 @@ function getLastSessionData(dayId, exerciseId) {
 }
 
 function buildPreviousSetHTML(dayId, ex, setIdx) {
-  const last = getLastSessionData(dayId, ex.exerciseId);
+  const last = getLastSessionData(dayId, ex.exerciseId, ex.uid);
   const set = last?.sd?.[setIdx];
   if (!set) return "";
   const reps = Number(set.r),
@@ -2138,7 +2165,8 @@ function buildPreviousSetHTML(dayId, ex, setIdx) {
         month: "short",
       }).format(date)
     : "Sessione precedente";
-  return `<div class="previous-set"><span>Ultima volta · ${escapeHTML(when)}</span><strong>${reps} rip. × ${formatGymNumber(weight, 2)} kg</strong><button onclick="applyPreviousSet(${reps},${weight})">Usa questi valori</button></div>`;
+  const repLabel = ex.unit === "sec" ? "s" : "rip.";
+  return `<div class="previous-set"><span>Ultima volta · ${escapeHTML(when)}</span><strong>${reps} ${repLabel} × ${formatGymNumber(weight, 2)} kg</strong><button onclick="applyPreviousSet(${reps},${weight})">Usa questi valori</button></div>`;
 }
 function applyPreviousSet(reps, kg) {
   document.getElementById("sesReps").value = reps;
@@ -2417,13 +2445,17 @@ function sesCheck() {
   if (
     !sesActive ||
     sessionFinalized ||
+    Date.now() < sesConfirmUntil ||
     confirmButton.disabled ||
     !validateSessionInputs()
   )
     return;
+  sesConfirmUntil = Date.now() + 400;
   confirmButton.disabled = true;
+  const unlockAt = sesConfirmUntil;
   setTimeout(() => {
-    confirmButton.disabled = false;
+    if (sesConfirmUntil === unlockAt) sesConfirmUntil = 0;
+    if (!sessionFinalized && confirmButton.isConnected) confirmButton.disabled = false;
   }, 400);
   const ex = gD()?.exs[sesExIdx];
   if (!ex) return;
@@ -2440,6 +2472,10 @@ function sesCheck() {
   if (wasDone) {
     sesRender();
     toast("Serie aggiornata", "ok");
+    return;
+  }
+  if (typeof addPersonalDropSetIfDue === "function" && addPersonalDropSetIfDue(ex, set, curDay)) {
+    sesRender();
     return;
   }
   const day = gD();
@@ -2515,68 +2551,98 @@ function sesAdj(inputId, delta) {
   if (navigator.vibrate) navigator.vibrate(10);
 }
 
-function sesCompleteSave() {
+function sesCompleteSave(feedback) {
   const day = gD();
-  if (!day || sessionFinalized) return;
+  if (!day || sessionFinalized || !feedback) return false;
   sessionFinalized = true;
   const sessionId = uid();
   const sessionDate = new Date().toISOString();
+  const activeSession = D.activeSession || {};
+  const savedPlan = activeSession.originalSets || {};
 
   const today = toLocalDate(new Date());
   const yest = toLocalDate(new Date(Date.now() - 864e5));
   const s = D.st;
   let newPR = false;
-
   if (s.lwd === yest) s.sk = (s.sk || 0) + 1;
   else if (s.lwd !== today) s.sk = 1;
   s.lwd = today;
   s.tw = (s.tw || 0) + 1;
 
   const doneSetsAll = day.exs.reduce(
-    (a, e) => a + (e.sd ? e.sd.filter((x) => x.done).length : 0),
+    (total, ex) => total + (ex.sd || []).filter((set) => set.done && !set.skipped).length,
     0,
   );
+  const totalSets = day.exs.reduce((total, ex) => total + (ex.sd?.length || 0), 0);
   s.ts = (s.ts || 0) + doneSetsAll;
-  s.te = (s.te || 0) + day.exs.filter((e) => e.sd?.some((s) => s.done)).length;
+  s.te = (s.te || 0) + day.exs.filter((ex) => ex.sd?.some((set) => set.done && !set.skipped)).length;
   if (!s.pr) s.pr = {};
+  D.hist = Array.isArray(D.hist) ? D.hist : [];
 
-  day.exs.forEach((e) => {
-    const doneS = e.sd ? e.sd.filter((x) => x.done) : [];
-    if (!doneS.length) return;
-    const maxW = Math.max(...doneS.map((x) => parseFloat(x.w) || 0));
-    if (maxW > (s.pr[e.exerciseId] || 0)) {
-      s.pr[e.exerciseId] = maxW;
+  day.exs.forEach((ex) => {
+    const doneSets = (ex.sd || []).filter((set) => set.done && !set.skipped);
+    if (!doneSets.length) return;
+    const workingSets = doneSets.filter((set) => !set.isDropSet);
+    const primarySets = workingSets.length ? workingSets : doneSets;
+    const maxW = Math.max(...primarySets.map((set) => parseFloat(set.w) || 0));
+    if (!isWarmupExercise(ex) && maxW > (s.pr[ex.exerciseId] || 0)) {
+      s.pr[ex.exerciseId] = maxW;
       newPR = true;
     }
     const avgR = Math.round(
-      doneS.reduce((a, x) => a + (parseInt(x.r) || 0), 0) / doneS.length,
+      primarySets.reduce((total, set) => total + (parseInt(set.r) || 0), 0) / primarySets.length,
     );
+    const expectedSets = (savedPlan[ex.uid] || ex.sd || []).filter((set) => !set.isDropSet).length;
+    const exerciseComplete = isWarmupExercise(ex)
+      ? doneSets.length >= (savedPlan[ex.uid] || ex.sd || []).length
+      : workingSets.length >= expectedSets && !ex.sd.some((set) => set.skipped);
     D.hist.push({
       sessionId,
+      exerciseUid: ex.uid,
+      exerciseRole: ex.sessionRole || "working",
+      isWarmup: isWarmupExercise(ex),
+      isDeload: Boolean(activeSession.isDeload),
+      isInactivityAdjusted: Boolean(activeSession.inactivityAdjusted),
+      exerciseComplete,
       duration: Math.floor((Date.now() - sesStartTime) / 1000),
-      eid: e.exerciseId,
-      name: e.name,
+      eid: ex.exerciseId,
+      name: ex.name,
       dt: sessionDate,
       dayId: curDay,
-      s: doneS.length,
-      volumeKg:
-        Math.round(
-          doneS.reduce((total, set) => total + getSetVolume(set), 0) * 100,
-        ) / 100,
+      s: doneSets.length,
+      volumeKg: Math.round(doneSets.reduce((total, set) => total + getSetVolume(set), 0) * 100) / 100,
       r: avgR,
       w: maxW,
-      rest: e.rest || 0,
-      seat: e.seat || null,
-      sd: doneS.map((x) => ({ r: x.r, w: x.w })),
+      rest: ex.rest || 0,
+      seat: ex.seat || null,
+      sd: doneSets.map((set) => ({ r: set.r, w: set.w, isDropSet: Boolean(set.isDropSet) })),
     });
   });
 
-  delete D.activeSession;
-  // Reset
-  day.exs.forEach((e) => {
-    if (e.sd) e.sd.forEach((x) => (x.done = false));
+  D.sessionFeedback = Array.isArray(D.sessionFeedback) ? D.sessionFeedback : [];
+  D.sessionFeedback.push({
+    sessionId,
+    dayId: curDay,
+    dt: sessionDate,
+    elbow: feedback.elbow,
+    knee: feedback.knee,
+    rpe: Number(feedback.rpe),
+    note: String(feedback.note || "").slice(0, 500),
+    saved: true,
+    complete: doneSetsAll === totalSets,
+    isDeload: Boolean(activeSession.isDeload),
+    reportedPain: { ...(activeSession.reportedPain || {}) },
   });
+  if (doneSetsAll === totalSets && day.personalProgramVersion && typeof advancePersonalDay === "function")
+    advancePersonalDay(curDay);
+  if (typeof restorePersonalSessionPlan === "function")
+    restorePersonalSessionPlan(day, activeSession);
+  day.exs.forEach((ex) => {
+    if (ex.sd) ex.sd.forEach((set) => { set.done = false; delete set.skipped; delete set.isDropSet; });
+  });
+  delete D.activeSession;
   save();
+  return { sessionId, newPR, complete: doneSetsAll === totalSets };
 }
 
 function sesShowSummary() {
@@ -2584,17 +2650,79 @@ function sesShowSummary() {
   const day = gD();
   if (!day) return;
   const report = getWorkoutReport(day, sesStartTime);
-  if (!report.done) return;
+  const stopped = Object.keys(D.activeSession?.stoppedExercises || {}).length > 0;
+  if (!report.done && !stopped) return;
   skipRestTimer();
   resetStopwatch();
-  // Snapshot before finalization resets all done flags. Partial sessions stay truthful.
-  sesCompleteSave();
+  D.activeSession = D.activeSession || { dayId: curDay, startedAt: sesStartTime };
+  D.activeSession.pendingCompletion = true;
+  D.activeSession.pendingReport = report;
+  save();
   document.getElementById("sesExCard").style.display = "none";
   document.querySelector(".ses-nav").style.display = "none";
   document.getElementById("sesTimerToggle").disabled = true;
   renderSessionProgress(report.done, report.sets);
   renderWorkoutReport(report);
+  const draft = D.activeSession.feedbackDraft || {};
+  const reported = D.activeSession.reportedPain || {};
+  document.getElementById("feedbackElbow").value = reported.elbow ? "yes" : draft.elbow || "";
+  document.getElementById("feedbackKnee").value = reported.knee ? "yes" : draft.knee || "";
+  document.getElementById("feedbackRpe").value = draft.rpe || "";
+  document.getElementById("feedbackNote").value = draft.note || "";
+  document.getElementById("feedbackSavedMessage").hidden = true;
+  document.getElementById("saveFeedbackBtn").disabled = false;
+  document.getElementById("saveFeedbackBtn").textContent = "Salva feedback sessione";
 }
+function saveSessionFeedback() {
+  if (sessionFinalized) return;
+  const active = D?.activeSession;
+  if (!active?.pendingCompletion) return;
+  const reported = active.reportedPain || {};
+  const elbowInput = document.getElementById("feedbackElbow");
+  const kneeInput = document.getElementById("feedbackKnee");
+  const rpeInput = document.getElementById("feedbackRpe");
+  const elbow = reported.elbow ? "yes" : elbowInput.value;
+  const knee = reported.knee ? "yes" : kneeInput.value;
+  const rpe = Number(rpeInput.value);
+  if (!["none", "mild", "yes"].includes(elbow)) {
+    toast("Registra il fastidio al gomito (No, Lieve o Sì).", "warn");
+    elbowInput.focus();
+    return;
+  }
+  if (!["none", "mild", "yes"].includes(knee)) {
+    toast("Registra il fastidio al ginocchio (No, Lieve o Sì).", "warn");
+    kneeInput.focus();
+    return;
+  }
+  if (!Number.isInteger(rpe) || rpe < 1 || rpe > 10) {
+    toast("Registra l’RPE finale da 1 a 10.", "warn");
+    rpeInput.focus();
+    return;
+  }
+  const feedback = {
+    elbow,
+    knee,
+    rpe,
+    note: document.getElementById("feedbackNote").value.trim().slice(0, 500),
+  };
+  const result = sesCompleteSave(feedback);
+  if (!result) return;
+  [elbowInput, kneeInput, rpeInput, document.getElementById("feedbackNote")].forEach((input) => { input.disabled = true; });
+  const saved = document.getElementById("feedbackSavedMessage");
+  saved.hidden = false;
+  const elbowStreak = typeof getJointDiscomfortStreak === "function" ? getJointDiscomfortStreak("elbow") : 0;
+  const kneeStreak = typeof getJointDiscomfortStreak === "function" ? getJointDiscomfortStreak("knee") : 0;
+  const warnings = [];
+  if (elbowStreak >= 3) warnings.push("gomito: sospendi gli esercizi che lo irritano e valuta una variante a presa neutra");
+  if (kneeStreak >= 3) warnings.push("ginocchio: sospendi gli esercizi che lo irritano e valuta una variante senza dolore (per il Bulgarian, step-up)");
+  saved.textContent = warnings.length
+    ? "Feedback salvato. Trigger di sicurezza: " + warnings.join("; ") + "."
+    : "Feedback salvato: fastidi e RPE sono registrati.";
+  document.getElementById("saveFeedbackBtn").disabled = true;
+  document.getElementById("saveFeedbackBtn").textContent = "Feedback salvato";
+  toast(warnings.length ? "Feedback salvato · controlla l’avviso di sicurezza." : "Feedback sessione salvato.", warnings.length ? "warn" : "ok", 3500);
+}
+
 // ============================================================
 // 📤📥 IMPORT / EXPORT (formato unico)
 // ============================================================
