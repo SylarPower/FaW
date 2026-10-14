@@ -116,7 +116,11 @@ function renderSessionProgress(done, total) {
   document.getElementById("sesExCount").textContent = percent + "%";
   document.getElementById("sesProgressCaption").textContent =
     `${done} di ${total} serie completate`;
-  document.getElementById("sesProgFill").style.width = percent + "%";
+  // Il riempimento si anima con transform (solo compositore): nessuna
+  // rilesatura di layout dentro la colonna ad altezza viewport.
+  document
+    .getElementById("sesProgFill")
+    .style.setProperty("--gym-progress", String(percent / 100));
   const bar = document.getElementById("sessionProgress");
   bar.setAttribute("aria-valuenow", percent);
   bar.setAttribute(

@@ -2439,6 +2439,16 @@ function sesEditSet(setIdx) {
 
   if (navigator.vibrate) navigator.vibrate(10);
 }
+// Feedback di conferma: micro-pop sul pulsante, disattivato se il sistema
+// chiede di ridurre il movimento. WAAPI: nessun cleanup e nessuna dipendenza.
+function pulseConfirmFeedback(el) {
+  if (!el || typeof el.animate !== "function") return;
+  if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+  el.animate(
+    [{ transform: "scale(0.94)" }, { transform: "scale(1.03)" }, { transform: "scale(1)" }],
+    { duration: 240, easing: "cubic-bezier(0.2, 0, 0, 1)" },
+  );
+}
 // ===== Check set (con Logica Superserie Alternate) =====
 function sesCheck() {
   const confirmButton = document.getElementById("sesCheckBtn");
@@ -2465,6 +2475,7 @@ function sesCheck() {
   const wasDone = set.done;
   persistSessionInputs();
   set.done = true;
+  pulseConfirmFeedback(confirmButton);
   selectedSetIdx = null;
   resetStopwatch();
   save();
@@ -3087,18 +3098,15 @@ function parseImport(text) {
     if (restMatch) rest = parseInt(restMatch[1]) || 0;
 
     // Parse carico/peso: "50 kg", "14+14 kg", "50", "Corpo", "Leggero", ""
+    // Il carico appartiene SOLO alla colonna CARICO (poi sd[].w): non viene mai
+    // riversato nel campo note, che resta il testo dell'atleta, as-is.
     let weight = 0;
-    let caricoNote = "";
     const dblMatch = carico.match(/([\d.]+)\s*\+\s*([\d.]+)/);
     if (dblMatch) {
       weight = parseFloat(dblMatch[1]) || 0;
     } else {
       const kgMatch = carico.match(/([\d.]+)/);
       if (kgMatch) weight = parseFloat(kgMatch[1]) || 0;
-    }
-    // Se il carico è testuale (Leggero, Moderato, Corpo, etc.), salvalo nelle note
-    if (weight === 0 && carico && !carico.match(/^\s*$/)) {
-      caricoNote = "💪 " + carico;
     }
 
     // Parse tempo: "3-1-2", ""
@@ -3158,7 +3166,7 @@ function parseImport(text) {
       seat: "",
       ssG: ssG,
       pF: false,
-      note: [caricoNote, note].filter(Boolean).join(" — "),
+      note: note,
       tempo: tempoClean,
     });
   }

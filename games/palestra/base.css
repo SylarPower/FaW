@@ -57,9 +57,9 @@ body {
 /* ===== TOAST ===== */
 .toast {
   position: fixed;
-  top: -80px;
+  top: 0;
   left: 50%;
-  transform: translateX(-50%);
+  transform: translate(-50%, -100%);
   z-index: 99999;
   padding: 14px 24px;
   border-radius: 14px;
@@ -67,14 +67,17 @@ body {
   font-weight: 600;
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  transition: top 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition:
+    transform 0.22s cubic-bezier(0.05, 0.7, 0.1, 1),
+    visibility 0s linear 0.22s;
   max-width: 90vw;
   text-align: center;
   pointer-events: none;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
 }
 .toast.show {
-  top: calc(16px + env(safe-area-inset-top, 0px));
+  transform: translate(-50%, calc(16px + env(safe-area-inset-top, 0px)));
+  transition: transform 0.22s cubic-bezier(0.05, 0.7, 0.1, 1);
 }
 .toast.ok {
   background: rgba(39, 174, 96, 0.95);
@@ -1209,6 +1212,12 @@ body.in-session .ses-nav {
 #vSession {
   height: 100vh;
   height: 100dvh;
+  /* Il blocco è una colonna flex ad altezza viewport: se l'altezza eccedesse
+     (fallback 100vh, tastiera, URL bar) la barra inferiore — e quindi il
+     pulsante di conferma — verrebbe tagliato senza possibilità di scroll.
+     Il clamp lo rende strutturalmente impossibile. */
+  max-height: 100dvh;
+  max-height: var(--gym-viewport, 100dvh);
   display: flex;
   flex-direction: column;
   background: var(--bg);
@@ -1253,10 +1262,14 @@ body.in-session .ses-nav {
   overflow: hidden;
 }
 .ses-progress-fill {
+  width: 100%;
   height: 100%;
   border-radius: 6px;
   background: linear-gradient(90deg, var(--acc), var(--grn));
-  transition: width 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transform-origin: left center;
+  transform: scaleX(var(--gym-progress, 0));
+  will-change: transform;
+  transition: transform 0.32s cubic-bezier(0.2, 0, 0, 1);
 }
 .ses-counter {
   font-size: 0.8rem;
@@ -1278,6 +1291,10 @@ body.in-session .ses-nav {
   align-items: center;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  /* fine lista: lo scroll non si propaga alla pagina (niente "tiraggio"
+     che sposta la barra di conferma fuori schermo) */
+  overscroll-behavior: contain;
+  scroll-padding-bottom: 16px;
 }
 .ses-ex-name {
   font-size: 1.15rem;
@@ -1306,7 +1323,9 @@ body.in-session .ses-nav {
   border-radius: 50%;
   border: 2px solid var(--brd);
   background: none;
-  transition: all 0.3s;
+  transition:
+    background-color 0.18s cubic-bezier(0.2, 0, 0, 1),
+    border-color 0.18s cubic-bezier(0.2, 0, 0, 1);
 }
 .ses-dot.done {
   background: var(--grn);
@@ -1487,13 +1506,20 @@ body.in-session .ses-nav {
   justify-content: center;
   gap: 10px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition:
+    transform 0.16s cubic-bezier(0.2, 0, 0, 1),
+    background-color 0.16s cubic-bezier(0.2, 0, 0, 1),
+    box-shadow 0.16s cubic-bezier(0.2, 0, 0, 1);
   min-height: 48px;
   box-shadow: 0 4px 20px rgba(3, 218, 198, 0.3);
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
 .ses-check-btn:active {
   transform: scale(0.96);
   box-shadow: 0 2px 10px rgba(3, 218, 198, 0.2);
+  transition-duration: 0.08s;
 }
 .ses-check-icon {
   font-size: 1.4rem;
@@ -1520,10 +1546,15 @@ body.in-session .ses-nav {
   background: var(--c1);
   border-top: 1px solid var(--brd);
   flex-shrink: 0;
+  position: relative;
+  z-index: 3;
 }
 .ses-nav-btn {
   flex: 1;
   padding: 14px 8px;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
   border-radius: 12px;
   border: 1px solid var(--brd);
   background: var(--c2);
@@ -1733,8 +1764,26 @@ body.in-session .ses-nav {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
   gap: 6px;
+  padding: calc(16px + env(safe-area-inset-top, 0px)) 16px
+    calc(16px + env(safe-area-inset-bottom, 0px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  /* Centraggio con margini auto (non justify-content: center): se lo schermo
+     è basso — orizzontale, testi ingranditi — il contenuto in eccedenza
+     resta raggiungibile con lo scroll invece di essere tagliato sopra. */
+  justify-content: flex-start;
+}
+.ses-timer::before,
+.ses-timer::after {
+  content: "";
+  flex: 0 0 0%;
+}
+.ses-timer::before {
+  margin-top: auto;
+}
+.ses-timer::after {
+  margin-bottom: auto;
 }
 [data-theme="light"] .ses-timer {
   background: rgba(240, 242, 245, 0.96);
@@ -1749,8 +1798,11 @@ body.in-session .ses-nav {
 }
 .ses-timer-ring-wrap {
   position: relative;
-  width: 200px;
-  height: 200px;
+  /* anello fluido: in orizzontale o su viewport bassi non ruba lo spazio
+     ai comandi (che devono restare raggiungibili senza scrollare) */
+  width: min(200px, 42dvh);
+  height: min(200px, 42dvh);
+  flex-shrink: 0;
 }
 .ses-timer-ring-wrap svg {
   position: absolute;
