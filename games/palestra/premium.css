@@ -16,6 +16,13 @@
   --yel: #e9cd8e;
   --pur2: #c8b9e8;
   --pur: #685580;
+  /* Motion tokens: pressione rapidissima, rilascio morbido, niente overshoot
+     sui controlli di sistema. Usati da barra sessione, modali e toast. */
+  --gym-dur-1: 80ms;
+  --gym-dur-2: 150ms;
+  --gym-dur-3: 220ms;
+  --gym-ease-std: cubic-bezier(0.2, 0, 0, 1);
+  --gym-ease-decel: cubic-bezier(0.05, 0.7, 0.1, 1);
 }
 [data-theme="light"] {
   color-scheme: light;
@@ -42,11 +49,19 @@ body {
   padding-bottom: calc(112px + env(safe-area-inset-bottom));
   line-height: 1.5;
 }
+/* Superficie piatta e GPU-friendly: niente blur né ombre decorative, e le
+   animazioni infinite/decorative restano spente. Il feedback di interazione
+   (apertura modale, ingresso sessione, pressata) invece è vivo: è breve,
+   solo transform/opacity e si azzera da sé con prefers-reduced-motion. */
 * {
-  animation: none !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
   box-shadow: none !important;
+}
+.apulse,
+.mm-breathe,
+.ses-dot.current {
+  animation: none !important;
 }
 button,
 a,
@@ -57,18 +72,41 @@ summary {
   touch-action: manipulation;
 }
 button {
-  transition: background-color 0.12s;
+  transition:
+    background-color var(--gym-dur-2) var(--gym-ease-std),
+    border-color var(--gym-dur-2) var(--gym-ease-std),
+    color var(--gym-dur-2) var(--gym-ease-std),
+    opacity var(--gym-dur-2) var(--gym-ease-std),
+    transform var(--gym-dur-2) var(--gym-ease-std);
   min-height: 48px;
   border-radius: 12px;
   font-size: 0.875rem;
 }
-button:active,
+button:active:not(:disabled),
 .btn-icon:active,
-.dc:active,
-.ex-card:active,
-.ses-check-btn:active {
+.dc:active {
+  opacity: 0.72;
+  transform: scale(0.97);
+  transition-duration: var(--gym-dur-1);
+}
+.ses-adj-btn:active:not(:disabled) {
+  transform: scale(0.9);
+}
+.ses-check-btn:active:not(:disabled) {
+  opacity: 0.9;
+  transform: scale(0.97);
+}
+/* Il blocco anti doppio-tocco dura 400ms: il pulsante non deve lampeggiare
+   in "disabled" (0.45 di opacità) ogni volta che confermi una serie. */
+.ses-check-btn:disabled {
+  opacity: 1;
   transform: none;
-  opacity: 0.8;
+  cursor: default;
+}
+/* Le card della scheda non "affondano": solo lo stato di pressione. */
+.ex-card:active {
+  opacity: 0.88;
+  transform: none;
 }
 button:disabled {
   opacity: 0.45;
@@ -661,8 +699,18 @@ body.in-session {
 #vSession {
   height: 100dvh;
   height: var(--gym-viewport, 100dvh);
+  max-height: var(--gym-viewport, 100dvh);
   max-width: 600px;
   margin: auto;
+  animation: gymFadeIn var(--gym-dur-2) var(--gym-ease-std);
+}
+@keyframes gymFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 .ses-top {
   padding: calc(12px + env(safe-area-inset-top)) 16px 12px;
@@ -824,10 +872,22 @@ body.in-session {
   border-width: 1px;
   font-size: 0.75rem;
 }
+.ses-timer {
+  animation: gymFadeIn var(--gym-dur-2) var(--gym-ease-std);
+}
+/* In sessione ogni tocco deve essere affidabile anche con i guanti: i comandi
+   dell'overlay recupero non scendono sotto il tocco minimo. */
+.ses-timer button {
+  min-height: 48px;
+}
 .ses-nav {
   padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
   background: var(--bg);
   gap: 8px;
+  /* la pressione lunga non deve aprire il menu di selezione sul pollice */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
 .ses-nav-btn {
   min-width: 0;
@@ -944,17 +1004,38 @@ body.in-session {
   padding: 12px 0 0;
   align-items: flex-end !important;
   z-index: 10000;
+  animation: gymScrimIn var(--gym-dur-2) var(--gym-ease-std);
+}
+@keyframes gymScrimIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 .mc {
   width: 100%;
   max-width: 600px !important;
+  animation: gymSheetIn var(--gym-dur-3) var(--gym-ease-decel);
   border: 1px solid var(--brd);
   border-bottom: 0;
   border-radius: 24px 24px 0 0;
   padding: 24px 20px calc(20px + env(safe-area-inset-bottom));
   max-height: 92dvh;
   overflow-y: auto;
+  overscroll-behavior: contain;
   background: var(--c1);
+}
+@keyframes gymSheetIn {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 .mc h2 {
   font-size: 1.2rem;
@@ -1048,7 +1129,13 @@ body.dialog-open {
   * {
     scroll-behavior: auto !important;
     transition: none !important;
+    animation: none !important;
   }
+}
+.ses-timer-mini {
+  transition:
+    background-color var(--gym-dur-2) var(--gym-ease-std),
+    border-color var(--gym-dur-2) var(--gym-ease-std);
 }
 .session-save-status {
   flex-shrink: 0;
@@ -1676,4 +1763,17 @@ body.dialog-open {
 }
 .rest-day-card p {
   line-height: 1.55;
+}
+
+/* Mouse/trackpad: lo stato hover esiste solo dove c'è un puntatore reale. */
+@media (hover: hover) and (pointer: fine) {
+  .bp:hover:not(:disabled),
+  .ses-check-btn:hover:not(:disabled),
+  .ses-timer-skip:hover:not(:disabled) {
+    filter: brightness(1.07);
+  }
+  .ses-nav-btn:hover:not(:disabled),
+  .ses-adj-btn:hover:not(:disabled) {
+    background: var(--c3);
+  }
 }

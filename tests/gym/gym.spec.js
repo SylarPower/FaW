@@ -490,6 +490,78 @@ test("tastiera ridotta e orientamento orizzontale mantengono navigazione e confe
   await page.screenshot({ path: "test-results/focus-dark.png" });
   expect(errors).toEqual([]);
 });
+test("modalità allenamento: per confermare una serie non si scorre mai", async ({
+  page,
+}) => {
+  const errors = await boot(page);
+  await start(page);
+  // Viewport reali: Android piccolo, Pixel, landscape e tastiera aperta.
+  for (const viewport of [
+    { width: 320, height: 568 },
+    { width: 360, height: 640 },
+    { width: 412, height: 915 },
+    { width: 844, height: 390 },
+    { width: 390, height: 400 },
+  ]) {
+    await page.setViewportSize(viewport);
+    const m = await page.evaluate(() => {
+      const de = document.documentElement;
+      const r = document.getElementById("sesCheckBtn").getBoundingClientRect();
+      const n = document.querySelector(".ses-nav").getBoundingClientRect();
+      return {
+        pageScrollable:
+          de.scrollHeight > de.clientHeight + 1 ||
+          document.body.scrollHeight > document.body.clientHeight + 1,
+        top: r.top,
+        bottom: r.bottom,
+        left: r.left,
+        right: r.right,
+        height: r.height,
+        navBottom: n.bottom,
+        sessionTop: document.getElementById("vSession").getBoundingClientRect().top,
+        vh: innerHeight,
+        vw: innerWidth,
+      };
+    });
+    const at = `${viewport.width}x${viewport.height}`;
+    expect(m.pageScrollable, `pagina scrollabile su ${at}`).toBe(false);
+    expect(m.top, `taglio in alto su ${at}`).toBeGreaterThanOrEqual(-1);
+    expect(m.bottom, `taglio in basso su ${at}`).toBeLessThanOrEqual(m.vh + 1);
+    expect(m.left, `taglio a sinistra su ${at}`).toBeGreaterThanOrEqual(-1);
+    expect(m.right, `taglio a destra su ${at}`).toBeLessThanOrEqual(m.vw + 1);
+    expect(m.height, `area di tocco su ${at}`).toBeGreaterThanOrEqual(44);
+    // la vista sessione parte dal bordo alto (nessun elemento la sospinge)
+    expect(m.sessionTop, `sessione spostata in basso su ${at}`).toBeLessThanOrEqual(1);
+    // ...e la barra è l'ultimo blocco della colonna: tocca il fondo del viewport
+    expect(m.vh - m.navBottom, `barra staccata dal fondo su ${at}`).toBeLessThanOrEqual(2);
+  }
+  // Con l'overlay del recupero aperto i suoi comandi restano raggiungibili
+  // (è l'unico modo per tornare alla serie: se escono dallo schermo, la
+  // conferma diventa irraggiungibile senza scroll).
+  for (const viewport of [
+    { width: 360, height: 640 },
+    { width: 844, height: 390 },
+  ]) {
+    await page.setViewportSize(viewport);
+    const overlay = await page.evaluate(() => {
+      const el = document.getElementById("sesTimer");
+      el.style.display = "flex";
+      const out = [...el.querySelectorAll("button")].map((b) => {
+        const r = b.getBoundingClientRect();
+        return { top: r.top, bottom: r.bottom, label: b.textContent.trim() };
+      });
+      el.style.display = "none";
+      return { out, vh: innerHeight };
+    });
+    for (const b of overlay.out)
+      expect(
+        b.bottom,
+        `"${b.label}" fuori schermo su ${viewport.width}x${viewport.height}`
+      ).toBeLessThanOrEqual(overlay.vh + 1);
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(errors).toEqual([]);
+});
 test("accessibilità: Schede, Progressi, editor e importazione", async ({
   page,
 }) => {
@@ -1116,6 +1188,48 @@ test("import nuovo e legacy conservano le note e ignorano il campo ritirato", as
   expect(result.rows[3].note).toBe("");
   expect(result.exported).not.toContain("RPE");
   expect(result.exported.split("\n")[0].split("\t")).toHaveLength(10);
+});
+test("le note restano il testo dell'atleta: carico ed emoji non vengono prefissati", async ({
+  page,
+}) => {
+  await boot(page);
+  const result = await page.evaluate(() => {
+    const header =
+      "GIORNO\tN\tESERCIZIO\tID_ES\tSERIE\tREP\tRECUPERO\tCARICO\tTEMPO\tNOTE";
+    const note = "Lenti e controllati. Solo attivazione.";
+    const line = (carico, txt = note) =>
+      header +
+      "\nPush\t1\tCirconduzioni\tCirconduzioni_Spalle_Gomiti\t2\t10\t0\t" +
+      carico +
+      "\t2-0-1\t" +
+      txt;
+    const imp = (carico, txt) => parseImport(line(carico, txt))[0].exs[0];
+    const zero = imp("0");
+    const numerico = imp("20/22");
+    const testuale = imp("Corpo libero");
+    return {
+      note,
+      zero: { note: zero.note, w: zero.sd.map((s) => s.w) },
+      numerico: { note: numerico.note, w: numerico.sd.map((s) => s.w) },
+      testuale: { note: testuale.note, w: testuale.sd.map((s) => s.w) },
+      senzaNota: parseImport(line("0", ""))[0].exs[0].note,
+      export: CSV_HEADER + "\n" + exportDayToText({ name: "Push", exs: [zero] }),
+    };
+  });
+  // CARICO = 0: prima l'import scriveva "💪 0 — " in testa alla nota
+  expect(result.zero.note).toBe(result.note);
+  expect(result.zero.w).toEqual([0, 0]);
+  // CARICO numerico: invariato, il carico sta solo nella sua colonna
+  expect(result.numerico.note).toBe(result.note);
+  expect(result.numerico.w).toEqual([20, 22]);
+  // CARICO testuale: non finisce più nelle note
+  expect(result.testuale.note).toBe(result.note);
+  expect(result.testuale.w).toEqual([0, 0]);
+  // nessuna nota "fantasma" quando l'atleta non ha scritto note
+  expect(result.senzaNota).toBe("");
+  // export round-trip pulito
+  expect(result.export).toContain(result.note);
+  expect(result.export).not.toContain("💪");
 });
 test("il volume pianificato non dipende più da punteggi legacy", async ({
   page,
