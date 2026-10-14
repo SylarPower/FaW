@@ -8,9 +8,8 @@ Portale giochi multiplayer per pause al lavoro.
 FaW/
 ├── index.html              # Hub: login, sfide, statistiche
 ├── dizionario.txt          # Dizionario condiviso (Ruzzle)
-├── exercises.json          # Dati palestra
-├── gym-icon.png
-├── esercizi/               # Asset legacy (non usati dalla palestra)
+├── exercises.json          # Catalogo testuale della palestra
+├── gym-icon.png            # Favicon GymTracker Pro
 └── games/
     ├── shared/firebase-config.js   # Config Firebase condivisa (unica fonte)
     ├── shared/faw-ui.css           # Design system premium condivisa (token + componenti)
@@ -279,6 +278,6 @@ verificato anche dal test statico `[9]`.
 
 ## Palestra mobile
 
-La palestra mantiene gli account e i dati esistenti, con una nuova esperienza mobile, modalità focus e salvataggio locale prima della sincronizzazione. Dettagli, verifiche e limiti: [games/palestra/README.md](games/palestra/README.md).
+La palestra mantiene gli account e i dati esistenti, con una nuova esperienza mobile, modalità focus e salvataggio locale prima della sincronizzazione. Il catalogo esercizi è testuale; il riepilogo di fine sessione mostra volume e statistiche, senza illustrazioni. Dettagli, verifiche e limiti: [games/palestra/README.md](games/palestra/README.md).
 
 Test UI: `npm ci`, `npx playwright install --with-deps chromium webkit`, `npm run test:gym`. Non è necessario npm per pubblicare o utilizzare il sito statico.

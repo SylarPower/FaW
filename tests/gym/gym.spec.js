@@ -92,6 +92,13 @@ async function start(page) {
   await page.locator("#dayStartBtn").click();
   await expect(page.locator("#vSession")).toBeVisible();
 }
+async function saveFeedback(page, { elbow = "none", knee = "none", rpe = "7" } = {}) {
+  await page.locator("#feedbackElbow").selectOption(elbow);
+  await page.locator("#feedbackKnee").selectOption(knee);
+  await page.locator("#feedbackRpe").selectOption(rpe);
+  await page.locator("#saveFeedbackBtn").click();
+  await expect(page.locator("#feedbackSavedMessage")).toBeVisible();
+}
 async function noOverflow(page) {
   expect(
     await page.evaluate(
@@ -137,6 +144,7 @@ test("sessione completa: conteggi corretti e nessun doppio salvataggio", async (
   for (let i = 0; i < 4; i++) await page.locator("#sesCheckBtn").click();
   await expect(page.locator("#sesSummary")).toBeVisible();
   await expect(page.locator("#sesSumGrid")).toContainText("4");
+  await saveFeedback(page, { rpe: "8" });
   expect(
     await page.evaluate(() => ({
       total: D.st.tw,
@@ -158,6 +166,7 @@ test("chiusura parziale: riepilogo e cronologia solo serie realmente fatte", asy
   await page.locator(".ses-exit").click();
   await page.locator("#sesExitFinishBtn").click();
   await expect(page.locator("#sesSummary")).toBeVisible();
+  await saveFeedback(page, { rpe: "5" });
   expect(
     await page.evaluate(() => ({
       sets: D.st.ts,
@@ -166,6 +175,7 @@ test("chiusura parziale: riepilogo e cronologia solo serie realmente fatte", asy
     })),
   ).toEqual({ sets: 1, exs: 1, historySets: 1 });
   await expect(page.locator("#sesSumGrid .ses-sum-val").nth(2)).toHaveText("1");
+  await expect(page.locator("#sessionFeedbackForm")).toContainText("RPE finale");
 });
 test("serie selezionata, modifica completata e navigazione non contaminano altri esercizi", async ({
   page,
@@ -366,7 +376,7 @@ test("onboarding vuoto, creazione e aggiunta esercizio da ricerca", async ({
   page,
 }) => {
   await boot(page, { data: { days: [], hist: [], st: {} } });
-  await page.getByRole("button", { name: "Crea la prima scheda" }).click();
+  await page.getByRole("button", { name: /Apri le schede/ }).click();
   await page.locator("#iDay").fill("Push");
   await page.locator("#homePlan .input-action button").first().click();
   await page.locator("#dList .quick-day").click();
@@ -374,6 +384,31 @@ test("onboarding vuoto, creazione e aggiunta esercizio da ricerca", async ({
   await page.locator("#exR button").first().click();
   await expect(page.locator("#dayStartBtn")).toBeEnabled();
   expect(await page.evaluate(() => D.days[0].exs.length)).toBe(1);
+});
+test("programma personale: aggiunta non distruttiva, split, volume e regole visibili", async ({ page }) => {
+  const data = fixture();
+  data.hist = [{ eid: "legacy", dayId: "push", dt: "2026-01-01T10:00:00Z", s: 1, sd: [{ r: 8, w: 12 }] }];
+  await boot(page, { data });
+  await page.evaluate(() => showGymTab("plan"));
+  await expect(page.locator("#personalProgramCard")).toBeVisible();
+  await page.locator("#personalProgramCard button").click();
+  const result = await page.evaluate(() => ({
+    names: D.days.map((day) => day.name),
+    originalDayId: D.days[0].id,
+    history: D.hist.length,
+    marker: D.st.personalProgramVersion,
+    upper: D.days.find((day) => day.name === "Upper Final").exs,
+  }));
+  expect(result.names.slice(-4)).toEqual(["Push Final", "Pull Final", "Gambe Final", "Upper Final"]);
+  expect(result.names).toContain("Upper · Forza e controllo");
+  expect(result.history).toBe(1);
+  expect(result.marker).toBe("personal-program-2026-10");
+  expect(result.upper.filter((exercise) => exercise.ssG === "upper-antagonist")).toHaveLength(2);
+  await expect(page.locator("#personalProgramCard")).toBeHidden();
+  const upperId = await page.evaluate(() => D.days.find((day) => day.name === "Upper Final").id);
+  await page.evaluate((id) => goDay(id), upperId);
+  await expect(page.locator("#dayOutline")).toContainText("90s");
+  await expect(page.locator("#dayOutline")).toContainText("Core 10/8 serie");
 });
 test("importa senza HTML attivo, limita serie e preserva lo storico", async ({
   page,
@@ -723,9 +758,11 @@ test("report finale: volume prima del reset, conteggio esatto, storico e finaliz
   for (let i = 0; i < 4; i++) await page.locator("#sesCheckBtn").click();
   await expect(page.locator("#sesVolumeValue")).toHaveText("800"); // 4 × 10 × 20, no hidden doubling.
   await expect(page.locator("#sesExCount")).toHaveText("100%");
-  await expect(page.locator(".cargo-equivalence")).toContainText(
-    "1 orso polare immaginario",
+  await expect(page.locator(".volume-caption")).toContainText(
+    "Somma di ripetizioni × carico registrato",
   );
+  await expect(page.locator("#sesVolumeReport img, #sesVolumeReport svg, #sesVolumeReport video")).toHaveCount(0);
+  await saveFeedback(page, { rpe: "8" });
   expect(
     await page.evaluate(() => D.hist.reduce((sum, h) => sum + h.volumeKg, 0)),
   ).toBe(800);
@@ -756,7 +793,7 @@ test("report parziale non include serie ancora da fare o valori negativi", async
   await page.locator(".ses-exit").click();
   await page.locator("#sesExitFinishBtn").click();
   await expect(page.locator("#sesVolumeValue")).toHaveText("270");
-  await expect(page.locator(".cargo-stamp")).toHaveText("SESSIONE PARZIALE");
+  await expect(page.locator(".session-status")).toHaveText("SESSIONE PARZIALE");
   await expect(page.locator("#sesSumGrid")).toContainText("25%");
   expect(
     await page.evaluate(() => [
@@ -775,25 +812,11 @@ test("corpo libero e carichi minimi: niente equivalenze inventate", async ({
   await start(page);
   await page.locator("#sesCheckBtn").click();
   await expect(page.locator("#sesVolumeValue")).toHaveText("0");
-  await expect(page.locator(".cargo-story")).toContainText(
-    "Non tutto si misura in chili.",
+  await expect(page.locator("#sesVolumeReport .volume-caption")).toContainText(
+    "15 ripetizioni completate senza carico registrato",
   );
-  await expect(page.locator(".cargo-story")).toContainText("15 ripetizioni");
-  await expect(page.locator(".cargo-equivalence")).toHaveCount(0);
-  expect(
-    await page.evaluate(() => [
-      getImpossibleCargo(0),
-      getImpossibleCargo(19.99),
-      getImpossibleCargo(NaN),
-    ]),
-  ).toEqual([null, null, null]);
-  expect(await page.evaluate(() => getImpossibleCargo(7000).id)).toBe(
-    "dinosaur",
-  );
-  expect(await page.evaluate(() => getImpossibleCargo(7000).count)).toBe(1);
-  expect(await page.evaluate(() => getImpossibleCargo(6999).id)).toBe(
-    "elephant",
-  );
+  await expect(page.locator(".cargo-story, .cargo-equivalence, .cargo-art-panel")).toHaveCount(0);
+  expect(await page.evaluate(() => typeof getImpossibleCargo)).toBe("undefined");
 });
 async function assertAlignedSession(page) {
   const geometry = await page.evaluate(() => {
@@ -949,13 +972,14 @@ test("completare serie fuori ordine non sovrascrive il carico dell’ultima seri
   await page.locator("#sesCheckBtn").click();
   await page.locator("#sesCheckBtn").click();
   await expect(page.locator("#sesVolumeValue")).toHaveText("450");
+  await expect(page.locator("#sesSummaryTitle")).toBeFocused();
+  await saveFeedback(page, { rpe: "7" });
   expect(
     await page.evaluate(() => D.hist[0].sd.map((s) => [s.r, s.w])),
   ).toEqual([
     [5, 10],
     [8, 50],
   ]);
-  await expect(page.locator("#sesSummaryTitle")).toBeFocused();
 });
 test("testo al 200% e nomi lunghi non fanno sovrapporre campi e pulsanti", async ({
   page,
@@ -1008,7 +1032,7 @@ test("report con numeri grandi, nomi lunghi e zero serie non causa overflow né 
   await page.locator("#sesSummary > button").scrollIntoViewIfNeeded();
 });
 
-test("RPE rimosso da sessione, editor, guida, stato e nuovi salvataggi", async ({
+test("RPE per-serie resta ritirato; RPE finale e sintomi sono registrati", async ({
   page,
 }) => {
   const data = fixture();
@@ -1033,9 +1057,10 @@ test("RPE rimosso da sessione, editor, guida, stato e nuovi salvataggi", async (
   await expect(
     page.locator("#eList .set-row").first().locator("input"),
   ).toHaveCount(2);
-  await expect(page.locator("body")).not.toContainText(/\bRPE\b/);
+  await expect(page.locator("#eList")).not.toContainText(/\bRPE\b/);
   await page.locator("#dayStartBtn").click();
   await expect(page.locator(".ses-input-group")).toHaveCount(2);
+  await expect(page.locator("#sesExCard")).not.toContainText(/\bRPE\b/);
   await expect(page.locator("#sesRpe, .rpe-input")).toHaveCount(0);
   await expect(page.locator("#sesPreviousSet")).toContainText("Ultima volta");
   expect(await page.evaluate(() => typeof generateSuggestion)).toBe(
@@ -1045,6 +1070,10 @@ test("RPE rimosso da sessione, editor, guida, stato e nuovi salvataggi", async (
   await page.locator("#sesCheckBtn").click();
   await page.locator(".ses-exit").click();
   await page.locator("#sesExitFinishBtn").click();
+  await saveFeedback(page, { elbow: "mild", knee: "none", rpe: "6" });
+  expect(
+    await page.evaluate(() => D.sessionFeedback.map(({ elbow, knee, rpe }) => [elbow, knee, rpe])),
+  ).toEqual([["mild", "none", 6]]);
   expect(
     await page.evaluate(() => JSON.stringify(D.hist).includes('"rpe"')),
   ).toBe(false);
@@ -1108,101 +1137,47 @@ test("il volume pianificato non dipende più da punteggi legacy", async ({
   });
   expect(equal).toBe(true);
 });
-test("21 livelli: soglie corrette, illustrazioni distinte e nessuna richiesta media", async ({
+test("report finale numerico: nessuna illustrazione o richiesta media", async ({
   page,
 }) => {
   const requests = [];
-  page.on("request", (req) => requests.push(req.url()));
-  await boot(page);
-  await start(page);
-  const levels = await page.evaluate(() => IMPOSSIBLE_CARGO);
-  expect(levels).toHaveLength(21);
-  expect(new Set(levels.map((l) => l.id)).size).toBe(21);
-  expect(levels.filter((l) => l.kg <= 15000).length).toBeGreaterThanOrEqual(14);
-  const arts = [];
-  for (const [index, level] of levels.entries()) {
-    const result = await page.evaluate(
-      ({ volume }) => {
-        const cargo = getImpossibleCargo(volume);
-        return {
-          id: cargo.id,
-          level: cargo.level,
-          count: cargo.count,
-          art: renderCargoArt(cargo.id),
-          below: getImpossibleCargo(volume - 0.01)?.id || null,
-        };
-      },
-      { volume: level.kg },
-    );
-    expect(result.id).toBe(level.id);
-    expect(result.level).toBe(index + 1);
-    expect(result.count).toBe(1);
-    expect(result.below).toBe(index ? levels[index - 1].id : null);
-    expect(result.art).not.toContain("undefined");
-    arts.push(result.art);
-    await page.evaluate(
-      (v) =>
-        renderWorkoutReport({
-          dayName: "Test",
-          sets: 2,
-          done: 2,
-          exercises: 1,
-          reps: 20,
-          volume: v,
-          percent: 100,
-          seconds: 600,
-        }),
-      level.kg,
-    );
-    await expect(page.locator(".cargo-art-panel")).toHaveAttribute(
-      "data-cargo",
-      level.id,
-    );
-    await expect(page.locator(".cargo-art-panel svg")).toHaveCount(1);
-    await noOverflow(page);
-  }
-  expect(new Set(arts).size).toBe(21);
-  expect(
-    requests.filter((url) =>
-      /\.mp4|\.gif|musclewiki|raw\.githubusercontent/.test(url),
-    ),
-  ).toEqual([]);
-});
-test("atlante dei carichi: tutti i livelli leggibili e accessibili anche a 320px", async ({
-  page,
-}) => {
-  await page.setViewportSize({ width: 320, height: 740 });
+  page.on("request", (request) => requests.push(request.url()));
   await boot(page);
   await start(page);
   await page.evaluate(() => {
-    gD().exs.forEach((e) =>
-      e.sd.forEach((s) => {
-        s.done = true;
-        s.w = 200;
+    gD().exs.forEach((exercise) =>
+      exercise.sd.forEach((set) => {
+        set.done = true;
+        set.w = 20;
       }),
     );
     sesShowSummary();
   });
-  await page.locator(".cargo-collection summary").click();
-  await expect(page.locator(".cargo-collection li")).toHaveCount(21);
-  await expect(page.locator(".current-cargo")).toContainText("T-rex");
+  await expect(page.locator("#sesVolumeReport")).toContainText("VOLUME REGISTRATO");
+  await expect(page.locator("#sesVolumeReport img, #sesVolumeReport svg, #sesVolumeReport video, .cargo-art-panel, .cargo-collection, .cargo-equivalence")).toHaveCount(0);
   await noOverflow(page);
-  await page.locator(".cargo-collection li").last().scrollIntoViewIfNeeded();
-  for (const theme of ["dark", "light"]) {
-    await page.evaluate(
-      (t) => (document.documentElement.dataset.theme = t),
-      theme,
-    );
-    const result = await new AxeBuilder({ page })
-      .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
-      .analyze();
-    expect(
-      result.violations.map((v) => ({
-        id: v.id,
-        nodes: v.nodes.map((n) => n.target),
-      })),
-    ).toEqual([]);
-  }
+  expect(
+    requests.filter((url) => /\.mp4|\.gif|musclewiki|raw\.githubusercontent/.test(url)),
+  ).toEqual([]);
+});
+test("feedback finale obbligatorio e utilizzabile a 320px", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 740 });
+  await boot(page);
+  await start(page);
+  await page.evaluate(() => {
+    gD().exs.forEach((exercise) => exercise.sd.forEach((set) => (set.done = true)));
+    sesShowSummary();
+  });
+  await expect(page.locator("#sessionFeedbackForm")).toBeVisible();
+  await expect(page.locator("#feedbackElbow")).toHaveAccessibleName("Fastidio al gomito");
+  await expect(page.locator("#feedbackKnee")).toHaveAccessibleName("Fastidio al ginocchio sinistro");
+  await expect(page.locator("#feedbackRpe")).toHaveAccessibleName("RPE finale · 1–10");
+  await noOverflow(page);
+  await page.locator("#sesSummary > button").click();
+  await expect(page.locator("#feedbackElbow")).toBeFocused();
+  await saveFeedback(page, { elbow: "none", knee: "none", rpe: "8" });
+  expect(await page.evaluate(() => D.sessionFeedback[0].rpe)).toBe(8);
+  await noOverflow(page);
 });
 test("entrambi i campi hanno meno a sinistra e più a destra", async ({
   page,

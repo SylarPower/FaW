@@ -13,9 +13,6 @@
     <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore-compat.js"></script>
     <!-- Config Firebase condivisa (prima dello script che inizializza Firebase) -->
     <script src="../shared/firebase-config.js"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" />
     <link rel="stylesheet" href="base.css" />
     <link rel="stylesheet" href="premium.css" />
   </head>
@@ -86,6 +83,12 @@
             <h2>Le tue schede.</h2>
             <p>Prepara qui. In palestra, pensa ad allenarti.</p>
           </div>
+          <article class="card" id="personalProgramCard">
+            <h3>Programma personale · 4 giorni</h3>
+            <p class="muted">Aggiunge Push Final, Pull Final, Gambe Final e Upper Final senza sostituire le schede o lo storico già presenti. Progressione, ramp-up, protezione articolare e superserie vengono mantenuti nella copia locale/cloud.</p>
+            <button class="bp full-width" onclick="installPersonalTrainingProgram()">Aggiungi il programma personale</button>
+            <p class="muted" id="personalProgramStatus" style="margin-bottom:0">La fase parte dal giorno dell’aggiunta; puoi correggere la data nella sezione qui sotto. Nessuna informazione di profilo o nutrizione viene salvata nella scheda.</p>
+          </article>
           <div class="card">
             <label class="field-label" for="iDay">Nuova giornata</label>
             <div class="input-action">
@@ -110,7 +113,7 @@
           <details class="card">
             <summary>Fase del programma</summary>
             <label class="field-label" for="programDateInput"
-              >Data di inizio</label
+              >Data di inizio del mesociclo</label
             >
             <div class="input-action">
               <input
@@ -324,7 +327,10 @@
 
           <!-- Input set corrente -->
           <div class="ses-set-area" id="sesSetArea">
+            <div id="sesSafetyNotice" role="status" hidden></div>
             <div id="sesPreviousSet"></div>
+            <div id="sesRampUpInfo" class="session-guidance" hidden></div>
+            <div id="sesDropSetInfo" class="session-guidance" hidden></div>
             <div class="ses-set-label" id="sesSetLabel">SET 1</div>
             <div class="ses-inputs">
               <div class="ses-input-group">
@@ -346,7 +352,7 @@
                     +
                   </button>
                 </div>
-                <label for="sesReps">Ripetizioni</label>
+                <label for="sesReps" id="sesRepsLabel">Ripetizioni</label>
               </div>
               <div class="ses-input-group">
                 <div class="ses-adj-row">
@@ -403,6 +409,7 @@
                 white-space: pre-wrap;
               "
             ></div>
+            <button class="text-button" id="sesPainStop" onclick="stopExerciseForJointPain()" hidden>Segnala fastidio e interrompi questo esercizio</button>
             <div class="ses-stopwatch" id="sesStopwatch">
               <button
                 class="ses-sw-btn"
@@ -460,7 +467,6 @@
 
         <!-- Summary (mostrato alla fine) -->
         <div class="ses-summary" id="sesSummary" style="display: none">
-          <div class="ses-summary-icon" aria-hidden="true">✓</div>
           <h2 class="ses-summary-title" id="sesSummaryTitle" tabindex="-1">
             Allenamento concluso.
           </h2>
@@ -471,6 +477,20 @@
             aria-label="Volume dell’allenamento"
           ></section>
           <div class="ses-summary-grid" id="sesSumGrid"></div>
+          <section class="card session-feedback" id="sessionFeedbackForm" aria-labelledby="sessionFeedbackTitle">
+            <h3 id="sessionFeedbackTitle">Com’è andata?</h3>
+            <p class="muted">Registra fastidio e RPE finale. Se compare fastidio articolare durante un esercizio, interrompilo subito.</p>
+            <label class="field-label" for="feedbackElbow">Fastidio al gomito</label>
+            <select id="feedbackElbow"><option value="">Seleziona</option><option value="none">No</option><option value="mild">Lieve · interrompi l’esercizio</option><option value="yes">Sì · interrompi l’esercizio</option></select>
+            <label class="field-label" for="feedbackKnee">Fastidio al ginocchio sinistro</label>
+            <select id="feedbackKnee"><option value="">Seleziona</option><option value="none">No</option><option value="mild">Lieve · interrompi l’esercizio</option><option value="yes">Sì · interrompi l’esercizio</option></select>
+            <label class="field-label" for="feedbackRpe">RPE finale · 1–10</label>
+            <select id="feedbackRpe"><option value="">Seleziona</option><option value="1">1 · molto facile</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10 · massimale</option></select>
+            <label class="field-label" for="feedbackNote">Note (facoltative)</label>
+            <textarea id="feedbackNote" rows="3" maxlength="500" placeholder="Sensazioni, tecnica, eventuali modifiche…"></textarea>
+            <button class="bp full-width" id="saveFeedbackBtn" onclick="saveSessionFeedback()">Salva feedback sessione</button>
+            <p class="muted" id="feedbackSavedMessage" role="status" hidden></p>
+          </section>
           <button
             class="bp"
             onclick="sesClose()"
@@ -602,10 +622,11 @@
             margin-bottom: 16px;
           "
         >
-          Scegli la strategia di sovraccarico per le prossime serie.
+          Per gli esercizi del programma personale si applica la doppia progressione specifica; le regole generiche restano per le schede libere.
         </p>
+        <div id="pmPersonalStatus" class="session-guidance" hidden></div>
 
-        <div style="display: flex; flex-direction: column; gap: 10px">
+        <div id="pmStrategyChoices" style="display: flex; flex-direction: column; gap: 10px">
           <button
             onclick="applyProgType('weight')"
             style="
@@ -2053,8 +2074,8 @@
     </div>
     <!-- fine #muscleMapTpl -->
     <script src="app.js"></script>
-    <script src="cargo-art.js"></script>
     <script src="workout-metrics.js"></script>
+    <script src="training-program.js"></script>
     <script src="premium.js"></script>
     <script>
       initGym();

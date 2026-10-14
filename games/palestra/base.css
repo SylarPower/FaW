@@ -45,7 +45,7 @@ html {
 }
 body {
   font-family:
-    "Plus Jakarta Sans", "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
   background: var(--bg);
   color: var(--tx);
   min-height: 100vh;
@@ -781,15 +781,12 @@ body.is-dragging * {
   overflow: hidden;
   transition:
     max-height 0.35s ease,
-    padding 0.35s ease,
-    opacity 0.25s ease;
+    padding 0.35s ease;
   padding: 0 16px;
-  opacity: 0;
 }
 .ex-body.open {
   max-height: 2000px; /* Abbastanza per qualsiasi contenuto */
   padding: 0 16px 16px;
-  opacity: 1;
 }
 .ex-summary {
   display: flex;

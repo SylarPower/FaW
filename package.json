@@ -9,7 +9,7 @@
     "test:shared": "node tests/shared/banner.test.js && node tests/shared/podio.test.js && node tests/shared/podio-giochi.test.js && node tests/shared/rivincita.test.js && node tests/shared/modale.test.js && node tests/shared/tema.test.js && node tests/shared/pagine.test.js",
     "test:ruzzle": "node tests/ruzzle/timer.test.js && node tests/ruzzle/input.test.js && node tests/ruzzle/replay.test.js && node tests/ruzzle/perso.test.js && node tests/ruzzle/punteggi-finali.test.js",
     "test:hub": "node tests/hub/firebase-down.test.js && node tests/hub/login-flow.test.js && node tests/hub/inviti-realtime.test.js",
-    "test:static": "node tests/static/syntax.test.js",
+    "test:static": "node tests/static/syntax.test.js && node tests/gym/training-program.test.js",
     "test": "npm run test:static && npm run test:ncc && npm run test:patata && npm run test:shared && npm run test:ruzzle && npm run test:hub"
   },
   "devDependencies": {
