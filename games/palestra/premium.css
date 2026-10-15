@@ -1723,6 +1723,31 @@ body.dialog-open {
 .program-policy h3 {
   margin-bottom: 8px;
 }
+/* Stato del ciclo a sessioni: hero, riepilogoProgressi e policy del giorno. */
+.hero-card .hero-cycle {
+  margin-top: 10px;
+  color: var(--tx3);
+  font-size: 0.75rem;
+  letter-spacing: 0.2px;
+}
+.hero-card .hero-cycle-deload {
+  color: var(--yel);
+  font-weight: 700;
+}
+.hero-tag-deload {
+  color: var(--yel);
+  border-color: var(--yel);
+}
+.stat-tile-deload strong {
+  color: var(--yel);
+}
+.program-policy-deload {
+  border-left-color: var(--yel);
+}
+.program-policy p:first-of-type {
+  color: var(--tx);
+  font-weight: 600;
+}
 .program-policy p {
   margin: 8px 0 0;
   color: var(--tx2);

@@ -293,7 +293,9 @@ async function loadExDB() {
 // 🔥 FIREBASE LOAD/SAVE
 // ============================================================
 function dSt() {
-  return { tw: 0, ts: 0, te: 0, pr: {}, sk: 0, lwd: null };
+  // cycleSessions = contatore progressivo delle sessioni completate: decide la
+  // scheda della rotazione e quando scatta il deload. Non si azzera mai.
+  return { tw: 0, ts: 0, te: 0, pr: {}, sk: 0, lwd: null, cycleSessions: 0 };
 }
 
 // ============================================================
@@ -463,13 +465,11 @@ function getProgramPhase(week) {
   return Math.ceil(week / 4);
 }
 
-function isDeloadWeek(week) {
-  if (!week) return false;
-  return week % 4 === 0;
-}
-function getDeloadPercent(week) {
-  return week && isDeloadWeek(week) ? 0.4 : 0;
-}
+/* Il deload non dipende piu' dalla settimana di calendario: la regola vive in
+   training-program.js ed e' ``(numero_sessione - 1) % 16 >= 12``
+   (isDeloadSessionNumber / getPersonalCycleState). Le vecchie
+   isDeloadWeek() e getDeloadPercent() sono state rimosse per non lasciare una
+   seconda fonte di verita' sullo scarico. */
 
 function getPhaseInfo(phase) {
   const phases = {
@@ -525,18 +525,37 @@ function renderPhaseIndicator() {
   const dateInput = document.getElementById("programDateInput");
   const start = D.st.personalProgramVersion ? D.st.personalProgramStart : D.st.programStart;
   if (dateInput) dateInput.value = start || "";
-  const week = getProgramWeek();
-  if (!week) {
-    el.innerHTML = `<div class="phase-card"><p>Imposta la data di inizio per attivare il mesociclo di 4 settimane e il deload obbligatorio.</p></div>`;
+  const cfg = PERSONAL_PROGRAM_CONFIG;
+  const cycle = typeof getPersonalCycleState === "function" ? getPersonalCycleState() : null;
+  const badge = document.getElementById("phaseSummaryBadge");
+  const plural = (count, one, many) => `${count} ${count === 1 ? one : many}`;
+  if (!cycle) {
+    if (badge) badge.textContent = "";
+    el.innerHTML = `<div class="phase-card"><p>Imposta la data di inizio solo per la revisione del volume: il ciclo e il deload seguono il conteggio delle sessioni.</p></div>`;
     return;
   }
-  const weekInCycle = ((week - 1) % 4) + 1;
-  const deload = isDeloadWeek(week);
-  el.innerHTML = `<div class="phase-card">
-    <div class="phase-week ${deload ? "phase-deload" : "phase-normal"}"><span class="pw-num">${week}</span><span class="pw-label">Sett.</span></div>
-    <div class="phase-info"><h4>${deload ? "Deload obbligatorio" : `Mesociclo ${Math.ceil(week / 4)} · settimana ${weekInCycle}/4`}</h4>
-    <small>${deload ? "−40% del carico dell’ultima sessione normale · −1 serie per esercizio (minimo 1) · ripetizioni e recuperi invariati · drop set esclusi." : "Doppia progressione per esercizio. La settimana 4 è sempre di scarico."}</small></div>
-  </div><div class="phase-cycle" aria-label="Settimana ${weekInCycle} di 4">${[1, 2, 3, 4].map((n) => `<span class="${n < weekInCycle ? "done" : n === weekInCycle ? "active" : ""}"${n === weekInCycle ? ' aria-current="step"' : ""}>${n === 4 ? "Deload" : `Sett. ${n}`}</span>`).join("")}</div>`;
+  if (badge) badge.textContent = `S${cycle.sessionNumber} · ${cycle.isDeload ? "DELOAD" : cycle.dayName || "normale"}`;
+  const week = getProgramWeek();
+  const deload = cycle.isDeload;
+  const alignment = !cycle.completedSessions && (D.st.tw || 0) > 0
+    ? `<small class="cycle-note">Contatore del ciclo azzerato con il passaggio alla logica a sessioni: le ${plural(D.st.tw, "sessione è", "sessioni sono")} già registrate nello storico e restano invariate.</small>`
+    : "";
+  const chips = typeof getPersonalDayList === "function" && cycle.day
+    ? Array.from({ length: cfg.daysInRotation }, (_, offset) => {
+        const upcoming = getCycleStateForSessionNumber(cycle.sessionNumber + offset);
+        const label = upcoming.dayName || `Sessione ${upcoming.sessionNumber}`;
+        return `<span class="${upcoming.isDeload ? "cycle-deload" : ""}"${offset === 0 ? ' aria-current="step"' : ""}>${escapeHTML(upcoming.isDeload ? `${label} · deload` : label)}</span>`;
+      }).join("")
+    : "";
+  el.innerHTML = `<div class="phase-card${deload ? " phase-card-deload" : ""}">
+    <div class="phase-week ${deload ? "phase-deload" : "phase-normal"}"><span class="pw-num">${cycle.sessionNumber}</span><span class="pw-label">Sessione</span></div>
+    <div class="phase-info"><h4>${escapeHTML(cycle.dayName || "Programma non installato")} · ${deload ? `DELOAD (${plural(cycle.deloadSessionsLeft, "sessione", "sessioni")} di ${cfg.deloadSessions})` : `ciclo ${cycle.cycleNumber} · sessione ${cycle.positionInCycle}/${cfg.sessionsPerCycle}`}</h4>
+    <small>${deload
+      ? `−40% del carico dell’ultima sessione normale · −1 serie per esercizio (minimo 1) · ripetizioni e recuperi invariati · drop set esclusi. Scarico fino alla sessione ${cycle.lastDeloadSessionNumber}, dalla ${cycle.nextNormalSessionNumber} si riparte normali.`
+      : `Deload tra ${plural(cycle.sessionsToDeload, "sessione", "sessioni")} (dalla sessione ${cycle.nextDeloadSessionNumber}) · dopo ${cfg.normalSessionsBeforeDeload} sessioni completate, non a fine settimana.`}</small>
+    ${cycle.day ? "" : `<small>Aggiungi il programma personale dalla scheda “Piano” per ruotare Push → Pull → Gambe → Upper.</small>`}
+    ${alignment}</div>
+  </div>${chips ? `<div class="phase-cycle" aria-label="Prossime ${cfg.daysInRotation} sessioni del ciclo">${chips}</div>` : ""}${week ? `<p class="cycle-foot">Settimana ${week} dal ${start || "—"} · usata solo per la revisione del volume ogni ${cfg.volumeReviewEveryWeeks} settimane.</p>` : ""}`;
 }
 
 function renderAll() {
@@ -1843,18 +1862,22 @@ function launchSession() {
   if (!day) return;
   const previous = D.activeSession?.dayId === curDay ? D.activeSession : null;
   if (!previous && day.personalProgramVersion) {
+    const cycle = typeof getPersonalCycleState === "function" ? getPersonalCycleState() : null;
     const personalDays = typeof getPersonalDayList === "function" ? getPersonalDayList() : [];
     const expectedIndex = Number(D.st?.nextPersonalDayIndex) || 0;
-    const expectedDay = personalDays[expectedIndex % Math.max(personalDays.length, 1)];
+    const expectedDay = (cycle && cycle.day) || personalDays[expectedIndex % Math.max(personalDays.length, 1)];
     const rest = typeof getPersonalRestStatus === "function" ? getPersonalRestStatus() : null;
     if (rest) {
       toast(rest.message, "warn", 5000);
       return;
     }
     if (expectedDay && expectedDay.id !== day.id) {
-      toast(`Segui la sequenza: la prossima giornata è ${expectedDay.name}.`, "warn", 4000);
+      toast(`Segui la sequenza: la sessione ${cycle?.sessionNumber ?? expectedIndex + 1} è ${expectedDay.name}.`, "warn", 4000);
       return;
     }
+    // Requisito 4 — avviso del deload prima di iniziare la sessione.
+    if (cycle?.isDeload)
+      toast(`Sessione ${cycle.sessionNumber} · deload: −40% di carico, −1 serie per esercizio, nessun drop set.`, "info", 6000);
   }
   sesActive = true;
   sesExIdx = 0;
@@ -2644,8 +2667,13 @@ function sesCompleteSave(feedback) {
     isDeload: Boolean(activeSession.isDeload),
     reportedPain: { ...(activeSession.reportedPain || {}) },
   });
-  if (doneSetsAll === totalSets && day.personalProgramVersion && typeof advancePersonalDay === "function")
-    advancePersonalDay(curDay);
+  if (doneSetsAll === totalSets) {
+    if (day.personalProgramVersion && typeof advancePersonalDay === "function")
+      advancePersonalDay(curDay);
+    // Requisito 1 — il contatore di ciclo avanza una sola volta per sessione
+    // completata (tutte le serie allenanti fatte) e non si azzera mai.
+    if (typeof recordCompletedCycleSession === "function") recordCompletedCycleSession();
+  }
   if (typeof restorePersonalSessionPlan === "function")
     restorePersonalSessionPlan(day, activeSession);
   day.exs.forEach((ex) => {

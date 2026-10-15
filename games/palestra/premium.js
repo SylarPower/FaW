@@ -353,8 +353,11 @@ function renderHomePremium() {
   const activeDay = D.days.find((d) => d.id === D.activeSession?.dayId);
   const partial = activeDay || D.days.find((d) => dayCounts(d).done > 0);
   const personalDays = typeof getPersonalDayList === "function" ? getPersonalDayList() : [];
+  const cycle = typeof getPersonalCycleState === "function" ? getPersonalCycleState() : null;
   const cursor = Number(D.st?.nextPersonalDayIndex) || 0;
-  const scheduled = personalDays.length ? personalDays[cursor % personalDays.length] : null;
+  const scheduled =
+    (cycle && cycle.day) ||
+    (personalDays.length ? personalDays[cursor % personalDays.length] : null);
   const restStatus = typeof getPersonalRestStatus === "function" ? getPersonalRestStatus() : null;
   const next =
     partial ||
@@ -367,7 +370,14 @@ function renderHomePremium() {
     hero.innerHTML = `<article class="hero-card rest-day-card"><span class="hero-label">RECUPERO PROGRAMMATO</span><h3>Giorno di riposo.</h3><p>${escapeHTML(restStatus.message)}</p><p class="muted">Il ciclo personale riprenderà con Gambe Final. La sequenza resta invariata.</p></article>`;
   } else if (next) {
     const count = dayCounts(next);
-    hero.innerHTML = `<article class="hero-card"><div class="hero-top"><span class="hero-label">${partial ? "Da dove eri rimasto" : "Il prossimo passo"}</span><span class="hero-tag">${partial ? "In corso" : "La tua scheda"}</span></div><h3>${escapeHTML(next.name)}</h3><p>${partial ? `${count.done} di ${count.sets} serie completate. Riparti da qui.` : "Tutto pronto. Prenditi questo tempo per te."}</p><div class="hero-meta"><div><strong>${next.exs.length}</strong><span>Esercizi</span></div><div><strong>${count.sets}</strong><span>Serie previste</span></div><div><strong>${count.sets ? Math.round((count.done / count.sets) * 100) : 0}%</strong><span>Completato</span></div></div><button class="bp" id="heroStart">${partial ? "Riprendi allenamento" : "Apri la scheda"} <span aria-hidden="true">→</span></button></article>`;
+    const cycleCfg = PERSONAL_PROGRAM_CONFIG;
+    const heroCycle =
+      cycle && next.personalProgramVersion
+        ? `<p class="hero-cycle${cycle.isDeload ? " hero-cycle-deload" : ""}">Sessione ${cycle.sessionNumber} · ${cycle.isDeload
+            ? `DELOAD ${cycleCfg.deloadSessions - cycle.deloadSessionsLeft + 1}/${cycleCfg.deloadSessions}: −40% di carico, −1 serie, nessun drop set`
+            : `normale · deload tra ${cycle.sessionsToDeload} ${cycle.sessionsToDeload === 1 ? "sessione" : "sessioni"}`}</p>`
+        : "";
+    hero.innerHTML = `<article class="hero-card"><div class="hero-top"><span class="hero-label">${partial ? "Da dove eri rimasto" : "Il prossimo passo"}</span><span class="hero-tag${cycle && next.personalProgramVersion && cycle.isDeload ? " hero-tag-deload" : ""}">${partial ? "In corso" : "La tua scheda"}</span></div><h3>${escapeHTML(next.name)}</h3><p>${partial ? `${count.done} di ${count.sets} serie completate. Riparti da qui.` : "Tutto pronto. Prenditi questo tempo per te."}</p>${heroCycle}<div class="hero-meta"><div><strong>${next.exs.length}</strong><span>Esercizi</span></div><div><strong>${count.sets}</strong><span>Serie previste</span></div><div><strong>${count.sets ? Math.round((count.done / count.sets) * 100) : 0}%</strong><span>Completato</span></div></div><button class="bp" id="heroStart">${partial ? "Riprendi allenamento" : "Apri la scheda"} <span aria-hidden="true">→</span></button></article>`;
     document.getElementById("heroStart").onclick = () => {
       goDay(next.id);
       if (partial) launchSession();
@@ -397,8 +407,22 @@ function renderHomePremium() {
   ).length;
   document.getElementById("weekStrip").innerHTML =
     `<strong>${weekly}</strong><span>allenament${weekly === 1 ? "o" : "i"} questa settimana.<br>Ogni sessione conta.</span>`;
+  const cycleTile =
+    typeof getPersonalCycleState === "function"
+      ? getPersonalCycleState()
+      : null;
   document.getElementById("progressStats").innerHTML =
-    `<div class="stat-tile"><strong>${D.st.tw || sessions.length}</strong><span>Allenamenti totali</span></div><div class="stat-tile"><strong>${D.st.ts || 0}</strong><span>Serie completate</span></div>`;
+    `<div class="stat-tile"><strong>${D.st.tw || sessions.length}</strong><span>Allenamenti totali</span></div><div class="stat-tile"><strong>${D.st.ts || 0}</strong><span>Serie completate</span></div>${
+      cycleTile
+        ? `<div class="stat-tile"><strong>${cycleTile.sessionNumber}</strong><span>Sessione del ciclo</span></div><div class="stat-tile${cycleTile.isDeload ? " stat-tile-deload" : ""}"><strong>${
+            cycleTile.isDeload ? "DELOAD" : cycleTile.sessionsToDeload
+          }</strong><span>${
+            cycleTile.isDeload
+              ? `fine alla sessione ${cycleTile.lastDeloadSessionNumber}`
+              : `sessioni al deload`
+          }</span></div>`
+        : ""
+    }`;
   document.getElementById("recentSessions").innerHTML = sessions.length
     ? sessions
         .slice(0, 20)
@@ -494,7 +518,11 @@ function renderDayPremium() {
   if (day.personalProgramVersion) {
     const messages = getProgramPolicyMessages(day);
     const policy = document.createElement("section");
-    policy.className = "card program-policy";
+    policy.className =
+      "card program-policy" +
+      (typeof getPersonalCycleState === "function" && getPersonalCycleState().isDeload
+        ? " program-policy-deload"
+        : "");
     policy.setAttribute("aria-label", "Regole del programma personale");
     policy.innerHTML = `<h3>Progressione e recupero</h3>${messages.map((message) => `<p>${escapeHTML(message)}</p>`).join("")}`;
     document.getElementById("dayOutline").prepend(policy);

@@ -4,7 +4,12 @@
 const PERSONAL_PROGRAM_VERSION = "personal-program-2026-10";
 const PERSONAL_PROGRAM_CONFIG = {
   title: "Push → Pull → Gambe → Upper",
-  deloadEveryWeeks: 4,
+  // SEZIONE 11 — ciclo a sessioni rotanti: il conteggio è di sessioni, non di
+  // settimane. 12 sessioni normali + le 4 successivi in deload = ciclo da 16.
+  sessionsPerCycle: 16,
+  normalSessionsBeforeDeload: 12,
+  deloadSessions: 4,
+  daysInRotation: 4,
   deloadLoadMultiplier: 0.6,
   deloadSetReduction: 1,
   inactivityDays: 5,
@@ -313,6 +318,86 @@ function getWeeklyVolumeAdvice(dayList, limits = PERSONAL_PROGRAM_CONFIG.maxWeek
   }));
 }
 
+// ============================================================
+// SEZIONE 11 — CICLO A SESSIONI ROTANTI
+// Le 4 schede si susseguono in ordine continuo: la scheda della sessione
+// corrente e il deload dipendono dal numero di sessione, non dal calendario.
+// ============================================================
+function getCompletedCycleSessions() {
+  const value = Number(D?.st?.cycleSessions);
+  return Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
+}
+function getPersonalSessionNumber() {
+  return getCompletedCycleSessions() + 1;
+}
+// Requisito 3 — deload quando (numero_sessione - 1) % 16 >= 12, cioè le
+// sessioni 13-16, 29-32, 45-48 … Nessuna data e nessuna settimana in gioco.
+function isDeloadSessionNumber(sessionNumber) {
+  const value = Number(sessionNumber);
+  if (!Number.isFinite(value) || value < 1) return false;
+  const cfg = PERSONAL_PROGRAM_CONFIG;
+  return (value - 1) % cfg.sessionsPerCycle >= cfg.normalSessionsBeforeDeload;
+}
+function getPersonalDayRotation() {
+  return getPersonalDayList().length || PERSONAL_PROGRAM_CONFIG.daysInRotation;
+}
+// Requisito 2 e 7 — stato del ciclo: numero sessione, scheda assegnata,
+// tipo sessione e quante sessioni mancano al prossimo scarico.
+function getCycleStateForSessionNumber(rawSessionNumber) {
+  const cfg = PERSONAL_PROGRAM_CONFIG;
+  const sessionNumber = Math.max(1, Math.floor(Number(rawSessionNumber) || 1));
+  const days = getPersonalDayList();
+  const rotationLength = getPersonalDayRotation();
+  const dayIndex = (sessionNumber - 1) % rotationLength;
+  const position = (sessionNumber - 1) % cfg.sessionsPerCycle;
+  const isDeload = isDeloadSessionNumber(sessionNumber);
+  const day = days[dayIndex] || null;
+  // Prima sessione del blocco di scarico corrente o del prossimo.
+  const deloadStart = isDeload
+    ? sessionNumber - (position - cfg.normalSessionsBeforeDeload)
+    : sessionNumber + (cfg.normalSessionsBeforeDeload - position);
+  return {
+    sessionNumber,
+    completedSessions: getCompletedCycleSessions(),
+    cycleNumber: Math.floor((sessionNumber - 1) / cfg.sessionsPerCycle) + 1,
+    positionInCycle: position + 1,
+    dayIndex,
+    day,
+    dayName: day?.name || "",
+    isDeload,
+    sessionsToDeload: isDeload ? 0 : deloadStart - sessionNumber,
+    nextDeloadSessionNumber: deloadStart,
+    lastDeloadSessionNumber: deloadStart + cfg.deloadSessions - 1,
+    nextNormalSessionNumber: deloadStart + cfg.deloadSessions,
+    deloadSessionsLeft: isDeload ? cfg.sessionsPerCycle - position : 0,
+    rotationLength,
+  };
+}
+function getPersonalCycleState() {
+  return getCycleStateForSessionNumber(getPersonalSessionNumber());
+}
+// Requisito 1 — contatore progressivo: +1 a ogni sessione completata, mai
+// azzerato (né a fine settimana né a fine mese) e persistito in D.st.
+function recordCompletedCycleSession() {
+  if (!D || !D.st) return 0;
+  D.st.cycleSessions = getCompletedCycleSessions() + 1;
+  if (D.st.personalProgramVersion) D.st.nextPersonalDayIndex = getPersonalCycleState().dayIndex;
+  return D.st.cycleSessions;
+}
+// Requisito 6 — il distacco si misura dall'ultima sessione completata in
+// assoluto: una giornata saltata è proprio il caso da segnalare.
+function getDaysSinceLastCompletedSession(now = Date.now()) {
+  const stamps = [];
+  const local = String(D?.st?.lwd || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (local) stamps.push(new Date(Number(local[1]), Number(local[2]) - 1, Number(local[3]), 12, 0, 0).getTime());
+  for (const entry of D?.hist || []) {
+    const time = new Date(entry?.dt || "").getTime();
+    if (Number.isFinite(time)) stamps.push(time);
+  }
+  if (!stamps.length) return null;
+  return Math.max(0, Math.floor((now - Math.max(...stamps)) / 86400000));
+}
+
 function installPersonalTrainingProgram() {
   if (!D || !Array.isArray(D.days)) return;
   if (D.st?.personalProgramVersion === PERSONAL_PROGRAM_VERSION) {
@@ -329,6 +414,7 @@ function installPersonalTrainingProgram() {
   D.st = D.st || {};
   D.st.personalProgramVersion = PERSONAL_PROGRAM_VERSION;
   D.st.nextPersonalDayIndex = 0;
+  if (!Number.isFinite(Number(D.st.cycleSessions))) D.st.cycleSessions = 0;
   if (!D.st.personalProgramStart) {
     const today = new Date();
     D.st.personalProgramStart = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
@@ -338,7 +424,7 @@ function installPersonalTrainingProgram() {
   if (typeof renderAll === "function") renderAll();
   if (typeof renderHomePremium === "function") renderHomePremium();
   toast(
-    "Programma aggiunto senza modificare le schede esistenti. La settimana 1 parte da oggi; puoi correggere la data nelle impostazioni della fase.",
+    "Programma aggiunto senza modificare le schede esistenti. Il ciclo a sessioni parte da Sessione 1 · Push Final: la scheda segue la sequenza a ogni sessione completata, indipendentemente dai giorni della settimana.",
     "ok",
     5000,
   );
@@ -425,8 +511,8 @@ function getProgressionStatus(ex, dayId) {
 }
 function applyPersonalProgressions(day) {
   if (!day || !D || !day.personalProgramVersion) return [];
-  const week = typeof getProgramWeek === "function" ? getProgramWeek() : null;
-  if (week && isDeloadWeek(week)) return [];
+  // Nei deload il carico scende di proposito: nessuna progressione da applicare.
+  if (isDeloadSessionNumber(getPersonalSessionNumber())) return [];
   const changes = [];
   day.exs.forEach((ex) => {
     if (!ex.progression) return;
@@ -454,13 +540,6 @@ function getLastSessionForDay(dayId) {
     .filter((entry) => entry.dayId === dayId)
     .sort((a, b) => new Date(b.dt) - new Date(a.dt))[0] || null;
 }
-function getDaysSinceLastPersonalSession(dayId, now = Date.now()) {
-  const last = (D?.hist || [])
-    .filter((entry) => entry.dayId === dayId && !entry.isWarmup)
-    .sort((a, b) => new Date(b.dt) - new Date(a.dt))[0];
-  if (!last?.dt) return null;
-  return Math.floor((now - new Date(last.dt).getTime()) / 86400000);
-}
 function getJointDiscomfortStreak(joint, feedback = D?.sessionFeedback || []) {
   if (!joint) return 0;
   const ordered = [...feedback].sort((a, b) => new Date(b.dt) - new Date(a.dt));
@@ -476,8 +555,7 @@ function getJointDiscomfortStreak(joint, feedback = D?.sessionFeedback || []) {
 function canUseDropSet(dayId) {
   if (Object.keys(D?.activeSession?.reportedPain || {}).length)
     return { allowed: false, reason: "Drop set sospesi dopo un fastidio articolare nella sessione in corso." };
-  const week = typeof getProgramWeek === "function" ? getProgramWeek() : null;
-  if (D?.activeSession?.isDeload || (week && isDeloadWeek(week))) return { allowed: false, reason: "Drop set esclusi nella settimana di deload." };
+  if (D?.activeSession?.isDeload || isDeloadSessionNumber(getPersonalSessionNumber())) return { allowed: false, reason: "Drop set esclusi nelle sessioni di deload." };
   const last = getLatestSessionFeedback();
   if (last && (last.elbow !== "none" || last.knee !== "none"))
     return { allowed: false, reason: "Drop set sospesi dopo un fastidio articolare nella sessione precedente." };
@@ -488,8 +566,9 @@ function preparePersonalSession(day, now = Date.now()) {
   const week = typeof getProgramWeek === "function" ? getProgramWeek() : null;
   const volumeChanges = typeof applyPersonalVolumeMilestone === "function" ? applyPersonalVolumeMilestone(week) : [];
   const progressionChanges = applyPersonalProgressions(day);
-  const deload = Boolean(week && isDeloadWeek(week));
-  const daysSince = getDaysSinceLastPersonalSession(day.id, now);
+  const cycle = getPersonalCycleState();
+  const deload = cycle.isDeload;
+  const daysSince = getDaysSinceLastCompletedSession(now);
   const inactivity = daysSince !== null && daysSince > PERSONAL_PROGRAM_CONFIG.inactivityDays;
   const multiplier = (deload ? PERSONAL_PROGRAM_CONFIG.deloadLoadMultiplier : 1) *
     (inactivity ? PERSONAL_PROGRAM_CONFIG.inactivityLoadMultiplier : 1);
@@ -523,6 +602,10 @@ function preparePersonalSession(day, now = Date.now()) {
     inactivityAdjusted: inactivity,
     daysSinceLastSession: daysSince,
     loadMultiplier: multiplier,
+    sessionNumber: cycle.sessionNumber,
+    cycleNumber: cycle.cycleNumber,
+    positionInCycle: cycle.positionInCycle,
+    sessionsToDeload: cycle.sessionsToDeload,
     week,
     progressionChanges,
     volumeChanges,
@@ -558,29 +641,34 @@ function addPersonalDropSetIfDue(ex, completedSet, dayId) {
 function getProgramPolicyMessages(day) {
   if (!day?.personalProgramVersion || !D) return [];
   const messages = [];
+  const cfg = PERSONAL_PROGRAM_CONFIG;
+  const plural = (count, one, many) => `${count} ${count === 1 ? one : many}`;
+  const cycle = getPersonalCycleState();
   const rest = getPersonalRestStatus();
   if (rest) messages.push(rest.message);
-  else {
-    const personalDays = getPersonalDayList();
-    const expected = personalDays[Number(D.st?.nextPersonalDayIndex) || 0];
-    if (expected && expected.id !== day.id)
-      messages.push(`Sequenza personale: la prossima giornata è ${expected.name}.`);
-  }
+  else if (cycle.day && cycle.day.id !== day.id)
+    messages.push(`Sequenza per sessioni: la sessione ${cycle.sessionNumber} è ${cycle.day.name}.`);
+  // Requisito 7 — stato del ciclo sempre leggibile prima di iniziare.
+  messages.push(`Sessione ${cycle.sessionNumber} · ${cycle.dayName || day.name} · ${cycle.isDeload
+    ? `DELOAD (${plural(cfg.deloadSessions - cycle.deloadSessionsLeft + 1, "sessione", "sessioni")} di ${cfg.deloadSessions} di scarico)`
+    : `normale · deload tra ${plural(cycle.sessionsToDeload, "sessione", "sessioni")}`}`);
   const week = typeof getProgramWeek === "function" ? getProgramWeek() : null;
-  if (week && isDeloadWeek(week)) {
-    messages.push(`Settimana ${week}: deload obbligatorio · −40% dal carico dell’ultima sessione normale, −1 serie per esercizio (minimo 1), ripetizioni e recuperi invariati, senza drop set.`);
-  } else if (week) {
-    messages.push(`Settimana ${week} del mesociclo · prossimo deload alla settimana ${Math.ceil(week / 4) * 4}.`);
+  if (cycle.isDeload) {
+    messages.push(`Deload obbligatorio (scatta dopo ${cfg.normalSessionsBeforeDeload} sessioni completate, non a fine settimana): −40% dal carico dell’ultima sessione normale, −1 serie per esercizio (minimo 1), ripetizioni e recuperi invariati, senza drop set. Le ${plural(cfg.deloadSessions, "sessione", "sessioni")} di scarico sono una per scheda, poi il ciclo riparte normale.`);
   } else {
-    messages.push("Imposta la data di inizio del programma per attivare il deload obbligatorio ogni 4 settimane.");
+    messages.push(`Ciclo ${cycle.cycleNumber} · sessione ${cycle.positionInCycle} di ${cfg.sessionsPerCycle}: le prossime ${plural(cfg.daysInRotation, "sessione", "sessioni")} seguono la sequenza Push → Pull → Gambe → Upper, indipendentemente dai giorni della settimana.`);
   }
-  const daysSince = getDaysSinceLastPersonalSession(day.id);
-  if (daysSince !== null && daysSince > PERSONAL_PROGRAM_CONFIG.inactivityDays && !(week && isDeloadWeek(week)))
-    messages.push(`Sono passati ${daysSince} giorni: solo in questa sessione carichi ridotti del 10%; dalla prossima si riprende il carico programmato.`);
+  // Requisito 6 — distacco misurato sull'ultima sessione completata e valido
+  // anche in deload (il −10% si somma al −40% solo per questa sessione).
+  const daysSince = getDaysSinceLastCompletedSession();
+  if (daysSince !== null && daysSince > cfg.inactivityDays)
+    messages.push(`Sono passati ${plural(daysSince, "giorno", "giorni")} dall’ultima sessione completata: solo in questa sessione carichi ridotti del 10%${cycle.isDeload ? " (si somma al −40% del deload)" : ""}; dalla prossima si riprende il carico programmato.`);
   if (week && D.st?.lastVolumeReview?.week === week)
     messages.push(`Revisione volume settimana ${week}: ${D.st.lastVolumeReview.messages.join(" ")}`);
   else if (week > 1 && (week - 1) % 4 === 0 && !D.st?.volumeReviewApplied?.[week])
-    messages.push("Revisione volume: braccia +1 serie/mese (entro il tetto) e, ogni 8 settimane, +1 serie all’esercizio principale se il gruppo è sotto il limite; ab wheel solo a 12 rip.");
+    messages.push(cycle.isDeload
+      ? `Revisione volume rimandata: le +1 serie proposte dal milestone verranno applicate alla prima sessione normale (dopo la ${cycle.lastDeloadSessionNumber}).`
+      : "Revisione volume: braccia +1 serie/mese (entro il tetto) e, ogni 8 settimane, +1 serie all’esercizio principale se il gruppo è sotto il limite; ab wheel solo a 12 rip.");
   const volume = getWeeklyVolumeAdvice(getPersonalDayList());
   const over = volume.filter((entry) => entry.sets > entry.limit);
   const atLimit = volume.filter((entry) => entry.sets === entry.limit);
@@ -660,6 +748,10 @@ function advancePersonalDay(dayId) {
   const days = getPersonalDayList();
   const index = days.findIndex((day) => day.id === dayId);
   if (index < 0) return;
+  // Il cursore resta la derivazione del contatore di ciclo (req. 2):
+  // (sessioni completate) % 4 coincide con l'indice del giorno appena fatto + 1
+  // finché la sequenza viene rispettata, e recordCompletedCycleSession() lo
+  // riallinea comunque a ogni sessione registrata.
   D.st.nextPersonalDayIndex = (index + 1) % days.length;
   if (days[index].name === "Pull Final") D.st.personalRestAfterPull = localProgramDate();
   else if (days[index].name === "Gambe Final") delete D.st.personalRestAfterPull;
@@ -746,6 +838,10 @@ function getLastExerciseSetLog(ex) {
 }
 function applyPersonalVolumeMilestone(week) {
   if (!D || !week || week <= 1) return [];
+  // Nelle sessioni di scarico non si aggiunge volume: la revisione resta "due"
+  // (D.st.volumeReviewApplied non viene marcata) e si applica alla prossima
+  // sessione normale del ciclo.
+  if (isDeloadSessionNumber(getPersonalSessionNumber())) return [];
   const monthDue = (week - 1) % 4 === 0;
   const eightWeekDue = (week - 1) % PERSONAL_PROGRAM_CONFIG.volumeReviewEveryWeeks === 0;
   if (!monthDue && !eightWeekDue) return [];
