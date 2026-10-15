@@ -414,6 +414,31 @@ console.log('\n[10] Ottimizzazioni Desktop, Tipografia (Soluzione A) e IntegritÃ
   ok(!/disco-flash 0\.5s/.test(leggi('games/ruzzle/index.html')), 'ruzzle: nessun lampeggio "discoteca" a schermo intero');
 }
 
+{
+  /* [12] Palestra: ciclo a sessioni rotanti (sezione 11) â€” cablaggio UI che
+     il test nel vm non puo' vedere: contatore, trigger e visualizzazione. */
+  const gymApp = leggi('games/palestra/app.js');
+  const gymProgram = leggi('games/palestra/training-program.js');
+  const gymPremium = leggi('games/palestra/premium.js');
+  const gymHtml = leggi('games/palestra/index.html');
+  ok(/cycleSessions:\s*0/.test(gymApp),
+    'palestra: dSt() dichiara il contatore di ciclo, cosi\' viene persistito con il resto di D.st');
+  ok(/if \(doneSetsAll === totalSets\) \{[\s\S]{0,400}recordCompletedCycleSession\(\);/.test(gymApp),
+    'palestra: il contatore di ciclo avanza solo alla fine di una sessione completata');
+  ok(/normalSessionsBeforeDeload: 12,/.test(gymProgram) && /sessionsPerCycle: 16,/.test(gymProgram),
+    'palestra: ciclo da 16 sessioni con deload dopo 12 sessioni completate');
+  ok(/dayIndex = \(sessionNumber - 1\) % rotationLength/.test(gymProgram),
+    'palestra: la scheda segue (numero_sessione - 1) % 4, non il giorno della settimana');
+  ok(!/isDeloadWeek|deloadEveryWeeks/.test(gymProgram),
+    'palestra: nessun trigger di deload basato su settimane nel programma');
+  ok(/Sessione \$\{cycle\.sessionNumber\}/.test(gymApp) && /Sessione \$\{cycle\.sessionNumber\}/.test(gymPremium),
+    'palestra: numero sessione visibile prima di iniziare (home, scheda giorno e riepilogo fase)');
+  ok(/id="phaseSummaryBadge"/.test(gymHtml) && /getElementById\("phaseSummaryBadge"\)/.test(gymApp),
+    'palestra: badge del ciclo nel riepilogo "Fase del programma"');
+  ok(/hero-cycle-deload|program-policy-deload|stat-tile-deload/.test(gymPremium),
+    'palestra: lo stato di deload e\' segnalato graficamente, non solo a testo');
+}
+
 console.log('\n=================');
 console.log('PASSATI: ' + passed + '  FALLITI: ' + failed);
 process.exit(failed ? 1 : 0);

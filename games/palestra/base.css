@@ -919,6 +919,38 @@ body.is-dragging * {
   font-size: 0.7rem;
   color: var(--tx2);
 }
+/* ===== CICLO A SESSIONI ROTANTI (sezione 11) ===== */
+.phase-card-deload {
+  border-color: var(--yel);
+}
+.phase-cycle span.cycle-deload {
+  color: var(--yel);
+  border-color: var(--yel);
+}
+.phase-info .cycle-note {
+  display: block;
+  margin-top: 6px;
+  color: var(--tx3);
+}
+.cycle-foot {
+  margin-top: 8px;
+  font-size: 0.68rem;
+  color: var(--tx3);
+  text-align: center;
+}
+/* Il contatore di ciclo deve restare leggibile anche a dettagli chiuso. */
+.summary-cycle {
+  margin-left: 8px;
+  padding: 2px 8px;
+  border: 1px solid var(--brd);
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--acc);
+}
+.summary-cycle:empty {
+  display: none;
+}
 /* ===== LEGEND ===== */
 .legend-section {
   margin-bottom: 16px;
