@@ -2769,8 +2769,89 @@ const CSV_HEADER =
   "GIORNO\tN\tESERCIZIO\tID_ES\tSERIE\tREP\tRECUPERO\tCARICO\tTEMPO\tNOTE";
 
 function detectSep(text) {
-  const first = text.split("\n")[0] || "";
+  const lines = text.split("\n").map(l => l.replace(/\r$/, "")).filter(l => l.trim());
+  const first = lines[0] || "";
+  const allText = lines.join("\n");
+  if (allText.includes("\t")) return "\t";
+  if (first.includes(";")) return ";";
+  if (/\s{2,}/.test(allText)) return "SPACE2";
   return first.includes("\t") ? "\t" : ";";
+}
+function splitBySep(line, sep) {
+  if (sep === "SPACE2") return line.split(/\s{2,}/).map(c => c.trim());
+  return line.split(sep).map(c => c.trim());
+}
+function inferRemainingColumns(remainingTokens) {
+  // remainingTokens = tokens after GIORNO,N,ESERCIZIO,ID,SERIE,REP (0..n)
+  // expected order: RECUPERO, CARICO, TEMPO, NOTE
+  if (!remainingTokens.length) return { recField: "", carico: "", tempo: "", note: "" };
+  if (remainingTokens.length === 1) {
+    // single token could be NOTE if not matching tempo/rec/car patterns
+    const t = remainingTokens[0];
+    if (/^\d{1,2}-\d{1,2}-\d{1,2}$/.test(t)) return { recField: "", carico: "", tempo: t, note: "" };
+    if (/^\d+s$/i.test(t)) return { recField: t, carico: "", tempo: "", note: "" };
+    if (/^[\d.,\/]+$/.test(t)) return { recField: "", carico: t, tempo: "", note: "" };
+    return { recField: "", carico: "", tempo: "", note: t };
+  }
+  // For 2-4 tokens, use pattern scoring to assign
+  const isRec = t => /^\d+s$/i.test(t);
+  const isTempo = t => /^\d{1,2}-\d{1,2}-\d{1,2}$/.test(t);
+  const isCaricoNumeric = t => /^[\d.,\/]+$/.test(t);
+  // Score each possible assignment: we try all ways to map remainingTokens to expected positions in order
+  const expected = ["REC","CAR","TEM","NOTE"];
+  const n = remainingTokens.length;
+  const m = expected.length;
+  let best = null;
+  let bestScore = -1;
+  // Generate combinations: choose m positions? Instead brute force via recursion to assign
+  function scoreAssignment(assign) {
+    // assign is array of same length as remainingTokens, each element is expected index it maps to
+    // Must be increasing (preserve order)
+    let score = 0;
+    for (let i=0;i<remainingTokens.length;i++) {
+      const token = remainingTokens[i];
+      const exp = expected[assign[i]];
+      if (exp === "REC") score += isRec(token) ? 2 : -1;
+      else if (exp === "CAR") score += isCaricoNumeric(token) ? 2 : (token ? 0.3 : 0);
+      else if (exp === "TEM") score += isTempo(token) ? 2 : -1;
+      else if (exp === "NOTE") score += 1; // note always ok, but bonus if long
+    }
+    // Prefer assignments that use NOTE for last token if it's free text
+    // Penalize gaps that skip expected but token could match later
+    return score;
+  }
+  // Generate all increasing assignments
+  function gen(idx, lastPos, currentAssign) {
+    if (idx === remainingTokens.length) {
+      const s = scoreAssignment(currentAssign);
+      if (s > bestScore) { bestScore = s; best = [...currentAssign]; }
+      return;
+    }
+    for (let pos = lastPos+1; pos < m; pos++) {
+      // Need enough remaining positions to fit remaining tokens
+      if (m - pos < remainingTokens.length - idx) continue;
+      currentAssign.push(pos);
+      gen(idx+1, pos, currentAssign);
+      currentAssign.pop();
+    }
+  }
+  gen(0, -1, []);
+  if (!best) return { recField: "", carico: "", tempo: "", note: remainingTokens.join("  ") };
+  let recField="", carico="", tempo="", note="";
+  for (let i=0;i<remainingTokens.length;i++) {
+    const exp = expected[best[i]];
+    const token = remainingTokens[i];
+    if (exp === "REC") recField = token;
+    else if (exp === "CAR") carico = token;
+    else if (exp === "TEM") tempo = token;
+    else if (exp === "NOTE") note = note ? note + "  " + token : token;
+  }
+  // If NOTE was assigned but there are leftover tokens that were not assigned to NOTE, they were already joined
+  // Also need to handle case where NOTE assignment got multiple tokens that should be joined
+  // Our gen already ensures each token assigned to one expected, but NOTE could get multiple tokens if we allowed
+  // For simplicity, if NOTE got one token but there were extra tokens after, they are already included as separate assignments
+  // But if remainingTokens had note with internal double spaces, it was already split, need to rejoin extra note parts
+  return { recField, carico: carico.replace(/,/g, "."), tempo, note };
 }
 
 function exportDay() {
@@ -3062,7 +3143,7 @@ function parseImport(text) {
 
   // Salta header
   let startIdx = 0;
-  const firstCols = lines[0].split(sep).map((c) => c.trim().toUpperCase());
+  const firstCols = splitBySep(lines[0], sep).map((c) => c.trim().toUpperCase());
   if (firstCols.includes("GIORNO") || firstCols.includes("ESERCIZIO")) {
     startIdx = 1;
   }
@@ -3072,33 +3153,76 @@ function parseImport(text) {
   const daysMap = Object.create(null);
   const dayOrder = [];
   const ssMapGlobal = Object.create(null);
+  // Per validare superserie: tieni traccia delle note per filtro "nessun recupero"
+  const ssNotes = Object.create(null);
 
   for (let i = startIdx; i < lines.length; i++) {
-    const cols = lines[i].split(sep).map((c) => c.trim());
-    if (cols.length < 4)
-      throw new Error(
-        "Riga " + (i + 1) + ": formato incompleto. Usa TAB o punto e virgola.",
-      );
-
-    const dayName = cols[0] || "";
-    const numField = cols[1] || "";
-    const exName = cols[2] || "";
-    const exId = cols[3] || "";
-    const serieNum = cols[4] ? Number(cols[4]) : 1;
+    let cols = splitBySep(lines[i], sep).map((c) => c.trim());
+    // Se il separatore è SPACE2, gli empty intermedi sono collassati: ricostruisci con inferenza
+    // Se cols ha meno colonne dell'header, usa l'inferenza per REC/CAR/TEM/NOTE
+    const headerLen = firstCols.length || 10;
+    let dayName, numField, exName, exId, serieNum, repField, recField, carico, tempo, note;
+    if (sep === "SPACE2" || cols.length !== headerLen) {
+      // Primi 6 campi (GIORNO,N,ESERCIZIO,ID,SERIE,REP) sono sempre presenti
+      // Se cols ha almeno 6 elementi, i restanti vanno inferiti
+      if (cols.length >= 6) {
+        dayName = cols[0] || "";
+        numField = cols[1] || "";
+        exName = cols[2] || "";
+        exId = cols[3] || "";
+        serieNum = cols[4] ? Number(cols[4]) : 1;
+        repField = cols[5] || "";
+        const remaining = cols.slice(6);
+        const inferred = inferRemainingColumns(remaining);
+        recField = inferred.recField || "";
+        carico = (inferred.carico || "").replace(/,/g, ".");
+        tempo = inferred.tempo || "";
+        note = inferred.note || "";
+      } else {
+        // Fallback a vecchio comportamento per linee molto corte
+        if (cols.length < 4)
+          throw new Error(
+            "Riga " + (i + 1) + ": formato incompleto. Usa TAB o punto e virgola.",
+          );
+        dayName = cols[0] || "";
+        numField = cols[1] || "";
+        exName = cols[2] || "";
+        exId = cols[3] || "";
+        serieNum = cols[4] ? Number(cols[4]) : 1;
+        repField = cols[5] || "";
+        recField = cols[6] || "";
+        carico = (cols[7] || "").replace(/,/g, ".");
+        tempo = cols[8] || "";
+        const noteIndex = startIdx ? firstCols.indexOf("NOTE") : cols.length >= 11 ? 10 : 9;
+        note = noteIndex >= 0 ? cols[noteIndex] || "" : "";
+      }
+    } else {
+      // Caso standard TAB o ; con colonne complete (anche con empty "")
+      if (cols.length < 4)
+        throw new Error(
+          "Riga " + (i + 1) + ": formato incompleto. Usa TAB o punto e virgola.",
+        );
+      // Se ci sono più colonne dell'header (nota con separatore dentro), unisci le extra nella nota
+      if (cols.length > headerLen) {
+        const extra = cols.slice(headerLen - 1).join(sep === "SPACE2" ? "  " : sep);
+        cols = cols.slice(0, headerLen - 1).concat([extra]);
+      }
+      dayName = cols[0] || "";
+      numField = cols[1] || "";
+      exName = cols[2] || "";
+      exId = cols[3] || "";
+      serieNum = cols[4] ? Number(cols[4]) : 1;
+      repField = cols[5] || "";
+      recField = cols[6] || "";
+      carico = (cols[7] || "").replace(/,/g, ".");
+      tempo = cols[8] || "";
+      const noteIndex = startIdx ? firstCols.indexOf("NOTE") : cols.length >= 11 ? 10 : 9;
+      note = noteIndex >= 0 ? cols[noteIndex] || "" : "";
+      // Se per qualche motivo cols[9] è vuoto ma la nota è in realtà più corta (es. 7 colonne con 3 empty finali mancanti),
+      // ma headerLen è 10 e cols.length è 10 con empty, questo non accade perché empty sono preservati con TAB
+    }
     if (!Number.isInteger(serieNum) || serieNum < 1 || serieNum > 100)
       throw new Error("Riga " + (i + 1) + ": imposta da 1 a 100 serie.");
-    const repField = cols[5] || "";
-    const recField = cols[6] || "";
-    const carico = (cols[7] || "").replace(/,/g, ".");
-    const tempo = cols[8] || "";
-    // Header-aware import skips retired columns; legacy headerless 11-column rows
-    // retain the final note instead of accidentally shifting it into another field.
-    const noteIndex = startIdx
-      ? firstCols.indexOf("NOTE")
-      : cols.length >= 11
-        ? 10
-        : 9;
-    const note = noteIndex >= 0 ? cols[noteIndex] || "" : "";
 
     if (!dayName || !exName) continue;
 
@@ -3115,6 +3239,8 @@ function parseImport(text) {
       const ssKey = dayName + "|" + ssMatch[1];
       if (!ssMapGlobal[ssKey]) ssMapGlobal[ssKey] = uid();
       ssG = ssMapGlobal[ssKey];
+      ssNotes[ssKey] = ssNotes[ssKey] || [];
+      ssNotes[ssKey].push(note);
     }
 
     // Parse reps: "10", "12-15" → prende il primo numero
@@ -3197,6 +3323,28 @@ function parseImport(text) {
       note: note,
       tempo: tempoClean,
     });
+  }
+
+  // Post-process superserie: pulizia gruppi singoli, troppo grandi o senza hint per >2
+  const ssCounts = Object.create(null);
+  for (const dName of dayOrder) {
+    for (const ex of daysMap[dName].exs) {
+      if (ex.ssG) ssCounts[ex.ssG] = (ssCounts[ex.ssG] || 0) + 1;
+    }
+  }
+  for (const dName of dayOrder) {
+    for (const ex of daysMap[dName].exs) {
+      if (!ex.ssG) continue;
+      const cnt = ssCounts[ex.ssG] || 0;
+      if (cnt < 2 || cnt > 4) { ex.ssG = null; continue; }
+      // Per gruppi di 3-4, richiedi hint esplicito "nessun recupero" altrimenti è una numerazione non voluta (es. warmup 1a-1d)
+      if (cnt > 2) {
+        const key = Object.keys(ssMapGlobal).find(k => ssMapGlobal[k] === ex.ssG);
+        const notes = key ? (ssNotes[key] || []) : [];
+        const hasHint = notes.some(n => /nessun\s*recupero|passa\s+a|superset|superserie/i.test(n));
+        if (!hasHint) ex.ssG = null;
+      }
+    }
   }
 
   return dayOrder.map((name) => daysMap[name]);
