@@ -344,4 +344,27 @@ assert.equal(applied.length > 0, true, 'alla prima sessione normale il milestone
 assert.equal(context.D.st.volumeReviewApplied[9], true);
 log('il milestone di volume scivola oltre il deload senza perdere l’appuntamento');
 
+
+/* Feedback facoltativo: senza dati articolari la progressione non avanza.
+   La regola vive in getCleanJointStreak: una sessione senza record di
+   feedback non può valere come "articolazione pulita". */
+context.D.hist = [
+  sessionRows([8, 8, 8, 8], 'no-feedback-1', '2026-10-01T10:00:00.000Z'),
+  sessionRows([8, 8, 8, 8], 'clean-2', '2026-10-08T10:00:00.000Z'),
+];
+context.D.sessionFeedback = [
+  { sessionId: 'clean-2', elbow: 'none', saved: true },
+];
+const streakSenzaFeedback = evaluate("getCleanJointStreak(D.hist, D.sessionFeedback, 'elbow', 2)");
+assert.equal(streakSenzaFeedback, 1, 'la sessione senza feedback interrompe la serie di sessioni pulite');
+context.D.days[0] = days[0];
+context.D.days[0].exs.find((ex) => ex.exerciseId === incline.exerciseId).sd.forEach((set) => { set.w = 26; set.r = 6; });
+const statusSenzaFeedback = plain(evaluate(`getProgressionStatus(D.days[0].exs.find((ex) => ex.exerciseId === 'Panca_Inclinata_Con_Manubri_(Presa_Neutra)'), '${pushDayId}')`));
+assert.equal(statusSenzaFeedback.ready, false, 'senza feedback il carico non sale');
+log('feedback facoltativo: senza dati articolari la doppia progressione resta ferma');
+
+const streakConFastidio = evaluate("getCleanJointStreak([{sessionId:'a',exerciseComplete:true,dt:'2026-10-01T10:00:00.000Z'},{sessionId:'b',exerciseComplete:true,dt:'2026-10-08T10:00:00.000Z'}], [{sessionId:'a',elbow:'mild'},{sessionId:'b',elbow:'none'}], 'elbow', 2)");
+assert.equal(streakConFastidio, 1, 'il fastidio nella sessione precedente lascia la serie a 1 (non basta per avanzare)');
+log('feedback parziale: il fastidio registrato continua a sospendere la progressione');
+
 console.log('Tutti i test del programma personale sono passati.');

@@ -1843,3 +1843,16 @@ body.dialog-open {
 .app-login .full-width {
   margin: 18px 0 4px;
 }
+
+/* Etichetta "facoltativo" nel feedback di fine sessione. */
+.optional-tag {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--tx3);
+  letter-spacing: 0;
+  text-transform: none;
+  margin-left: 4px;
+}
+.session-feedback .bs.full-width {
+  margin-top: -4px;
+}

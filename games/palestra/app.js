@@ -1999,11 +1999,11 @@ function doExitSession() {
 }
 
 function sesClose() {
+  // Il feedback di fine sessione è facoltativo: chi non lo registra chiude
+  // comunque, e la sessione viene salvata senza i dati articolari.
   if (!sessionFinalized) {
-    toast("Prima di chiudere, registra fastidi e RPE finale.", "warn");
-    document.getElementById("sessionFeedbackForm")?.scrollIntoView({ behavior: "smooth", block: "start" });
-    document.getElementById("feedbackElbow")?.focus({ preventScroll: true });
-    return;
+    const result = sesCompleteSave(null);
+    if (!result) return;
   }
   skipRestTimer();
   resetStopwatch();
@@ -2595,7 +2595,12 @@ function sesAdj(inputId, delta) {
 
 function sesCompleteSave(feedback) {
   const day = gD();
-  if (!day || sessionFinalized || !feedback) return false;
+  if (!day || sessionFinalized) return false;
+  // Il feedback è facoltativo: arriva nullo quando si chiude senza compilarlo.
+  const data = feedback || { elbow: "", knee: "", rpe: null, note: "" };
+  const hasFeedback = Boolean(
+    data.elbow || data.knee || data.note || Number.isFinite(Number(data.rpe)) && data.rpe !== null,
+  );
   sessionFinalized = true;
   const sessionId = uid();
   const sessionDate = new Date().toISOString();
@@ -2666,11 +2671,15 @@ function sesCompleteSave(feedback) {
     sessionId,
     dayId: curDay,
     dt: sessionDate,
-    elbow: feedback.elbow,
-    knee: feedback.knee,
-    rpe: Number(feedback.rpe),
-    note: String(feedback.note || "").slice(0, 500),
-    saved: true,
+    elbow: data.elbow || "",
+    knee: data.knee || "",
+    // rpe null = non indicato: non viene inventato un valore.
+    rpe: data.rpe === null || data.rpe === "" ? null : Number(data.rpe),
+    note: String(data.note || "").slice(0, 500),
+    // saved=false quando la sessione è chiusa senza alcun dato: la sicurezza
+    // articolare la tratta come "sconosciuta" e non fa avanzare i carichi.
+    saved: hasFeedback,
+    feedbackSkipped: !hasFeedback,
     complete: doneSetsAll === totalSets,
     isDeload: Boolean(activeSession.isDeload),
     reportedPain: { ...(activeSession.reportedPain || {}) },
@@ -2719,6 +2728,14 @@ function sesShowSummary() {
   document.getElementById("feedbackSavedMessage").hidden = true;
   document.getElementById("saveFeedbackBtn").disabled = false;
   document.getElementById("saveFeedbackBtn").textContent = "Salva feedback sessione";
+  const skip = document.getElementById("skipFeedbackBtn");
+  if (skip) {
+    skip.hidden = false;
+    skip.disabled = false;
+  }
+  ["feedbackElbow", "feedbackKnee", "feedbackRpe", "feedbackNote"].forEach((id) => {
+    document.getElementById(id).disabled = false;
+  });
 }
 function saveSessionFeedback() {
   if (sessionFinalized) return;
@@ -2730,31 +2747,55 @@ function saveSessionFeedback() {
   const rpeInput = document.getElementById("feedbackRpe");
   const elbow = reported.elbow ? "yes" : elbowInput.value;
   const knee = reported.knee ? "yes" : kneeInput.value;
-  const rpe = Number(rpeInput.value);
-  if (!["none", "mild", "yes"].includes(elbow)) {
-    toast("Registra il fastidio al gomito (No, Lieve o Sì).", "warn");
+  const rpeRaw = rpeInput.value;
+  const rpe = rpeRaw === "" ? null : Number(rpeRaw);
+  // Tutti i campi sono facoltativi: si valida solo ciò che è stato compilato.
+  if (elbow && !["none", "mild", "yes"].includes(elbow)) {
+    toast("Scegli un valore valido per il gomito (oppure lascia vuoto).", "warn");
     elbowInput.focus();
     return;
   }
-  if (!["none", "mild", "yes"].includes(knee)) {
-    toast("Registra il fastidio al ginocchio (No, Lieve o Sì).", "warn");
+  if (knee && !["none", "mild", "yes"].includes(knee)) {
+    toast("Scegli un valore valido per il ginocchio (oppure lascia vuoto).", "warn");
     kneeInput.focus();
     return;
   }
-  if (!Number.isInteger(rpe) || rpe < 1 || rpe > 10) {
-    toast("Registra l’RPE finale da 1 a 10.", "warn");
+  if (rpe !== null && (!Number.isInteger(rpe) || rpe < 1 || rpe > 10)) {
+    toast("L’RPE va da 1 a 10 (oppure lascia vuoto).", "warn");
     rpeInput.focus();
     return;
   }
   const feedback = {
-    elbow,
-    knee,
+    elbow: elbow || "",
+    knee: knee || "",
     rpe,
     note: document.getElementById("feedbackNote").value.trim().slice(0, 500),
   };
   const result = sesCompleteSave(feedback);
   if (!result) return;
-  [elbowInput, kneeInput, rpeInput, document.getElementById("feedbackNote")].forEach((input) => { input.disabled = true; });
+  finishFeedbackForm("Feedback salvato.");
+}
+
+/** Chiude la sessione senza compilare il feedback (facoltativo). */
+function skipSessionFeedback() {
+  if (sessionFinalized) return;
+  const partial = document.getElementById("feedbackElbow").value ||
+    document.getElementById("feedbackKnee").value ||
+    document.getElementById("feedbackRpe").value ||
+    document.getElementById("feedbackNote").value.trim();
+  // Un campo compilato non si butta: si salva quel poco che c'è.
+  if (partial) return saveSessionFeedback();
+  const result = sesCompleteSave(null);
+  if (!result) return;
+  finishFeedbackForm(
+    "Sessione salvata senza feedback: i carichi restano fermi finché non registri fastidi e RPE.",
+  );
+}
+
+function finishFeedbackForm(message) {
+  ["feedbackElbow", "feedbackKnee", "feedbackRpe", "feedbackNote"].forEach((id) => {
+    document.getElementById(id).disabled = true;
+  });
   const saved = document.getElementById("feedbackSavedMessage");
   saved.hidden = false;
   const elbowStreak = typeof getJointDiscomfortStreak === "function" ? getJointDiscomfortStreak("elbow") : 0;
@@ -2763,11 +2804,13 @@ function saveSessionFeedback() {
   if (elbowStreak >= 3) warnings.push("gomito: sospendi gli esercizi che lo irritano e valuta una variante a presa neutra");
   if (kneeStreak >= 3) warnings.push("ginocchio: sospendi gli esercizi che lo irritano e valuta una variante senza dolore (per il Bulgarian, step-up)");
   saved.textContent = warnings.length
-    ? "Feedback salvato. Trigger di sicurezza: " + warnings.join("; ") + "."
-    : "Feedback salvato: fastidi e RPE sono registrati.";
+    ? message + " Trigger di sicurezza: " + warnings.join("; ") + "."
+    : message;
   document.getElementById("saveFeedbackBtn").disabled = true;
   document.getElementById("saveFeedbackBtn").textContent = "Feedback salvato";
-  toast(warnings.length ? "Feedback salvato · controlla l’avviso di sicurezza." : "Feedback sessione salvato.", warnings.length ? "warn" : "ok", 3500);
+  const skip = document.getElementById("skipFeedbackBtn");
+  if (skip) skip.hidden = true;
+  toast(warnings.length ? "Sessione salvata · controlla l’avviso di sicurezza." : "Sessione salvata.", warnings.length ? "warn" : "ok", 3500);
 }
 
 // ============================================================
