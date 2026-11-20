@@ -294,7 +294,10 @@ function getCleanJointStreak(exerciseHistory, feedbackBySession, joint, limit = 
     .sort((a, b) => new Date(b.dt) - new Date(a.dt));
   let streak = 0;
   for (const entry of relevant) {
-    if (entry.exerciseComplete === false || !feedback.has(entry.sessionId) || feedback.get(entry.sessionId)?.[joint] !== "none") break;
+    const record = feedback.get(entry.sessionId);
+    // Senza feedback (facoltativo) non si può affermare che l'articolazione
+    // fosse pulita: la serie si interrompe e i carichi restano fermi.
+    if (entry.exerciseComplete === false || !record || record[joint] !== "none") break;
     streak++;
     if (streak >= limit) break;
   }
@@ -545,6 +548,8 @@ function getJointDiscomfortStreak(joint, feedback = D?.sessionFeedback || []) {
   const ordered = [...feedback].sort((a, b) => new Date(b.dt) - new Date(a.dt));
   let count = 0;
   for (const session of ordered) {
+    // Sessione chiusa senza feedback: nessun dato articolare, quindi non
+    // allunga la serie di fastidio (e non la azzera nemmeno).
     if (!session.saved) continue;
     if (!['mild', 'yes'].includes(session[joint])) break;
     count++;
@@ -557,6 +562,7 @@ function canUseDropSet(dayId) {
     return { allowed: false, reason: "Drop set sospesi dopo un fastidio articolare nella sessione in corso." };
   if (D?.activeSession?.isDeload || isDeloadSessionNumber(getPersonalSessionNumber())) return { allowed: false, reason: "Drop set esclusi nelle sessioni di deload." };
   const last = getLatestSessionFeedback();
+  // Con feedback assente non si può escludere un fastidio: si resta prudenti.
   if (last && (last.elbow !== "none" || last.knee !== "none"))
     return { allowed: false, reason: "Drop set sospesi dopo un fastidio articolare nella sessione precedente." };
   return { allowed: true, reason: "" };

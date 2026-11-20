@@ -549,16 +549,17 @@
           <div class="ses-summary-grid" id="sesSumGrid"></div>
           <section class="card session-feedback" id="sessionFeedbackForm" aria-labelledby="sessionFeedbackTitle">
             <h3 id="sessionFeedbackTitle">Com’è andata?</h3>
-            <p class="muted">Registra fastidio e RPE finale. Se compare fastidio articolare durante un esercizio, interrompilo subito.</p>
-            <label class="field-label" for="feedbackElbow">Fastidio al gomito</label>
-            <select id="feedbackElbow"><option value="">Seleziona</option><option value="none">No</option><option value="mild">Lieve · interrompi l’esercizio</option><option value="yes">Sì · interrompi l’esercizio</option></select>
-            <label class="field-label" for="feedbackKnee">Fastidio al ginocchio sinistro</label>
-            <select id="feedbackKnee"><option value="">Seleziona</option><option value="none">No</option><option value="mild">Lieve · interrompi l’esercizio</option><option value="yes">Sì · interrompi l’esercizio</option></select>
-            <label class="field-label" for="feedbackRpe">RPE finale · 1–10</label>
-            <select id="feedbackRpe"><option value="">Seleziona</option><option value="1">1 · molto facile</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10 · massimale</option></select>
-            <label class="field-label" for="feedbackNote">Note (facoltative)</label>
+            <p class="muted">Facoltativo. Se registri fastidio al gomito o al ginocchio e l’RPE, la progressione del carico tiene conto dei tuoi dati; senza feedback i carichi restano fermi. Se compare fastidio articolare durante un esercizio, interrompilo subito.</p>
+            <label class="field-label" for="feedbackElbow">Fastidio al gomito <span class="optional-tag">facoltativo</span></label>
+            <select id="feedbackElbow"><option value="">Non indicato</option><option value="none">No</option><option value="mild">Lieve · interrompi l’esercizio</option><option value="yes">Sì · interrompi l’esercizio</option></select>
+            <label class="field-label" for="feedbackKnee">Fastidio al ginocchio sinistro <span class="optional-tag">facoltativo</span></label>
+            <select id="feedbackKnee"><option value="">Non indicato</option><option value="none">No</option><option value="mild">Lieve · interrompi l’esercizio</option><option value="yes">Sì · interrompi l’esercizio</option></select>
+            <label class="field-label" for="feedbackRpe">RPE finale · 1–10 <span class="optional-tag">facoltativo</span></label>
+            <select id="feedbackRpe"><option value="">Non indicato</option><option value="1">1 · molto facile</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10 · massimale</option></select>
+            <label class="field-label" for="feedbackNote">Note <span class="optional-tag">facoltative</span></label>
             <textarea id="feedbackNote" rows="3" maxlength="500" placeholder="Sensazioni, tecnica, eventuali modifiche…"></textarea>
             <button class="bp full-width" id="saveFeedbackBtn" onclick="saveSessionFeedback()">Salva feedback sessione</button>
+            <button class="bs full-width" id="skipFeedbackBtn" onclick="skipSessionFeedback()">Salta e chiudi</button>
             <p class="muted" id="feedbackSavedMessage" role="status" hidden></p>
           </section>
           <button

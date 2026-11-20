@@ -1274,7 +1274,7 @@ test("report finale numerico: nessuna illustrazione o richiesta media", async ({
     requests.filter((url) => /\.mp4|\.gif|musclewiki|raw\.githubusercontent/.test(url)),
   ).toEqual([]);
 });
-test("feedback finale obbligatorio e utilizzabile a 320px", async ({ page }) => {
+test("feedback finale facoltativo e utilizzabile a 320px", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 740 });
   await boot(page);
   await start(page);
@@ -1283,15 +1283,46 @@ test("feedback finale obbligatorio e utilizzabile a 320px", async ({ page }) => 
     sesShowSummary();
   });
   await expect(page.locator("#sessionFeedbackForm")).toBeVisible();
-  await expect(page.locator("#feedbackElbow")).toHaveAccessibleName("Fastidio al gomito");
-  await expect(page.locator("#feedbackKnee")).toHaveAccessibleName("Fastidio al ginocchio sinistro");
-  await expect(page.locator("#feedbackRpe")).toHaveAccessibleName("RPE finale · 1–10");
+  await expect(page.locator("#feedbackElbow")).toHaveAccessibleName(/Fastidio al gomito/);
+  await expect(page.locator("#feedbackKnee")).toHaveAccessibleName(/Fastidio al ginocchio sinistro/);
+  await expect(page.locator("#feedbackRpe")).toHaveAccessibleName(/RPE finale · 1–10/);
   await noOverflow(page);
+  // Chiudere senza compilare niente non deve bloccare.
   await page.locator("#sesSummary > button").click();
-  await expect(page.locator("#feedbackElbow")).toBeFocused();
-  await saveFeedback(page, { elbow: "none", knee: "none", rpe: "8" });
-  expect(await page.evaluate(() => D.sessionFeedback[0].rpe)).toBe(8);
+  await expect(page.locator("#vSession")).toBeHidden();
   await noOverflow(page);
+});
+test("feedback parziale: RPE assente non diventa zero e il salto registra la sessione", async ({
+  page,
+}) => {
+  await boot(page);
+  await start(page);
+  await page.evaluate(() => {
+    gD().exs.forEach((exercise) => exercise.sd.forEach((set) => (set.done = true)));
+    sesShowSummary();
+  });
+  await page.locator("#feedbackElbow").selectOption("none");
+  await page.locator("#saveFeedbackBtn").click();
+  await expect(page.locator("#feedbackSavedMessage")).toBeVisible();
+  const record = await page.evaluate(() => D.sessionFeedback[0]);
+  expect(record.rpe).toBe(null);
+  expect(record.elbow).toBe("none");
+  expect(record.saved).toBe(true);
+});
+test("salta feedback: la sessione si chiude e i carichi non avanzano", async ({ page }) => {
+  await boot(page);
+  await start(page);
+  await page.evaluate(() => {
+    gD().exs.forEach((exercise) => exercise.sd.forEach((set) => (set.done = true)));
+    sesShowSummary();
+  });
+  await page.locator("#skipFeedbackBtn").click();
+  await expect(page.locator("#feedbackSavedMessage")).toBeVisible();
+  await expect(page.locator("#vSession")).toBeHidden();
+  const record = await page.evaluate(() => D.sessionFeedback[0]);
+  expect(record.saved).toBe(false);
+  expect(record.feedbackSkipped).toBe(true);
+  expect(record.rpe).toBe(null);
 });
 test("entrambi i campi hanno meno a sinistra e più a destra", async ({
   page,

@@ -429,7 +429,7 @@ function renderHomePremium() {
         .slice(0, 20)
         .map(
           (session) =>
-            `<article class="history-item"><strong>${escapeHTML(D.days.find((d) => d.id === session.dayId)?.name || "Allenamento")}</strong><p>${new Intl.DateTimeFormat("it", { day: "numeric", month: "short", year: "numeric" }).format(new Date(session.dt))} · ${session.exercises} esercizi · ${session.sets} serie${session.volumeKnown ? " · " + formatGymNumber(session.volumeKg, 2) + " kg di volume" : ""}${session.duration ? " · " + Math.max(1, Math.round(session.duration / 60)) + " min" : ""}${session.rpe ? ` · RPE ${session.rpe}/10 · gomito ${{ none: "no", mild: "lieve", yes: "sì" }[session.elbow] || "—"} · ginocchio ${{ none: "no", mild: "lieve", yes: "sì" }[session.knee] || "—"}` : ""}${session.note ? ` · ${escapeHTML(session.note)}` : ""}</p></article>`,
+            `<article class="history-item"><strong>${escapeHTML(D.days.find((d) => d.id === session.dayId)?.name || "Allenamento")}</strong><p>${new Intl.DateTimeFormat("it", { day: "numeric", month: "short", year: "numeric" }).format(new Date(session.dt))} · ${session.exercises} esercizi · ${session.sets} serie${session.volumeKnown ? " · " + formatGymNumber(session.volumeKg, 2) + " kg di volume" : ""}${session.duration ? " · " + Math.max(1, Math.round(session.duration / 60)) + " min" : ""}${session.rpe || session.elbow || session.knee ? ` · RPE ${session.rpe || "—"}${session.rpe ? "/10" : ""} · gomito ${{ none: "no", mild: "lieve", yes: "sì" }[session.elbow] || "—"} · ginocchio ${{ none: "no", mild: "lieve", yes: "sì" }[session.knee] || "—"}` : ""}${session.feedbackSkipped ? " · feedback non registrato" : ""}${session.note ? ` · ${escapeHTML(session.note)}` : ""}</p></article>`,
         )
         .join("")
     : '<div class="card"><h3>La tua storia inizia qui.</h3><p class="muted">Completa un allenamento per ritrovare qui il tuo lavoro.</p></div>';
@@ -463,7 +463,9 @@ function sessionHistory() {
   const feedbackById = new Map((D.sessionFeedback || []).map((entry) => [entry.sessionId, entry]));
   return [...groups.entries()].map(([key, entry]) => {
     const feedback = feedbackById.get(key);
-    return feedback ? { ...entry, rpe: feedback.rpe, elbow: feedback.elbow, knee: feedback.knee, note: feedback.note } : entry;
+    return feedback
+      ? { ...entry, rpe: feedback.rpe, elbow: feedback.elbow, knee: feedback.knee, note: feedback.note, feedbackSkipped: Boolean(feedback.feedbackSkipped) }
+      : entry;
   }).sort((a, b) => new Date(b.dt) - new Date(a.dt));
 }
 const legacyRenDay = renDay;
