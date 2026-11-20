@@ -49,24 +49,29 @@ manifest.icons.forEach((icona) => {
 });
 log('manifest: icone 192/512/maskable dichiarate e presenti su disco');
 
-/* Proporzione del logo dentro l'icona. Play Store/Android disegnano il
-   foreground nell'area sicura di 66dp su 108dp = 61,1%: il resto è il margine
-   che i launcher tagliano con maschere diverse. Il PNG non si può misurare
-   senza decodificarlo, ma il margine atteso è dichiarato qui e i file sono
-   generati con quel ritaglio: se qualcuno rimette il logo a tutta icona,
-   dimensione e rapporti qui sotto non tornano più. */
-const SAFE_ZONE = 66 / 108; // 61,1% come le icone del Play Store
-[['icon-512.png', 512, 313], ['icon-192.png', 192, 117], ['apple-touch-icon.png', 180, 110],
-  ['icon-maskable-512.png', 512, 313]].forEach(([file, lato, emblema]) => {
+/* Proporzione del simbolo dentro l'icona, fissata dal prompt di progetto:
+   il simbolo occupa il 40% della larghezza (205 px su 512) con margini uguali
+   di ~154 px, e resta interamente dentro il cerchio di sicurezza dell'80%.
+   Il PNG non si può misurare senza decodificarlo: qui si fissa la specifica
+   numerica, così una rigenerazione che torna a un logo a tutta icona o
+   troppo piccolo non passa più. */
+const SIMBOLO = 0.40;    // 205 px su 512
+const CERCHIO_SICUREZZA = 0.80; // 410 px su 512 (maskable)
+const misure = {
+  'icon-512.png': [512, 205],
+  'icon-192.png': [192, 77],
+  'apple-touch-icon.png': [180, 72],
+  'icon-maskable-512.png': [512, 205],
+};
+Object.entries(misure).forEach(([file, [lato, simbolo]]) => {
   const icona = manifest.icons.find((i) => i.src.endsWith(file));
-  const bersaglio = Math.round(lato * SAFE_ZONE);
-  assert.equal(emblema, bersaglio, `${file}: emblema ${bersaglio}px (${Math.round(SAFE_ZONE * 1000) / 10}%)`);
+  assert.equal(simbolo, Math.round(lato * SIMBOLO), `${file}: simbolo ${simbolo}px (40%)`);
+  assert.ok(simbolo <= lato * CERCHIO_SICUREZZA, `${file}: il simbolo sta nel cerchio dell'80%`);
+  const margine = (lato - simbolo) / 2;
+  assert.ok(Math.abs(margine - (lato * 0.30)) < 1, `${file}: margini uguali (~${Math.round(lato * 0.30)}px)`);
 });
-assert.ok(
-  Math.abs(SAFE_ZONE - 0.6111) < 0.001,
-  'la safe zone usata è quella Android/Play Store (66/108)',
-);
-log('icone: emblema al 61,1% del lato (margine play store), non a tutta icona');
+assert.equal(Math.round(512 * SIMBOLO), 205, 'su 512 il simbolo misura 205 px');
+log('icone: simbolo al 40% (205/512) dentro il cerchio di sicurezza dell\'80%');
 
 // ------------------------------------------------------------ pagina/meta
 const html = leggi('index.html');
