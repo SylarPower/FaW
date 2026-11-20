@@ -49,6 +49,30 @@ manifest.icons.forEach((icona) => {
 });
 log('manifest: icone 192/512/maskable dichiarate e presenti su disco');
 
+/* Proporzione del simbolo dentro l'icona, fissata dal prompt di progetto:
+   il simbolo occupa il 40% della larghezza (205 px su 512) con margini uguali
+   di ~154 px, e resta interamente dentro il cerchio di sicurezza dell'80%.
+   Il PNG non si può misurare senza decodificarlo: qui si fissa la specifica
+   numerica, così una rigenerazione che torna a un logo a tutta icona o
+   troppo piccolo non passa più. */
+const SIMBOLO = 0.40;    // 205 px su 512
+const CERCHIO_SICUREZZA = 0.80; // 410 px su 512 (maskable)
+const misure = {
+  'icon-512.png': [512, 205],
+  'icon-192.png': [192, 77],
+  'apple-touch-icon.png': [180, 72],
+  'icon-maskable-512.png': [512, 205],
+};
+Object.entries(misure).forEach(([file, [lato, simbolo]]) => {
+  const icona = manifest.icons.find((i) => i.src.endsWith(file));
+  assert.equal(simbolo, Math.round(lato * SIMBOLO), `${file}: simbolo ${simbolo}px (40%)`);
+  assert.ok(simbolo <= lato * CERCHIO_SICUREZZA, `${file}: il simbolo sta nel cerchio dell'80%`);
+  const margine = (lato - simbolo) / 2;
+  assert.ok(Math.abs(margine - (lato * 0.30)) < 1, `${file}: margini uguali (~${Math.round(lato * 0.30)}px)`);
+});
+assert.equal(Math.round(512 * SIMBOLO), 205, 'su 512 il simbolo misura 205 px');
+log('icone: simbolo al 40% (205/512) dentro il cerchio di sicurezza dell\'80%');
+
 // ------------------------------------------------------------ pagina/meta
 const html = leggi('index.html');
 assert.match(html, /<link rel="manifest" href="manifest\.webmanifest"/);
