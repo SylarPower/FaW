@@ -300,6 +300,7 @@ function dayCounts(day) {
 }
 function showGymTab(tab) {
   if (!D || sesActive) return;
+  hideAppLoginScreen();
   gymTab = ["today", "plan", "progress"].includes(tab) ? tab : "today";
   curDay = null;
   document.getElementById("vDay").style.display = "none";
@@ -872,4 +873,38 @@ function loadChartLibrary() {
     document.head.append(script);
   });
   return chartLoading;
+}
+
+// ------------------------------------------------------------------
+// Accesso nella web app installata
+// Su iOS la web app aggiunta alla Home ha uno storage separato da Safari:
+// senza nome account salvato non c'è niente da caricare, e il vecchio
+// redirect all'hub lasciava il contenitore installato senza sessioni.
+// Qui si mostra il modulo che ripristina lo stesso account Firestore.
+// ------------------------------------------------------------------
+function hideAppLoginScreen() {
+  const view = document.getElementById("vAppLogin");
+  if (view) {
+    view.hidden = true;
+    view.style.display = "none";
+  }
+}
+
+/** Mostra la schermata di accesso se serve; ritorna true se è visibile. */
+function showAppLoginScreen() {
+  const view = document.getElementById("vAppLogin");
+  if (!view || typeof isInstalledApp !== "function" || !isInstalledApp())
+    return false;
+  view.hidden = false;
+  view.style.display = "block";
+  const home = document.getElementById("vHome");
+  if (home) home.style.display = "none";
+  document.getElementById("vDay").style.display = "none";
+  document.getElementById("vSession").style.display = "none";
+  document.querySelectorAll("[data-tab]").forEach((b) => b.removeAttribute("aria-current"));
+  view.querySelectorAll("input").forEach((field) => (field.value = ""));
+  if (typeof fillSuggestedAccount === "function") fillSuggestedAccount();
+  const password = document.getElementById(APP_PASSWORD_PROMPT_ID);
+  if (password) password.focus();
+  return true;
 }

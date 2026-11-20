@@ -26,8 +26,16 @@ try {
 const MIO = localStorage.getItem("mioNome");
 
 if (!MIO) {
-  alert("Devi prima fare login!");
-  location.href = "../../index.html";
+  // Nella web app installata (iOS isola lo storage da Safari) il redirect
+  // all'hub non serve: l'accesso si fa qui con la stessa password una volta
+  // sola, poi si riprende lo stesso account Firestore.
+  const avvioInstallato =
+    window.matchMedia?.("(display-mode: standalone)")?.matches === true ||
+    window.navigator.standalone === true;
+  if (!avvioInstallato) {
+    alert("Devi prima fare login!");
+    location.href = "../../index.html";
+  }
 }
 
 const uBadge = document.getElementById("ubadge");
@@ -3382,7 +3390,13 @@ function toggleTheme() {
 // 🚀 INIT
 // ============================================================
 async function initGym() {
-  if (!MIO) return;
+  if (!MIO) {
+    // App installata: schermata di accesso locale invece del redirect all'hub.
+    const loader = document.getElementById("vLoad");
+    if (loader) loader.style.display = "none";
+    if (typeof showAppLoginScreen === "function" && showAppLoginScreen()) return;
+    return;
+  }
   try {
     console.log("1. Loading exercises...");
     await loadExDB();
@@ -3417,6 +3431,7 @@ async function initGym() {
                     <b>❌ Errore di caricamento:</b><br><br>
                     <code style="font-size:.75rem;color:var(--tx2);word-break:break-all;">${e.message}</code><br><br>
                     <button onclick="location.reload()">Riprova</button>
+                    <button onclick="signInAgain()" style="margin-top:10px">Accedi di nuovo</button>
                 </div>`;
     } // Chiude l'if
   } // Chiude il catch

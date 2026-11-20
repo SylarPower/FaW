@@ -8,6 +8,18 @@
     />
     <meta name="theme-color" content="#101413" />
     <title>GymTracker Pro</title>
+    <meta
+      name="description"
+      content="GymTracker Pro (FaW): schede, sessioni e progressi della palestra, con salvataggio sul dispositivo prima della sincronizzazione."
+    />
+    <!-- Installazione come app sul telefono (manifest + icone + meta iOS) -->
+    <link rel="manifest" href="manifest.webmanifest" />
+    <meta name="application-name" content="GymTracker" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="GymTracker" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
     <link rel="icon" href="../../gym-icon.png" />
     <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore-compat.js"></script>
@@ -59,6 +71,45 @@
         <p style="margin-top: 12px; color: var(--tx2)">Caricamento...</p>
       </div>
 
+      <!-- ===== ACCESSO NELLA WEB APP INSTALLATA ===== -->
+      <!-- Su iPhone/iPad la web app aggiunta alla Home ha uno storage separato
+           da Safari: qui si ripristina lo stesso account (stesse schede, stesso
+           storico Firestore) chiedendo la password una sola volta. -->
+      <main id="vAppLogin" class="card app-login" style="display: none" hidden>
+        <p class="eyebrow">GYMTRACKER PRO</p>
+        <h2>Di nuovo qui.</h2>
+        <p class="muted">
+          Stai usando l’app installata: inserisci una volta la password per
+          ritrovare le tue schede e il tuo storico. I dati restano gli stessi
+          del sito.
+        </p>
+        <form id="formAppPassword" onsubmit="event.preventDefault(); submitAppLogin();">
+          <label class="field-label" for="appUsername">Il tuo nome</label>
+          <input
+            id="appUsername"
+            name="username"
+            type="text"
+            autocomplete="username"
+            spellcheck="false"
+            maxlength="40"
+            placeholder="ES. MARCO"
+            required
+          />
+          <label class="field-label" for="appPassword">Password</label>
+          <input
+            id="appPassword"
+            name="password"
+            type="password"
+            autocomplete="current-password"
+            placeholder="Password"
+            required
+          />
+          <button class="bp full-width" id="appLoginBtn" type="submit">
+            Entra
+          </button>
+        </form>
+      </main>
+
       <!-- ===== HOME ===== -->
       <main id="vHome" style="display: none">
         <section id="homeToday">
@@ -68,6 +119,25 @@
             <p>Un allenamento alla volta.</p>
           </div>
           <div id="todayHero"></div>
+          <article class="card install-card" id="installCard" hidden>
+            <h3>Porta la palestra sul telefono</h3>
+            <p class="muted" id="installHint">
+              Aggiunge l’icona alla Home e fa partire la palestra anche senza
+              rete.
+            </p>
+            <div class="two-actions">
+              <button class="bp" id="installAppBtn" onclick="requestAppInstall()">
+                Installa l’app
+              </button>
+              <button
+                class="bs"
+                onclick="dismissInstallCard()"
+                aria-label="Nascondi il suggerimento di installazione"
+              >
+                Non ora
+              </button>
+            </div>
+          </article>
           <div class="section-heading">
             <h3>Le tue schede</h3>
             <button class="text-button" onclick="showGymTab('plan')">
@@ -2077,6 +2147,7 @@
     <script src="workout-metrics.js"></script>
     <script src="training-program.js"></script>
     <script src="premium.js"></script>
+    <script src="install.js"></script>
     <script>
       initGym();
     </script>
