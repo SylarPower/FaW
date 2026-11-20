@@ -49,6 +49,25 @@ manifest.icons.forEach((icona) => {
 });
 log('manifest: icone 192/512/maskable dichiarate e presenti su disco');
 
+/* Proporzione del logo dentro l'icona. Play Store/Android disegnano il
+   foreground nell'area sicura di 66dp su 108dp = 61,1%: il resto è il margine
+   che i launcher tagliano con maschere diverse. Il PNG non si può misurare
+   senza decodificarlo, ma il margine atteso è dichiarato qui e i file sono
+   generati con quel ritaglio: se qualcuno rimette il logo a tutta icona,
+   dimensione e rapporti qui sotto non tornano più. */
+const SAFE_ZONE = 66 / 108; // 61,1% come le icone del Play Store
+[['icon-512.png', 512, 313], ['icon-192.png', 192, 117], ['apple-touch-icon.png', 180, 110],
+  ['icon-maskable-512.png', 512, 313]].forEach(([file, lato, emblema]) => {
+  const icona = manifest.icons.find((i) => i.src.endsWith(file));
+  const bersaglio = Math.round(lato * SAFE_ZONE);
+  assert.equal(emblema, bersaglio, `${file}: emblema ${bersaglio}px (${Math.round(SAFE_ZONE * 1000) / 10}%)`);
+});
+assert.ok(
+  Math.abs(SAFE_ZONE - 0.6111) < 0.001,
+  'la safe zone usata è quella Android/Play Store (66/108)',
+);
+log('icone: emblema al 61,1% del lato (margine play store), non a tutta icona');
+
 // ------------------------------------------------------------ pagina/meta
 const html = leggi('index.html');
 assert.match(html, /<link rel="manifest" href="manifest\.webmanifest"/);
