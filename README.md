@@ -22,7 +22,7 @@ FaW/
     ├── pictionary/index.html
     ├── gameof15/index.html
     ├── neonwar/index.html
-    └── palestra/            # UI mobile + logica + stili (vedi README dedicato)
+    └── palestra/            # UI mobile + logica + stili + web app installabile (vedi README dedicato)
 ```
 
 Ogni gioco vive nella propria cartella. L'hub punta a `games/<nome>/index.html`.
@@ -279,5 +279,7 @@ verificato anche dal test statico `[9]`.
 ## Palestra mobile
 
 La palestra mantiene gli account e i dati esistenti, con una nuova esperienza mobile, modalità focus e salvataggio locale prima della sincronizzazione. Il catalogo esercizi è testuale; il riepilogo di fine sessione mostra volume e statistiche, senza illustrazioni. Dettagli, verifiche e limiti: [games/palestra/README.md](games/palestra/README.md).
+
+La palestra si installa sul telefono come web app: `manifest.webmanifest`, icone in `games/palestra/icons/`, `sw.js` e `install.js`. Su iPhone/iPad serve Safari → Condividi → «Aggiungi alla Home»; su Android/desktop Chrome o Edge propongono «Installa app».
 
 Test UI: `npm ci`, `npx playwright install --with-deps chromium webkit`, `npm run test:gym`. Non è necessario npm per pubblicare o utilizzare il sito statico.

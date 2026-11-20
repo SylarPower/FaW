@@ -37,12 +37,15 @@ Lo stato del ciclo è esposto prima di iniziare: hero in Home (`Sessione N · �
 
 ## File
 
-- `index.html`: struttura e dialoghi; carica gli script nell’ordine `app.js` → `workout-metrics.js` → `training-program.js` → `premium.js`.
+- `index.html`: struttura e dialoghi; carica gli script nell’ordine `app.js` → `workout-metrics.js` → `training-program.js` → `premium.js` → `install.js`.
 - `base.css` e `premium.css`: stili esistenti e interfaccia mobile.
 - `app.js`: schede, sessioni, import/export e flusso base.
 - `workout-metrics.js`: report, volume, step standard per schede libere e conteggi.
 - `training-program.js`: preset non distruttivo, parametri per esercizio, progressioni, gate articolari, ciclo a sessioni (`getPersonalCycleState`, `isDeloadSessionNumber`, `recordCompletedCycleSession`), deload, rientro, drop set e revisione volume.
 - `premium.js`: persistenza, navigazione mobile, rendering, feedback e accessibilità.
+- `install.js`: registrazione del service worker, prompt di installazione, istruzioni iOS e accesso nella web app installata.
+- `manifest.webmanifest` e `icons/`: installazione come app (nome, colori, icone 192/512/maskable e icona Apple).
+- `sw.js`: service worker (cache dei soli asset statici, rete prima per le pagine, nessun dato Firestore).
 - `exercises.json`: catalogo testuale con gli esercizi custom usati dal preset.
 
 ## Salvataggio e compatibilità
@@ -55,9 +58,21 @@ Lo stato del ciclo è esposto prima di iniziare: hero in Home (`Sessione N · �
 - I log nuovi includono `sessionId`, `exerciseUid`, serie, carico, durata, flag deload/rientro; `sessionFeedback` conserva RPE e sintomi a livello di sessione. Vecchi log privi di questi campi restano leggibili.
 - Export testuale TAB e import legacy restano disponibili; l’export è delle schede e non un backup completo di storico/feedback o dei metadati avanzati.
 
+## Installazione sul telefono (web app)
+
+La pagina è installabile come app: c’era il blocco opposto, perché senza `manifest`, icone dedicate e `service worker` il browser non mostrava «Installa app» e trattava la palestra come una pagina qualsiasi.
+
+- `manifest.webmanifest`: nome, `start_url` (`./index.html?fonte=app`), `scope`, `display: standalone`, colori e icone 192/512 più una `maskable`.
+- `icons/`: icone locali (niente CDN) e `apple-touch-icon` 180×180 per iPhone/iPad.
+- `sw.js`: service worker con cache **solo degli asset statici** dell’app. Le navigazioni vanno prima in rete, così un aggiornamento del sito non resta bloccato da una copia vecchia; Firestore e le API non vengono mai messi in cache. Al cambio di `CACHE_VERSION` le cache vecchie vengono eliminate.
+- `install.js`: registra il service worker, usa il prompt nativo (`beforeinstallprompt`) dove esiste e mostra istruzioni esplicite su iOS/iPadOS (Condividi → «Aggiungi alla Home»). In Home la card «Porta la palestra sul telefono» sparisce da sola quando l’app è già installata o aperta come app.
+- **Accesso nell’app installata**: su iOS la web app aggiunta alla Home ha `localStorage` separato da Safari. Senza nome account il vecchio codice faceva `alert` e rimandava all’hub, lasciando il contenitore installato senza sessioni. Ora la pagina mostra un modulo di accesso (stesse credenziali, stessa verifica SHA-256 su `utenti/{NOME}`), salva nome e hash localmente e riparte: schede e storico arrivano dal documento Firestore già esistente. La schermata di errore offre anche «Accedi di nuovo» per le sessioni scadute.
+
+Per installarla: Chrome/Edge (Android o computer) → menu → **Installa app**; iPhone/iPad in **Safari** → Condividi → **Aggiungi alla Home**. Safari non offre un prompt automatico: il gesto resta manuale.
+
 ### Limiti e verifiche da mantenere espliciti
 
-Questa pagina non introduce PWA/service worker; l’archiviazione locale non garantisce avvio a freddo offline. Il timer può essere sospeso dal browser a schermo bloccato. Il documento Firestore singolo non offre garanzie transazionali per editing concorrente multi-dispositivo; le regole Firestore reali non sono state modificate.
+La cache del service worker rende possibile l’avvio a freddo offline, ma limitatamente agli asset: senza rete restano disponibili la scheda salvata e i log locali, mentre la sincronizzazione cloud riprende quando torna la connessione. Il primo avvio offline richiede che l’app sia stata aperta almeno una volta con la connessione attiva. Il timer può essere sospeso dal browser a schermo bloccato. Il documento Firestore singolo non offre garanzie transazionali per editing concorrente multi-dispositivo; le regole Firestore reali non sono state modificate. Su Android alcuni browser (Firefox, browser dei produttori) installano un collegamento con badge invece di una WebAPK: l’icona può mostrare il marchio del browser.
 
 Non sono state effettuate scritture sui dati di produzione. La verifica automatica ripetibile dalla root è:
 
@@ -67,4 +82,4 @@ npm run test:static
 npm run test:gym:chromium
 ```
 
-`npm run test:static` comprende la sintassi e i test unitari delle regole del preset. La suite Playwright verifica flussi mobile, report, feedback e installazione non distruttiva. In questo checkout il binario Chromium Playwright non era installato: il tentativo di eseguire la suite è quindi fallito prima del lancio del browser; non equivale a una regressione applicativa. Installare Chromium Playwright nell’ambiente CI prima della verifica end-to-end. WebKit/Safari e dispositivi fisici iPhone/Android restano da provare.
+`npm run test:static` comprende la sintassi, i test unitari delle regole del preset e `tests/gym/install.test.js` (manifest, icone su disco, service worker, card di installazione e accesso nell’app su jsdom). La suite Playwright verifica flussi mobile, report, feedback e installazione non distruttiva. In questo checkout il binario Chromium Playwright non era installato: il tentativo di eseguire la suite è quindi fallito prima del lancio del browser; non equivale a una regressione applicativa. Installare Chromium Playwright nell’ambiente CI prima della verifica end-to-end. WebKit/Safari e dispositivi fisici iPhone/Android restano da provare.
